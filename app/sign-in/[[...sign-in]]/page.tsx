@@ -1,34 +1,26 @@
-import { SignIn } from '@clerk/nextjs'
+import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 
-export default function SignInPage() {
-  return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '2rem',
-        position: 'relative',
-        zIndex: 1,
-      }}
-    >
-      <p
-        style={{
-          fontFamily: 'TokyoDreams, serif',
-          fontSize: '1.8rem',
-          color: '#C8A848',
-          marginBottom: '0.5rem',
-          textShadow: '0 0 30px rgba(210,57,248,0.4)',
-        }}
-      >
-        Glåüm
-      </p>
-      <p style={{ fontSize: '0.7rem', letterSpacing: '0.2em', color: '#D239F8', opacity: 0.7, marginBottom: '2rem' }}>
-        MEMBER ACCESS
-      </p>
-      <SignIn />
-    </div>
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: { redirect_url?: string }
+}) {
+  const headersList = await headers()
+  const host = headersList.get('host') || 'localhost:3000'
+  const protocol = host.includes('localhost') ? 'http' : 'https'
+  const baseUrl = `${protocol}://${host}`
+
+  // Clerk's middleware passes redirect_url when protecting a route (e.g. /admin).
+  // Forward it to accounts.dev so the user lands back where they intended.
+  // Fall back to /profile if no redirect_url was supplied.
+  const returnTo = searchParams.redirect_url || `${baseUrl}/profile`
+
+  // Safety: only allow redirects back to our own origin
+  const safeReturn =
+    returnTo.startsWith('/') ? `${baseUrl}${returnTo}` : returnTo
+
+  redirect(
+    `https://sweet-lionfish-23.accounts.dev/sign-in?redirect_url=${encodeURIComponent(safeReturn)}`
   )
 }

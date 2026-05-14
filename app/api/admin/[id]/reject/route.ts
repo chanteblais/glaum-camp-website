@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
+import { auth, clerkClient } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const { userId, sessionClaims } = await auth()
+  const { userId } = await auth()
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  if (!userId || sessionClaims?.metadata?.role !== 'admin') {
+  const client = await clerkClient()
+  const user = await client.users.getUser(userId)
+  if (user.publicMetadata?.role !== 'admin') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

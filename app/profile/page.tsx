@@ -1,7 +1,7 @@
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
-import { SignOutButton } from '@clerk/nextjs'
+import { SignOutBtn } from '@/components/SignOutBtn'
 import Link from 'next/link'
 
 export default async function ProfilePage() {
@@ -38,11 +38,7 @@ export default async function ProfilePage() {
           <Link href="/" style={{ fontSize: '0.8rem', letterSpacing: '0.1em', color: '#C8A848', textDecoration: 'none', opacity: 0.6 }}>
             ← Back to camp
           </Link>
-          <SignOutButton>
-            <button style={{ background: 'none', border: '1px solid rgba(200,168,72,0.2)', borderRadius: '9999px', padding: '0.4rem 1rem', color: '#F3EDE6', fontSize: '0.75rem', letterSpacing: '0.08em', cursor: 'pointer', opacity: 0.5 }}>
-              Sign out
-            </button>
-          </SignOutButton>
+          <SignOutBtn />
         </div>
 
         <div style={{ textAlign: 'center', marginBottom: '3rem' }}>

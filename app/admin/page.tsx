@@ -1,15 +1,16 @@
-import { auth } from '@clerk/nextjs/server'
+import { auth, clerkClient } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { AdminActions } from './AdminActions'
 import Link from 'next/link'
 
 export default async function AdminPage() {
-  const { userId, sessionClaims } = await auth()
+  const { userId } = await auth()
+  if (!userId) redirect('/sign-in')
 
-  if (!userId || sessionClaims?.metadata?.role !== 'admin') {
-    redirect('/')
-  }
+  const client = await clerkClient()
+  const user = await client.users.getUser(userId)
+  if (user.publicMetadata?.role !== 'admin') redirect('/')
 
   const { data: applications } = await supabaseAdmin
     .from('applications')

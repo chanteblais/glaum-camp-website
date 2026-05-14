@@ -94,9 +94,7 @@ export function Header() {
             color: isSignedIn ? '#C8A848' : '#F3EDE6',
             textDecoration: 'none',
             opacity: isSignedIn ? 0.9 : 0.5,
-            display: 'none',
           }}
-          className="md:block"
         >
           {isSignedIn ? (user?.firstName ?? 'Profile') : 'Sign in'}
         </Link>
