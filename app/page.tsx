@@ -96,7 +96,7 @@ export default function Home() {
         {/* ─── ABOUT ────────────────────────────────────────── */}
         <Section id="about">
           <Kicker>What is this, exactly</Kicker>
-          <h2 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 5vw, 3rem)', marginBottom: '1.5rem', lineHeight: 1.15 }}>
+          <h2 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 5vw, 3rem)', marginBottom: '1.5rem', lineHeight: 1.15, textAlign: 'center' }}>
             A camp. A collective.
           </h2>
           <p style={{ fontSize: '1.05rem', lineHeight: 1.8, marginBottom: '1.25rem' }}>
@@ -118,12 +118,13 @@ export default function Home() {
         {/* ─── PARTICIPATE ──────────────────────────────────── */}
         <Section id="participate">
           <Kicker>How to be in it</Kicker>
-          <h2 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 5vw, 3rem)', marginBottom: '1.5rem' }}>
+          <h2 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 5vw, 3rem)', marginBottom: '1.5rem', textAlign: 'center' }}>
             This Camp Runs on Participation
           </h2>
           <p style={{ fontSize: '1.05rem', lineHeight: 1.8, marginBottom: '2.5rem' }}>
             The Many Hands hold us all up. Sometimes we do the carrying. Sometimes we are carried. Everyone contributes in some way: setup, teardown, cooking, welcoming, cleaning, decorating, emotional support, infrastructure, care.
           </p>
+          <div style={{ textAlign: 'center' }}>
           <a
             href="/apply"
             style={{
@@ -142,6 +143,7 @@ export default function Home() {
           >
             Apply to Camp
           </a>
+          </div>
         </Section>
 
         <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.2), transparent)' }} />
@@ -149,7 +151,7 @@ export default function Home() {
         {/* ─── SCHEDULE ─────────────────────────────────────── */}
         <Section id="schedule" style={{ backgroundColor: 'rgba(210, 57, 248, 0.03)' }}>
           <Kicker>When things happen</Kicker>
-          <h2 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 5vw, 3rem)', marginBottom: '0.5rem' }}>
+          <h2 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 5vw, 3rem)', marginBottom: '0.5rem', textAlign: 'center' }}>
             Schedule
           </h2>
           <p style={{ opacity: 0.6, fontStyle: 'italic', marginBottom: '3rem', fontSize: '0.9rem' }}>

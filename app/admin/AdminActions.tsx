@@ -1,0 +1,62 @@
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+
+export function AdminActions({ id, email }: { id: string; email: string }) {
+  const [loading, setLoading] = useState<'approve' | 'reject' | null>(null)
+  const router = useRouter()
+
+  const handleApprove = async () => {
+    setLoading('approve')
+    await fetch(`/api/admin/${id}/approve`, { method: 'POST' })
+    router.refresh()
+    setLoading(null)
+  }
+
+  const handleReject = async () => {
+    setLoading('reject')
+    await fetch(`/api/admin/${id}/reject`, { method: 'POST' })
+    router.refresh()
+    setLoading(null)
+  }
+
+  return (
+    <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+      <button
+        onClick={handleApprove}
+        disabled={loading !== null}
+        style={{
+          padding: '0.4rem 1rem',
+          borderRadius: '9999px',
+          border: '1px solid rgba(210,57,248,0.4)',
+          background: 'transparent',
+          color: '#D239F8',
+          fontSize: '0.75rem',
+          letterSpacing: '0.08em',
+          cursor: loading ? 'not-allowed' : 'pointer',
+          opacity: loading ? 0.5 : 1,
+        }}
+      >
+        {loading === 'approve' ? '...' : 'Approve'}
+      </button>
+      <button
+        onClick={handleReject}
+        disabled={loading !== null}
+        style={{
+          padding: '0.4rem 1rem',
+          borderRadius: '9999px',
+          border: '1px solid rgba(200,168,72,0.2)',
+          background: 'transparent',
+          color: '#F3EDE6',
+          fontSize: '0.75rem',
+          letterSpacing: '0.08em',
+          cursor: loading ? 'not-allowed' : 'pointer',
+          opacity: loading ? 0.5 : 0.4,
+        }}
+      >
+        {loading === 'reject' ? '...' : 'Reject'}
+      </button>
+    </div>
+  )
+}

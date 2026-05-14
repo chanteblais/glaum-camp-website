@@ -169,12 +169,69 @@ function RadioGroup({ options, name }: { options: string[]; name: string }) {
 
 export default function ApplyPage() {
   const [submitted, setSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    // TODO: wire up form submission (e.g. Formspree, Netlify Forms, email)
-    setSubmitted(true)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    setSubmitting(true)
+    setError(null)
+
+    const formData = new FormData(e.currentTarget)
+
+    // Collect checkbox groups as arrays
+    const contributions = formData.getAll('contributions') as string[]
+    const acknowledgements = formData.getAll('acknowledgements') as string[]
+
+    const data = {
+      first_name: formData.get('first_name'),
+      last_name: formData.get('last_name'),
+      preferred_name: formData.get('preferred_name'),
+      pronouns: formData.get('pronouns'),
+      email: formData.get('email'),
+      phone: formData.get('phone'),
+      instagram: formData.get('instagram'),
+      location: formData.get('location'),
+      camped_before: formData.get('camped_before'),
+      attendance: formData.get('attendance'),
+      arrival_date: formData.get('arrival'),
+      departure_date: formData.get('departure'),
+      camp_relationship: formData.get('camp_relationship'),
+      vehicle: formData.get('vehicle'),
+      space_requirements: formData.get('space'),
+      structures: formData.get('structures'),
+      rideshare: formData.get('rideshare'),
+      contributions,
+      energizing_participation: formData.get('energizing_participation'),
+      support_needs: formData.get('support_needs'),
+      accessibility: formData.get('accessibility'),
+      capacity: formData.get('capacity'),
+      participation_style: formData.get('participation_style'),
+      draws_to_glaum: formData.get('draws_to_glaum'),
+      healthy_community: formData.get('healthy_community'),
+      acknowledgements,
+      shrimp_relationship: formData.get('shrimp_relationship'),
+    }
+
+    try {
+      const res = await fetch('/api/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+
+      if (!res.ok) {
+        const { error } = await res.json()
+        throw new Error(error || 'Submission failed')
+      }
+
+      setSubmitted(true)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -502,8 +559,14 @@ export default function ApplyPage() {
 
             {/* Submit */}
             <div style={{ textAlign: 'center' }}>
+              {error && (
+                <p style={{ color: '#ff6b6b', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
+                  {error}
+                </p>
+              )}
               <button
                 type="submit"
+                disabled={submitting}
                 style={{
                   padding: '1rem 3rem',
                   borderRadius: '9999px',
@@ -513,19 +576,22 @@ export default function ApplyPage() {
                   fontFamily: 'TokyoDreams, serif',
                   fontSize: '0.9rem',
                   letterSpacing: '0.15em',
-                  cursor: 'pointer',
+                  cursor: submitting ? 'not-allowed' : 'pointer',
+                  opacity: submitting ? 0.5 : 1,
                   transition: 'all 0.25s',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(200,168,72,0.08)'
-                  e.currentTarget.style.borderColor = 'rgba(200,168,72,0.8)'
+                  if (!submitting) {
+                    e.currentTarget.style.backgroundColor = 'rgba(200,168,72,0.08)'
+                    e.currentTarget.style.borderColor = 'rgba(200,168,72,0.8)'
+                  }
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = 'transparent'
                   e.currentTarget.style.borderColor = 'rgba(200,168,72,0.5)'
                 }}
               >
-                Submit Application
+                {submitting ? 'Submitting...' : 'Submit Application'}
               </button>
               <p style={{ fontSize: '0.75rem', opacity: 0.35, marginTop: '1.25rem', fontStyle: 'italic' }}>
                 The Many Hands receive you.

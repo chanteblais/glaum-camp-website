@@ -1,0 +1,24 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@clerk/nextjs/server'
+import { supabaseAdmin } from '@/lib/supabase'
+
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const { userId, sessionClaims } = await auth()
+
+  if (!userId || sessionClaims?.metadata?.role !== 'admin') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const { error } = await supabaseAdmin
+    .from('applications')
+    .update({
+      status: 'rejected',
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: userId,
+    })
+    .eq('id', params.id)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  return NextResponse.json({ success: true })
+}

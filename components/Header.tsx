@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useUser } from '@clerk/nextjs'
 
 const navLinks = [
   { href: '#about', label: 'About' },
@@ -12,6 +13,7 @@ const navLinks = [
 
 export function Header() {
   const [menuOpen, setMenuOpen] = useState(false)
+  const { isSignedIn, user } = useUser()
 
   return (
     <header
@@ -82,6 +84,22 @@ export function Header() {
             </a>
           ))}
         </nav>
+
+        {/* Auth link */}
+        <Link
+          href={isSignedIn ? '/profile' : '/sign-in'}
+          style={{
+            fontSize: '0.75rem',
+            letterSpacing: '0.12em',
+            color: isSignedIn ? '#C8A848' : '#F3EDE6',
+            textDecoration: 'none',
+            opacity: isSignedIn ? 0.9 : 0.5,
+            display: 'none',
+          }}
+          className="md:block"
+        >
+          {isSignedIn ? (user?.firstName ?? 'Profile') : 'Sign in'}
+        </Link>
 
         {/* Mobile menu button */}
         <button
