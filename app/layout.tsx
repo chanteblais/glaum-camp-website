@@ -15,12 +15,19 @@ export const metadata: Metadata = {
   icons: { icon: '/favicon.ico' },
 }
 
+const publicSite =
+  typeof process.env.NEXT_PUBLIC_SITE_URL === 'string'
+    ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, '')
+    : ''
+const appHome =
+  publicSite && !publicSite.includes('localhost') ? `${publicSite}/` : '/'
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider
-      afterSignOutUrl="/"
-      signInFallbackRedirectUrl="/"
-      signUpFallbackRedirectUrl="/"
+      afterSignOutUrl={appHome}
+      signInFallbackRedirectUrl={appHome}
+      signUpFallbackRedirectUrl={appHome}
       signInUrl="/sign-in"
       signUpUrl="/sign-up"
     >

@@ -1,11 +1,17 @@
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
+import { SignIn } from '@clerk/nextjs'
 import { auth } from '@clerk/nextjs/server'
 
 function getBaseUrl(headersList: Headers) {
-  const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL
-  if (configuredSiteUrl && !configuredSiteUrl.includes('localhost')) {
-    return configuredSiteUrl.replace(/\/$/, '')
+  const configured = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '')
+  if (configured && !configured.includes('localhost')) {
+    return configured
+  }
+
+  // On Vercel production without NEXT_PUBLIC_SITE_URL, derive canonical host from VERCEL_URL.
+  if (process.env.VERCEL_ENV === 'production' && process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL.replace(/^https?:\/\//, '')}`
   }
 
   const forwardedHost = headersList.get('x-forwarded-host')
@@ -25,7 +31,6 @@ export default async function SignInPage({
   const baseUrl = getBaseUrl(headersList)
 
   // Clerk's middleware passes redirect_url when protecting a route (e.g. /admin).
-  // Forward it to accounts.dev so the user lands back where they intended.
   // Fall back to the home page if no redirect_url was supplied.
   const returnTo = searchParams.redirect_url || `${baseUrl}/?signed_in=1`
 
@@ -48,7 +53,23 @@ export default async function SignInPage({
     redirect(safeReturn)
   }
 
-  redirect(
-    `https://sweet-lionfish-23.accounts.dev/sign-in?redirect_url=${encodeURIComponent(safeReturn)}`
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '4rem 1rem',
+      }}
+    >
+      <SignIn
+        routing="path"
+        path="/sign-in"
+        forceRedirectUrl={safeReturn}
+        fallbackRedirectUrl={safeReturn}
+        signUpFallbackRedirectUrl={safeReturn}
+      />
+    </div>
   )
 }
