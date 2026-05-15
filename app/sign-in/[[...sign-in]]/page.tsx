@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
+import { SignIn } from '@clerk/nextjs'
 import { auth } from '@clerk/nextjs/server'
 
 function getBaseUrl(headersList: Headers) {
@@ -48,7 +49,22 @@ export default async function SignInPage({
     redirect(safeReturn)
   }
 
-  redirect(
-    `https://sweet-lionfish-23.accounts.dev/sign-in?redirect_url=${encodeURIComponent(safeReturn)}`
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '4rem 1rem',
+      }}
+    >
+      <SignIn
+        routing="path"
+        path="/sign-in"
+        fallbackRedirectUrl="/?signed_in=1"
+        signUpFallbackRedirectUrl="/?signed_in=1"
+      />
+    </div>
   )
 }
