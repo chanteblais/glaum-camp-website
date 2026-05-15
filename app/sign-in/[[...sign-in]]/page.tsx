@@ -2,25 +2,7 @@ import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { SignIn } from '@clerk/nextjs'
 import { auth } from '@clerk/nextjs/server'
-
-function getBaseUrl(headersList: Headers) {
-  const configured = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '')
-  if (configured && !configured.includes('localhost')) {
-    return configured
-  }
-
-  // On Vercel production without NEXT_PUBLIC_SITE_URL, derive canonical host from VERCEL_URL.
-  if (process.env.VERCEL_ENV === 'production' && process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL.replace(/^https?:\/\//, '')}`
-  }
-
-  const forwardedHost = headersList.get('x-forwarded-host')
-  const forwardedProto = headersList.get('x-forwarded-proto')
-  const host = forwardedHost || headersList.get('host') || process.env.VERCEL_URL || 'localhost:3000'
-  const protocol = forwardedProto || (host.includes('localhost') ? 'http' : 'https')
-
-  return `${protocol}://${host}`
-}
+import { resolveSiteOrigin } from '@/lib/site-origin'
 
 export default async function SignInPage({
   searchParams,
@@ -28,7 +10,7 @@ export default async function SignInPage({
   searchParams: { redirect_url?: string }
 }) {
   const headersList = await headers()
-  const baseUrl = getBaseUrl(headersList)
+  const baseUrl = resolveSiteOrigin(headersList)
 
   // Clerk's middleware passes redirect_url when protecting a route (e.g. /admin).
   // Fall back to the home page if no redirect_url was supplied.
