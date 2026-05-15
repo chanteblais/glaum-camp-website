@@ -3,21 +3,23 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-export function AdminActions({ id, email }: { id: string; email: string }) {
+export function AdminActions({ id, email, redirectAfter }: { id: string; email: string; redirectAfter?: string }) {
   const [loading, setLoading] = useState<'approve' | 'reject' | null>(null)
   const router = useRouter()
 
   const handleApprove = async () => {
     setLoading('approve')
     await fetch(`/api/admin/${id}/approve`, { method: 'POST' })
-    router.refresh()
+    if (redirectAfter) router.push(redirectAfter)
+    else router.refresh()
     setLoading(null)
   }
 
   const handleReject = async () => {
     setLoading('reject')
     await fetch(`/api/admin/${id}/reject`, { method: 'POST' })
-    router.refresh()
+    if (redirectAfter) router.push(redirectAfter)
+    else router.refresh()
     setLoading(null)
   }
 

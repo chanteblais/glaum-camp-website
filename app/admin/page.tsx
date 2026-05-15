@@ -1,7 +1,7 @@
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
-import { AdminActions } from './AdminActions'
+import { ApplicationRow } from './ApplicationRow'
 
 export default async function AdminPage() {
   const { userId } = await auth()
@@ -101,26 +101,3 @@ export default async function AdminPage() {
   )
 }
 
-function ApplicationRow({ app, showActions }: { app: any; showActions: boolean }) {
-  const submitted = new Date(app.submitted_at).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })
-
-  return (
-    <div style={{ padding: '1.25rem 1.5rem', border: '1px solid rgba(200,168,72,0.12)', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.02)', display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
-      <div style={{ flex: 1, minWidth: '200px' }}>
-        <p style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.2rem' }}>
-          {app.first_name} {app.last_name}
-        </p>
-        <p style={{ fontSize: '0.8rem', opacity: 0.5 }}>{app.email}</p>
-      </div>
-      <div style={{ fontSize: '0.8rem', opacity: 0.5, flexShrink: 0 }}>
-        {submitted}
-      </div>
-      <div style={{ fontSize: '0.75rem', opacity: 0.6, flexShrink: 0 }}>
-        {app.attendance}
-      </div>
-      {showActions && (
-        <AdminActions id={app.id} email={app.email} />
-      )}
-    </div>
-  )
-}
