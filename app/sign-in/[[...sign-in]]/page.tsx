@@ -37,6 +37,7 @@ export default async function SignInPage({
 
   return (
     <div
+      className="clerk-scope"
       style={{
         minHeight: '100vh',
         display: 'flex',

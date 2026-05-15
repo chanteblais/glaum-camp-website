@@ -75,6 +75,17 @@
     color: #C8A848;
   }
 
+  /* Clerk embeds: site-shell sets gold + heavy text-shadow on headings and cream on <p>,
+     which looks blurry / illegible on Clerk's white card. Override inside auth only. */
+  .site-shell .clerk-scope :is(h1, h2, h3, h4, h5, h6) {
+    color: hsl(219 42% 12%);
+    text-shadow: none;
+  }
+
+  .site-shell .clerk-scope p {
+    color: hsl(220 17% 32%);
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       animation-duration: 0.01ms !important;
