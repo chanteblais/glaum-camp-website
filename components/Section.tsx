@@ -36,6 +36,7 @@ export function Kicker({ children }: { children: ReactNode }) {
         marginBottom: '0.75rem',
         fontFamily: 'var(--font-libre-baskerville)',
         opacity: 0.9,
+        textAlign: 'center',
       }}
     >
       {children}

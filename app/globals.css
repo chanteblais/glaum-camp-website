@@ -32,7 +32,7 @@
     box-sizing: border-box;
   }
 
-  body {
+  .site-shell {
     color: #F3EDE6;
     font-feature-settings: "rlig" 1, "calt" 1;
     background-color: #1A0A24;
@@ -40,9 +40,10 @@
       radial-gradient(ellipse at center top, rgba(210, 57, 248, 0.18) 0%, rgba(93, 43, 122, 0.1) 50%, transparent 100%),
       linear-gradient(180deg, #1A0A24 0%, #2A0A3A 60%, #1A0A24 100%);
     min-height: 100vh;
+    position: relative;
   }
 
-  body::before {
+  .site-shell::before {
     content: '';
     position: fixed;
     top: 0;
@@ -56,16 +57,21 @@
     z-index: 0;
   }
 
-  p {
+  .site-shell p {
     color: #F3EDE6;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  .site-shell h1,
+  .site-shell h2,
+  .site-shell h3,
+  .site-shell h4,
+  .site-shell h5,
+  .site-shell h6 {
     color: #C8A848;
     text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
   }
 
-  a {
+  .site-shell a {
     color: #C8A848;
   }
 
@@ -84,8 +90,8 @@
     font-family: 'TokyoDreams', serif;
   }
 
-  button:focus-visible,
-  a:focus-visible {
+  .site-shell button:focus-visible,
+  .site-shell a:focus-visible {
     outline: 2px solid #D239F8;
     outline-offset: 2px;
     border-radius: 4px;
