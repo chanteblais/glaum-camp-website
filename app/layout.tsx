@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import { Libre_Baskerville } from 'next/font/google'
 import { ClerkProvider } from '@clerk/nextjs'
+import { headers } from 'next/headers'
+import { clerkFallbackHome, resolveSiteOrigin } from '@/lib/site-origin'
 import './globals.css'
 
 const libreBaskerville = Libre_Baskerville({
@@ -12,17 +14,21 @@ const libreBaskerville = Libre_Baskerville({
 export const metadata: Metadata = {
   title: 'Glåüm @ What If 2026',
   description: 'Glåüm Theme Camp at What If 2026. Sponsored by Shrimp™. Find your attunement in the forest.',
-  icons: { icon: '/favicon.ico' },
+  icons: {
+    icon: [
+      { url: '/favicon/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/favicon/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+    ],
+    shortcut: ['/favicon/favicon.ico'],
+    apple: '/favicon/apple-touch-icon.png',
+  },
+  manifest: '/favicon/site.webmanifest',
 }
 
-const publicSite =
-  typeof process.env.NEXT_PUBLIC_SITE_URL === 'string'
-    ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, '')
-    : ''
-const appHome =
-  publicSite && !publicSite.includes('localhost') ? `${publicSite}/` : '/'
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const headerList = await headers()
+  const appHome = clerkFallbackHome(resolveSiteOrigin(headerList))
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider
       afterSignOutUrl={appHome}
