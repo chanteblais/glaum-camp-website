@@ -15,9 +15,9 @@ export default async function SignInPage({
   // Clerk's middleware passes redirect_url when protecting a route (e.g. /admin).
   // Forward it to accounts.dev so the user lands back where they intended.
   // Fall back to the home page if no redirect_url was supplied.
-  const returnTo = searchParams.redirect_url || `${baseUrl}/`
+  const returnTo = searchParams.redirect_url || `${baseUrl}/?signed_in=1`
 
-  let safeReturn = `${baseUrl}/`
+  let safeReturn = `${baseUrl}/?signed_in=1`
   if (returnTo.startsWith('/')) {
     safeReturn = `${baseUrl}${returnTo}`
   } else {
