@@ -3,74 +3,88 @@
     "0add9c80682fbf435076c624ec39e3490f3b89c9": {
       "workers": {
         "app/page": "(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fserver%2Fkeyless-custom-headers.js%22%2C%5B%22collectKeylessMetadata%22%2C%22formatMetadataHeaders%22%5D%5D%2C%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fkeyless-actions.js%22%2C%5B%22detectKeylessEnvDriftAction%22%2C%22createOrReadKeylessAction%22%2C%22deleteKeylessAction%22%2C%22syncKeylessConfigAction%22%5D%5D%5D&__client_imported__=!",
-        "app/sign-in/[[...sign-in]]/page": "(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fserver%2Fkeyless-custom-headers.js%22%2C%5B%22collectKeylessMetadata%22%2C%22formatMetadataHeaders%22%5D%5D%2C%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fkeyless-actions.js%22%2C%5B%22detectKeylessEnvDriftAction%22%2C%22createOrReadKeylessAction%22%2C%22deleteKeylessAction%22%2C%22syncKeylessConfigAction%22%5D%5D%5D&__client_imported__=!"
+        "app/sign-in/[[...sign-in]]/page": "(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fserver%2Fkeyless-custom-headers.js%22%2C%5B%22collectKeylessMetadata%22%2C%22formatMetadataHeaders%22%5D%5D%2C%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fkeyless-actions.js%22%2C%5B%22detectKeylessEnvDriftAction%22%2C%22createOrReadKeylessAction%22%2C%22deleteKeylessAction%22%2C%22syncKeylessConfigAction%22%5D%5D%5D&__client_imported__=!",
+        "app/profile/page": "(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fserver%2Fkeyless-custom-headers.js%22%2C%5B%22collectKeylessMetadata%22%2C%22formatMetadataHeaders%22%5D%5D%2C%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fkeyless-actions.js%22%2C%5B%22detectKeylessEnvDriftAction%22%2C%22createOrReadKeylessAction%22%2C%22deleteKeylessAction%22%2C%22syncKeylessConfigAction%22%5D%5D%5D&__client_imported__=!"
       },
       "layer": {
         "app/page": "rsc",
-        "app/sign-in/[[...sign-in]]/page": "rsc"
+        "app/sign-in/[[...sign-in]]/page": "rsc",
+        "app/profile/page": "rsc"
       }
     },
     "9d827f8bf0049cad9d355176a90405d72e5a7442": {
       "workers": {
         "app/page": "(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fserver%2Fkeyless-custom-headers.js%22%2C%5B%22collectKeylessMetadata%22%2C%22formatMetadataHeaders%22%5D%5D%2C%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fkeyless-actions.js%22%2C%5B%22detectKeylessEnvDriftAction%22%2C%22createOrReadKeylessAction%22%2C%22deleteKeylessAction%22%2C%22syncKeylessConfigAction%22%5D%5D%5D&__client_imported__=!",
-        "app/sign-in/[[...sign-in]]/page": "(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fserver%2Fkeyless-custom-headers.js%22%2C%5B%22collectKeylessMetadata%22%2C%22formatMetadataHeaders%22%5D%5D%2C%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fkeyless-actions.js%22%2C%5B%22detectKeylessEnvDriftAction%22%2C%22createOrReadKeylessAction%22%2C%22deleteKeylessAction%22%2C%22syncKeylessConfigAction%22%5D%5D%5D&__client_imported__=!"
+        "app/sign-in/[[...sign-in]]/page": "(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fserver%2Fkeyless-custom-headers.js%22%2C%5B%22collectKeylessMetadata%22%2C%22formatMetadataHeaders%22%5D%5D%2C%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fkeyless-actions.js%22%2C%5B%22detectKeylessEnvDriftAction%22%2C%22createOrReadKeylessAction%22%2C%22deleteKeylessAction%22%2C%22syncKeylessConfigAction%22%5D%5D%5D&__client_imported__=!",
+        "app/profile/page": "(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fserver%2Fkeyless-custom-headers.js%22%2C%5B%22collectKeylessMetadata%22%2C%22formatMetadataHeaders%22%5D%5D%2C%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fkeyless-actions.js%22%2C%5B%22detectKeylessEnvDriftAction%22%2C%22createOrReadKeylessAction%22%2C%22deleteKeylessAction%22%2C%22syncKeylessConfigAction%22%5D%5D%5D&__client_imported__=!"
       },
       "layer": {
         "app/page": "rsc",
-        "app/sign-in/[[...sign-in]]/page": "rsc"
+        "app/sign-in/[[...sign-in]]/page": "rsc",
+        "app/profile/page": "rsc"
       }
     },
     "766c93284121a81cf0afb22713bfce31152d3d9e": {
       "workers": {
         "app/page": "(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fserver%2Fkeyless-custom-headers.js%22%2C%5B%22collectKeylessMetadata%22%2C%22formatMetadataHeaders%22%5D%5D%2C%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fkeyless-actions.js%22%2C%5B%22detectKeylessEnvDriftAction%22%2C%22createOrReadKeylessAction%22%2C%22deleteKeylessAction%22%2C%22syncKeylessConfigAction%22%5D%5D%5D&__client_imported__=!",
-        "app/sign-in/[[...sign-in]]/page": "(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fserver%2Fkeyless-custom-headers.js%22%2C%5B%22collectKeylessMetadata%22%2C%22formatMetadataHeaders%22%5D%5D%2C%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fkeyless-actions.js%22%2C%5B%22detectKeylessEnvDriftAction%22%2C%22createOrReadKeylessAction%22%2C%22deleteKeylessAction%22%2C%22syncKeylessConfigAction%22%5D%5D%5D&__client_imported__=!"
+        "app/sign-in/[[...sign-in]]/page": "(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fserver%2Fkeyless-custom-headers.js%22%2C%5B%22collectKeylessMetadata%22%2C%22formatMetadataHeaders%22%5D%5D%2C%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fkeyless-actions.js%22%2C%5B%22detectKeylessEnvDriftAction%22%2C%22createOrReadKeylessAction%22%2C%22deleteKeylessAction%22%2C%22syncKeylessConfigAction%22%5D%5D%5D&__client_imported__=!",
+        "app/profile/page": "(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fserver%2Fkeyless-custom-headers.js%22%2C%5B%22collectKeylessMetadata%22%2C%22formatMetadataHeaders%22%5D%5D%2C%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fkeyless-actions.js%22%2C%5B%22detectKeylessEnvDriftAction%22%2C%22createOrReadKeylessAction%22%2C%22deleteKeylessAction%22%2C%22syncKeylessConfigAction%22%5D%5D%5D&__client_imported__=!"
       },
       "layer": {
         "app/page": "rsc",
-        "app/sign-in/[[...sign-in]]/page": "rsc"
+        "app/sign-in/[[...sign-in]]/page": "rsc",
+        "app/profile/page": "rsc"
       }
     },
     "90304152455bddd7e4ec8fe7700b66dfe4f04f5d": {
       "workers": {
         "app/page": "(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fserver%2Fkeyless-custom-headers.js%22%2C%5B%22collectKeylessMetadata%22%2C%22formatMetadataHeaders%22%5D%5D%2C%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fkeyless-actions.js%22%2C%5B%22detectKeylessEnvDriftAction%22%2C%22createOrReadKeylessAction%22%2C%22deleteKeylessAction%22%2C%22syncKeylessConfigAction%22%5D%5D%5D&__client_imported__=!",
-        "app/sign-in/[[...sign-in]]/page": "(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fserver%2Fkeyless-custom-headers.js%22%2C%5B%22collectKeylessMetadata%22%2C%22formatMetadataHeaders%22%5D%5D%2C%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fkeyless-actions.js%22%2C%5B%22detectKeylessEnvDriftAction%22%2C%22createOrReadKeylessAction%22%2C%22deleteKeylessAction%22%2C%22syncKeylessConfigAction%22%5D%5D%5D&__client_imported__=!"
+        "app/sign-in/[[...sign-in]]/page": "(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fserver%2Fkeyless-custom-headers.js%22%2C%5B%22collectKeylessMetadata%22%2C%22formatMetadataHeaders%22%5D%5D%2C%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fkeyless-actions.js%22%2C%5B%22detectKeylessEnvDriftAction%22%2C%22createOrReadKeylessAction%22%2C%22deleteKeylessAction%22%2C%22syncKeylessConfigAction%22%5D%5D%5D&__client_imported__=!",
+        "app/profile/page": "(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fserver%2Fkeyless-custom-headers.js%22%2C%5B%22collectKeylessMetadata%22%2C%22formatMetadataHeaders%22%5D%5D%2C%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fkeyless-actions.js%22%2C%5B%22detectKeylessEnvDriftAction%22%2C%22createOrReadKeylessAction%22%2C%22deleteKeylessAction%22%2C%22syncKeylessConfigAction%22%5D%5D%5D&__client_imported__=!"
       },
       "layer": {
         "app/page": "rsc",
-        "app/sign-in/[[...sign-in]]/page": "rsc"
+        "app/sign-in/[[...sign-in]]/page": "rsc",
+        "app/profile/page": "rsc"
       }
     },
     "cea89e0becefbbbe9766f51c232e184c629bae41": {
       "workers": {
         "app/page": "(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fserver%2Fkeyless-custom-headers.js%22%2C%5B%22collectKeylessMetadata%22%2C%22formatMetadataHeaders%22%5D%5D%2C%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fkeyless-actions.js%22%2C%5B%22detectKeylessEnvDriftAction%22%2C%22createOrReadKeylessAction%22%2C%22deleteKeylessAction%22%2C%22syncKeylessConfigAction%22%5D%5D%5D&__client_imported__=!",
-        "app/sign-in/[[...sign-in]]/page": "(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fserver%2Fkeyless-custom-headers.js%22%2C%5B%22collectKeylessMetadata%22%2C%22formatMetadataHeaders%22%5D%5D%2C%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fkeyless-actions.js%22%2C%5B%22detectKeylessEnvDriftAction%22%2C%22createOrReadKeylessAction%22%2C%22deleteKeylessAction%22%2C%22syncKeylessConfigAction%22%5D%5D%5D&__client_imported__=!"
+        "app/sign-in/[[...sign-in]]/page": "(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fserver%2Fkeyless-custom-headers.js%22%2C%5B%22collectKeylessMetadata%22%2C%22formatMetadataHeaders%22%5D%5D%2C%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fkeyless-actions.js%22%2C%5B%22detectKeylessEnvDriftAction%22%2C%22createOrReadKeylessAction%22%2C%22deleteKeylessAction%22%2C%22syncKeylessConfigAction%22%5D%5D%5D&__client_imported__=!",
+        "app/profile/page": "(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fserver%2Fkeyless-custom-headers.js%22%2C%5B%22collectKeylessMetadata%22%2C%22formatMetadataHeaders%22%5D%5D%2C%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fkeyless-actions.js%22%2C%5B%22detectKeylessEnvDriftAction%22%2C%22createOrReadKeylessAction%22%2C%22deleteKeylessAction%22%2C%22syncKeylessConfigAction%22%5D%5D%5D&__client_imported__=!"
       },
       "layer": {
         "app/page": "rsc",
-        "app/sign-in/[[...sign-in]]/page": "rsc"
+        "app/sign-in/[[...sign-in]]/page": "rsc",
+        "app/profile/page": "rsc"
       }
     },
     "e57a2522e9f3c48c5f6bea5093178adf65984452": {
       "workers": {
         "app/page": "(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fserver%2Fkeyless-custom-headers.js%22%2C%5B%22collectKeylessMetadata%22%2C%22formatMetadataHeaders%22%5D%5D%2C%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fkeyless-actions.js%22%2C%5B%22detectKeylessEnvDriftAction%22%2C%22createOrReadKeylessAction%22%2C%22deleteKeylessAction%22%2C%22syncKeylessConfigAction%22%5D%5D%5D&__client_imported__=!",
-        "app/sign-in/[[...sign-in]]/page": "(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fserver%2Fkeyless-custom-headers.js%22%2C%5B%22collectKeylessMetadata%22%2C%22formatMetadataHeaders%22%5D%5D%2C%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fkeyless-actions.js%22%2C%5B%22detectKeylessEnvDriftAction%22%2C%22createOrReadKeylessAction%22%2C%22deleteKeylessAction%22%2C%22syncKeylessConfigAction%22%5D%5D%5D&__client_imported__=!"
+        "app/sign-in/[[...sign-in]]/page": "(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fserver%2Fkeyless-custom-headers.js%22%2C%5B%22collectKeylessMetadata%22%2C%22formatMetadataHeaders%22%5D%5D%2C%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fkeyless-actions.js%22%2C%5B%22detectKeylessEnvDriftAction%22%2C%22createOrReadKeylessAction%22%2C%22deleteKeylessAction%22%2C%22syncKeylessConfigAction%22%5D%5D%5D&__client_imported__=!",
+        "app/profile/page": "(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fserver%2Fkeyless-custom-headers.js%22%2C%5B%22collectKeylessMetadata%22%2C%22formatMetadataHeaders%22%5D%5D%2C%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fkeyless-actions.js%22%2C%5B%22detectKeylessEnvDriftAction%22%2C%22createOrReadKeylessAction%22%2C%22deleteKeylessAction%22%2C%22syncKeylessConfigAction%22%5D%5D%5D&__client_imported__=!"
       },
       "layer": {
         "app/page": "rsc",
-        "app/sign-in/[[...sign-in]]/page": "rsc"
+        "app/sign-in/[[...sign-in]]/page": "rsc",
+        "app/profile/page": "rsc"
       }
     },
     "9532aa5246ce41b50ae9fbe5aa9d6607f675918e": {
       "workers": {
         "app/page": "(action-browser)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fserver-actions.js%22%2C%5B%22invalidateCacheAction%22%5D%5D%5D&__client_imported__=true!",
-        "app/sign-in/[[...sign-in]]/page": "(action-browser)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fserver-actions.js%22%2C%5B%22invalidateCacheAction%22%5D%5D%5D&__client_imported__=true!"
+        "app/sign-in/[[...sign-in]]/page": "(action-browser)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fserver-actions.js%22%2C%5B%22invalidateCacheAction%22%5D%5D%5D&__client_imported__=true!",
+        "app/profile/page": "(action-browser)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fchante%2FDocuments%2FGlaum%2Fwebsite%2Fglaum-camp-website%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fserver-actions.js%22%2C%5B%22invalidateCacheAction%22%5D%5D%5D&__client_imported__=true!"
       },
       "layer": {
         "app/page": "action-browser",
-        "app/sign-in/[[...sign-in]]/page": "action-browser"
+        "app/sign-in/[[...sign-in]]/page": "action-browser",
+        "app/profile/page": "action-browser"
       }
     }
   },
   "edge": {},
-  "encryptionKey": "2Ip8SSA00zaFojhcQQQSu5A2tVd4cjfpOvbCdiPThNw="
+  "encryptionKey": "EShkwNWqH3H5SBAB5r2zrc6yiI9M3w4ZvRm3Az5M/K0="
 }

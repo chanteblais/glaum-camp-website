@@ -2,6 +2,7 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { SignOutBtn } from '@/components/SignOutBtn'
+import { RememberSignedIn } from '@/components/RememberSignedIn'
 
 export default async function ProfilePage() {
   const { userId } = await auth()
@@ -30,6 +31,7 @@ export default async function ProfilePage() {
 
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1 }}>
+      <RememberSignedIn firstName={user?.firstName} email={email} />
       <div style={{ maxWidth: '760px', margin: '0 auto', padding: '3rem 1.5rem 6rem' }}>
 
         {/* Header */}

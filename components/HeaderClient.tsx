@@ -4,6 +4,10 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { useAuth, useUser } from '@clerk/nextjs'
 
+const AUTH_MEMORY_KEY = 'glaum-auth-signed-in'
+const AUTH_NAME_KEY = 'glaum-auth-first-name'
+const AUTH_EMAIL_KEY = 'glaum-auth-email'
+
 type NavAuthState = {
   isSignedIn: boolean
   firstName?: string | null
@@ -22,34 +26,93 @@ export function HeaderClient() {
   const { user } = useUser()
   const [mounted, setMounted] = useState(false)
   const [serverAuth, setServerAuth] = useState<NavAuthState | null>(null)
+  const [authChecked, setAuthChecked] = useState(false)
+  const [hasRememberedAuth, setHasRememberedAuth] = useState(false)
+  const [rememberedFirstName, setRememberedFirstName] = useState<string | null>(null)
+  const [rememberedEmail, setRememberedEmail] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  const signedIn = mounted && (Boolean(isSignedIn) || Boolean(serverAuth?.isSignedIn))
-  const userFirstName = user?.firstName ?? serverAuth?.firstName
-  const userEmail = user?.primaryEmailAddress?.emailAddress ?? serverAuth?.email
+  const signedIn = mounted && (Boolean(isSignedIn) || Boolean(serverAuth?.isSignedIn) || hasRememberedAuth)
+  const userFirstName = user?.firstName ?? serverAuth?.firstName ?? rememberedFirstName
+  const userEmail = user?.primaryEmailAddress?.emailAddress ?? serverAuth?.email ?? rememberedEmail
   const initials = userFirstName?.[0] ?? '✦'
 
   useEffect(() => {
     setMounted(true)
+
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('signed_in') === '1') {
+      window.localStorage.setItem(AUTH_MEMORY_KEY, 'true')
+      params.delete('signed_in')
+      const nextSearch = params.toString()
+      window.history.replaceState(
+        null,
+        '',
+        `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ''}${window.location.hash}`
+      )
+    }
+
+    setHasRememberedAuth(window.localStorage.getItem(AUTH_MEMORY_KEY) === 'true')
+    setRememberedFirstName(window.localStorage.getItem(AUTH_NAME_KEY))
+    setRememberedEmail(window.localStorage.getItem(AUTH_EMAIL_KEY))
   }, [])
 
   useEffect(() => {
     if (!mounted) return
 
+    const firstName = user?.firstName ?? serverAuth?.firstName
+    const email = user?.primaryEmailAddress?.emailAddress ?? serverAuth?.email
+
+    if (firstName) {
+      window.localStorage.setItem(AUTH_NAME_KEY, firstName)
+      setRememberedFirstName(firstName)
+    }
+
+    if (email) {
+      window.localStorage.setItem(AUTH_EMAIL_KEY, email)
+      setRememberedEmail(email)
+    }
+  }, [mounted, user?.firstName, user?.primaryEmailAddress?.emailAddress, serverAuth?.firstName, serverAuth?.email])
+
+  useEffect(() => {
+    if (!mounted) return
+
     let cancelled = false
-    fetch('/api/nav-auth', { cache: 'no-store' })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data: NavAuthState | null) => {
-        if (!cancelled) setServerAuth(data)
-      })
-      .catch(() => {
-        if (!cancelled) setServerAuth(null)
-      })
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+
+    const checkAuth = (attempt = 0) => {
+      fetch('/api/nav-auth', { cache: 'no-store' })
+        .then((response) => (response.ok ? response.json() : null))
+        .then((data: NavAuthState | null) => {
+          if (cancelled) return
+
+          if (data?.isSignedIn || attempt >= 3) {
+            setServerAuth(data)
+            setAuthChecked(true)
+            if (data?.isSignedIn) {
+              window.localStorage.setItem(AUTH_MEMORY_KEY, 'true')
+              setHasRememberedAuth(true)
+            }
+            return
+          }
+
+          timeoutId = setTimeout(() => checkAuth(attempt + 1), 350)
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setServerAuth(null)
+            setAuthChecked(true)
+          }
+        })
+    }
+
+    checkAuth()
 
     return () => {
       cancelled = true
+      if (timeoutId) clearTimeout(timeoutId)
     }
   }, [mounted])
 
@@ -149,6 +212,14 @@ export function HeaderClient() {
           <div style={{ height: '1px', background: 'rgba(200,168,72,0.1)', margin: '0.25rem 0' }} />
           <a
             href="/api/sign-out"
+            onClick={() => {
+              window.localStorage.removeItem(AUTH_MEMORY_KEY)
+              window.localStorage.removeItem(AUTH_NAME_KEY)
+              window.localStorage.removeItem(AUTH_EMAIL_KEY)
+              setHasRememberedAuth(false)
+              setRememberedFirstName(null)
+              setRememberedEmail(null)
+            }}
             style={{
               display: 'block',
               width: '100%',
@@ -172,7 +243,7 @@ export function HeaderClient() {
         </div>
       )}
     </div>
-  ) : mounted && isLoaded && serverAuth ? (
+  ) : mounted && isLoaded && authChecked ? (
     <Link
       href="/sign-in"
       style={{
@@ -256,7 +327,9 @@ export function HeaderClient() {
           ))}
         </nav>
 
-        {authSlot}
+        <div style={{ width: '72px', display: 'flex', justifyContent: 'flex-end' }}>
+          {authSlot}
+        </div>
 
         <button
           onClick={() => setMenuOpen(!menuOpen)}
@@ -309,7 +382,18 @@ export function HeaderClient() {
               <Link href="/profile" onClick={() => setMenuOpen(false)} style={{ color: '#C8A848', textDecoration: 'none', fontSize: '1rem', letterSpacing: '0.08em', padding: '0.5rem 0', borderBottom: '1px solid rgba(200, 168, 72, 0.1)' }}>
                 My Profile
               </Link>
-              <a href="/api/sign-out" style={{ color: '#F3EDE6', textDecoration: 'none', cursor: 'pointer', fontSize: '1rem', letterSpacing: '0.08em', padding: '0.5rem 0', opacity: 0.5, textAlign: 'left' }}>
+              <a
+                href="/api/sign-out"
+                onClick={() => {
+                  window.localStorage.removeItem(AUTH_MEMORY_KEY)
+                  window.localStorage.removeItem(AUTH_NAME_KEY)
+                  window.localStorage.removeItem(AUTH_EMAIL_KEY)
+                  setHasRememberedAuth(false)
+                  setRememberedFirstName(null)
+                  setRememberedEmail(null)
+                }}
+                style={{ color: '#F3EDE6', textDecoration: 'none', cursor: 'pointer', fontSize: '1rem', letterSpacing: '0.08em', padding: '0.5rem 0', opacity: 0.5, textAlign: 'left' }}
+              >
                 Sign out
               </a>
             </>
