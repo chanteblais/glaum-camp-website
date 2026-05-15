@@ -17,13 +17,19 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ClerkProvider afterSignOutUrl="/" afterSignInUrl="/"  afterSignUpUrl="/" signInUrl="/sign-in" signUpUrl="/sign-up">
+    <ClerkProvider
+      afterSignOutUrl="/"
+      signInFallbackRedirectUrl="/"
+      signUpFallbackRedirectUrl="/"
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
+    >
       <html lang="en">
         <body
           className={libreBaskerville.variable}
           style={{ fontFamily: 'var(--font-libre-baskerville), Georgia, serif' }}
         >
-          {children}
+          <div className="site-shell">{children}</div>
         </body>
       </html>
     </ClerkProvider>

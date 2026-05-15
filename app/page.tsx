@@ -3,6 +3,8 @@ import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
 import { Section, Kicker, GoldDivider } from '@/components/Section'
 
+export const dynamic = 'force-dynamic'
+
 export default function Home() {
   return (
     <>

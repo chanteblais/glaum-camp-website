@@ -34,14 +34,15 @@ export async function GET(req: Request) {
     }
   }
 
-  // Delete every Clerk cookie
+  // Delete session cookies only — NOT __clerk_db_jwt* (the dev browser token).
+  // Clearing the dev browser cookie causes Clerk to bounce through accounts.dev
+  // on the next page load to re-initialize it, which looks like a login page.
   const clerkCookies = cookieHeader
     .split(';')
     .map(c => c.trim().split('=')[0])
     .filter(name =>
       name.startsWith('__session') ||
       name.startsWith('__client_uat') ||
-      name.startsWith('__clerk') ||
       name.startsWith('__refresh')
     )
 

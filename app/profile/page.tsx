@@ -2,7 +2,6 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { SignOutBtn } from '@/components/SignOutBtn'
-import Link from 'next/link'
 
 export default async function ProfilePage() {
   const { userId } = await auth()
@@ -35,9 +34,9 @@ export default async function ProfilePage() {
 
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
-          <Link href="/" style={{ fontSize: '0.8rem', letterSpacing: '0.1em', color: '#C8A848', textDecoration: 'none', opacity: 0.6 }}>
+          <a href="/" style={{ fontSize: '0.8rem', letterSpacing: '0.1em', color: '#C8A848', textDecoration: 'none', opacity: 0.6 }}>
             ← Back to camp
-          </Link>
+          </a>
           <SignOutBtn />
         </div>
 

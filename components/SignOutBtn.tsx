@@ -1,5 +1,3 @@
-'use client'
-
 export function SignOutBtn() {
   return (
     <a
@@ -14,6 +12,7 @@ export function SignOutBtn() {
         letterSpacing: '0.08em',
         cursor: 'pointer',
         opacity: 0.5,
+        background: 'none',
         textDecoration: 'none',
       }}
     >
