@@ -11,10 +11,14 @@ export default async function AdminPage() {
   const user = await client.users.getUser(userId)
   if (user.publicMetadata?.role !== 'admin') redirect('/')
 
-  const { data: applications } = await supabaseAdmin
+  const { data: applications, error: dbError } = await supabaseAdmin
     .from('applications')
     .select('id, first_name, last_name, email, status, submitted_at, attendance, camped_before, contributions')
     .order('submitted_at', { ascending: false })
+
+  if (dbError) {
+    console.error('[Admin] Supabase query error:', dbError)
+  }
 
   const pending = applications?.filter(a => a.status === 'pending') ?? []
   const approved = applications?.filter(a => a.status === 'approved') ?? []
@@ -82,7 +86,14 @@ export default async function AdminPage() {
           </div>
         )}
 
-        {applications?.length === 0 && (
+        {dbError && (
+          <div style={{ padding: '1rem 1.5rem', border: '1px solid rgba(255,80,80,0.4)', borderRadius: '0.75rem', background: 'rgba(255,0,0,0.05)', marginBottom: '2rem' }}>
+            <p style={{ fontSize: '0.8rem', color: '#ff8080', marginBottom: '0.25rem', fontWeight: 700 }}>Database error</p>
+            <p style={{ fontSize: '0.75rem', color: '#F3EDE6', opacity: 0.6, fontFamily: 'monospace' }}>{dbError.message}</p>
+          </div>
+        )}
+
+        {!dbError && applications?.length === 0 && (
           <p style={{ textAlign: 'center', opacity: 0.4, fontStyle: 'italic' }}>No applications yet.</p>
         )}
       </div>

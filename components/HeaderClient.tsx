@@ -243,7 +243,7 @@ export function HeaderClient() {
         </div>
       )}
     </div>
-  ) : mounted && isLoaded && authChecked ? (
+  ) : (
     <Link
       href="/sign-in"
       style={{
@@ -256,7 +256,7 @@ export function HeaderClient() {
     >
       Sign in
     </Link>
-  ) : null
+  )
 
   return (
     <header
@@ -398,7 +398,7 @@ export function HeaderClient() {
               </a>
             </>
           )}
-          {!signedIn && isLoaded && (
+          {!signedIn && (
             <Link href="/sign-in" onClick={() => setMenuOpen(false)} style={{ color: '#F3EDE6', textDecoration: 'none', fontSize: '1rem', letterSpacing: '0.08em', padding: '0.5rem 0', opacity: 0.6 }}>
               Sign in
             </Link>

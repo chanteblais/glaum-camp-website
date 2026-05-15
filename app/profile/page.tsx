@@ -11,16 +11,17 @@ export default async function ProfilePage() {
   const user = await currentUser()
   const email = user?.emailAddresses[0]?.emailAddress
 
-  // Find their approved application by email
+  // Find any application for this user (pending or approved)
   const { data: application } = await supabaseAdmin
     .from('applications')
     .select('*')
-    .eq('email', email)
-    .eq('status', 'approved')
-    .single()
+    .or(`clerk_user_id.eq.${userId},email.eq.${email}`)
+    .order('submitted_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
-  // Link clerk_user_id if not already set
-  if (application && !application.clerk_user_id) {
+  // Link clerk_user_id if not already set (for approved applications found by email)
+  if (application?.status === 'approved' && !application.clerk_user_id) {
     await supabaseAdmin
       .from('applications')
       .update({ clerk_user_id: userId })
@@ -56,6 +57,37 @@ export default async function ProfilePage() {
         </div>
 
         {!application ? (
+          // No application state
+          <div style={{ maxWidth: '580px', margin: '0 auto' }}>
+            <p style={{ fontSize: '1rem', lineHeight: 1.8, marginBottom: '1.25rem' }}>
+              Glåüm is a participatory camp built collaboratively by The Many Hands. This form helps us understand who's joining camp, how people would like to contribute, and what support structures we need to build together.
+            </p>
+            <p style={{ fontSize: '1rem', lineHeight: 1.8, marginBottom: '1.25rem' }}>
+              You do not need to be the most skilled, experienced, outgoing, or useful person in the world to join Glåüm.
+            </p>
+            <p style={{ fontSize: '1rem', lineHeight: 1.8, fontStyle: 'italic', opacity: 0.7, marginBottom: '2.5rem' }}>
+              You simply need to be willing to participate honestly, communicate clearly, and help hold the camp with us in whatever ways are realistic for you.
+            </p>
+            <div style={{ textAlign: 'center' }}>
+              <a
+                href="/apply"
+                style={{
+                  display: 'inline-block',
+                  padding: '0.75rem 2.5rem',
+                  borderRadius: '9999px',
+                  border: '1px solid rgba(200,168,72,0.5)',
+                  color: '#FFFACD',
+                  textDecoration: 'none',
+                  letterSpacing: '0.12em',
+                  fontSize: '0.85rem',
+                  fontFamily: 'TokyoDreams, serif',
+                }}
+              >
+                Submit Application
+              </a>
+            </div>
+          </div>
+        ) : application.status === 'pending' ? (
           // Pending state
           <div style={{ textAlign: 'center', padding: '3rem 2rem', border: '1px solid rgba(200,168,72,0.15)', borderRadius: '1rem', background: 'rgba(210,57,248,0.04)' }}>
             <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.2rem', color: '#C8A848', marginBottom: '0.75rem' }}>

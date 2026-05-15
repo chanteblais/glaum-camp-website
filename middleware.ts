@@ -1,6 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 
-const isProtectedRoute = createRouteMatcher(['/profile(.*)', '/admin(.*)'])
+const isProtectedRoute = createRouteMatcher(['/profile(.*)', '/admin(.*)', '/apply(.*)'])
 
 export default clerkMiddleware(async (auth, req) => {
   if (req.nextUrl.pathname === '/api/sign-out') {
