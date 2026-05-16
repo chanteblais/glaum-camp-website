@@ -295,7 +295,7 @@ export function HeaderClient() {
           }}
         >
           Glåüm
-          <span className="hidden sm:inline" style={{ color: '#F3EDE6', fontSize: '0.65rem', letterSpacing: '0.15em', marginLeft: '0.5rem', fontFamily: 'var(--font-libre-baskerville)', opacity: 0.6 }}>
+          <span style={{ color: '#F3EDE6', fontSize: '0.65rem', letterSpacing: '0.15em', marginLeft: '0.5rem', fontFamily: 'var(--font-libre-baskerville)', opacity: 0.6 }}>
             sponsored by Shrimp™
           </span>
         </Link>
