@@ -295,7 +295,7 @@ export function HeaderClient() {
           }}
         >
           Glåüm
-          <span style={{ color: '#F3EDE6', fontSize: '0.65rem', letterSpacing: '0.15em', marginLeft: '0.5rem', fontFamily: 'var(--font-libre-baskerville)', opacity: 0.6 }}>
+          <span className="hidden sm:inline" style={{ color: '#F3EDE6', fontSize: '0.65rem', letterSpacing: '0.15em', marginLeft: '0.5rem', fontFamily: 'var(--font-libre-baskerville)', opacity: 0.6 }}>
             sponsored by Shrimp™
           </span>
         </Link>
@@ -327,7 +327,7 @@ export function HeaderClient() {
           ))}
         </nav>
 
-        <div style={{ width: '72px', display: 'flex', justifyContent: 'flex-end' }}>
+        <div className="hidden md:flex" style={{ width: '72px', justifyContent: 'flex-end' }}>
           {authSlot}
         </div>
 
@@ -357,9 +357,16 @@ export function HeaderClient() {
             padding: '1rem 1.5rem 1.5rem',
             display: 'flex',
             flexDirection: 'column',
-            gap: '1rem',
+            gap: '0',
+            overflowX: 'hidden',
           }}
         >
+          {signedIn && (userFirstName || userEmail) && (
+            <div style={{ paddingBottom: '1rem', marginBottom: '0.5rem', borderBottom: '1px solid rgba(200,168,72,0.15)' }}>
+              {userFirstName && <p style={{ fontSize: '0.85rem', color: '#C8A848', opacity: 0.9 }}>{userFirstName}</p>}
+              {userEmail && <p style={{ fontSize: '0.75rem', color: '#F3EDE6', opacity: 0.35 }}>{userEmail}</p>}
+            </div>
+          )}
           {navLinks.map((link) => (
             <a
               key={link.href}
@@ -370,8 +377,8 @@ export function HeaderClient() {
                 textDecoration: 'none',
                 fontSize: '1rem',
                 letterSpacing: '0.08em',
-                padding: '0.5rem 0',
-                borderBottom: '1px solid rgba(200, 168, 72, 0.1)',
+                padding: '0.75rem 0',
+                borderBottom: '1px solid rgba(200, 168, 72, 0.08)',
               }}
             >
               {link.label}
@@ -379,7 +386,7 @@ export function HeaderClient() {
           ))}
           {signedIn && (
             <>
-              <Link href="/profile" onClick={() => setMenuOpen(false)} style={{ color: '#C8A848', textDecoration: 'none', fontSize: '1rem', letterSpacing: '0.08em', padding: '0.5rem 0', borderBottom: '1px solid rgba(200, 168, 72, 0.1)' }}>
+              <Link href="/profile" onClick={() => setMenuOpen(false)} style={{ color: '#C8A848', textDecoration: 'none', fontSize: '1rem', letterSpacing: '0.08em', padding: '0.75rem 0', borderBottom: '1px solid rgba(200, 168, 72, 0.08)' }}>
                 My Profile
               </Link>
               <a
@@ -392,14 +399,14 @@ export function HeaderClient() {
                   setRememberedFirstName(null)
                   setRememberedEmail(null)
                 }}
-                style={{ color: '#F3EDE6', textDecoration: 'none', cursor: 'pointer', fontSize: '1rem', letterSpacing: '0.08em', padding: '0.5rem 0', opacity: 0.5, textAlign: 'left' }}
+                style={{ color: '#F3EDE6', textDecoration: 'none', cursor: 'pointer', fontSize: '1rem', letterSpacing: '0.08em', padding: '0.75rem 0', opacity: 0.4, textAlign: 'left' }}
               >
                 Sign out
               </a>
             </>
           )}
           {!signedIn && (
-            <Link href="/sign-in" onClick={() => setMenuOpen(false)} style={{ color: '#F3EDE6', textDecoration: 'none', fontSize: '1rem', letterSpacing: '0.08em', padding: '0.5rem 0', opacity: 0.6 }}>
+            <Link href="/sign-in" onClick={() => setMenuOpen(false)} style={{ color: '#F3EDE6', textDecoration: 'none', fontSize: '1rem', letterSpacing: '0.08em', padding: '0.75rem 0', opacity: 0.6 }}>
               Sign in
             </Link>
           )}
