@@ -73,6 +73,11 @@ export default async function ProfilePage() {
             ← Back to camp
           </a>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            {isAdmin && (
+              <a href="/admin" style={{ fontSize: '0.75rem', letterSpacing: '0.12em', color: '#D239F8', textDecoration: 'none', opacity: 0.7 }}>
+                Admin
+              </a>
+            )}
             {isAdmin ? <NotificationBell /> : <UserNotificationBell />}
             {application && (application.status === 'approved' || application.status === 'pending') && (
               <ProfileSettings application={application} />
@@ -270,8 +275,8 @@ export default async function ProfilePage() {
                       You still need to choose {missing.join(' and ')}.
                     </span>
                   </div>
-                  <a href="#role-signup" style={{ fontSize: '0.8rem', color: '#C8A848', opacity: 0.7, textDecoration: 'underline', textUnderlineOffset: '2px', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                    Go to signup →
+                  <a href="/apply" style={{ fontSize: '0.8rem', color: '#C8A848', opacity: 0.7, textDecoration: 'underline', textUnderlineOffset: '2px', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    Complete registration →
                   </a>
                 </div>
               )
@@ -299,9 +304,7 @@ export default async function ProfilePage() {
                 { label: 'Arrival', value: application.arrival_date },
                 { label: 'Departure', value: application.departure_date },
                 { label: 'Attendance', value: application.attendance },
-                { label: 'Camp Relationship', value: application.camp_relationship },
                 { label: 'Traveling From', value: application.location },
-                { label: 'Rideshare', value: application.rideshare },
               ].filter(({ value }) => value).map(({ label, value }) => (
                 <div key={label} style={{ padding: '1rem 1.25rem', border: '1px solid rgba(200,168,72,0.12)', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.02)' }}>
                   <p style={{ fontSize: '0.7rem', letterSpacing: '0.1em', color: '#C8A848', opacity: 0.6, marginBottom: '0.35rem', textTransform: 'uppercase' }}>{label}</p>
@@ -312,7 +315,7 @@ export default async function ProfilePage() {
 
             <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.2), transparent)', marginBottom: '2.5rem' }} />
 
-            <SignupSection />
+            <SignupSection showPickers={false} />
 
             <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.2), transparent)', margin: '2.5rem 0' }} />
 

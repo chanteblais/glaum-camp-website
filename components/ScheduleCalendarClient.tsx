@@ -25,6 +25,8 @@ const DAYS = [
   { label: 'Monday',    short: 'Mon', date: 27 },
 ]
 
+const DAY_ORDER: Record<string, number> = Object.fromEntries(DAYS.map((d, i) => [d.label, i]))
+
 const PX_PER_HOUR = 56
 
 // Colour palette per event type
@@ -92,10 +94,10 @@ function RecurringEventCard({ event }: { event: ScheduleEvent }) {
           {event.time}
         </p>
       )}
-      <div style={{ color: '#C8A848', opacity: 0.55, display: 'flex', justifyContent: 'center' }}>
-        <EventIcon type={event.icon_type} size={event.icon_type.startsWith('http') || event.icon_type.startsWith('/') ? 72 : 38} />
+      <div style={{ color: '#C8A848', opacity: 0.55, display: 'flex', justifyContent: 'center', flex: 1, alignItems: 'center' }}>
+        <EventIcon type={event.icon_type} size={38} />
       </div>
-      <div>
+      <div style={{ marginTop: 'auto' }}>
         <p style={{ fontSize: '1rem', fontWeight: 700, color: '#F3EDE6', margin: '0 0 0.4rem', textAlign: 'center' }}>{event.title}</p>
         {event.detail_desc && <p style={{ fontSize: '0.85rem', lineHeight: 1.65, opacity: 0.6, margin: 0, textAlign: 'center' }}>{event.detail_desc}</p>}
       </div>
@@ -142,7 +144,7 @@ function EventBlock({ event, style }: { event: ScheduleEvent; style: React.CSSPr
         </div>
         {expanded && expandedText && (
           <div style={{ marginTop: '0.3rem', paddingTop: '0.3rem', borderTop: '1px solid rgba(200,168,72,0.1)' }}>
-            <p style={{ fontSize: '0.65rem', opacity: 0.6, margin: 0, lineHeight: 1.5 }}>{expandedText}</p>
+            <p style={{ fontSize: '0.65rem', opacity: 0.6, margin: 0, lineHeight: 1.5, textAlign: 'center' }}>{expandedText}</p>
           </div>
         )}
       </div>
@@ -153,9 +155,11 @@ function EventBlock({ event, style }: { event: ScheduleEvent; style: React.CSSPr
 // ── Main Calendar ─────────────────────────────────────────────────────────────
 
 export function ScheduleCalendarClient({ events }: { events: ScheduleEvent[] }) {
-  const regular = [...events.filter(e => !e.is_recurring)].sort((a, b) =>
-    (parseEventTimes(a.time).start ?? 9999) - (parseEventTimes(b.time).start ?? 9999)
-  )
+  const regular = [...events.filter(e => !e.is_recurring)].sort((a, b) => {
+    const dayDiff = (DAY_ORDER[a.day] ?? 99) - (DAY_ORDER[b.day] ?? 99)
+    if (dayDiff !== 0) return dayDiff
+    return (parseEventTimes(a.time).start ?? 9999) - (parseEventTimes(b.time).start ?? 9999)
+  })
   const recurring = events.filter(e => e.is_recurring)
   const untimed = regular.filter(e => !e.time)
 
@@ -305,15 +309,15 @@ export function ScheduleCalendarClient({ events }: { events: ScheduleEvent[] }) 
             </p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1rem' }}>
-            {regular.map(card => (
+            {regular.filter((card, i, arr) => arr.findIndex(c => c.title === card.title) === i).map(card => (
               <div key={card.id} style={{ padding: '1.25rem', border: '1px solid rgba(200,168,72,0.15)', borderRadius: '0.85rem', background: 'rgba(200,168,72,0.03)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <p style={{ fontSize: '0.68rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: card.highlight ? '#C8803A' : '#C8A848', opacity: 0.85, margin: 0, textAlign: 'center' }}>
                   {card.day}&nbsp;&nbsp;{card.time}
                 </p>
-                <div style={{ color: '#C8A848', opacity: 0.55, display: 'flex', justifyContent: 'center' }}>
+                <div style={{ color: '#C8A848', opacity: 0.55, display: 'flex', justifyContent: 'center', flex: 1, alignItems: 'center' }}>
                   <EventIcon type={card.icon_type} size={card.icon_type.startsWith('http') || card.icon_type.startsWith('/') ? 72 : 38} />
                 </div>
-                <div>
+                <div style={{ marginTop: 'auto' }}>
                   <p style={{ fontSize: '1rem', fontWeight: 700, color: '#F3EDE6', margin: '0 0 0.4rem', textAlign: 'center' }}>{card.title}</p>
                   {card.detail_desc && <p style={{ fontSize: '0.85rem', lineHeight: 1.65, opacity: 0.6, margin: 0, textAlign: 'center' }}>{card.detail_desc}</p>}
                 </div>

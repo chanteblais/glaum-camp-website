@@ -4,15 +4,16 @@ export const ICON_TYPES = [
 ] as const
 
 export function EventIcon({ type, size = 38 }: { type: string; size?: number }) {
-  // Custom uploaded icon — background-image bypasses Tailwind's img reset entirely
+  // Custom uploaded icon — scale up to visually match built-in stroke icons
   if (type.startsWith('http') || type.startsWith('/')) {
+    const scaledSize = Math.round(size * 1.5)
     return (
       <span style={{
         display: 'block',
-        width: `${size}px`,
-        height: `${size}px`,
-        minWidth: `${size}px`,
-        minHeight: `${size}px`,
+        width: `${scaledSize}px`,
+        height: `${scaledSize}px`,
+        minWidth: `${scaledSize}px`,
+        minHeight: `${scaledSize}px`,
         backgroundImage: `url(${type})`,
         backgroundSize: 'contain',
         backgroundRepeat: 'no-repeat',

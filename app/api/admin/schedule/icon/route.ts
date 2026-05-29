@@ -45,3 +45,39 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ url: publicUrl })
 }
+
+export async function DELETE(req: NextRequest) {
+  const { userId } = await auth()
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const client = await clerkClient()
+  const user = await client.users.getUser(userId)
+  if (user.publicMetadata?.role !== 'admin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const { url } = await req.json()
+  if (!url) return NextResponse.json({ error: 'No URL provided' }, { status: 400 })
+
+  // Extract storage path from the public URL
+  const match = (url as string).match(/schedule-icons\/(.+?)(\?|$)/)
+  if (!match) return NextResponse.json({ error: 'Invalid icon URL' }, { status: 400 })
+  const path = match[1]
+
+  // Delete from storage
+  const { error: storageError } = await supabaseAdmin.storage
+    .from('schedule-icons')
+    .remove([path])
+
+  if (storageError) {
+    return NextResponse.json({ error: storageError.message }, { status: 500 })
+  }
+
+  // Reset any events using this icon back to 'star'
+  await supabaseAdmin
+    .from('schedule_events')
+    .update({ icon_type: 'star' })
+    .eq('icon_type', url)
+
+  return NextResponse.json({ success: true })
+}

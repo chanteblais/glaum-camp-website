@@ -127,10 +127,14 @@ function EventModal({
   onClose,
   saving,
   error,
+  customIcons = [],
+  onDeleteIcon,
 }: {
   initial: Omit<ScheduleEvent, 'id' | 'sort_order'>
   onSave: (form: Omit<ScheduleEvent, 'id' | 'sort_order'>) => void
   onClose: () => void
+  customIcons?: string[]
+  onDeleteIcon?: (url: string) => void
   saving: boolean
   error: string | null
 }) {
@@ -224,20 +228,43 @@ function EventModal({
               </button>
             ))}
 
-            {/* Custom uploaded icon — show preview if active */}
-            {form.icon_type.startsWith('http') && (
-              <button
-                type="button"
-                onClick={() => iconInputRef.current?.click()}
-                title="Custom icon (click to replace)"
-                style={{
-                  padding: '0.4rem', borderRadius: '0.5rem', cursor: 'pointer',
-                  border: '1px solid #C8A848', background: 'rgba(200,168,72,0.12)',
-                }}
-              >
-                <EventIcon type={form.icon_type} size={20} />
-              </button>
-            )}
+            {/* Previously uploaded custom icons — reusable across events */}
+            {customIcons.map((url) => (
+              <div key={url} style={{ position: 'relative', display: 'inline-flex' }} className="icon-item" onMouseEnter={e => { const btn = e.currentTarget.querySelector('.icon-delete') as HTMLElement; if (btn) btn.style.opacity = '1' }} onMouseLeave={e => { const btn = e.currentTarget.querySelector('.icon-delete') as HTMLElement; if (btn) btn.style.opacity = '0' }}>
+                <button
+                  type="button"
+                  onClick={() => set('icon_type', url)}
+                  title="Use this icon"
+                  style={{
+                    padding: '0.4rem', borderRadius: '0.5rem', cursor: 'pointer',
+                    border: form.icon_type === url ? '1px solid #C8A848' : '1px solid rgba(200,168,72,0.2)',
+                    background: form.icon_type === url ? 'rgba(200,168,72,0.12)' : 'transparent',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  <EventIcon type={url} size={20} />
+                </button>
+                {onDeleteIcon && (
+                  <button
+                    type="button"
+                    className="icon-delete"
+                    onClick={(e) => { e.stopPropagation(); onDeleteIcon(url) }}
+                    title="Delete icon"
+                    style={{
+                      position: 'absolute', top: '-6px', right: '-6px',
+                      width: '16px', height: '16px', borderRadius: '50%',
+                      background: '#1A0A24', border: '1px solid rgba(255,100,100,0.4)',
+                      color: '#ff8a8a', cursor: 'pointer', fontSize: '0.55rem',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      lineHeight: 1, padding: 0,
+                      opacity: 0, transition: 'opacity 0.15s',
+                    }}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            ))}
 
             {/* Upload button */}
             <button
@@ -416,6 +443,7 @@ export function ScheduleManager() {
 
   const regular = events.filter((e) => !e.is_recurring)
   const recurring = events.filter((e) => e.is_recurring)
+  const customIcons = Array.from(new Set(events.map(e => e.icon_type).filter(t => t.startsWith('http') || t.startsWith('/'))))
 
   const handleSave = async (form: Omit<ScheduleEvent, 'id' | 'sort_order'>) => {
     setSaving(true)
@@ -446,6 +474,17 @@ export function ScheduleManager() {
     if (!confirm('Delete this event?')) return
     await fetch(`/api/admin/schedule/${id}`, { method: 'DELETE' })
     setEvents((prev) => prev.filter((e) => e.id !== id))
+  }
+
+  const handleDeleteIcon = async (url: string) => {
+    if (!confirm('Delete this icon? Any events using it will revert to the default icon.')) return
+    await fetch('/api/admin/schedule/icon', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    })
+    // Reload events so any that used this icon show the updated icon_type
+    await load()
   }
 
   const handleToggleVisible = async (event: ScheduleEvent) => {
@@ -568,6 +607,8 @@ const handleDrop = async (group: ScheduleEvent[], targetId: string) => {
           onClose={() => setModal(null)}
           saving={saving}
           error={modalError}
+          customIcons={customIcons}
+          onDeleteIcon={handleDeleteIcon}
         />
       )}
     </div>
