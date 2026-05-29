@@ -26,6 +26,9 @@ export async function POST(req: NextRequest) {
       .from('applications')
       .insert([{
         clerk_user_id: userId,
+        avatar_url: data.avatar_url || null,
+
+        // Section 1 — Basic Info
         first_name: data.first_name,
         last_name: data.last_name,
         preferred_name: data.preferred_name || null,
@@ -34,7 +37,22 @@ export async function POST(req: NextRequest) {
         phone: data.phone,
         instagram: data.instagram || null,
         location: data.location || null,
+        emergency_contact: data.emergency_contact || null,
+        referral: data.referral || null,
         camped_before: data.camped_before,
+
+        // Section 2 — About You
+        about_you: data.about_you || null,
+        glaum_acceptance: data.glaum_acceptance || null,
+        special_skills: data.special_skills || null,
+        recent_achievements: data.recent_achievements || null,
+        official_designation: data.official_designation || null,
+        research_interests: data.research_interests || null,
+        known_side_effects: data.known_side_effects || null,
+        attunement_status: data.attunement_status || [],
+        attunement_status_other: data.attunement_status_other || null,
+
+        // Section 3 — What If Plans
         attendance: data.attendance,
         arrival_date: data.arrival_date || null,
         departure_date: data.departure_date || null,
@@ -43,16 +61,28 @@ export async function POST(req: NextRequest) {
         space_requirements: data.space_requirements || null,
         structures: data.structures || null,
         rideshare: data.rideshare || null,
-        contributions: data.contributions || [],
-        energizing_participation: data.energizing_participation || null,
-        support_needs: data.support_needs || null,
-        accessibility: data.accessibility || null,
-        capacity: data.capacity || null,
-        participation_style: data.participation_style || null,
+
+        // Section 4 — Participation
+        leadership_interest: data.leadership_interest || null,
+        setup_available: data.setup_available || null,
+        setup_preference: data.setup_preference || [],
+        setup_limitations: data.setup_limitations || [],
+        setup_notes: data.setup_notes || null,
+        community_contribution: data.community_contribution || null,
+        welcome_support: data.welcome_support || null,
+        leadership_note: data.leadership_note || null,
+        skills_contribution: data.skills_contribution || null,
+
+        // Section 5 — Camp Culture
         draws_to_glaum: data.draws_to_glaum || null,
         healthy_community: data.healthy_community || null,
+
+        // Section 6 — Contribution Expectations
         acknowledgements: data.acknowledgements || [],
+
+        // Section 7 — Final Glåüm Questions
         shrimp_relationship: data.shrimp_relationship || null,
+
         status: 'pending',
       }])
 

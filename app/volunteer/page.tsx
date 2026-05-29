@@ -12,14 +12,14 @@ export default async function VolunteerPage() {
   const firstName = user?.firstName ?? ''
   const lastName = user?.lastName ?? ''
 
-  // Redirect if already signed up
+  // Redirect if already actively signed up (cancelled records can re-signup)
   const { data: existing } = await supabaseAdmin
     .from('volunteers')
-    .select('id')
+    .select('id, status')
     .eq('clerk_user_id', userId)
     .maybeSingle()
 
-  if (existing) redirect('/profile')
+  if (existing?.status === 'active') redirect('/profile')
 
   // Redirect if already has a camp application
   const { data: application } = await supabaseAdmin

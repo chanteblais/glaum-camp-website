@@ -4,7 +4,6 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { ApplicationRow } from './ApplicationRow'
 import { CollapsibleSection } from './CollapsibleSection'
 import { OverviewSection } from './OverviewSection'
-import { ContributionsSection } from './ContributionsSection'
 import { VolunteersSection } from './VolunteersSection'
 import { NotificationsSection } from './NotificationsSection'
 import { NotificationBell } from './NotificationBell'
@@ -139,15 +138,7 @@ export default async function AdminPage() {
           <OverviewSection applications={all} />
         </CollapsibleSection>
 
-        {/* ── CONTRIBUTIONS ── */}
-        <CollapsibleSection
-          title="Contributions"
-          summary={`${approved.length + pending.length} members`}
-        >
-          <ContributionsSection applications={all} />
-        </CollapsibleSection>
-
-        {/* ── ROLE REQUESTS ── */}
+{/* ── ROLE REQUESTS ── */}
         <CollapsibleSection
           title="Role Requests"
           summary="Pending approval"

@@ -1,8 +1,8 @@
 import { supabaseAdmin } from '@/lib/supabase'
 
 type NotifyAdminInput = {
-  applicationId: string
-  eventType: 'profile_updated' | 'attendance_cancelled'
+  applicationId?: string | null
+  eventType: 'profile_updated' | 'attendance_cancelled' | 'volunteer_cancelled' | 'volunteer_signup'
   message: string
   details?: Record<string, unknown>
 }
@@ -10,7 +10,7 @@ type NotifyAdminInput = {
 export async function notifyAdmin(input: NotifyAdminInput): Promise<void> {
   const { error } = await supabaseAdmin.from('admin_notifications').insert([
     {
-      application_id: input.applicationId,
+      application_id: input.applicationId ?? null,
       event_type: input.eventType,
       message: input.message,
       details: input.details ?? null,

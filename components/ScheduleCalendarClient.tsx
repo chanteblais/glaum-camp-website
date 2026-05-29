@@ -13,6 +13,7 @@ type ScheduleEvent = {
   icon_type: string
   highlight: boolean
   is_recurring: boolean
+  all_hands: boolean
 }
 
 const DAYS = [
@@ -102,10 +103,14 @@ function EventBlock({ event, style }: { event: ScheduleEvent; style: React.CSSPr
         position: 'absolute',
         left: '2px', right: '2px',
         borderRadius: '0.35rem',
-        border: event.highlight
+        border: event.all_hands
+          ? '1px solid rgba(210,57,248,0.45)'
+          : event.highlight
           ? '1px solid rgba(200,168,72,0.4)'
           : '1px solid rgba(200,168,72,0.15)',
-        background: event.highlight
+        background: event.all_hands
+          ? 'rgba(210,57,248,0.1)'
+          : event.highlight
           ? 'rgba(200,168,72,0.1)'
           : 'rgba(255,255,255,0.03)',
         overflow: 'hidden',
@@ -120,7 +125,7 @@ function EventBlock({ event, style }: { event: ScheduleEvent; style: React.CSSPr
           <div style={{ color: '#C8A848', opacity: 0.65, flexShrink: 0, marginTop: '1px' }}>
             <EventIcon type={event.icon_type} size={10} />
           </div>
-          <p style={{ fontSize: '0.68rem', color: '#F3EDE6', margin: 0, lineHeight: 1.3, fontWeight: event.highlight ? 600 : 400, wordBreak: 'break-word' }}>
+          <p style={{ fontSize: '0.68rem', color: event.all_hands ? '#e08aff' : '#F3EDE6', margin: 0, lineHeight: 1.3, fontWeight: (event.highlight || event.all_hands) ? 600 : 400, wordBreak: 'break-word' }}>
             {event.title}
           </p>
           {hasDetail && (
