@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, FormEvent } from 'react'
+import { useState, useRef, FormEvent } from 'react'
 import Link from 'next/link'
 
 const inputStyle: React.CSSProperties = {
@@ -26,7 +26,7 @@ const labelStyle: React.CSSProperties = {
 }
 
 const fieldStyle: React.CSSProperties = {
-  marginBottom: '1.75rem',
+  marginBottom: '2.75rem',
 }
 
 const sectionHeadingStyle: React.CSSProperties = {
@@ -52,6 +52,15 @@ const dividerStyle: React.CSSProperties = {
   margin: '3rem 0',
 }
 
+const helperTextStyle: React.CSSProperties = {
+  fontSize: '0.8rem',
+  color: '#F3EDE6',
+  opacity: 0.5,
+  marginTop: '0.75rem',
+  lineHeight: 1.6,
+  fontStyle: 'italic',
+}
+
 function Field({ label, children, optional }: { label: string; children: React.ReactNode; optional?: boolean }) {
   return (
     <div style={fieldStyle}>
@@ -64,12 +73,13 @@ function Field({ label, children, optional }: { label: string; children: React.R
   )
 }
 
-function TextInput({ name, placeholder, type = 'text' }: { name: string; placeholder?: string; type?: string }) {
+function TextInput({ name, placeholder, type = 'text', required }: { name: string; placeholder?: string; type?: string; required?: boolean }) {
   return (
     <input
       type={type}
       name={name}
       placeholder={placeholder}
+      required={required}
       style={inputStyle}
       onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(210,57,248,0.6)' }}
       onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(200,168,72,0.25)' }}
@@ -168,22 +178,57 @@ function RadioGroup({ options, name }: { options: string[]; name: string }) {
 }
 
 export function ApplyForm({ userEmail }: { userEmail: string }) {
+  const [pathChosen, setPathChosen] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [attunementOther, setAttunementOther] = useState(false)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const [avatarError, setAvatarError] = useState<string | null>(null)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setAvatarPreview(URL.createObjectURL(file))
+    setAvatarError(null)
+    setAvatarUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append('avatar', file)
+      const res = await fetch('/api/profile/avatar', { method: 'POST', body: fd })
+      const json = await res.json()
+      if (!res.ok) { setAvatarPreview(null); setAvatarError(json.error ?? 'Upload failed'); return }
+      setAvatarUrl(json.avatarUrl)
+    } finally {
+      setAvatarUploading(false)
+      if (avatarInputRef.current) avatarInputRef.current.value = ''
+    }
+  }
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    if (!avatarUrl) {
+      setError('Please upload a photo before submitting.')
+      return
+    }
     setSubmitting(true)
     setError(null)
 
     const formData = new FormData(e.currentTarget)
 
-    // Collect checkbox groups as arrays
-    const contributions = formData.getAll('contributions') as string[]
     const acknowledgements = formData.getAll('acknowledgements') as string[]
+    const attunementStatus = formData.getAll('attunement_status') as string[]
+    const setupPreference = formData.getAll('setup_preference') as string[]
+    const setupLimitations = formData.getAll('setup_limitations') as string[]
 
     const data = {
+      // Photo
+      avatar_url: avatarUrl,
+
+      // Section 1 — Basic Info
       first_name: formData.get('first_name'),
       last_name: formData.get('last_name'),
       preferred_name: formData.get('preferred_name'),
@@ -192,7 +237,21 @@ export function ApplyForm({ userEmail }: { userEmail: string }) {
       phone: formData.get('phone'),
       instagram: formData.get('instagram'),
       location: formData.get('location'),
+      emergency_contact: formData.get('emergency_contact'),
+      referral: formData.get('referral'),
       camped_before: formData.get('camped_before'),
+
+      // Section 2 — About You
+      glaum_acceptance: formData.get('glaum_acceptance'),
+      special_skills: formData.get('special_skills'),
+      recent_achievements: formData.get('recent_achievements'),
+      official_designation: formData.get('official_designation'),
+      research_interests: formData.get('research_interests'),
+      known_side_effects: formData.get('known_side_effects'),
+      attunement_status: attunementStatus,
+      attunement_status_other: formData.get('attunement_status_other'),
+
+      // Section 3 — What If Plans
       attendance: formData.get('attendance'),
       arrival_date: formData.get('arrival'),
       departure_date: formData.get('departure'),
@@ -201,15 +260,26 @@ export function ApplyForm({ userEmail }: { userEmail: string }) {
       space_requirements: formData.get('space'),
       structures: formData.get('structures'),
       rideshare: formData.get('rideshare'),
-      contributions,
-      energizing_participation: formData.get('energizing_participation'),
-      support_needs: formData.get('support_needs'),
-      accessibility: formData.get('accessibility'),
-      capacity: formData.get('capacity'),
-      participation_style: formData.get('participation_style'),
+
+      // Section 4 — Participation
+      leadership_interest: formData.get('leadership_interest'),
+      setup_available: formData.get('setup_available'),
+      setup_preference: setupPreference,
+      setup_limitations: setupLimitations,
+      setup_notes: formData.get('setup_notes'),
+      community_contribution: formData.get('community_contribution'),
+      welcome_support: formData.get('welcome_support'),
+      leadership_note: formData.get('leadership_note'),
+      skills_contribution: formData.get('skills_contribution'),
+
+      // Section 5 — Camp Culture
       draws_to_glaum: formData.get('draws_to_glaum'),
       healthy_community: formData.get('healthy_community'),
+
+      // Section 6 — Contribution Expectations
       acknowledgements,
+
+      // Section 7 — Final Glåüm Questions
       shrimp_relationship: formData.get('shrimp_relationship'),
     }
 
@@ -236,7 +306,6 @@ export function ApplyForm({ userEmail }: { userEmail: string }) {
 
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1 }}>
-
       {/* Back link */}
       <div style={{ padding: '1.5rem', maxWidth: '760px', margin: '0 auto' }}>
         <Link
@@ -258,19 +327,103 @@ export function ApplyForm({ userEmail }: { userEmail: string }) {
 
       <div style={{ maxWidth: '760px', margin: '0 auto', padding: '0 1.5rem 6rem' }}>
 
-        {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
-          <p style={{ fontSize: '0.65rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: '#D239F8', marginBottom: '1rem', opacity: 0.85 }}>
-            What If 2026
-          </p>
-          <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2.2rem, 6vw, 3.5rem)', color: '#C8A848', lineHeight: 1.1, marginBottom: '0.5rem', textShadow: '0 0 40px rgba(210,57,248,0.4)' }}>
-            Glåüm Camp Application
-          </h1>
-          <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1rem', color: '#F3EDE6', opacity: 0.5, letterSpacing: '0.15em', marginBottom: '2rem' }}>
-            ManyHands Participation Registry
-          </p>
-          <div style={dividerStyle} />
-        </div>
+        {/* ── PATH CHOICE ── */}
+        {!pathChosen && !submitted && (
+          <div style={{ textAlign: 'center', paddingTop: '2rem' }}>
+            <p style={{ fontSize: '0.65rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: '#D239F8', marginBottom: '1rem', opacity: 0.85 }}>
+              What If 2026
+            </p>
+            <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 6vw, 3rem)', color: '#C8A848', lineHeight: 1.1, marginBottom: '0.5rem', textShadow: '0 0 40px rgba(210,57,248,0.4)' }}>
+              Join Glåüm
+            </h1>
+            <p style={{ fontSize: '0.95rem', opacity: 0.5, marginBottom: '3rem', fontStyle: 'italic' }}>
+              How would you like to participate?
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem', textAlign: 'left' }}>
+              {/* Camp member */}
+              <div style={{ padding: '2rem', border: '1px solid rgba(200,168,72,0.2)', borderRadius: '1rem', background: 'rgba(200,168,72,0.03)', display: 'flex', flexDirection: 'column' }}>
+                <p style={{ fontSize: '0.65rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.7, marginBottom: '0.75rem' }}>
+                  Camp Member
+                </p>
+                <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.3rem', color: '#C8A848', marginBottom: '0.75rem' }}>
+                  Join the Camp
+                </p>
+                <p style={{ fontSize: '0.875rem', lineHeight: 1.7, opacity: 0.6, marginBottom: '2rem', flex: 1 }}>
+                  Camp with Glåüm at What If 2026. Full participation — you'll sleep on site, help build and hold the space, and take on roles as part of the camp.
+                </p>
+                <button
+                  onClick={() => setPathChosen(true)}
+                  style={{
+                    display: 'block',
+                    textAlign: 'center',
+                    padding: '0.75rem 1.5rem',
+                    borderRadius: '9999px',
+                    border: '1px solid rgba(200,168,72,0.5)',
+                    background: 'none',
+                    color: '#FFFACD',
+                    fontSize: '0.8rem',
+                    letterSpacing: '0.1em',
+                    cursor: 'pointer',
+                    transition: 'background 0.2s, border-color 0.2s',
+                    fontFamily: 'var(--font-libre-baskerville), Georgia, serif',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(200,168,72,0.08)'; e.currentTarget.style.borderColor = 'rgba(200,168,72,0.8)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.borderColor = 'rgba(200,168,72,0.5)' }}
+                >
+                  Apply to Camp
+                </button>
+              </div>
+
+              {/* Volunteer */}
+              <div style={{ padding: '2rem', border: '1px solid rgba(210,57,248,0.15)', borderRadius: '1rem', background: 'rgba(210,57,248,0.03)', display: 'flex', flexDirection: 'column' }}>
+                <p style={{ fontSize: '0.65rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#D239F8', opacity: 0.7, marginBottom: '0.75rem' }}>
+                  Volunteer
+                </p>
+                <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.3rem', color: '#C8A848', marginBottom: '0.75rem' }}>
+                  Volunteer for a Shift
+                </p>
+                <p style={{ fontSize: '0.875rem', lineHeight: 1.7, opacity: 0.6, marginBottom: '2rem', flex: 1 }}>
+                  Not camping with Glåüm, but want to be part of it? Sign up to volunteer for a shift and we'll be in touch as the event gets closer.
+                </p>
+                <Link
+                  href="/volunteer"
+                  style={{
+                    display: 'block',
+                    textAlign: 'center',
+                    padding: '0.75rem 1.5rem',
+                    borderRadius: '9999px',
+                    border: '1px solid rgba(210,57,248,0.4)',
+                    color: '#F3EDE6',
+                    textDecoration: 'none',
+                    fontSize: '0.8rem',
+                    letterSpacing: '0.1em',
+                    transition: 'background 0.2s, border-color 0.2s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(210,57,248,0.08)'; e.currentTarget.style.borderColor = 'rgba(210,57,248,0.7)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.borderColor = 'rgba(210,57,248,0.4)' }}
+                >
+                  Sign Up to Volunteer
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Form — shown once path is chosen */}
+        {pathChosen && <>
+          <div style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
+            <p style={{ fontSize: '0.65rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: '#D239F8', marginBottom: '1rem', opacity: 0.85 }}>
+              What If 2026
+            </p>
+            <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2.2rem, 6vw, 3.5rem)', color: '#C8A848', lineHeight: 1.1, marginBottom: '0.5rem', textShadow: '0 0 40px rgba(210,57,248,0.4)' }}>
+              Glåüm Camp Application
+            </h1>
+            <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1rem', color: '#F3EDE6', opacity: 0.5, letterSpacing: '0.15em', marginBottom: '2rem' }}>
+              ManyHands Participation Registry
+            </p>
+            <div style={dividerStyle} />
+          </div>
 
         {/* Success state */}
         {submitted ? (
@@ -296,17 +449,17 @@ export function ApplyForm({ userEmail }: { userEmail: string }) {
         ) : (
           <form onSubmit={handleSubmit}>
 
-            {/* ── SECTION 1 ── */}
+            {/* ── SECTION 1 — Basic Info ── */}
             <div>
               <p style={sectionHeadingStyle}>Section 1 — Basic Info</p>
               <div style={dividerStyle} />
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                 <Field label="First Name">
-                  <TextInput name="first_name" placeholder="First name" />
+                  <TextInput name="first_name" placeholder="First name" required />
                 </Field>
                 <Field label="Last Name">
-                  <TextInput name="last_name" placeholder="Last name" />
+                  <TextInput name="last_name" placeholder="Last name" required />
                 </Field>
               </div>
 
@@ -330,7 +483,7 @@ export function ApplyForm({ userEmail }: { userEmail: string }) {
                   />
                 </Field>
                 <Field label="Phone number">
-                  <TextInput name="phone" type="tel" placeholder="For camp logistics" />
+                  <TextInput name="phone" type="tel" placeholder="For camp logistics" required />
                 </Field>
               </div>
 
@@ -342,19 +495,194 @@ export function ApplyForm({ userEmail }: { userEmail: string }) {
                 <TextInput name="location" placeholder="City, region, or 'the void'" />
               </Field>
 
+              <Field label="Emergency Contact">
+                <TextInput name="emergency_contact" placeholder="Name and phone number" required />
+              </Field>
+
+              <Field label="Who referred you to Glåüm?" optional>
+                <TextInput name="referral" placeholder="Name, or how you found us" />
+              </Field>
+
               <Field label="Have you camped with Glåüm before?">
                 <RadioGroup
                   name="camped_before"
                   options={['Yes', 'No']}
                 />
               </Field>
+
+              {/* Photo upload */}
+              <div style={{ marginBottom: '2.75rem' }}>
+                <p style={labelStyle}>Photo Upload</p>
+                <p style={{ fontSize: '0.875rem', lineHeight: 1.7, opacity: 0.65, marginBottom: '0.6rem' }}>
+                  Please upload a photo for the Many Hands Photo Board. This helps camp members learn names and recognize each other during the event.
+                </p>
+                <p style={{ fontSize: '0.8rem', lineHeight: 1.7, opacity: 0.45, fontStyle: 'italic', marginBottom: '1.25rem' }}>
+                  A photo where people can reasonably tell it's you is appreciated. Baby photos, blurry silhouettes, and distant figures disappearing into the mist may be beautiful, but they aren't always particularly helpful when it comes to identification. Don't worry about finding the perfect photo — you can always update it later.
+                </p>
+
+                <div
+                  onClick={() => !avatarUploading && avatarInputRef.current?.click()}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.75rem',
+                    border: `1px dashed ${avatarPreview ? 'rgba(210,57,248,0.4)' : 'rgba(200,168,72,0.25)'}`,
+                    borderRadius: '0.75rem',
+                    padding: '2rem',
+                    cursor: avatarUploading ? 'wait' : 'pointer',
+                    transition: 'border-color 0.2s, background 0.2s',
+                    background: avatarPreview ? 'rgba(210,57,248,0.04)' : 'rgba(255,255,255,0.02)',
+                    minHeight: '140px',
+                    position: 'relative',
+                    overflow: 'hidden',
+                  }}
+                  onMouseEnter={e => { if (!avatarUploading) (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(210,57,248,0.5)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = avatarPreview ? 'rgba(210,57,248,0.4)' : 'rgba(200,168,72,0.25)' }}
+                >
+                  {avatarPreview ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', width: '100%' }}>
+                      <img
+                        src={avatarPreview}
+                        alt="Preview"
+                        style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(210,57,248,0.3)', flexShrink: 0 }}
+                      />
+                      <div>
+                        {avatarUploading ? (
+                          <p style={{ fontSize: '0.85rem', color: '#D239F8', opacity: 0.8 }}>Uploading…</p>
+                        ) : (
+                          <>
+                            <p style={{ fontSize: '0.85rem', color: '#7dcf8e', marginBottom: '0.25rem' }}>✓ Photo uploaded</p>
+                            <p style={{ fontSize: '0.75rem', opacity: 0.45, fontStyle: 'italic' }}>Click to change</p>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="rgba(200,168,72,0.5)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                        <circle cx="12" cy="13" r="4" />
+                      </svg>
+                      <p style={{ fontSize: '0.85rem', opacity: 0.5, margin: 0 }}>Click to upload a photo</p>
+                      <p style={{ fontSize: '0.72rem', opacity: 0.3, margin: 0 }}>JPEG, PNG, WebP or GIF · max 5 MB</p>
+                    </>
+                  )}
+                </div>
+
+                {avatarError && (
+                  <p style={{ fontSize: '0.78rem', color: '#ff8a8a', marginTop: '0.5rem' }}>{avatarError}</p>
+                )}
+
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  onChange={handleAvatarChange}
+                  style={{ display: 'none' }}
+                />
+              </div>
             </div>
 
             <div style={dividerStyle} />
 
-            {/* ── SECTION 2 ── */}
+            {/* ── SECTION 2 — About You ── */}
             <div>
-              <p style={sectionHeadingStyle}>Section 2 — Your What If Plans</p>
+              <p style={sectionHeadingStyle}>Section 2 — About You</p>
+              <div style={dividerStyle} />
+
+              <Field label="Have you accepted Glåüm into your heart?">
+                <RadioGroup
+                  name="glaum_acceptance"
+                  options={['Yes', 'Not Yet', "It's Complicated"]}
+                />
+              </Field>
+
+              <Field label="Is there anything you're particularly good at that Glåüm might not know about?" optional>
+                <TextArea
+                  name="special_skills"
+                  placeholder="Skills, talents, specialties — mundane or otherwise."
+                  rows={3}
+                />
+              </Field>
+
+              <Field label="Recent Achievements" optional>
+                <TextArea
+                  name="recent_achievements"
+                  placeholder="Personal, professional, spiritual, or otherwise."
+                  rows={3}
+                />
+              </Field>
+
+              <Field label="Official Designation" optional>
+                <TextInput name="official_designation" placeholder="Your title, role, or self-assigned rank" />
+              </Field>
+
+              <Field label="Current Research Interests" optional>
+                <TextArea
+                  name="research_interests"
+                  placeholder="What are you currently obsessed with or investigating?"
+                  rows={3}
+                />
+              </Field>
+
+              <Field label="Known Side Effects" optional>
+                <TextArea
+                  name="known_side_effects"
+                  placeholder="Of spending time with you, or generally."
+                  rows={3}
+                />
+              </Field>
+
+              <Field label="Current Attunement Status">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                  {['Emerging', 'Stable', 'Elevated', 'Classified'].map((option) => (
+                    <label
+                      key={option}
+                      style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer', fontSize: '0.9rem', lineHeight: 1.5, color: '#F3EDE6', opacity: 0.85 }}
+                    >
+                      <input
+                        type="checkbox"
+                        name="attunement_status"
+                        value={option}
+                        style={{ marginTop: '0.2rem', width: '1rem', height: '1rem', flexShrink: 0, accentColor: '#D239F8', cursor: 'pointer' }}
+                      />
+                      {option}
+                    </label>
+                  ))}
+                  <label
+                    style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer', fontSize: '0.9rem', lineHeight: 1.5, color: '#F3EDE6', opacity: 0.85 }}
+                  >
+                    <input
+                      type="checkbox"
+                      name="attunement_status"
+                      value="Other"
+                      checked={attunementOther}
+                      onChange={(e) => setAttunementOther(e.target.checked)}
+                      style={{ marginTop: '0.2rem', width: '1rem', height: '1rem', flexShrink: 0, accentColor: '#D239F8', cursor: 'pointer' }}
+                    />
+                    Other
+                  </label>
+                  {attunementOther && (
+                    <input
+                      type="text"
+                      name="attunement_status_other"
+                      placeholder="Please describe..."
+                      style={{ ...inputStyle, marginTop: '0.25rem' }}
+                      onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(210,57,248,0.6)' }}
+                      onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(200,168,72,0.25)' }}
+                    />
+                  )}
+                </div>
+              </Field>
+            </div>
+
+            <div style={dividerStyle} />
+
+            {/* ── SECTION 3 — Your What If Plans ── */}
+            <div>
+              <p style={sectionHeadingStyle}>Section 3 — Your What If Plans</p>
               <div style={dividerStyle} />
 
               <Field label="Are you attending?">
@@ -399,93 +727,98 @@ export function ApplyForm({ userEmail }: { userEmail: string }) {
               <Field label="Do you need rideshare help?" optional>
                 <RadioGroup
                   name="rideshare"
-                  options={['I need a ride', 'I can offer a ride', 'I\'m sorted', 'Not sure yet']}
+                  options={['I need a ride', 'I can offer a ride', "I'm sorted", 'Not sure yet']}
                 />
               </Field>
             </div>
 
             <div style={dividerStyle} />
 
-            {/* ── SECTION 3 ── */}
+            {/* ── SECTION 4 — Participation ── */}
             <div>
-              <p style={sectionHeadingStyle}>Section 3 — Participation</p>
+              <p style={sectionHeadingStyle}>Section 4 — Participation</p>
               <p style={sectionSubStyle}>This is the heart of it.</p>
 
-              <Field label="How would you like to contribute to camp?">
+              <Field label="Are you interested in a leadership role?">
+                <RadioGroup
+                  name="leadership_interest"
+                  options={['Yes', 'No', 'Maybe — tell me more']}
+                />
+              </Field>
+
+              <Field label="Are you available for early setup?">
+                <RadioGroup
+                  name="setup_available"
+                  options={['Yes', 'No']}
+                />
+              </Field>
+
+              <div style={{ marginBottom: '2.75rem' }}>
+                <p style={{ ...sectionHeadingStyle, fontSize: '1.15rem', marginBottom: '0.5rem' }}>Setup & Teardown</p>
+                <p style={{ ...helperTextStyle, marginTop: 0, marginBottom: '1.5rem' }}>
+                  Setup and teardown are among the most important ways the Many Hands of Glåüm support camp.
+                  We recognize that travel schedules, accessibility needs, family obligations, and other circumstances
+                  may affect availability. If you are unable to participate in setup or teardown, we'll work with you
+                  to find another meaningful way to contribute.
+                </p>
+
+                <Field label="Which would you prefer?">
+                  <CheckboxGroup
+                    name="setup_preference"
+                    options={['Setup Team', 'Teardown Team', 'Both', 'No preference']}
+                  />
+                </Field>
+              </div>
+
+              <Field label="Are there any limitations we should be aware of when planning communal responsibilities?" optional>
                 <CheckboxGroup
-                  name="contributions"
+                  name="setup_limitations"
                   options={[
-                    'Setup',
-                    'Teardown',
-                    'Camp kitchen',
-                    'Decor / ambiance',
-                    'Sound / DJ support',
-                    'Lighting',
-                    'Welcoming / greeting',
-                    'Shift coverage',
-                    'Cleanup',
-                    'Emotional support / grounding presence',
-                    'Art support',
-                    'Tea/snack operations',
-                    'Logistics / organization',
-                    'Build crew',
-                    'Strike crew',
-                    'General helper',
-                    '"Put me where needed"',
-                    'Tiny hand distribution',
-                    'Shrimp relations',
+                    'I am unable to participate in setup',
+                    'I am unable to participate in teardown',
+                    'I am unable to participate in either setup or teardown',
+                    "I'd prefer to discuss my circumstances privately",
                   ]}
                 />
               </Field>
 
-              <Field label="What kinds of participation feel energizing or meaningful for you?">
+              <Field label="Additional notes" optional>
                 <TextArea
-                  name="energizing_participation"
-                  placeholder="Tell us what genuinely lights you up — not what you feel you should say."
+                  name="setup_notes"
+                  placeholder="Anything else relevant to your availability or participation..."
+                  rows={3}
+                />
+              </Field>
+
+              <Field label="What do you hope to contribute to the community this year?">
+                <TextArea
+                  name="community_contribution"
+                  placeholder="Tell us what you're bringing — tangible, energetic, or otherwise."
                   rows={5}
                 />
               </Field>
-            </div>
 
-            <div style={dividerStyle} />
-
-            {/* ── SECTION 4 ── */}
-            <div>
-              <p style={sectionHeadingStyle}>Section 4 — Capacity & Boundaries</p>
-              <p style={sectionSubStyle}>
-                This section protects both the camp and the individual. Please be honest — there are no wrong answers.
-              </p>
-
-              <Field label="What helps you feel safe, supported, or comfortable in camp environments?">
-                <TextArea name="support_needs" placeholder="Quiet spaces, check-ins, structure, spontaneity, etc." rows={4} />
-              </Field>
-
-              <Field label="Are there accessibility needs, physical limitations, sensory considerations, or boundaries we should know about?" optional>
-                <TextArea name="accessibility" placeholder="You don't have to share anything you're not comfortable sharing." rows={4} />
-              </Field>
-
-              <Field label="What level of participation feels realistic and sustainable for you?">
-                <TextArea name="capacity" placeholder="Be honest with yourself here. Overcommitting helps no one." rows={3} />
-              </Field>
-
-              <Field label="You are more likely to:">
-                <RadioGroup
-                  name="participation_style"
-                  options={[
-                    'Overcommit',
-                    'Undercommit',
-                    'Disappear into the woods',
-                    'Become nocturnal',
-                    'Become one with the carpet',
-                    'Unsure',
-                  ]}
+              <Field label="What would help you feel welcome and supported in camp?">
+                <TextArea
+                  name="welcome_support"
+                  placeholder="Quiet spaces, check-ins, structure, spontaneity, etc."
+                  rows={4}
                 />
               </Field>
+
+              <Field label="Is there anything you'd like camp leadership to know?" optional>
+                <TextArea
+                  name="leadership_note"
+                  placeholder="Anything on your mind — no wrong answers here."
+                  rows={4}
+                />
+              </Field>
+
             </div>
 
             <div style={dividerStyle} />
 
-            {/* ── SECTION 5 ── */}
+            {/* ── SECTION 5 — Camp Culture ── */}
             <div>
               <p style={sectionHeadingStyle}>Section 5 — Camp Culture</p>
               <div style={dividerStyle} />
@@ -509,32 +842,48 @@ export function ApplyForm({ userEmail }: { userEmail: string }) {
 
             <div style={dividerStyle} />
 
-            {/* ── SECTION 6 ── */}
+            {/* ── SECTION 6 — Contribution Expectations ── */}
             <div>
-              <p style={sectionHeadingStyle}>Section 6 — Contribution Expectations</p>
+              <p style={sectionHeadingStyle}>Section 6 — What We Ask of the Many Hands</p>
               <p style={sectionSubStyle}>
-                Glåüm is built collaboratively. We ask everyone camping with us to contribute in ways
-                that are realistic and sustainable for them.
+                Glåüm is built collaboratively. Every participant helps create the experience that we all enjoy.
               </p>
 
-              <Field label="Please acknowledge the following:">
+              <p style={{ fontSize: '0.85rem', color: '#F3EDE6', opacity: 0.6, marginBottom: '1.75rem', lineHeight: 1.6 }}>
+                By applying to camp, you acknowledge the following expectations:
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                 <CheckboxGroup
                   name="acknowledgements"
                   options={[
-                    'I understand Glåüm is participatory',
-                    'I will contribute honestly within my capacity',
-                    'I will communicate if my plans change',
-                    'I will help maintain shared spaces',
-                    'I understand setup and teardown are shared responsibilities',
-                    'I understand no one person is responsible for carrying the entire camp',
+                    'I will sign up for a camp role or department that aligns with my interests and capacity.',
+                    'I will participate in one 3-hour public-facing shift during the event.',
+                    'I will contribute to either setup or teardown (or communicate with camp leadership if circumstances prevent me from doing so).',
+                    'I will communicate clearly if my plans, availability, or responsibilities change.',
+                    'I will help maintain shared spaces and contribute to a welcoming camp environment.',
+                    'I will treat fellow camp members, neighbours, and participants with kindness, respect, and consideration.',
+                    'I will take responsibility for my own wellbeing and contribute to a culture where others feel safe doing the same.',
+                    'I will address concerns directly, respectfully, and in a timely manner whenever possible.',
+                    'I understand that Glåüm is a collaborative effort and that no one person is responsible for carrying the entire camp.',
+                    'I will leave Glåüm better than I found it.',
                   ]}
                 />
-              </Field>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer', fontSize: '0.9rem', lineHeight: 1.7, color: '#F3EDE6', opacity: 0.85, marginTop: '0.4rem' }}>
+                  <input
+                    type="checkbox"
+                    name="acknowledgements"
+                    value="I agree to comply with all terms and obligations set forth in the Glåüm Sponsorship & Shrimp Awareness Agreement, including but not limited to the reasonable promotion, celebration, and veneration of shrimp; the cultivation of shrimp-positive discourse; and the advancement of public awareness regarding the contributions of shrimp to community, attunement, and human flourishing. Compliance may occur through direct advocacy, symbolic representation, educational outreach, interpretive dance, or other approved methods."
+                    style={{ marginTop: '0.3rem', width: '1rem', height: '1rem', flexShrink: 0, accentColor: '#D239F8', cursor: 'pointer' }}
+                  />
+                  I agree to comply with all terms and obligations set forth in the Glåüm Sponsorship &amp; Shrimp Awareness Agreement, including but not limited to the reasonable promotion, celebration, and veneration of shrimp; the cultivation of shrimp-positive discourse; and the advancement of public awareness regarding the contributions of shrimp to community, attunement, and human flourishing. Compliance may occur through direct advocacy, symbolic representation, educational outreach, interpretive dance, or other approved methods.
+                </label>
+              </div>
             </div>
 
             <div style={dividerStyle} />
 
-            {/* ── SECTION 7 ── */}
+            {/* ── SECTION 7 — Final Glåüm Questions ── */}
             <div>
               <p style={sectionHeadingStyle}>Section 7 — Final Glåüm Questions</p>
               <div style={dividerStyle} />
@@ -593,6 +942,7 @@ export function ApplyForm({ userEmail }: { userEmail: string }) {
 
           </form>
         )}
+        </>}
       </div>
     </div>
   )

@@ -25,34 +25,69 @@ const labelStyle: React.CSSProperties = {
   textTransform: 'uppercase',
 }
 
-const DAYS = [
-  'Tuesday, Jul 22 — Setup day',
-  'Wednesday, Jul 23',
-  'Thursday, Jul 24',
-  'Friday, Jul 25',
-  'Saturday, Jul 26',
-  'Sunday, Jul 27 — Teardown',
-]
+const fieldStyle: React.CSSProperties = {
+  marginBottom: '2.75rem',
+}
 
-const TIMES = ['Morning', 'Afternoon', 'Evening', 'Flexible']
+const dividerStyle: React.CSSProperties = {
+  height: '1px',
+  background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.3), transparent)',
+  margin: '3rem 0',
+}
 
-const SHIFT_INTERESTS = [
-  'Welcoming & hosting',
-  'Setup & build',
-  'Teardown & strike',
-  'Kitchen & food',
-  'Decor & ambiance',
-  'Programming & activities',
-  'Cleanup',
-  'General help',
-]
+function Field({ label, children, optional }: { label: string; children: React.ReactNode; optional?: boolean }) {
+  return (
+    <div style={fieldStyle}>
+      <label style={labelStyle}>
+        {label}
+        {optional && <span style={{ opacity: 0.45, marginLeft: '0.4rem', textTransform: 'none', letterSpacing: 0, fontSize: '0.75rem' }}>(optional)</span>}
+      </label>
+      {children}
+    </div>
+  )
+}
+
+function TextInput({ name, placeholder, type = 'text', required, defaultValue }: {
+  name: string; placeholder?: string; type?: string; required?: boolean; defaultValue?: string
+}) {
+  return (
+    <input
+      type={type}
+      name={name}
+      placeholder={placeholder}
+      required={required}
+      defaultValue={defaultValue}
+      style={inputStyle}
+      onFocus={e => { e.currentTarget.style.borderColor = 'rgba(210,57,248,0.6)' }}
+      onBlur={e => { e.currentTarget.style.borderColor = 'rgba(200,168,72,0.25)' }}
+    />
+  )
+}
+
+function TextArea({ name, placeholder, rows = 4 }: { name: string; placeholder?: string; rows?: number }) {
+  return (
+    <textarea
+      name={name}
+      placeholder={placeholder}
+      rows={rows}
+      style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6 }}
+      onFocus={e => { e.currentTarget.style.borderColor = 'rgba(210,57,248,0.6)' }}
+      onBlur={e => { e.currentTarget.style.borderColor = 'rgba(200,168,72,0.25)' }}
+    />
+  )
+}
 
 function CheckboxGroup({ options, name }: { options: string[]; name: string }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
       {options.map(option => (
-        <label key={option} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', fontSize: '0.9rem', color: '#F3EDE6', opacity: 0.85 }}>
-          <input type="checkbox" name={name} value={option} style={{ width: '1rem', height: '1rem', accentColor: '#D239F8', cursor: 'pointer', flexShrink: 0 }} />
+        <label key={option} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer', fontSize: '0.9rem', lineHeight: 1.5, color: '#F3EDE6', opacity: 0.85 }}>
+          <input
+            type="checkbox"
+            name={name}
+            value={option}
+            style={{ marginTop: '0.2rem', width: '1rem', height: '1rem', flexShrink: 0, accentColor: '#D239F8', cursor: 'pointer' }}
+          />
           {option}
         </label>
       ))}
@@ -60,12 +95,29 @@ function CheckboxGroup({ options, name }: { options: string[]; name: string }) {
   )
 }
 
+const DAYS = ['Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Monday', 'Flexible']
+
+const ROLE_INTERESTS = [
+  'Public-facing shifts',
+  'Tiny Hand Services',
+  'Initiation Ceremony',
+  'Setup',
+  'Teardown',
+  'Decor & ambiance',
+  'Administration',
+  'Logistics',
+  'Sound & Music',
+  'Whatever is most helpful',
+  'Other',
+]
+
 export function VolunteerForm({ userEmail, userFirstName, userLastName }: {
   userEmail: string
   userFirstName: string
   userLastName: string
 }) {
   const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
@@ -79,12 +131,17 @@ export function VolunteerForm({ userEmail, userFirstName, userLastName }: {
     const data = {
       first_name: formData.get('first_name'),
       last_name: formData.get('last_name'),
+      preferred_name: formData.get('preferred_name') || null,
+      pronouns: formData.get('pronouns') || null,
       email: formData.get('email'),
-      phone: formData.get('phone') || null,
+      phone: formData.get('phone'),
+      brings_to_glaum: formData.get('brings_to_glaum') || null,
+      role_interests: formData.getAll('role_interests'),
       days_available: formData.getAll('days_available'),
-      preferred_times: formData.getAll('preferred_times'),
-      shift_interests: formData.getAll('shift_interests'),
-      other_notes: formData.get('other_notes') || null,
+      specific_interests: formData.get('specific_interests') || null,
+      special_skills: formData.get('special_skills') || null,
+      familiar_with_glaum: formData.get('familiar_with_glaum') === 'yes',
+      why_contribute: formData.get('why_contribute') || null,
     }
 
     try {
@@ -99,7 +156,8 @@ export function VolunteerForm({ userEmail, userFirstName, userLastName }: {
         throw new Error(error || 'Submission failed')
       }
 
-      router.push('/profile')
+      setSubmitted(true)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err: any) {
       setError(err.message || 'Something went wrong. Please try again.')
       setSubmitting(false)
@@ -109,12 +167,14 @@ export function VolunteerForm({ userEmail, userFirstName, userLastName }: {
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1 }}>
       <div style={{ padding: '1.5rem', maxWidth: '640px', margin: '0 auto' }}>
-        <a href="/profile" style={{ fontSize: '0.8rem', letterSpacing: '0.1em', color: '#C8A848', textDecoration: 'none', opacity: 0.6 }}>
-          ← Back
+        <a href="/" style={{ fontSize: '0.8rem', letterSpacing: '0.1em', color: '#C8A848', textDecoration: 'none', opacity: 0.6 }}>
+          ← Back to camp
         </a>
       </div>
 
       <div style={{ maxWidth: '640px', margin: '0 auto', padding: '0 1.5rem 6rem' }}>
+
+        {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
           <p style={{ fontSize: '0.65rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: '#D239F8', marginBottom: '1rem', opacity: 0.85 }}>
             What If 2026
@@ -122,118 +182,138 @@ export function VolunteerForm({ userEmail, userFirstName, userLastName }: {
           <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 6vw, 3rem)', color: '#C8A848', lineHeight: 1.1, marginBottom: '1rem', textShadow: '0 0 40px rgba(210,57,248,0.4)' }}>
             Volunteer Signup
           </h1>
-          <p style={{ fontSize: '0.95rem', lineHeight: 1.8, opacity: 0.7, maxWidth: '480px', margin: '0 auto' }}>
-            Not camping with Glåüm, but want to be part of it? Sign up to volunteer for a shift.
-            We'll be in touch with more details as the event gets closer.
+          <p style={{ fontSize: '0.95rem', lineHeight: 1.8, opacity: 0.6, maxWidth: '480px', margin: '0 auto' }}>
+            Not camping with Glåüm, but want to be part of it? Sign up to volunteer and we'll be in touch as the event gets closer.
           </p>
         </div>
 
-        <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.3), transparent)', marginBottom: '2.5rem' }} />
+        <div style={dividerStyle} />
 
-        <form onSubmit={handleSubmit}>
-
-          {/* Basic info */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.75rem' }}>
-            <div>
-              <label style={labelStyle}>First Name</label>
-              <input name="first_name" defaultValue={userFirstName} style={inputStyle}
-                onFocus={e => { e.currentTarget.style.borderColor = 'rgba(210,57,248,0.6)' }}
-                onBlur={e => { e.currentTarget.style.borderColor = 'rgba(200,168,72,0.25)' }}
-              />
-            </div>
-            <div>
-              <label style={labelStyle}>Last Name</label>
-              <input name="last_name" defaultValue={userLastName} style={inputStyle}
-                onFocus={e => { e.currentTarget.style.borderColor = 'rgba(210,57,248,0.6)' }}
-                onBlur={e => { e.currentTarget.style.borderColor = 'rgba(200,168,72,0.25)' }}
-              />
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '2rem' }}>
-            <div>
-              <label style={labelStyle}>Email</label>
-              <input name="email" type="email" defaultValue={userEmail} readOnly
-                style={{ ...inputStyle, opacity: 0.6, cursor: 'default' }}
-              />
-            </div>
-            <div>
-              <label style={labelStyle}>Phone <span style={{ opacity: 0.45, textTransform: 'none', letterSpacing: 0, fontSize: '0.75rem' }}>(optional)</span></label>
-              <input name="phone" type="tel" placeholder="For shift coordination"
-                style={inputStyle}
-                onFocus={e => { e.currentTarget.style.borderColor = 'rgba(210,57,248,0.6)' }}
-                onBlur={e => { e.currentTarget.style.borderColor = 'rgba(200,168,72,0.25)' }}
-              />
-            </div>
-          </div>
-
-          <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.15), transparent)', marginBottom: '2rem' }} />
-
-          {/* Availability */}
-          <div style={{ marginBottom: '2rem' }}>
-            <label style={labelStyle}>Which days are you available?</label>
-            <CheckboxGroup options={DAYS} name="days_available" />
-          </div>
-
-          <div style={{ marginBottom: '2rem' }}>
-            <label style={labelStyle}>Preferred time of day</label>
-            <CheckboxGroup options={TIMES} name="preferred_times" />
-          </div>
-
-          <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.15), transparent)', marginBottom: '2rem' }} />
-
-          {/* Shift interests */}
-          <div style={{ marginBottom: '2rem' }}>
-            <label style={labelStyle}>What kinds of shifts interest you?</label>
-            <p style={{ fontSize: '0.8rem', opacity: 0.5, marginBottom: '0.75rem', fontStyle: 'italic' }}>
-              More detailed shift descriptions are coming — pick whatever sounds appealing for now.
+        {/* Success state */}
+        {submitted ? (
+          <div style={{ textAlign: 'center', padding: '4rem 2rem', border: '1px solid rgba(200,168,72,0.3)', borderRadius: '1rem', background: 'rgba(210,57,248,0.05)' }}>
+            <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '2rem', color: '#C8A848', marginBottom: '1.25rem' }}>
+              Thank you.
             </p>
-            <CheckboxGroup options={SHIFT_INTERESTS} name="shift_interests" />
+            <p style={{ fontSize: '0.95rem', lineHeight: 1.8, opacity: 0.75, marginBottom: '0.75rem' }}>
+              Thank you for your interest in contributing to Glåüm.
+            </p>
+            <p style={{ fontSize: '0.9rem', lineHeight: 1.8, opacity: 0.6, marginBottom: '0.75rem' }}>
+              Approved volunteers will be invited to join the Many Hands Registry, where they may sign up for available roles and shifts.
+            </p>
+            <p style={{ fontSize: '0.85rem', lineHeight: 1.8, opacity: 0.4, fontStyle: 'italic' }}>
+              Attunement may begin immediately. Results may vary.
+            </p>
           </div>
+        ) : (
+          <form onSubmit={handleSubmit}>
 
-          <div style={{ marginBottom: '2.5rem' }}>
-            <label style={labelStyle}>
-              Anything specific in mind? <span style={{ opacity: 0.45, textTransform: 'none', letterSpacing: 0, fontSize: '0.75rem' }}>(optional)</span>
-            </label>
-            <textarea
-              name="other_notes"
-              rows={3}
-              placeholder="A skill, an idea, something you'd love to do..."
-              style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6 }}
-              onFocus={e => { e.currentTarget.style.borderColor = 'rgba(210,57,248,0.6)' }}
-              onBlur={e => { e.currentTarget.style.borderColor = 'rgba(200,168,72,0.25)' }}
-            />
-          </div>
+            {/* Basic info */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+              <Field label="First Name">
+                <TextInput name="first_name" placeholder="First name" required defaultValue={userFirstName} />
+              </Field>
+              <Field label="Last Name">
+                <TextInput name="last_name" placeholder="Last name" required defaultValue={userLastName} />
+              </Field>
+            </div>
 
-          {error && (
-            <p style={{ color: '#ff6b6b', fontSize: '0.9rem', marginBottom: '1.25rem', textAlign: 'center' }}>{error}</p>
-          )}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+              <Field label="Preferred Name" optional>
+                <TextInput name="preferred_name" placeholder="If different from first name" />
+              </Field>
+              <Field label="Pronouns" optional>
+                <TextInput name="pronouns" placeholder="e.g. she/her, they/them" />
+              </Field>
+            </div>
 
-          <div style={{ textAlign: 'center' }}>
-            <button
-              type="submit"
-              disabled={submitting}
-              style={{
-                padding: '0.9rem 2.75rem',
-                borderRadius: '9999px',
-                border: '1px solid rgba(200,168,72,0.5)',
-                backgroundColor: 'transparent',
-                color: '#FFFACD',
-                fontFamily: 'TokyoDreams, serif',
-                fontSize: '0.9rem',
-                letterSpacing: '0.15em',
-                cursor: submitting ? 'not-allowed' : 'pointer',
-                opacity: submitting ? 0.5 : 1,
-                transition: 'all 0.25s',
-              }}
-              onMouseEnter={e => { if (!submitting) e.currentTarget.style.backgroundColor = 'rgba(200,168,72,0.08)' }}
-              onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }}
-            >
-              {submitting ? 'Signing up...' : 'Sign Up to Volunteer'}
-            </button>
-          </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+              <Field label="Email">
+                <input
+                  name="email"
+                  type="email"
+                  defaultValue={userEmail}
+                  readOnly
+                  required
+                  style={{ ...inputStyle, opacity: 0.6, cursor: 'default' }}
+                />
+              </Field>
+              <Field label="Phone">
+                <TextInput name="phone" type="tel" placeholder="For shift coordination" required />
+              </Field>
+            </div>
 
-        </form>
+            <div style={dividerStyle} />
+
+            <Field label="What brings you to Glåüm?">
+              <TextArea name="brings_to_glaum" placeholder="Tell us a little about how you found us and what draws you here." rows={4} />
+            </Field>
+
+            <Field label="What kinds of contributions interest you?">
+              <p style={{ fontSize: '0.8rem', opacity: 0.45, fontStyle: 'italic', marginBottom: '0.75rem' }}>Check all that apply</p>
+              <CheckboxGroup name="role_interests" options={ROLE_INTERESTS} />
+            </Field>
+
+            <Field label="What days are you likely available?">
+              <CheckboxGroup name="days_available" options={DAYS} />
+            </Field>
+
+            <Field label="Are there any roles or activities that particularly interest you?" optional>
+              <TextArea name="specific_interests" placeholder="Anything specific you have in mind..." rows={3} />
+            </Field>
+
+            <Field label="Is there anything you're particularly good at that Glåüm should know about?" optional>
+              <TextArea name="special_skills" placeholder="Skills, talents, specialties — mundane or otherwise." rows={3} />
+            </Field>
+
+            <div style={dividerStyle} />
+
+            <Field label="Have you familiarized yourself with Glåüm?">
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer', fontSize: '0.9rem', lineHeight: 1.6, color: '#F3EDE6', opacity: 0.85 }}>
+                <input
+                  type="checkbox"
+                  name="familiar_with_glaum"
+                  value="yes"
+                  style={{ marginTop: '0.2rem', width: '1rem', height: '1rem', flexShrink: 0, accentColor: '#D239F8', cursor: 'pointer' }}
+                />
+                I've explored the website, spoken with members, attended events, or otherwise have a general understanding of what Glåüm is about.
+              </label>
+            </Field>
+
+            <Field label="Why do you want to contribute to Glåüm?">
+              <TextArea name="why_contribute" placeholder="Take your time with this one." rows={5} />
+            </Field>
+
+            {error && (
+              <p style={{ color: '#ff6b6b', fontSize: '0.9rem', marginBottom: '1.25rem', textAlign: 'center' }}>{error}</p>
+            )}
+
+            <div style={{ textAlign: 'center' }}>
+              <button
+                type="submit"
+                disabled={submitting}
+                style={{
+                  padding: '0.9rem 2.75rem',
+                  borderRadius: '9999px',
+                  border: '1px solid rgba(200,168,72,0.5)',
+                  backgroundColor: 'transparent',
+                  color: '#FFFACD',
+                  fontFamily: 'TokyoDreams, serif',
+                  fontSize: '0.9rem',
+                  letterSpacing: '0.15em',
+                  cursor: submitting ? 'not-allowed' : 'pointer',
+                  opacity: submitting ? 0.5 : 1,
+                  transition: 'all 0.25s',
+                }}
+                onMouseEnter={e => { if (!submitting) e.currentTarget.style.backgroundColor = 'rgba(200,168,72,0.08)' }}
+                onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }}
+              >
+                {submitting ? 'Submitting...' : 'Submit'}
+              </button>
+            </div>
+
+          </form>
+        )}
       </div>
     </div>
   )

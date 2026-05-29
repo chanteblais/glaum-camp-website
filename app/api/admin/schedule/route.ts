@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
       highlight: body.highlight ?? false,
       is_recurring: body.is_recurring ?? false,
       capacity: body.capacity ?? null,
+      all_hands: body.all_hands ?? false,
     }])
     .select()
     .single()

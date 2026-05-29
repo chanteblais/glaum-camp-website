@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import {
   ATTENDANCE_OPTIONS,
@@ -87,9 +88,10 @@ export function ProfileSettings({ application }: { application: ApplicationData 
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
+      if (view !== 'menu') return
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuOpen(false)
-        if (view === 'menu') setView(null)
+        setView(null)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -108,6 +110,7 @@ export function ProfileSettings({ application }: { application: ApplicationData 
     setView(next)
     setError(null)
     setSuccess(null)
+    if (next === 'cancel') setCancelReason('')
   }
 
   const toggleContribution = (option: string) => {
@@ -151,7 +154,7 @@ export function ProfileSettings({ application }: { application: ApplicationData 
       const res = await fetch('/api/profile/cancel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: cancelReason }),
+        body: JSON.stringify({ reason: cancelReason.trim() }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to cancel attendance')
@@ -166,6 +169,7 @@ export function ProfileSettings({ application }: { application: ApplicationData 
   }
 
   const canEdit = application.status === 'approved' || application.status === 'pending'
+  const cancelReasonOk = cancelReason.trim().length >= 10
 
   if (!canEdit) return null
 
@@ -375,7 +379,7 @@ export function ProfileSettings({ application }: { application: ApplicationData 
               {CONTRIBUTION_OPTIONS.map((option) => (
                 <label
                   key={option}
-                  style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start', fontSize: '0.85rem', cursor: 'pointer' }}
+                  style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start', fontSize: '0.85rem', cursor: 'pointer', color: '#F3EDE6' }}
                 >
                   <input
                     type="checkbox"
@@ -414,6 +418,11 @@ export function ProfileSettings({ application }: { application: ApplicationData 
               placeholder="Tell us what's changed…"
               style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6 }}
             />
+            <p style={{ fontSize: '0.78rem', opacity: 0.55, marginTop: '0.5rem', marginBottom: 0 }}>
+              {cancelReasonOk
+                ? 'Thank you — this helps us plan.'
+                : `Please share at least 10 characters (${cancelReason.trim().length}/10).`}
+            </p>
           </Field>
           {error && <p style={{ color: '#ff8a8a', fontSize: '0.85rem', marginBottom: '0.75rem' }}>{error}</p>}
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
@@ -421,8 +430,14 @@ export function ProfileSettings({ application }: { application: ApplicationData 
             <button
               type="button"
               onClick={handleCancel}
-              disabled={saving || cancelReason.trim().length < 10}
-              style={{ ...primaryBtnStyle, borderColor: 'rgba(255,120,120,0.5)', color: '#ffb4b4' }}
+              disabled={saving || !cancelReasonOk}
+              style={{
+                ...primaryBtnStyle,
+                borderColor: 'rgba(255,120,120,0.5)',
+                color: '#ffb4b4',
+                opacity: saving || !cancelReasonOk ? 0.45 : 1,
+                cursor: saving || !cancelReasonOk ? 'not-allowed' : 'pointer',
+              }}
             >
               {saving ? 'Cancelling…' : 'Confirm cancellation'}
             </button>
@@ -442,18 +457,31 @@ function Panel({
   onClose: () => void
   children: React.ReactNode
 }) {
-  return (
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) return null
+
+  return createPortal(
     <>
       <div
+        role="presentation"
         onClick={onClose}
         style={{
           position: 'fixed',
           inset: 0,
           background: 'rgba(0,0,0,0.55)',
-          zIndex: 30,
+          zIndex: 200,
         }}
       />
       <div
+        role="dialog"
+        aria-modal="true"
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
         style={{
           position: 'fixed',
           top: '50%',
@@ -466,7 +494,7 @@ function Panel({
           borderRadius: '1rem',
           background: '#1A0A24',
           padding: '1.5rem',
-          zIndex: 40,
+          zIndex: 201,
           boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
         }}
       >
@@ -478,7 +506,8 @@ function Panel({
         </div>
         {children}
       </div>
-    </>
+    </>,
+    document.body
   )
 }
 

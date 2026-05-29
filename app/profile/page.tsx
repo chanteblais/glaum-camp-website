@@ -6,6 +6,7 @@ import { RememberSignedIn } from '@/components/RememberSignedIn'
 import { ProfileSettings } from './ProfileSettings'
 import { VolunteerSettings } from './VolunteerSettings'
 import { UserNotificationBell } from '@/components/UserNotificationBell'
+import { NotificationBell } from '@/app/admin/NotificationBell'
 import { AvatarUpload } from '@/components/AvatarUpload'
 import { SignupSection } from './SignupSection'
 
@@ -25,12 +26,13 @@ export default async function ProfilePage() {
     .limit(1)
     .maybeSingle()
 
-  // Check for volunteer signup
-  const { data: volunteer } = await supabaseAdmin
+  // Check for active volunteer signup (cancelled records are treated as no record)
+  const { data: volunteerRaw } = await supabaseAdmin
     .from('volunteers')
     .select('*')
     .eq('clerk_user_id', userId)
     .maybeSingle()
+  const volunteer = volunteerRaw?.status === 'active' ? volunteerRaw : null
 
   // Fetch signup status for approved members
   const { data: campSignup } = application?.status === 'approved'
@@ -48,6 +50,8 @@ export default async function ProfilePage() {
       .update({ clerk_user_id: userId })
       .eq('id', application.id)
   }
+
+  const isAdmin = user?.publicMetadata?.role === 'admin'
 
   const displayName =
     volunteer?.preferred_name || volunteer?.first_name ||
@@ -69,7 +73,7 @@ export default async function ProfilePage() {
             ← Back to camp
           </a>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <UserNotificationBell />
+            {isAdmin ? <NotificationBell /> : <UserNotificationBell />}
             {application && (application.status === 'approved' || application.status === 'pending') && (
               <ProfileSettings application={application} />
             )}

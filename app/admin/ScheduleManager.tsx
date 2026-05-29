@@ -16,13 +16,43 @@ type ScheduleEvent = {
   highlight: boolean
   is_recurring: boolean
   capacity: number | null
+  all_hands: boolean
 }
 
 const DAYS = ['Thursday', 'Friday', 'Saturday', 'Sunday', 'Wednesday', 'Tuesday', 'Monday']
 
+// Normalise a single time token like "7", "7pm", "7:00pm", "19:00", "7:30 PM" → "7:00 PM"
+function normaliseToken(t: string): string {
+  t = t.trim()
+  if (!t) return t
+  const m = t.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i)
+  if (!m) return t // unrecognised — leave as-is
+  let h = parseInt(m[1], 10)
+  const min = m[2] ?? '00'
+  const meridiem = m[3]?.toLowerCase()
+  if (meridiem === 'pm' && h < 12) h += 12
+  if (meridiem === 'am' && h === 12) h = 0
+  // If no meridiem provided, infer: treat < 7 as PM (camp context), ≥ 7 as AM/PM by value
+  const period = h >= 12 ? 'PM' : 'AM'
+  const displayH = h % 12 === 0 ? 12 : h % 12
+  return `${displayH}:${min} ${period}`
+}
+
+// Normalise a full time string, handling ranges like "7 - 10pm" or "7:00PM – 10:00 PM"
+function formatTime(raw: string): string {
+  if (!raw.trim()) return raw
+  // Split on en-dash, em-dash, or hyphen (with optional surrounding spaces)
+  const parts = raw.split(/\s*[–—-]\s*/)
+  if (parts.length === 2) {
+    const [start, end] = parts.map(normaliseToken)
+    return `${start} – ${end}`
+  }
+  return normaliseToken(raw)
+}
+
 const blank = (): Omit<ScheduleEvent, 'id' | 'sort_order'> => ({
   day: 'Thursday', time: '', title: '', subtitle: '', detail_desc: '',
-  icon_type: 'star', visible: true, highlight: false, is_recurring: false, capacity: null,
+  icon_type: 'star', visible: true, highlight: false, is_recurring: false, capacity: null, all_hands: false,
 })
 
 const inputStyle: React.CSSProperties = {
@@ -223,6 +253,7 @@ function EventModal({
           <Toggle checked={form.visible} onChange={(v) => set('visible', v)} label="Visible on site" />
           <Toggle checked={form.highlight} onChange={(v) => set('highlight', v)} label="Highlight day" />
           <Toggle checked={form.is_recurring} onChange={(v) => set('is_recurring', v)} label="Daily recurring" />
+          <Toggle checked={form.all_hands} onChange={(v) => set('all_hands', v)} label="All-hands" />
         </div>
 
         {error && <p style={{ color: '#ff8a8a', fontSize: '0.82rem', marginBottom: '0.75rem' }}>{error}</p>}
@@ -349,15 +380,16 @@ export function ScheduleManager() {
   const handleSave = async (form: Omit<ScheduleEvent, 'id' | 'sort_order'>) => {
     setSaving(true)
     setModalError(null)
+    const normalised = { ...form, time: formatTime(form.time) }
     try {
       let res: Response
       if (modal?.mode === 'edit') {
         res = await fetch(`/api/admin/schedule/${modal.event.id}`, {
-          method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form),
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(normalised),
         })
       } else {
         res = await fetch('/api/admin/schedule', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form),
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(normalised),
         })
       }
       if (!res.ok) { const d = await res.json(); throw new Error(d.error) }
