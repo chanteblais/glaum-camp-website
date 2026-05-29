@@ -9,6 +9,8 @@ import { VolunteersSection } from './VolunteersSection'
 import { NotificationsSection } from './NotificationsSection'
 import { NotificationBell } from './NotificationBell'
 import { ScheduleManager } from './ScheduleManager'
+import { DepartmentsManager } from './DepartmentsManager'
+import { ShiftsManager } from './ShiftsManager'
 
 export default async function AdminPage() {
   const { userId } = await auth()
@@ -111,7 +113,7 @@ export default async function AdminPage() {
 
         {/* ── VOLUNTEERS ── */}
         <CollapsibleSection
-          title="Volunteers"
+          title="Registered Hands"
           summary={`${approved.length} members · ${volunteers?.length ?? 0} outside`}
         >
           <VolunteersSection
@@ -142,6 +144,22 @@ export default async function AdminPage() {
           summary={`${approved.length + pending.length} members`}
         >
           <ContributionsSection applications={all} />
+        </CollapsibleSection>
+
+        {/* ── DEPARTMENTS & ROLES ── */}
+        <CollapsibleSection
+          title="Departments"
+          summary="Roles grouped by department"
+        >
+          <DepartmentsManager />
+        </CollapsibleSection>
+
+        {/* ── SHIFTS ── */}
+        <CollapsibleSection
+          title="Shifts"
+          summary="3h volunteer shifts"
+        >
+          <ShiftsManager />
         </CollapsibleSection>
 
         {/* ── SCHEDULE ── */}

@@ -15,13 +15,14 @@ type ScheduleEvent = {
   visible: boolean
   highlight: boolean
   is_recurring: boolean
+  capacity: number | null
 }
 
 const DAYS = ['Thursday', 'Friday', 'Saturday', 'Sunday', 'Wednesday', 'Tuesday', 'Monday']
 
 const blank = (): Omit<ScheduleEvent, 'id' | 'sort_order'> => ({
   day: 'Thursday', time: '', title: '', subtitle: '', detail_desc: '',
-  icon_type: 'star', visible: true, highlight: false, is_recurring: false,
+  icon_type: 'star', visible: true, highlight: false, is_recurring: false, capacity: null,
 })
 
 const inputStyle: React.CSSProperties = {
@@ -205,6 +206,17 @@ function EventModal({
             />
           </div>
           {iconError && <p style={{ color: '#ff8a8a', fontSize: '0.75rem', marginTop: '0.4rem' }}>{iconError}</p>}
+        </Field>
+
+        <Field label="Capacity (optional — leave blank for no signup)">
+          <input
+            style={{ ...inputStyle, width: '120px' }}
+            type="number"
+            min={1}
+            placeholder="e.g. 20"
+            value={form.capacity ?? ''}
+            onChange={e => set('capacity', e.target.value === '' ? null : parseInt(e.target.value) || null)}
+          />
         </Field>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem 1.5rem', marginBottom: '1.25rem' }}>

@@ -7,6 +7,7 @@ import { ProfileSettings } from './ProfileSettings'
 import { VolunteerSettings } from './VolunteerSettings'
 import { UserNotificationBell } from '@/components/UserNotificationBell'
 import { AvatarUpload } from '@/components/AvatarUpload'
+import { SignupSection } from './SignupSection'
 
 export default async function ProfilePage() {
   const { userId } = await auth()
@@ -252,6 +253,10 @@ export default async function ProfilePage() {
             </div>
 
             <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.2), transparent)', marginBottom: '2.5rem' }} />
+
+            <SignupSection />
+
+            <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.2), transparent)', margin: '2.5rem 0' }} />
 
             <div style={{ padding: '2rem', border: '1px solid rgba(210,57,248,0.2)', borderRadius: '1rem', background: 'rgba(210,57,248,0.04)' }}>
               <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.1rem', color: '#C8A848', marginBottom: '1rem' }}>
