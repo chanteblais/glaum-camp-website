@@ -13,9 +13,9 @@ type Notification = {
 }
 
 export function NotificationBell({
-  initialNotifications,
+  initialNotifications = [],
 }: {
-  initialNotifications: Notification[]
+  initialNotifications?: Notification[]
 }) {
   const [notifications, setNotifications] = useState(initialNotifications)
   const [open, setOpen] = useState(false)
@@ -51,6 +51,14 @@ export function NotificationBell({
     if (open) document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [open])
+
+  // Fetch on mount (for when rendered outside the admin page)
+  useEffect(() => {
+    fetch('/api/admin/notifications')
+      .then(r => r.ok ? r.json() : null)
+      .then(json => { if (json) setNotifications(json.notifications ?? []) })
+      .catch(() => {})
+  }, [])
 
   // Poll for new notifications every 60s
   useEffect(() => {

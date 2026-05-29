@@ -934,7 +934,6 @@ export function SignupSection() {
 
   return (
     <div style={{ marginBottom: '2.5rem' }}>
-      <SignupStatusBanner signup={signup} hasRoles={hasRoles} hasShiftableEvents={hasShiftableEvents} />
       <CurrentSignupCards signup={signup} departments={departments} scheduleEvents={scheduleEvents} onOptOut={handleOptOut} onCancelShift={handleCancelShift} />
 
       <div id="role-signup" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>

@@ -2,6 +2,7 @@ import { auth, clerkClient } from '@clerk/nextjs/server'
 import { redirect, notFound } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { AdminActions } from '../AdminActions'
+import { MemberSignupCard } from '../MemberSignupCard'
 
 export default async function ApplicationDetailPage({ params }: { params: { id: string } }) {
   const { userId } = await auth()
@@ -18,6 +19,45 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
     .single()
 
   if (!app) notFound()
+
+  // Fetch signup if member has a clerk_user_id
+  let signupData: { role: any; shift: any } | null = null
+  if (app.clerk_user_id) {
+    const { data: signup } = await supabaseAdmin
+      .from('camp_signups')
+      .select('role_id, schedule_event_id, role_approval_status')
+      .eq('clerk_user_id', app.clerk_user_id)
+      .maybeSingle()
+
+    if (signup) {
+      const [roleRes, shiftRes] = await Promise.all([
+        signup.role_id
+          ? supabaseAdmin.from('roles').select('name, commitment, department_id, departments(name, icon)').eq('id', signup.role_id).single()
+          : Promise.resolve({ data: null }),
+        signup.schedule_event_id
+          ? supabaseAdmin.from('schedule_events').select('title, time, day').eq('id', signup.schedule_event_id).single()
+          : Promise.resolve({ data: null }),
+      ])
+
+      const roleRow = roleRes.data as any
+      const dept = roleRow?.departments as { name: string; icon: string | null } | null
+
+      signupData = {
+        role: roleRow ? {
+          name: roleRow.name,
+          department: dept?.name ?? null,
+          department_icon: dept?.icon ?? null,
+          commitment: roleRow.commitment ?? null,
+          approval_status: signup.role_approval_status ?? null,
+        } : null,
+        shift: shiftRes.data ? {
+          title: (shiftRes.data as any).title,
+          time: (shiftRes.data as any).time ?? null,
+          day: (shiftRes.data as any).day,
+        } : null,
+      }
+    }
+  }
 
   const submitted = new Date(app.submitted_at).toLocaleDateString('en-CA', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
@@ -77,6 +117,20 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
         )}
 
         <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.2), transparent)', marginBottom: '2.5rem' }} />
+
+        {/* Role & Shift */}
+        {app.clerk_user_id && (
+          <>
+            <Section title="Role & Shift">
+              <MemberSignupCard
+                clerkUserId={app.clerk_user_id}
+                role={signupData?.role ?? null}
+                shift={signupData?.shift ?? null}
+              />
+            </Section>
+            <Divider />
+          </>
+        )}
 
         {/* Sections */}
         <Section title="Basic Info">

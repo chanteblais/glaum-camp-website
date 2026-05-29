@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { useAuth, useUser } from '@clerk/nextjs'
 import { UserNotificationBell } from './UserNotificationBell'
+import { NotificationBell } from '@/app/admin/NotificationBell'
 
 const AUTH_MEMORY_KEY = 'glaum-auth-signed-in'
 const AUTH_NAME_KEY = 'glaum-auth-first-name'
@@ -149,7 +150,7 @@ export function HeaderClient() {
 
   const authSlot = signedIn ? (
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-      <UserNotificationBell />
+      {isAdmin ? <NotificationBell /> : <UserNotificationBell />}
     <div ref={dropdownRef} style={{ position: 'relative' }}>
       <button
         onClick={() => setDropdownOpen(!dropdownOpen)}
@@ -370,7 +371,7 @@ export function HeaderClient() {
         {/* Mobile right side: bell (if signed in) + hamburger */}
         {isMobile && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
-            {signedIn && <UserNotificationBell />}
+            {signedIn && (isAdmin ? <NotificationBell /> : <UserNotificationBell />)}
             <button
               onClick={() => setMenuOpen(!menuOpen)}
               style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.4rem', color: '#C8A848', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
