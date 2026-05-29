@@ -1,24 +1,4 @@
-export const CONTRIBUTION_OPTIONS = [
-  'Setup',
-  'Teardown',
-  'Camp kitchen',
-  'Decor / ambiance',
-  'Sound / DJ support',
-  'Lighting',
-  'Welcoming / greeting',
-  'Shift coverage',
-  'Cleanup',
-  'Emotional support / grounding presence',
-  'Art support',
-  'Tea/snack operations',
-  'Logistics / organization',
-  'Build crew',
-  'Strike crew',
-  'General helper',
-  '"Put me where needed"',
-  'Tiny hand distribution',
-  'Shrimp relations',
-] as const
+export const SETUP_PREFERENCE_OPTIONS = ['Setup', 'Teardown', 'Decor', 'Other'] as const
 
 export const ATTENDANCE_OPTIONS = ['Full event', 'Partial event', 'Unsure'] as const
 
@@ -49,7 +29,7 @@ export const EDITABLE_APPLICATION_FIELDS = [
   'space_requirements',
   'structures',
   'rideshare',
-  'contributions',
+  'setup_preference',
 ] as const
 
 export type EditableApplicationField = (typeof EDITABLE_APPLICATION_FIELDS)[number]

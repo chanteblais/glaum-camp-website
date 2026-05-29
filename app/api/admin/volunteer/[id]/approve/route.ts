@@ -1,0 +1,42 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { auth, clerkClient } from '@clerk/nextjs/server'
+import { supabaseAdmin } from '@/lib/supabase'
+
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const { userId } = await auth()
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const client = await clerkClient()
+  const user = await client.users.getUser(userId)
+  if (user.publicMetadata?.role !== 'admin') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const { data: volunteer, error: fetchError } = await supabaseAdmin
+    .from('volunteers')
+    .select('id, clerk_user_id, first_name, preferred_name')
+    .eq('id', params.id)
+    .maybeSingle()
+
+  if (fetchError || !volunteer) {
+    return NextResponse.json({ error: 'Volunteer not found' }, { status: 404 })
+  }
+
+  const { error } = await supabaseAdmin
+    .from('volunteers')
+    .update({ status: 'active' })
+    .eq('id', params.id)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Notify the volunteer if they have a Clerk account linked
+  if (volunteer.clerk_user_id) {
+    await supabaseAdmin.from('user_notifications').insert([{
+      clerk_user_id: volunteer.clerk_user_id,
+      message: 'Your volunteer signup has been approved!',
+      details: {},
+    }])
+  }
+
+  return NextResponse.json({ success: true })
+}

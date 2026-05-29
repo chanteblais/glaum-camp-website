@@ -12,17 +12,19 @@ export default async function ApplyPage() {
   const user = await currentUser()
   const email = user?.emailAddresses[0]?.emailAddress ?? ''
 
-  const { data: existing } = await supabaseAdmin
-    .from('applications')
-    .select('id, status')
-    .eq('clerk_user_id', userId)
-    .maybeSingle()
+  const [{ data: existing }, { data: volunteer }] = await Promise.all([
+    supabaseAdmin.from('applications').select('id, status').eq('clerk_user_id', userId).maybeSingle(),
+    supabaseAdmin.from('volunteers').select('id, status').eq('clerk_user_id', userId).maybeSingle(),
+  ])
 
-  // Pending / rejected / cancelled → send to profile
-  if (existing && existing.status !== 'approved') redirect('/profile')
+  // Pending / rejected → send to profile; cancelled can re-apply
+  if (existing && existing.status === 'pending') redirect('/profile')
+  if (existing && existing.status === 'rejected') redirect('/profile')
 
-  // Approved → show role & shift selection
-  if (existing?.status === 'approved') {
+  // Active volunteer or approved member → show role & shift selection
+  const showSignup = existing?.status === 'approved' || volunteer?.status === 'active'
+
+  if (showSignup) {
     return (
       <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
         <img src="/hands-left.svg" alt="" aria-hidden style={{ position: 'fixed', left: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />

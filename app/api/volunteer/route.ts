@@ -7,11 +7,14 @@ export async function POST(req: NextRequest) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // Check for existing record (may be cancelled)
+  // Check for existing record (may be cancelled). Use limit(1) to avoid
+  // maybeSingle() errors if duplicate rows somehow exist from test data.
   const { data: existing } = await supabaseAdmin
     .from('volunteers')
     .select('id, status')
     .eq('clerk_user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
     .maybeSingle()
 
   if (existing?.status === 'active') return NextResponse.json({ error: 'Already signed up' }, { status: 409 })
@@ -26,13 +29,14 @@ export async function POST(req: NextRequest) {
     email: data.email,
     phone: data.phone || null,
     brings_to_glaum: data.brings_to_glaum || null,
+    signup_intent: Array.isArray(data.signup_intent) && data.signup_intent.length > 0 ? data.signup_intent : null,
     role_interests: data.role_interests ?? [],
     days_available: data.days_available ?? [],
     specific_interests: data.specific_interests || null,
     special_skills: data.special_skills || null,
     familiar_with_glaum: data.familiar_with_glaum ?? false,
     why_contribute: data.why_contribute || null,
-    status: 'active',
+    status: 'pending',
   }
 
   // Re-signup: update existing cancelled record instead of inserting
@@ -101,6 +105,8 @@ export async function PATCH(req: NextRequest) {
     .from('volunteers')
     .select('id')
     .eq('clerk_user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
     .maybeSingle()
 
   if (!existing) return NextResponse.json({ error: 'Volunteer record not found' }, { status: 404 })
@@ -113,6 +119,7 @@ export async function PATCH(req: NextRequest) {
   if ('preferred_times' in body) updates.preferred_times = Array.isArray(body.preferred_times) ? body.preferred_times : []
   if ('shift_interests' in body) updates.shift_interests = Array.isArray(body.shift_interests) ? body.shift_interests : []
   if ('other_notes' in body) updates.other_notes = body.other_notes || null
+  if ('signup_intent' in body) updates.signup_intent = Array.isArray(body.signup_intent) && body.signup_intent.length > 0 ? body.signup_intent : null
 
   const { error } = await supabaseAdmin
     .from('volunteers')

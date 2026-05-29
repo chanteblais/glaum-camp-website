@@ -17,18 +17,22 @@ export default async function VolunteerPage() {
     .from('volunteers')
     .select('id, status')
     .eq('clerk_user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
     .maybeSingle()
 
   if (existing?.status === 'active') redirect('/profile')
 
-  // Redirect if already has a camp application
+  // Redirect if already has an active camp application (cancelled can still volunteer)
   const { data: application } = await supabaseAdmin
     .from('applications')
-    .select('id')
+    .select('id, status')
     .or(`clerk_user_id.eq.${userId},email.eq.${email}`)
+    .order('submitted_at', { ascending: false })
+    .limit(1)
     .maybeSingle()
 
-  if (application) redirect('/profile')
+  if (application && application.status !== 'cancelled') redirect('/profile')
 
   return (
     <VolunteerForm

@@ -17,6 +17,7 @@ type ScheduleEvent = {
   is_recurring: boolean
   capacity: number | null
   event_type: string | null
+  contribution_type: string | null
 }
 
 const DAYS = ['Thursday', 'Friday', 'Saturday', 'Sunday', 'Wednesday', 'Tuesday', 'Monday']
@@ -81,7 +82,7 @@ function formatTime(raw: string): string {
 
 const blank = (): Omit<ScheduleEvent, 'id' | 'sort_order'> => ({
   day: 'Thursday', time: '', title: '', subtitle: '', detail_desc: '',
-  icon_type: 'star', visible: true, highlight: false, is_recurring: false, capacity: null, event_type: null,
+  icon_type: 'star', visible: true, highlight: false, is_recurring: false, capacity: null, event_type: null, contribution_type: null,
 })
 
 const inputStyle: React.CSSProperties = {
@@ -228,6 +229,20 @@ function EventModal({
               </button>
             ))}
 
+            {/* Freshly uploaded icon — not yet in customIcons, show as selected */}
+            {(form.icon_type.startsWith('http') || form.icon_type.startsWith('/')) && !customIcons.includes(form.icon_type) && (
+              <button
+                type="button"
+                title="Custom icon (selected)"
+                style={{
+                  padding: '0.4rem', borderRadius: '0.5rem', cursor: 'default',
+                  border: '1px solid #C8A848', background: 'rgba(200,168,72,0.12)',
+                }}
+              >
+                <EventIcon type={form.icon_type} size={20} />
+              </button>
+            )}
+
             {/* Previously uploaded custom icons — reusable across events */}
             {customIcons.map((url) => (
               <div key={url} style={{ position: 'relative', display: 'inline-flex' }} className="icon-item" onMouseEnter={e => { const btn = e.currentTarget.querySelector('.icon-delete') as HTMLElement; if (btn) btn.style.opacity = '1' }} onMouseLeave={e => { const btn = e.currentTarget.querySelector('.icon-delete') as HTMLElement; if (btn) btn.style.opacity = '0' }}>
@@ -319,6 +334,18 @@ function EventModal({
               <option value="all_hands">All Hands</option>
               <option value="camp_tending">Camp Tending</option>
               <option value="service">Service</option>
+            </select>
+          </Field>
+          <Field label="Contribution">
+            <select
+              style={{ ...inputStyle, fontSize: '0.82rem', cursor: 'pointer' }}
+              value={form.contribution_type ?? ''}
+              onChange={e => set('contribution_type', e.target.value || null)}
+            >
+              <option value="">None</option>
+              <option value="Setup">Setup</option>
+              <option value="Teardown">Teardown</option>
+              <option value="Decor">Decor</option>
             </select>
           </Field>
         </div>

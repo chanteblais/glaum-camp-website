@@ -57,6 +57,7 @@ export async function POST(req: NextRequest) {
       is_recurring: body.is_recurring ?? false,
       capacity: body.capacity ?? null,
       event_type: body.event_type ?? null,
+      contribution_type: body.contribution_type ?? null,
     }])
     .select()
     .single()

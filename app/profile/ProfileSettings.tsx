@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   ATTENDANCE_OPTIONS,
   CAMP_RELATIONSHIP_OPTIONS,
-  CONTRIBUTION_OPTIONS,
+  SETUP_PREFERENCE_OPTIONS,
   RIDESHARE_OPTIONS,
 } from '@/lib/application-options'
 
@@ -26,7 +26,7 @@ type ApplicationData = {
   space_requirements?: string | null
   structures?: string | null
   rideshare?: string | null
-  contributions?: string[] | null
+  setup_preference?: string[] | null
 }
 
 const inputStyle: React.CSSProperties = {
@@ -83,8 +83,27 @@ export function ProfileSettings({ application }: { application: ApplicationData 
     space_requirements: application.space_requirements ?? '',
     structures: application.structures ?? '',
     rideshare: application.rideshare ?? '',
-    contributions: application.contributions ?? [],
+    setup_preference: (application.setup_preference ?? []).filter(v => SETUP_PREFERENCE_OPTIONS.includes(v as typeof SETUP_PREFERENCE_OPTIONS[number])),
   })
+
+  useEffect(() => {
+    setForm({
+      preferred_name: application.preferred_name ?? '',
+      pronouns: application.pronouns ?? '',
+      phone: application.phone ?? '',
+      instagram: application.instagram ?? '',
+      location: application.location ?? '',
+      attendance: application.attendance ?? '',
+      arrival_date: application.arrival_date ?? '',
+      departure_date: application.departure_date ?? '',
+      camp_relationship: application.camp_relationship ?? '',
+      vehicle: application.vehicle ?? '',
+      space_requirements: application.space_requirements ?? '',
+      structures: application.structures ?? '',
+      rideshare: application.rideshare ?? '',
+      setup_preference: (application.setup_preference ?? []).filter(v => SETUP_PREFERENCE_OPTIONS.includes(v as typeof SETUP_PREFERENCE_OPTIONS[number])),
+    })
+  }, [application])
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -113,12 +132,12 @@ export function ProfileSettings({ application }: { application: ApplicationData 
     if (next === 'cancel') setCancelReason('')
   }
 
-  const toggleContribution = (option: string) => {
+  const toggleSetupPreference = (option: string) => {
     setForm((prev) => ({
       ...prev,
-      contributions: prev.contributions.includes(option)
-        ? prev.contributions.filter((c) => c !== option)
-        : [...prev.contributions, option],
+      setup_preference: prev.setup_preference.includes(option)
+        ? prev.setup_preference.filter((c) => c !== option)
+        : [...prev.setup_preference, option],
     }))
   }
 
@@ -375,16 +394,16 @@ export function ProfileSettings({ application }: { application: ApplicationData 
           </Field>
 
           <Field label="Contributions">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', maxHeight: '10rem', overflowY: 'auto' }}>
-              {CONTRIBUTION_OPTIONS.map((option) => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+              {SETUP_PREFERENCE_OPTIONS.map((option) => (
                 <label
                   key={option}
                   style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start', fontSize: '0.85rem', cursor: 'pointer', color: '#F3EDE6' }}
                 >
                   <input
                     type="checkbox"
-                    checked={form.contributions.includes(option)}
-                    onChange={() => toggleContribution(option)}
+                    checked={form.setup_preference.includes(option)}
+                    onChange={() => toggleSetupPreference(option)}
                     style={{ marginTop: '0.15rem', accentColor: '#D239F8' }}
                   />
                   {option}
@@ -407,7 +426,7 @@ export function ProfileSettings({ application }: { application: ApplicationData 
 
       {view === 'cancel' && (
         <Panel title="Cancel attendance" onClose={closeAll}>
-          <p style={{ fontSize: '0.9rem', lineHeight: 1.7, opacity: 0.7, marginBottom: '1.25rem' }}>
+          <p style={{ fontSize: '0.9rem', lineHeight: 1.7, color: '#F3EDE6', opacity: 0.9, marginBottom: '1.25rem' }}>
             We're sorry to see you go. Please share why you're cancelling so the camp can plan accordingly.
           </p>
           <Field label="Reason (required)">
@@ -418,10 +437,10 @@ export function ProfileSettings({ application }: { application: ApplicationData 
               placeholder="Tell us what's changed…"
               style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6 }}
             />
-            <p style={{ fontSize: '0.78rem', opacity: 0.55, marginTop: '0.5rem', marginBottom: 0 }}>
+            <p style={{ fontSize: '0.78rem', color: cancelReasonOk ? '#7dcf8e' : '#F3EDE6', opacity: cancelReasonOk ? 0.9 : 0.75, marginTop: '0.5rem', marginBottom: 0 }}>
               {cancelReasonOk
-                ? 'Thank you — this helps us plan.'
-                : `Please share at least 10 characters (${cancelReason.trim().length}/10).`}
+                ? '✓ Thank you — this helps us plan.'
+                : `Please write at least 10 characters before confirming (${cancelReason.trim().length}/10).`}
             </p>
           </Field>
           {error && <p style={{ color: '#ff8a8a', fontSize: '0.85rem', marginBottom: '0.75rem' }}>{error}</p>}

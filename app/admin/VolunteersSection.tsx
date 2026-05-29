@@ -7,12 +7,15 @@ type Volunteer = {
   id: string
   first_name: string
   last_name: string
+  preferred_name: string | null
   email: string
   phone: string | null
   days_available: string[]
   preferred_times: string[]
   shift_interests: string[]
   other_notes: string | null
+  signup_intent: string | null
+  status: string
   created_at: string
 }
 
@@ -153,6 +156,117 @@ function CampMemberRow({ member }: { member: CampMember }) {
   )
 }
 
+// ── Pending Volunteer Row ───────────────────────────────────────────────────
+
+function PendingVolunteerRow({ volunteer }: { volunteer: Volunteer }) {
+  const [expanded, setExpanded] = useState(false)
+  const [approving, setApproving] = useState(false)
+  const [removing, setRemoving] = useState(false)
+  const router = useRouter()
+
+  const displayName = volunteer.preferred_name || volunteer.first_name
+  const signed = new Date(volunteer.created_at).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })
+
+  const handleApprove = async () => {
+    setApproving(true)
+    await fetch(`/api/admin/volunteer/${volunteer.id}/approve`, { method: 'POST' })
+    router.refresh()
+  }
+
+  const handleRemove = async () => {
+    if (!confirm(`Decline ${displayName} ${volunteer.last_name}?`)) return
+    setRemoving(true)
+    await fetch(`/api/admin/volunteer/${volunteer.id}`, { method: 'DELETE' })
+    router.refresh()
+  }
+
+  const INTENT_LABELS: Record<string, string> = {
+    shift: 'Shift',
+    role: 'Role',
+    other: 'Other',
+  }
+
+  return (
+    <div style={{
+      border: '1px solid rgba(210,57,248,0.25)',
+      borderRadius: '0.75rem',
+      background: 'rgba(210,57,248,0.04)',
+      overflow: 'hidden',
+    }}>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '1rem',
+          padding: '1rem 1.25rem',
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          color: 'inherit',
+          textAlign: 'left',
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ flex: 1, minWidth: '160px' }}>
+          <p style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.15rem' }}>
+            {displayName} {volunteer.last_name}
+          </p>
+          <p style={{ fontSize: '0.8rem', opacity: 0.45 }}>{volunteer.email}</p>
+        </div>
+        {volunteer.signup_intent && (
+          <span style={{ fontSize: '0.72rem', color: '#D239F8', opacity: 0.7, flexShrink: 0, letterSpacing: '0.06em' }}>
+            {INTENT_LABELS[volunteer.signup_intent] ?? volunteer.signup_intent}
+          </span>
+        )}
+        <span style={{ fontSize: '0.78rem', opacity: 0.4, flexShrink: 0 }}>{signed}</span>
+        <span style={{ fontSize: '0.65rem', opacity: 0.3, flexShrink: 0 }}>{expanded ? '▲' : '▼'}</span>
+      </button>
+
+      {expanded && (
+        <div style={{ padding: '0 1.25rem 1.25rem', borderTop: '1px solid rgba(210,57,248,0.1)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginTop: '1rem', marginBottom: '1.25rem' }}>
+            {volunteer.days_available?.length > 0 && (
+              <div>
+                <p style={{ fontSize: '0.65rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.5, marginBottom: '0.4rem' }}>Days Available</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                  {volunteer.days_available.map(d => (
+                    <span key={d} style={{ fontSize: '0.82rem', opacity: 0.8 }}>{d}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {volunteer.phone && (
+              <div>
+                <p style={{ fontSize: '0.65rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.5, marginBottom: '0.4rem' }}>Phone</p>
+                <p style={{ fontSize: '0.82rem', opacity: 0.8 }}>{volunteer.phone}</p>
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+            <button
+              onClick={handleRemove}
+              disabled={removing}
+              style={{ padding: '0.45rem 1.1rem', borderRadius: '9999px', border: '1px solid rgba(255,100,100,0.25)', background: 'transparent', color: '#F3EDE6', fontSize: '0.78rem', opacity: removing ? 0.4 : 0.5, cursor: removing ? 'not-allowed' : 'pointer' }}
+            >
+              {removing ? 'Declining…' : 'Decline'}
+            </button>
+            <button
+              onClick={handleApprove}
+              disabled={approving}
+              style={{ padding: '0.45rem 1.25rem', borderRadius: '9999px', border: '1px solid rgba(210,57,248,0.5)', background: 'rgba(210,57,248,0.08)', color: '#D239F8', fontSize: '0.78rem', fontWeight: 600, cursor: approving ? 'not-allowed' : 'pointer', opacity: approving ? 0.5 : 1, letterSpacing: '0.04em' }}
+            >
+              {approving ? 'Approving…' : 'Approve'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Outside Volunteer Row ───────────────────────────────────────────────────
 
 function VolunteerRow({ volunteer }: { volunteer: Volunteer }) {
@@ -168,6 +282,7 @@ function VolunteerRow({ volunteer }: { volunteer: Volunteer }) {
   }
 
   const signed = new Date(volunteer.created_at).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })
+  const displayName = volunteer.preferred_name || volunteer.first_name
 
   return (
     <div style={{
@@ -194,7 +309,7 @@ function VolunteerRow({ volunteer }: { volunteer: Volunteer }) {
       >
         <div style={{ flex: 1, minWidth: '160px' }}>
           <p style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.15rem' }}>
-            {volunteer.first_name} {volunteer.last_name}
+            {displayName} {volunteer.last_name}
           </p>
           <p style={{ fontSize: '0.8rem', opacity: 0.45 }}>{volunteer.email}</p>
         </div>
@@ -283,12 +398,14 @@ function VolunteerRow({ volunteer }: { volunteer: Volunteer }) {
 
 export function VolunteersSection({
   volunteers,
+  pendingVolunteers,
   campMembers,
 }: {
   volunteers: Volunteer[]
+  pendingVolunteers: Volunteer[]
   campMembers: CampMember[]
 }) {
-  const noOne = campMembers.length === 0 && volunteers.length === 0
+  const noOne = campMembers.length === 0 && volunteers.length === 0 && pendingVolunteers.length === 0
 
   if (noOne) {
     return <p style={{ opacity: 0.4, fontStyle: 'italic', fontSize: '0.875rem' }}>No volunteers or camp members yet.</p>
@@ -296,6 +413,18 @@ export function VolunteersSection({
 
   return (
     <div>
+      {pendingVolunteers.length > 0 && (
+        <div style={{ marginBottom: '2rem' }}>
+          <SubHeading>Pending Approval — {pendingVolunteers.length}</SubHeading>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+            {pendingVolunteers.map(v => <PendingVolunteerRow key={v.id} volunteer={v} />)}
+          </div>
+          {(campMembers.length > 0 || volunteers.length > 0) && (
+            <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(210,57,248,0.15), transparent)', marginTop: '2rem' }} />
+          )}
+        </div>
+      )}
+
       {campMembers.length > 0 && (
         <div style={{ marginBottom: volunteers.length > 0 ? '2rem' : 0 }}>
           <SubHeading>Camp Members — {campMembers.length}</SubHeading>

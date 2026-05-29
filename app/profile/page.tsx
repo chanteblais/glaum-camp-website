@@ -9,6 +9,8 @@ import { UserNotificationBell } from '@/components/UserNotificationBell'
 import { NotificationBell } from '@/app/admin/NotificationBell'
 import { AvatarUpload } from '@/components/AvatarUpload'
 import { SignupSection } from './SignupSection'
+import { TaskStatus } from './TaskStatus'
+import { PersonalSchedule } from './PersonalSchedule'
 
 export default async function ProfilePage() {
   const { userId } = await auth()
@@ -17,14 +19,15 @@ export default async function ProfilePage() {
   const user = await currentUser()
   const email = user?.emailAddresses[0]?.emailAddress
 
-  // Check for camp application
-  const { data: application } = await supabaseAdmin
+  // Check for camp application (cancelled treated as no application)
+  const { data: applicationRaw } = await supabaseAdmin
     .from('applications')
     .select('*')
     .or(`clerk_user_id.eq.${userId},email.eq.${email}`)
     .order('submitted_at', { ascending: false })
     .limit(1)
     .maybeSingle()
+  const application = applicationRaw?.status === 'cancelled' ? null : applicationRaw
 
   // Check for active volunteer signup (cancelled records are treated as no record)
   const { data: volunteerRaw } = await supabaseAdmin
@@ -32,16 +35,25 @@ export default async function ProfilePage() {
     .select('*')
     .eq('clerk_user_id', userId)
     .maybeSingle()
-  const volunteer = volunteerRaw?.status === 'active' ? volunteerRaw : null
+  const volunteer = (volunteerRaw?.status === 'active' || volunteerRaw?.status === 'pending') ? volunteerRaw : null
 
-  // Fetch signup status for approved members
-  const { data: campSignup } = application?.status === 'approved'
+  // Fetch signup status for approved members and active (not pending) volunteers
+  const { data: campSignup } = (application?.status === 'approved' || volunteer?.status === 'active')
     ? await supabaseAdmin
         .from('camp_signups')
-        .select('role_id, schedule_event_id, role_approval_status')
+        .select('role_id, schedule_event_id, role_approval_status, roles(department_id, departments(name))')
         .eq('clerk_user_id', userId)
         .maybeSingle()
     : { data: null }
+
+  // Derive contributions: setup_preference from application + auto-Decor if role is in Decor dept
+  const deptName = (campSignup?.roles as { departments?: { name?: string } | null } | null)?.departments?.name ?? ''
+  const isDecorRole = deptName.toLowerCase().includes('decor')
+  const VALID_CONTRIBUTIONS = ['Setup', 'Teardown', 'Decor', 'Other']
+  const baseContributions: string[] = ((application?.setup_preference as string[] | null) ?? []).filter(v => VALID_CONTRIBUTIONS.includes(v))
+  const contributions = isDecorRole && !baseContributions.includes('Decor')
+    ? [...baseContributions, 'Decor']
+    : baseContributions
 
   // Link clerk_user_id for approved applications found by email
   if (application?.status === 'approved' && !application.clerk_user_id) {
@@ -136,7 +148,7 @@ export default async function ProfilePage() {
                   Camp with Glåüm at What If 2026. Full participation — you'll sleep on site, help build and hold the space, and take on volunteer shifts as part of the camp.
                 </p>
                 <a
-                  href="/apply"
+                  href="/apply?join=1"
                   style={{
                     display: 'block',
                     textAlign: 'center',
@@ -189,21 +201,21 @@ export default async function ProfilePage() {
 
         {/* ── CAMP APPLICATION STATES ── */}
         {application && !volunteer && application.status === 'pending' && (
-          <div style={{ textAlign: 'center', padding: '3rem 2rem', border: '1px solid rgba(200,168,72,0.15)', borderRadius: '1rem', background: 'rgba(210,57,248,0.04)' }}>
-            <div style={{ marginBottom: '1.5rem' }}>
-              <span style={{ display: 'inline-block', padding: '0.35rem 1.25rem', borderRadius: '9999px', backgroundColor: 'rgba(200,168,72,0.08)', border: '1px solid rgba(200,168,72,0.25)', fontSize: '0.75rem', letterSpacing: '0.12em', color: '#C8A848', opacity: 0.7 }}>
-                ○ PENDING PARTICIPANT
-              </span>
+          <div>
+            <div style={{ textAlign: 'center', marginBottom: '2rem', padding: '2rem 2rem 1.5rem', border: '1px solid rgba(200,168,72,0.15)', borderRadius: '1rem', background: 'rgba(210,57,248,0.04)' }}>
+              <div style={{ marginBottom: '1.25rem' }}>
+                <span style={{ display: 'inline-block', padding: '0.35rem 1.25rem', borderRadius: '9999px', backgroundColor: 'rgba(200,168,72,0.08)', border: '1px solid rgba(200,168,72,0.25)', fontSize: '0.75rem', letterSpacing: '0.12em', color: '#C8A848', opacity: 0.7 }}>
+                  ○ PENDING PARTICIPANT
+                </span>
+              </div>
+              <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.2rem', color: '#C8A848', marginBottom: '0.75rem' }}>
+                Application under review.
+              </p>
+              <p style={{ fontSize: '0.82rem', lineHeight: 1.7, opacity: 0.45 }}>
+                Need to update your details? Use the gear icon above.
+              </p>
             </div>
-            <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.2rem', color: '#C8A848', marginBottom: '0.75rem' }}>
-              Application under review.
-            </p>
-            <p style={{ fontSize: '0.9rem', lineHeight: 1.7, opacity: 0.6, marginBottom: '0.75rem' }}>
-              The Many Hands are deliberating. You'll receive an email when your application has been reviewed.
-            </p>
-            <p style={{ fontSize: '0.82rem', lineHeight: 1.7, opacity: 0.45 }}>
-              Need to update your details? Use the gear icon above.
-            </p>
+            <TaskStatus track="pending" />
           </div>
         )}
 
@@ -237,60 +249,17 @@ export default async function ProfilePage() {
               </span>
             </div>
 
-            {/* Signup status banner — shown prominently before any other content */}
-            {(() => {
-              const hasRole = !!campSignup?.role_id
-              const hasShift = !!campSignup?.schedule_event_id
-              const isPending = campSignup?.role_approval_status === 'pending'
-              const allDone = hasRole && !isPending && hasShift
-
-              if (allDone) return (
-                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '2rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.65rem 1.25rem', borderRadius: '9999px', border: '1px solid rgba(100,200,120,0.3)', background: 'rgba(100,200,120,0.06)' }}>
-                    <span style={{ color: '#7dcf8e', fontSize: '0.75rem' }}>✓</span>
-                    <span style={{ fontSize: '0.78rem', color: '#7dcf8e', letterSpacing: '0.04em' }}>Role &amp; shift confirmed</span>
-                  </div>
-                </div>
-              )
-
-              if (isPending) return (
-                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '2rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.65rem 1.25rem', borderRadius: '9999px', border: '1px solid rgba(210,57,248,0.3)', background: 'rgba(210,57,248,0.06)' }}>
-                    <span style={{ color: '#D239F8', fontSize: '0.75rem' }}>○</span>
-                    <span style={{ fontSize: '0.78rem', color: '#D239F8', letterSpacing: '0.04em' }}>Role request pending approval</span>
-                  </div>
-                </div>
-              )
-
-              const missing = []
-              if (!hasRole) missing.push('a role')
-              if (!hasShift) missing.push('a shift')
-              if (!missing.length) return null
-
-              return (
-                <div style={{ marginBottom: '2rem', padding: '0.9rem 1.25rem', borderRadius: '0.85rem', border: '1px solid rgba(210,168,50,0.4)', background: 'rgba(210,168,50,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <span style={{ fontSize: '1rem' }}>⚠</span>
-                    <span style={{ fontSize: '0.88rem', color: '#C8A848' }}>
-                      You still need to choose {missing.join(' and ')}.
-                    </span>
-                  </div>
-                  <a href="/apply" style={{ fontSize: '0.8rem', color: '#C8A848', opacity: 0.7, textDecoration: 'underline', textUnderlineOffset: '2px', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                    Complete registration →
-                  </a>
-                </div>
-              )
-            })()}
+            <TaskStatus track="approved" campSignup={campSignup} contributions={contributions} />
 
             <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.3), transparent)', marginBottom: '2.5rem' }} />
 
-            {application.contributions?.length > 0 && (
+            {contributions.length > 0 && (
               <div style={{ marginBottom: '2.5rem' }}>
                 <p style={{ fontSize: '0.7rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', marginBottom: '1rem', opacity: 0.7 }}>
-                  Your Contributions
+                  Contributions
                 </p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  {application.contributions.map((c: string) => (
+                  {contributions.map((c: string) => (
                     <span key={c} style={{ padding: '0.3rem 0.85rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.2)', fontSize: '0.8rem', opacity: 0.8 }}>
                       {c}
                     </span>
@@ -303,7 +272,6 @@ export default async function ProfilePage() {
               {[
                 { label: 'Arrival', value: application.arrival_date },
                 { label: 'Departure', value: application.departure_date },
-                { label: 'Attendance', value: application.attendance },
                 { label: 'Traveling From', value: application.location },
               ].filter(({ value }) => value).map(({ label, value }) => (
                 <div key={label} style={{ padding: '1rem 1.25rem', border: '1px solid rgba(200,168,72,0.12)', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.02)' }}>
@@ -319,6 +287,10 @@ export default async function ProfilePage() {
 
             <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.2), transparent)', margin: '2.5rem 0' }} />
 
+            <PersonalSchedule userId={userId} contributions={contributions} />
+
+            <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.2), transparent)', marginBottom: '2.5rem' }} />
+
             <div style={{ padding: '2rem', border: '1px solid rgba(210,57,248,0.2)', borderRadius: '1rem', background: 'rgba(210,57,248,0.04)' }}>
               <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.1rem', color: '#C8A848', marginBottom: '1rem' }}>
                 Camp Information
@@ -331,12 +303,18 @@ export default async function ProfilePage() {
         )}
 
         {/* ── VOLUNTEER PROFILE ── */}
-        {volunteer && volunteer.status === 'active' && (
+        {volunteer && (volunteer.status === 'active' || volunteer.status === 'pending') && (
           <>
             <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-              <span style={{ display: 'inline-block', padding: '0.35rem 1.25rem', borderRadius: '9999px', backgroundColor: 'rgba(210,57,248,0.1)', border: '1px solid rgba(210,57,248,0.25)', fontSize: '0.75rem', letterSpacing: '0.12em', color: '#D239F8' }}>
-                ✦ HELPING HAND
-              </span>
+              {volunteer.status === 'pending' ? (
+                <span style={{ display: 'inline-block', padding: '0.35rem 1.25rem', borderRadius: '9999px', backgroundColor: 'rgba(200,168,72,0.08)', border: '1px solid rgba(200,168,72,0.25)', fontSize: '0.75rem', letterSpacing: '0.12em', color: '#C8A848', opacity: 0.8 }}>
+                  ○ PENDING REVIEW
+                </span>
+              ) : (
+                <span style={{ display: 'inline-block', padding: '0.35rem 1.25rem', borderRadius: '9999px', backgroundColor: 'rgba(210,57,248,0.1)', border: '1px solid rgba(210,57,248,0.25)', fontSize: '0.75rem', letterSpacing: '0.12em', color: '#D239F8' }}>
+                  ✦ HELPING HAND
+                </span>
+              )}
             </div>
 
             <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(210,57,248,0.2), transparent)', marginBottom: '2.5rem' }} />
@@ -366,14 +344,7 @@ export default async function ProfilePage() {
               )}
             </div>
 
-            <div style={{ padding: '2rem', border: '1px solid rgba(210,57,248,0.15)', borderRadius: '1rem', background: 'rgba(210,57,248,0.03)' }}>
-              <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.1rem', color: '#D239F8', marginBottom: '0.75rem' }}>
-                You're on the list.
-              </p>
-              <p style={{ fontSize: '0.9rem', lineHeight: 1.8, opacity: 0.65, fontStyle: 'italic' }}>
-                We'll share more details about specific shifts and roles closer to the event. Keep an eye on your email.
-              </p>
-            </div>
+            <TaskStatus track="volunteer" volunteerStatus={volunteer.status} campSignup={campSignup} signupIntent={volunteer.signup_intent} />
           </>
         )}
 
