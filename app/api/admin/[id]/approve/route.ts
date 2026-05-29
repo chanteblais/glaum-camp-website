@@ -14,6 +14,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const { id } = params
 
+  // Fetch application so we can notify the user
+  const { data: application } = await supabaseAdmin
+    .from('applications')
+    .select('clerk_user_id, first_name, preferred_name')
+    .eq('id', id)
+    .single()
+
   // Mark application as approved
   const { error: updateError } = await supabaseAdmin
     .from('applications')
@@ -26,6 +33,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   if (updateError) {
     return NextResponse.json({ error: updateError.message }, { status: 500 })
+  }
+
+  // Notify the applicant
+  if (application?.clerk_user_id) {
+    const displayName = application.preferred_name || application.first_name || 'Camper'
+    await supabaseAdmin.from('user_notifications').insert([{
+      clerk_user_id: application.clerk_user_id,
+      event_type: 'application_approved',
+      message: `Welcome to Glåüm, ${displayName}! Your application has been approved. 🎉`,
+    }])
   }
 
   return NextResponse.json({ success: true })

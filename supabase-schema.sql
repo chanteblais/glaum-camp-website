@@ -46,9 +46,22 @@ CREATE TABLE applications (
   shrimp_relationship TEXT,
 
   -- Admin fields
-  status TEXT DEFAULT 'pending',  -- pending | approved | rejected
+  status TEXT DEFAULT 'pending',  -- pending | approved | rejected | cancelled
   clerk_user_id TEXT,
   admin_notes TEXT,
   reviewed_at TIMESTAMPTZ,
-  reviewed_by TEXT
+  reviewed_by TEXT,
+  cancel_reason TEXT,
+  cancelled_at TIMESTAMPTZ,
+  profile_updated_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS admin_notifications (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  application_id UUID REFERENCES applications(id) ON DELETE CASCADE,
+  event_type TEXT NOT NULL,
+  message TEXT NOT NULL,
+  details JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  read_at TIMESTAMPTZ
 );

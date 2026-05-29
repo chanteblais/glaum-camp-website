@@ -25,6 +25,7 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
 
   const statusColor =
     app.status === 'approved' ? '#C8A848' :
+    app.status === 'cancelled' ? '#ffb4b4' :
     app.status === 'rejected' ? 'rgba(243,237,230,0.3)' :
     '#D239F8'
 
@@ -58,6 +59,20 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
         {app.status === 'pending' && (
           <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginBottom: '3rem' }}>
             <AdminActions id={app.id} email={app.email} redirectAfter="/admin" />
+          </div>
+        )}
+
+        {app.status === 'cancelled' && app.cancel_reason && (
+          <div style={{ marginBottom: '2.5rem', padding: '1.25rem 1.5rem', border: '1px solid rgba(255,120,120,0.25)', borderRadius: '0.75rem', background: 'rgba(255,0,0,0.04)' }}>
+            <p style={{ fontSize: '0.7rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#ffb4b4', marginBottom: '0.5rem' }}>
+              Cancellation reason
+            </p>
+            <p style={{ fontSize: '0.9rem', lineHeight: 1.7, opacity: 0.75, fontStyle: 'italic' }}>{app.cancel_reason}</p>
+            {app.cancelled_at && (
+              <p style={{ fontSize: '0.75rem', opacity: 0.4, marginTop: '0.5rem' }}>
+                Cancelled {new Date(app.cancelled_at).toLocaleString('en-CA')}
+              </p>
+            )}
           </div>
         )}
 

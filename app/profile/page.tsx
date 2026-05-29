@@ -3,6 +3,9 @@ import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { SignOutBtn } from '@/components/SignOutBtn'
 import { RememberSignedIn } from '@/components/RememberSignedIn'
+import { ProfileSettings } from './ProfileSettings'
+import { VolunteerSettings } from './VolunteerSettings'
+import { UserNotificationBell } from '@/components/UserNotificationBell'
 
 export default async function ProfilePage() {
   const { userId } = await auth()
@@ -11,7 +14,7 @@ export default async function ProfilePage() {
   const user = await currentUser()
   const email = user?.emailAddresses[0]?.emailAddress
 
-  // Find any application for this user (pending or approved)
+  // Check for camp application
   const { data: application } = await supabaseAdmin
     .from('applications')
     .select('*')
@@ -20,7 +23,14 @@ export default async function ProfilePage() {
     .limit(1)
     .maybeSingle()
 
-  // Link clerk_user_id if not already set (for approved applications found by email)
+  // Check for volunteer signup
+  const { data: volunteer } = await supabaseAdmin
+    .from('volunteers')
+    .select('*')
+    .eq('clerk_user_id', userId)
+    .maybeSingle()
+
+  // Link clerk_user_id for approved applications found by email
   if (application?.status === 'approved' && !application.clerk_user_id) {
     await supabaseAdmin
       .from('applications')
@@ -28,78 +38,173 @@ export default async function ProfilePage() {
       .eq('id', application.id)
   }
 
-  const displayName = application?.preferred_name || application?.first_name || user?.firstName || 'Camper'
+  const displayName =
+    volunteer?.preferred_name || volunteer?.first_name ||
+    application?.preferred_name || application?.first_name ||
+    user?.firstName || 'Welcome'
+
+  const kicker = application ? 'Member Profile' : volunteer ? 'Volunteer Profile' : null
 
   return (
-    <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1 }}>
+    <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
+      <img src="/hands-left.svg" alt="" aria-hidden style={{ position: 'fixed', left: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
+      <img src="/hands-right.svg" alt="" aria-hidden style={{ position: 'fixed', right: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
       <RememberSignedIn firstName={user?.firstName} email={email} />
-      <div style={{ maxWidth: '760px', margin: '0 auto', padding: '3rem 1.5rem 6rem' }}>
+      <div style={{ maxWidth: '760px', margin: '0 auto', padding: '3rem 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
 
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
           <a href="/" style={{ fontSize: '0.8rem', letterSpacing: '0.1em', color: '#C8A848', textDecoration: 'none', opacity: 0.6 }}>
             ← Back to camp
           </a>
-          <SignOutBtn />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <UserNotificationBell />
+            {application && (application.status === 'approved' || application.status === 'pending') && (
+              <ProfileSettings application={application} />
+            )}
+            {volunteer && volunteer.status === 'active' && !application && (
+              <VolunteerSettings volunteer={volunteer} />
+            )}
+            <SignOutBtn />
+          </div>
         </div>
 
-        <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-          <p style={{ fontSize: '0.65rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: '#D239F8', marginBottom: '0.75rem', opacity: 0.85 }}>
-            Member Profile
-          </p>
-          <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 6vw, 3rem)', color: '#C8A848', marginBottom: '0.25rem', textShadow: '0 0 40px rgba(210,57,248,0.4)' }}>
-            {displayName}
-          </h1>
-          {application?.pronouns && (
-            <p style={{ fontSize: '0.85rem', opacity: 0.5, marginBottom: '0.25rem' }}>{application.pronouns}</p>
-          )}
-          <p style={{ fontSize: '0.8rem', opacity: 0.4 }}>{email}</p>
-        </div>
+        {/* Name header — shown for application and volunteer tracks */}
+        {(application || volunteer) && (
+          <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+            {kicker && (
+              <p style={{ fontSize: '0.65rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: '#D239F8', marginBottom: '0.75rem', opacity: 0.85 }}>
+                {kicker}
+              </p>
+            )}
+            <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 6vw, 3rem)', color: '#C8A848', marginBottom: '0.25rem', textShadow: '0 0 40px rgba(210,57,248,0.4)' }}>
+              {displayName}
+            </h1>
+            {application?.pronouns && (
+              <p style={{ fontSize: '0.85rem', opacity: 0.5, marginBottom: '0.25rem' }}>{application.pronouns}</p>
+            )}
+            <p style={{ fontSize: '0.8rem', opacity: 0.4 }}>{email}</p>
+          </div>
+        )}
 
-        {!application ? (
-          // No application state
-          <div style={{ maxWidth: '580px', margin: '0 auto' }}>
-            <p style={{ fontSize: '1rem', lineHeight: 1.8, marginBottom: '1.25rem' }}>
-              Glåüm is a participatory camp built collaboratively by The Many Hands. This form helps us understand who's joining camp, how people would like to contribute, and what support structures we need to build together.
-            </p>
-            <p style={{ fontSize: '1rem', lineHeight: 1.8, marginBottom: '1.25rem' }}>
-              You do not need to be the most skilled, experienced, outgoing, or useful person in the world to join Glåüm.
-            </p>
-            <p style={{ fontSize: '1rem', lineHeight: 1.8, fontStyle: 'italic', opacity: 0.7, marginBottom: '2.5rem' }}>
-              You simply need to be willing to participate honestly, communicate clearly, and help hold the camp with us in whatever ways are realistic for you.
-            </p>
-            <div style={{ textAlign: 'center' }}>
-              <a
-                href="/apply"
-                style={{
-                  display: 'inline-block',
-                  padding: '0.75rem 2.5rem',
-                  borderRadius: '9999px',
-                  border: '1px solid rgba(200,168,72,0.5)',
-                  color: '#FFFACD',
-                  textDecoration: 'none',
-                  letterSpacing: '0.12em',
-                  fontSize: '0.85rem',
-                  fontFamily: 'TokyoDreams, serif',
-                }}
-              >
-                Submit Application
-              </a>
+        {/* ── CHOOSE YOUR PATH ── */}
+        {!application && !volunteer && (
+          <div>
+            <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+              <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(1.8rem, 5vw, 2.5rem)', color: '#C8A848', marginBottom: '0.5rem', textShadow: '0 0 40px rgba(210,57,248,0.4)' }}>
+                {user?.firstName ? `Welcome, ${user.firstName}.` : 'Welcome.'}
+              </h1>
+              <p style={{ fontSize: '0.85rem', opacity: 0.5 }}>{email}</p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem' }}>
+              {/* Camp member card */}
+              <div style={{ padding: '2rem', border: '1px solid rgba(200,168,72,0.2)', borderRadius: '1rem', background: 'rgba(200,168,72,0.03)', display: 'flex', flexDirection: 'column' }}>
+                <p style={{ fontSize: '0.65rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.7, marginBottom: '0.75rem' }}>
+                  Camp Member
+                </p>
+                <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.3rem', color: '#C8A848', marginBottom: '0.75rem' }}>
+                  Join the Camp
+                </p>
+                <p style={{ fontSize: '0.875rem', lineHeight: 1.7, opacity: 0.6, marginBottom: '2rem', flex: 1 }}>
+                  Camp with Glåüm at What If 2026. Full participation — you'll sleep on site, help build and hold the space, and take on volunteer shifts as part of the camp.
+                </p>
+                <a
+                  href="/apply"
+                  style={{
+                    display: 'block',
+                    textAlign: 'center',
+                    padding: '0.75rem 1.5rem',
+                    borderRadius: '9999px',
+                    border: '1px solid rgba(200,168,72,0.5)',
+                    color: '#FFFACD',
+                    textDecoration: 'none',
+                    letterSpacing: '0.1em',
+                    fontSize: '0.82rem',
+                    fontFamily: 'TokyoDreams, serif',
+                  }}
+                >
+                  Apply to Camp
+                </a>
+              </div>
+
+              {/* Volunteer card */}
+              <div style={{ padding: '2rem', border: '1px solid rgba(210,57,248,0.15)', borderRadius: '1rem', background: 'rgba(210,57,248,0.03)', display: 'flex', flexDirection: 'column' }}>
+                <p style={{ fontSize: '0.65rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#D239F8', opacity: 0.7, marginBottom: '0.75rem' }}>
+                  Volunteer
+                </p>
+                <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.3rem', color: '#D239F8', marginBottom: '0.75rem' }}>
+                  Volunteer for a Shift
+                </p>
+                <p style={{ fontSize: '0.875rem', lineHeight: 1.7, opacity: 0.6, marginBottom: '2rem', flex: 1 }}>
+                  Not camping with Glåüm, but want to be part of it? Sign up to help out for a shift or two. We'll share more details about available roles closer to the event.
+                </p>
+                <a
+                  href="/volunteer"
+                  style={{
+                    display: 'block',
+                    textAlign: 'center',
+                    padding: '0.75rem 1.5rem',
+                    borderRadius: '9999px',
+                    border: '1px solid rgba(210,57,248,0.7)',
+                    color: '#F3EDE6',
+                    textDecoration: 'none',
+                    letterSpacing: '0.1em',
+                    fontSize: '0.82rem',
+                    fontFamily: 'TokyoDreams, serif',
+                  }}
+                >
+                  Sign Up to Volunteer
+                </a>
+              </div>
             </div>
           </div>
-        ) : application.status === 'pending' ? (
-          // Pending state
+        )}
+
+        {/* ── CAMP APPLICATION STATES ── */}
+        {application && !volunteer && application.status === 'pending' && (
           <div style={{ textAlign: 'center', padding: '3rem 2rem', border: '1px solid rgba(200,168,72,0.15)', borderRadius: '1rem', background: 'rgba(210,57,248,0.04)' }}>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <span style={{ display: 'inline-block', padding: '0.35rem 1.25rem', borderRadius: '9999px', backgroundColor: 'rgba(200,168,72,0.08)', border: '1px solid rgba(200,168,72,0.25)', fontSize: '0.75rem', letterSpacing: '0.12em', color: '#C8A848', opacity: 0.7 }}>
+                ○ PENDING PARTICIPANT
+              </span>
+            </div>
             <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.2rem', color: '#C8A848', marginBottom: '0.75rem' }}>
               Application under review.
             </p>
-            <p style={{ fontSize: '0.9rem', lineHeight: 1.7, opacity: 0.6 }}>
+            <p style={{ fontSize: '0.9rem', lineHeight: 1.7, opacity: 0.6, marginBottom: '0.75rem' }}>
               The Many Hands are deliberating. You'll receive an email when your application has been reviewed.
             </p>
+            <p style={{ fontSize: '0.82rem', lineHeight: 1.7, opacity: 0.45 }}>
+              Need to update your details? Use the gear icon above.
+            </p>
           </div>
-        ) : (
+        )}
+
+        {application && application.status === 'cancelled' && (
+          <div style={{ textAlign: 'center', padding: '3rem 2rem', border: '1px solid rgba(255,120,120,0.2)', borderRadius: '1rem', background: 'rgba(255,0,0,0.04)' }}>
+            <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.2rem', color: '#ffb4b4', marginBottom: '0.75rem' }}>
+              Attendance cancelled
+            </p>
+            <p style={{ fontSize: '0.9rem', lineHeight: 1.7, opacity: 0.6 }}>
+              Your spot has been released. If your plans change again, reach out to camp organizers.
+            </p>
+          </div>
+        )}
+
+        {application && application.status === 'rejected' && (
+          <div style={{ textAlign: 'center', padding: '3rem 2rem', border: '1px solid rgba(200,168,72,0.12)', borderRadius: '1rem', background: 'rgba(255,255,255,0.02)' }}>
+            <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.2rem', color: '#C8A848', marginBottom: '0.75rem' }}>
+              Application not approved
+            </p>
+            <p style={{ fontSize: '0.9rem', lineHeight: 1.7, opacity: 0.6 }}>
+              If you have questions, please contact camp organizers.
+            </p>
+          </div>
+        )}
+
+        {application && application.status === 'approved' && (
           <>
-            {/* Status badge */}
             <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
               <span style={{ display: 'inline-block', padding: '0.35rem 1.25rem', borderRadius: '9999px', backgroundColor: 'rgba(210,57,248,0.15)', border: '1px solid rgba(210,57,248,0.3)', fontSize: '0.75rem', letterSpacing: '0.12em', color: '#D239F8' }}>
                 ✦ APPROVED CAMPER
@@ -108,7 +213,6 @@ export default async function ProfilePage() {
 
             <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.3), transparent)', marginBottom: '2.5rem' }} />
 
-            {/* Contribution areas */}
             {application.contributions?.length > 0 && (
               <div style={{ marginBottom: '2.5rem' }}>
                 <p style={{ fontSize: '0.7rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', marginBottom: '1rem', opacity: 0.7 }}>
@@ -124,7 +228,6 @@ export default async function ProfilePage() {
               </div>
             )}
 
-            {/* Camp details */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '2.5rem' }}>
               {[
                 { label: 'Arrival', value: application.arrival_date },
@@ -143,18 +246,64 @@ export default async function ProfilePage() {
 
             <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.2), transparent)', marginBottom: '2.5rem' }} />
 
-            {/* Private camp info */}
             <div style={{ padding: '2rem', border: '1px solid rgba(210,57,248,0.2)', borderRadius: '1rem', background: 'rgba(210,57,248,0.04)' }}>
               <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.1rem', color: '#C8A848', marginBottom: '1rem' }}>
                 Camp Information
               </p>
               <p style={{ fontSize: '0.9rem', lineHeight: 1.8, opacity: 0.65, fontStyle: 'italic' }}>
-                Location details, logistics, and camp-specific information will appear here closer to the event.
-                Keep an eye on your email.
+                Location details, logistics, and camp-specific information will appear here closer to the event. Keep an eye on your email.
               </p>
             </div>
           </>
         )}
+
+        {/* ── VOLUNTEER PROFILE ── */}
+        {volunteer && volunteer.status === 'active' && (
+          <>
+            <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
+              <span style={{ display: 'inline-block', padding: '0.35rem 1.25rem', borderRadius: '9999px', backgroundColor: 'rgba(210,57,248,0.1)', border: '1px solid rgba(210,57,248,0.25)', fontSize: '0.75rem', letterSpacing: '0.12em', color: '#D239F8' }}>
+                ✦ HELPING HAND
+              </span>
+            </div>
+
+            <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(210,57,248,0.2), transparent)', marginBottom: '2.5rem' }} />
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '2.5rem' }}>
+              {volunteer.days_available?.length > 0 && (
+                <div style={{ padding: '1rem 1.25rem', border: '1px solid rgba(200,168,72,0.12)', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.02)', gridColumn: '1 / -1' }}>
+                  <p style={{ fontSize: '0.7rem', letterSpacing: '0.1em', color: '#C8A848', opacity: 0.6, marginBottom: '0.5rem', textTransform: 'uppercase' }}>Days Available</p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                    {volunteer.days_available.map((d: string) => (
+                      <span key={d} style={{ padding: '0.25rem 0.75rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.2)', fontSize: '0.8rem', opacity: 0.8 }}>{d}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {volunteer.preferred_times?.length > 0 && (
+                <div style={{ padding: '1rem 1.25rem', border: '1px solid rgba(200,168,72,0.12)', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.02)' }}>
+                  <p style={{ fontSize: '0.7rem', letterSpacing: '0.1em', color: '#C8A848', opacity: 0.6, marginBottom: '0.5rem', textTransform: 'uppercase' }}>Preferred Times</p>
+                  <p style={{ fontSize: '0.9rem' }}>{volunteer.preferred_times.join(', ')}</p>
+                </div>
+              )}
+              {volunteer.shift_interests?.length > 0 && (
+                <div style={{ padding: '1rem 1.25rem', border: '1px solid rgba(200,168,72,0.12)', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.02)' }}>
+                  <p style={{ fontSize: '0.7rem', letterSpacing: '0.1em', color: '#C8A848', opacity: 0.6, marginBottom: '0.5rem', textTransform: 'uppercase' }}>Shift Interests</p>
+                  <p style={{ fontSize: '0.9rem' }}>{volunteer.shift_interests.join(', ')}</p>
+                </div>
+              )}
+            </div>
+
+            <div style={{ padding: '2rem', border: '1px solid rgba(210,57,248,0.15)', borderRadius: '1rem', background: 'rgba(210,57,248,0.03)' }}>
+              <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.1rem', color: '#D239F8', marginBottom: '0.75rem' }}>
+                You're on the list.
+              </p>
+              <p style={{ fontSize: '0.9rem', lineHeight: 1.8, opacity: 0.65, fontStyle: 'italic' }}>
+                We'll share more details about specific shifts and roles closer to the event. Keep an eye on your email.
+              </p>
+            </div>
+          </>
+        )}
+
       </div>
     </div>
   )
