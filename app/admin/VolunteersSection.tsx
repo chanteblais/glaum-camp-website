@@ -310,7 +310,7 @@ export function VolunteersSection({
           {campMembers.length > 0 && (
             <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.1), transparent)', marginBottom: '2rem' }} />
           )}
-          <SubHeading>Outside Volunteers — {volunteers.length}</SubHeading>
+          <SubHeading>Helping Hands — {volunteers.length}</SubHeading>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
             {volunteers.map(v => <VolunteerRow key={v.id} volunteer={v} />)}
           </div>
