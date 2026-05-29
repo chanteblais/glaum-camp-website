@@ -8,6 +8,7 @@ import { ContributionsSection } from './ContributionsSection'
 import { VolunteersSection } from './VolunteersSection'
 import { NotificationsSection } from './NotificationsSection'
 import { NotificationBell } from './NotificationBell'
+import { ScheduleManager } from './ScheduleManager'
 
 export default async function AdminPage() {
   const { userId } = await auth()
@@ -141,6 +142,14 @@ export default async function AdminPage() {
           summary={`${approved.length + pending.length} members`}
         >
           <ContributionsSection applications={all} />
+        </CollapsibleSection>
+
+        {/* ── SCHEDULE ── */}
+        <CollapsibleSection
+          title="Schedule"
+          summary="Edit public schedule"
+        >
+          <ScheduleManager />
         </CollapsibleSection>
 
         {/* ── REGISTRY ── */}

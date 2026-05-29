@@ -2,6 +2,7 @@ import Image from 'next/image'
 import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
 import { Section, Kicker, GoldDivider } from '@/components/Section'
+import { ScheduleSection } from '@/components/ScheduleSection'
 
 export const dynamic = 'force-dynamic'
 
@@ -153,94 +154,10 @@ export default function Home() {
         {/* ─── SCHEDULE ─────────────────────────────────────── */}
         <Section id="schedule" style={{ backgroundColor: 'rgba(210, 57, 248, 0.03)' }}>
           <Kicker>When things happen</Kicker>
-          <h2 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 5vw, 3rem)', marginBottom: '0.5rem', textAlign: 'center' }}>
+          <h2 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 5vw, 3rem)', marginBottom: '3rem', textAlign: 'center' }}>
             Schedule
           </h2>
-          <p style={{ opacity: 0.6, fontStyle: 'italic', marginBottom: '3rem', fontSize: '0.9rem' }}>
-            All times approximate. Attunement is not bound by the clock.
-          </p>
-
-          {[
-            {
-              day: 'Tuesday, July 22',
-              events: [
-                { time: null, title: 'Early Arrival / Infrastructure Setup', desc: null },
-              ],
-            },
-            {
-              day: 'Wednesday, July 23',
-              events: [
-                { time: 'Morning / Afternoon', title: 'Decor & Atmosphere Day', desc: null },
-                { time: 'Evening', title: 'Glåüm Salon — Soft Opening', desc: '8pm–1am' },
-              ],
-            },
-            {
-              day: 'Thursday, July 24',
-              events: [
-                { time: 'Evening', title: 'Glåüm Salon', desc: '8pm–2am' },
-              ],
-            },
-            {
-              day: 'Friday, July 25',
-              events: [
-                { time: '4pm–7pm', title: 'Glåüm Initiation Ceremony', desc: null },
-                { time: 'Evening', title: 'Glåüm Salon', desc: '9pm–2am' },
-              ],
-            },
-            {
-              day: 'Saturday, July 26',
-              events: [
-                { time: 'Evening', title: 'Glåüm Salon', desc: '8pm–1am' },
-              ],
-            },
-            {
-              day: 'Sunday, July 27',
-              events: [
-                { time: null, title: 'Teardown / Departure', desc: null },
-              ],
-            },
-          ].map(({ day, events }) => (
-            <div key={day} style={{ marginBottom: '2.5rem' }}>
-              <h3
-                style={{
-                  fontFamily: 'TokyoDreams, serif',
-                  fontSize: '1.2rem',
-                  color: '#D239F8',
-                  marginBottom: '1rem',
-                  paddingBottom: '0.5rem',
-                  borderBottom: '1px solid rgba(210,57,248,0.2)',
-                }}
-              >
-                {day}
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {events.map(({ time, title, desc }) => (
-                  <div
-                    key={title}
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: time ? '140px 1fr' : '1fr',
-                      gap: '1rem',
-                      padding: '0.85rem 1rem',
-                      borderRadius: '0.5rem',
-                      backgroundColor: 'rgba(255,255,255,0.02)',
-                      border: '1px solid rgba(200,168,72,0.08)',
-                    }}
-                  >
-                    {time && (
-                      <span style={{ fontSize: '0.8rem', color: '#C8A848', opacity: 0.65, paddingTop: '0.15rem', letterSpacing: '0.04em' }}>
-                        {time}
-                      </span>
-                    )}
-                    <div>
-                      <p style={{ fontWeight: 700, fontSize: '0.95rem', color: '#F3EDE6', marginBottom: desc ? '0.2rem' : 0 }}>{title}</p>
-                      {desc && <p style={{ fontSize: '0.82rem', opacity: 0.5, letterSpacing: '0.04em' }}>{desc}</p>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
+          <ScheduleSection />
         </Section>
 
 

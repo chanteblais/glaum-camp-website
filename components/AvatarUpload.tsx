@@ -82,7 +82,7 @@ export function AvatarUpload({
           <img
             src={preview}
             alt={displayName}
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            style={{ width: '100%', minHeight: '100%', objectFit: 'cover', display: 'block' }}
           />
         ) : (
           <span style={{
