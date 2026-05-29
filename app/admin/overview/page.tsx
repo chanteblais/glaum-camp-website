@@ -113,27 +113,12 @@ export default async function OverviewPage() {
   const pendingHours = incomplete * HOURS_PER_MEMBER
   const volunteerHours = activeVolunteers.length * HOURS_PER_MEMBER
 
-  // Setup & teardown — derived from application answers
-  const setupTeam = approved.filter(a => {
-    const prefs: string[] = (a.setup_preference as string[]) ?? []
-    return prefs.includes('Setup Team') || prefs.includes('Both')
-  })
-  const teardownTeam = approved.filter(a => {
-    const prefs: string[] = (a.setup_preference as string[]) ?? []
-    return prefs.includes('Teardown Team') || prefs.includes('Both')
-  })
-  const noPreference = approved.filter(a => {
-    const prefs: string[] = (a.setup_preference as string[]) ?? []
-    return prefs.includes('No preference') && !prefs.includes('Both')
-  })
-  const limitations = approved.filter(a => {
-    const lims: string[] = (a.setup_limitations as string[]) ?? []
-    return lims.length > 0
-  })
-  const unassigned = approved.filter(a => {
-    const prefs: string[] = (a.setup_preference as string[]) ?? []
-    return prefs.length === 0
-  })
+  // Contributions — derived from setup_preference
+  const setupTeam = approved.filter(a => ((a.setup_preference as string[]) ?? []).includes('Setup'))
+  const teardownTeam = approved.filter(a => ((a.setup_preference as string[]) ?? []).includes('Teardown'))
+  const decorTeam = approved.filter(a => ((a.setup_preference as string[]) ?? []).includes('Decor'))
+  const limitations = approved.filter(a => ((a.setup_limitations as string[]) ?? []).length > 0)
+  const unassigned = approved.filter(a => ((a.setup_preference as string[]) ?? []).length === 0)
 
   // Rideshare
   const RIDESHARE_OPTIONS = ['I need a ride', 'I can offer a ride', "I'm sorted", 'Not sure yet']
@@ -204,28 +189,28 @@ export default async function OverviewPage() {
         {/* ── HOURS ── */}
         <section style={{ marginBottom: '2.5rem' }}>
           <p style={{ fontSize: '0.65rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, marginBottom: '1.25rem' }}>
-            Shift Hours ({HOURS_PER_MEMBER}h per member)
+            Shift Hours ({HOURS_PER_MEMBER} per member)
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem' }}>
             <div style={card()}>
               <p style={statLabel}>Total Committed</p>
-              <p style={statValue}>{totalHours}h</p>
+              <p style={statValue}>{totalHours}</p>
               <p style={statSub}>from {approved.length} approved campers</p>
             </div>
             <div style={card()}>
               <p style={statLabel}>Confirmed</p>
-              <p style={{ ...statValue, color: '#7dcf8e' }}>{completedHours}h</p>
+              <p style={{ ...statValue, color: '#7dcf8e' }}>{completedHours}</p>
               <p style={statSub}>{complete} members signed up</p>
             </div>
             <div style={card()}>
               <p style={statLabel}>Still Pending</p>
-              <p style={{ ...statValue, color: incomplete > 0 ? '#ffb432' : '#7dcf8e' }}>{pendingHours}h</p>
+              <p style={{ ...statValue, color: incomplete > 0 ? '#ffb432' : '#7dcf8e' }}>{pendingHours}</p>
               <p style={statSub}>{incomplete} members not yet signed up</p>
             </div>
             <div style={card('purple')}>
               <p style={{ ...statLabel, color: '#D239F8' }}>Volunteer Hours</p>
-              <p style={{ ...statValue, color: '#D239F8' }}>{volunteerHours}h</p>
+              <p style={{ ...statValue, color: '#D239F8' }}>{volunteerHours}</p>
               <p style={statSub}>from {activeVolunteers.length} volunteers</p>
             </div>
           </div>
@@ -239,27 +224,25 @@ export default async function OverviewPage() {
             Setup & Teardown
           </p>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
             <div style={card()}>
-              <p style={statLabel}>Setup Team</p>
+              <p style={statLabel}>Setup</p>
               <p style={statValue}>{setupTeam.length}</p>
               <MemberPills members={setupTeam} />
             </div>
             <div style={card()}>
-              <p style={statLabel}>Teardown Team</p>
+              <p style={statLabel}>Teardown</p>
               <p style={statValue}>{teardownTeam.length}</p>
               <MemberPills members={teardownTeam} />
+            </div>
+            <div style={card()}>
+              <p style={statLabel}>Decor</p>
+              <p style={statValue}>{decorTeam.length}</p>
+              <MemberPills members={decorTeam} />
             </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-            {noPreference.length > 0 && (
-              <div style={card()}>
-                <p style={statLabel}>No preference</p>
-                <p style={{ ...statValue, fontSize: '1.5rem' }}>{noPreference.length}</p>
-                <MemberPills members={noPreference} />
-              </div>
-            )}
             {limitations.length > 0 && (
               <div style={{ ...card(), borderColor: 'rgba(255,180,50,0.2)', background: 'rgba(255,180,50,0.03)' }}>
                 <p style={{ ...statLabel, color: '#ffb432' }}>Noted limitations</p>

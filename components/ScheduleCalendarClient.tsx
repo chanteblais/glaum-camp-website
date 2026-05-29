@@ -39,7 +39,7 @@ const DEFAULT_STYLE = { border: 'rgba(200,168,72,0.15)', background: 'rgba(255,2
 
 function eventTypeStyle(event: ScheduleEvent) {
   if (event.event_type && EVENT_TYPE_STYLES[event.event_type]) return EVENT_TYPE_STYLES[event.event_type]
-  if (event.highlight) return { border: 'rgba(200,168,72,0.4)', background: 'rgba(200,168,72,0.1)', text: '#F3EDE6' }
+  if (event.highlight) return { border: 'rgba(200,168,72,0.25)', background: 'rgba(200,168,72,0.04)', text: '#F3EDE6' }
   return DEFAULT_STYLE
 }
 
@@ -121,6 +121,7 @@ function EventBlock({ event, style }: { event: ScheduleEvent; style: React.CSSPr
         borderRadius: '0.35rem',
         border: `1px solid ${eventTypeStyle(event).border}`,
         background: eventTypeStyle(event).background,
+        boxShadow: event.highlight ? '0 0 10px rgba(200,168,72,0.35), 0 0 20px rgba(200,168,72,0.15)' : undefined,
         overflow: 'hidden',
         cursor: hasDetail ? 'pointer' : 'default',
         zIndex: expanded ? 10 : 1,
@@ -310,8 +311,8 @@ export function ScheduleCalendarClient({ events }: { events: ScheduleEvent[] }) 
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1rem' }}>
             {regular.filter((card, i, arr) => arr.findIndex(c => c.title === card.title) === i).map(card => (
-              <div key={card.id} style={{ padding: '1.25rem', border: '1px solid rgba(200,168,72,0.15)', borderRadius: '0.85rem', background: 'rgba(200,168,72,0.03)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <p style={{ fontSize: '0.68rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: card.highlight ? '#C8803A' : '#C8A848', opacity: 0.85, margin: 0, textAlign: 'center' }}>
+              <div key={card.id} style={{ padding: '1.25rem', border: '1px solid rgba(200,168,72,0.15)', borderRadius: '0.85rem', background: 'rgba(200,168,72,0.03)', display: 'flex', flexDirection: 'column', gap: '0.75rem', boxShadow: card.highlight ? '0 0 18px rgba(200,168,72,0.3), 0 0 40px rgba(200,168,72,0.1)' : undefined }}>
+                <p style={{ fontSize: '0.68rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.85, margin: 0, textAlign: 'center' }}>
                   {card.day}&nbsp;&nbsp;{card.time}
                 </p>
                 <div style={{ color: '#C8A848', opacity: 0.55, display: 'flex', justifyContent: 'center', flex: 1, alignItems: 'center' }}>

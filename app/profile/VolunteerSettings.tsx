@@ -10,7 +10,14 @@ type VolunteerData = {
   preferred_times: string[]
   shift_interests: string[]
   other_notes: string | null
+  signup_intent: string[] | null
 }
+
+const SIGNUP_INTENT_OPTIONS = [
+  { value: 'shift', label: 'Sign up for a shift', description: 'Help out during a specific time slot.' },
+  { value: 'role', label: 'Take on a camp role', description: 'Take on a defined responsibility for the event.' },
+  { value: 'other', label: 'Something else', description: "Not sure yet, or something else entirely." },
+]
 
 const DAYS = [
   'Tuesday, Jul 22 — Setup day',
@@ -73,12 +80,20 @@ export function VolunteerSettings({ volunteer }: { volunteer: VolunteerData }) {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    phone: string
+    days_available: string[]
+    preferred_times: string[]
+    shift_interests: string[]
+    other_notes: string
+    signup_intent: string[]
+  }>({
     phone: volunteer.phone ?? '',
     days_available: volunteer.days_available ?? [],
     preferred_times: volunteer.preferred_times ?? [],
     shift_interests: volunteer.shift_interests ?? [],
     other_notes: volunteer.other_notes ?? '',
+    signup_intent: volunteer.signup_intent ?? [],
   })
 
   const closeAll = () => { setView(null); setError(null); setSuccess(null); setCancelReason('') }
@@ -93,7 +108,7 @@ export function VolunteerSettings({ volunteer }: { volunteer: VolunteerData }) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [view])
 
-  const toggle = (field: 'days_available' | 'preferred_times' | 'shift_interests', value: string) => {
+  const toggle = (field: 'days_available' | 'preferred_times' | 'shift_interests' | 'signup_intent', value: string) => {
     setForm((prev) => ({
       ...prev,
       [field]: prev[field].includes(value)
@@ -228,6 +243,29 @@ export function VolunteerSettings({ volunteer }: { volunteer: VolunteerData }) {
               </h2>
               <button type="button" onClick={closeAll} aria-label="Close" style={{ border: 'none', background: 'transparent', color: '#C8A848', fontSize: '1.5rem', lineHeight: 1, cursor: 'pointer', opacity: 0.7 }}>×</button>
             </div>
+
+            <Field label="How would you like to contribute?">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {SIGNUP_INTENT_OPTIONS.map(opt => {
+                  const checked = form.signup_intent.includes(opt.value)
+                  return (
+                    <label key={opt.value} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer', padding: '0.7rem 0.85rem', borderRadius: '0.5rem', border: `1px solid ${checked ? 'rgba(210,57,248,0.4)' : 'rgba(200,168,72,0.12)'}`, background: checked ? 'rgba(210,57,248,0.06)' : 'transparent', transition: 'border-color 0.15s' }}>
+                      <input
+                        type="checkbox"
+                        value={opt.value}
+                        checked={checked}
+                        onChange={() => toggle('signup_intent', opt.value)}
+                        style={{ marginTop: '0.2rem', flexShrink: 0, accentColor: '#D239F8', cursor: 'pointer' }}
+                      />
+                      <div>
+                        <p style={{ fontSize: '0.85rem', color: '#F3EDE6', marginBottom: '0.1rem' }}>{opt.label}</p>
+                        <p style={{ fontSize: '0.75rem', opacity: 0.45, lineHeight: 1.4 }}>{opt.description}</p>
+                      </div>
+                    </label>
+                  )
+                })}
+              </div>
+            </Field>
 
             <Field label="Phone">
               <input

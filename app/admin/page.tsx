@@ -20,15 +20,18 @@ export default async function AdminPage() {
   const user = await client.users.getUser(userId)
   if (user.publicMetadata?.role !== 'admin') redirect('/')
 
-  const { data: volunteers } = await supabaseAdmin
+  const { data: volunteersRaw } = await supabaseAdmin
     .from('volunteers')
-    .select('id, first_name, last_name, email, phone, days_available, preferred_times, shift_interests, other_notes, created_at')
-    .eq('status', 'active')
+    .select('id, first_name, last_name, preferred_name, email, phone, days_available, preferred_times, shift_interests, other_notes, signup_intent, status, created_at')
+    .in('status', ['active', 'pending'])
     .order('created_at', { ascending: false })
+  const volunteers = volunteersRaw ?? []
+  const pendingVolunteers = volunteers.filter(v => v.status === 'pending')
+  const activeVolunteers = volunteers.filter(v => v.status === 'active')
 
   const { data: applications, error: dbError } = await supabaseAdmin
     .from('applications')
-    .select('id, first_name, last_name, preferred_name, email, status, submitted_at, attendance, camp_relationship, camped_before, contributions')
+    .select('id, first_name, last_name, preferred_name, email, status, submitted_at, attendance, camp_relationship, camped_before, setup_preference')
     .order('submitted_at', { ascending: false })
 
   const { data: notifications, error: notificationsError } = await supabaseAdmin
@@ -116,17 +119,18 @@ export default async function AdminPage() {
         {/* ── VOLUNTEERS ── */}
         <CollapsibleSection
           title="Registered Hands"
-          summary={`${approved.length} members · ${volunteers?.length ?? 0} outside`}
+          summary={`${approved.length} members · ${activeVolunteers.length} outside${pendingVolunteers.length > 0 ? ` · ${pendingVolunteers.length} pending` : ''}`}
         >
           <VolunteersSection
-            volunteers={volunteers ?? []}
+            volunteers={activeVolunteers}
+            pendingVolunteers={pendingVolunteers}
             campMembers={approved.map(a => ({
               id: a.id,
               first_name: a.first_name,
               last_name: a.last_name,
               preferred_name: a.preferred_name ?? null,
               email: a.email,
-              contributions: a.contributions ?? null,
+              contributions: a.setup_preference ?? null,
               attendance: a.attendance ?? null,
             }))}
           />

@@ -165,11 +165,11 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
         <Divider />
 
         <Section title="Participation">
-          {app.contributions?.length > 0 && (
+          {app.setup_preference?.length > 0 && (
             <div style={{ marginBottom: '1.5rem' }}>
               <p style={{ fontSize: '0.7rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.6, marginBottom: '0.6rem' }}>Contributions</p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-                {app.contributions.map((c: string) => (
+                {app.setup_preference.map((c: string) => (
                   <span key={c} style={{ padding: '0.25rem 0.75rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.2)', fontSize: '0.8rem', opacity: 0.8 }}>
                     {c}
                   </span>

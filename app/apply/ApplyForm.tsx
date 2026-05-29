@@ -178,7 +178,9 @@ function RadioGroup({ options, name }: { options: string[]; name: string }) {
 }
 
 export function ApplyForm({ userEmail }: { userEmail: string }) {
-  const [pathChosen, setPathChosen] = useState(false)
+  const [pathChosen, setPathChosen] = useState(() =>
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('join') === '1'
+  )
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -754,18 +756,18 @@ export function ApplyForm({ userEmail }: { userEmail: string }) {
               </Field>
 
               <div style={{ marginBottom: '2.75rem' }}>
-                <p style={{ ...sectionHeadingStyle, fontSize: '1.15rem', marginBottom: '0.5rem' }}>Setup & Teardown</p>
+                <p style={{ ...sectionHeadingStyle, fontSize: '1.15rem', marginBottom: '0.5rem' }}>Contributions</p>
                 <p style={{ ...helperTextStyle, marginTop: 0, marginBottom: '1.5rem' }}>
-                  Setup and teardown are among the most important ways the Many Hands of Glåüm support camp.
-                  We recognize that travel schedules, accessibility needs, family obligations, and other circumstances
-                  may affect availability. If you are unable to participate in setup or teardown, we'll work with you
-                  to find another meaningful way to contribute.
+                  Setup, teardown, and decor are among the most hands-on ways to shape the space.
+                  Select any you'd like to contribute to — you can choose more than one.
+                  We recognize that travel schedules, accessibility needs, and other circumstances
+                  may affect availability. If you have limitations, note them below.
                 </p>
 
-                <Field label="Which would you prefer?">
+                <Field label="Which would you like to help with?">
                   <CheckboxGroup
                     name="setup_preference"
-                    options={['Setup Team', 'Teardown Team', 'Both', 'No preference']}
+                    options={['Setup', 'Teardown', 'Decor']}
                   />
                 </Field>
               </div>

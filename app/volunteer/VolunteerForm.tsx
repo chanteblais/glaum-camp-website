@@ -95,21 +95,35 @@ function CheckboxGroup({ options, name }: { options: string[]; name: string }) {
   )
 }
 
+const SIGNUP_INTENT_OPTIONS = [
+  { value: 'shift', label: 'Sign up for a shift', description: 'I want to help out during a specific time slot.' },
+  { value: 'role', label: 'Take on a camp role', description: 'I want to take on a defined responsibility for the event.' },
+  { value: 'other', label: 'Something else', description: "I'm interested in contributing but not sure how yet, or I have something else in mind." },
+]
+
+function SignupIntentCheckboxes() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      {SIGNUP_INTENT_OPTIONS.map(opt => (
+        <label key={opt.value} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.85rem', cursor: 'pointer', padding: '0.85rem 1rem', borderRadius: '0.6rem', border: '1px solid rgba(200,168,72,0.15)', background: 'rgba(255,255,255,0.02)' }}>
+          <input
+            type="checkbox"
+            name="signup_intent"
+            value={opt.value}
+            style={{ marginTop: '0.25rem', flexShrink: 0, accentColor: '#D239F8', cursor: 'pointer' }}
+          />
+          <div>
+            <p style={{ fontSize: '0.9rem', color: '#F3EDE6', marginBottom: '0.2rem' }}>{opt.label}</p>
+            <p style={{ fontSize: '0.78rem', opacity: 0.5, lineHeight: 1.5 }}>{opt.description}</p>
+          </div>
+        </label>
+      ))}
+    </div>
+  )
+}
+
 const DAYS = ['Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Monday', 'Flexible']
 
-const ROLE_INTERESTS = [
-  'Public-facing shifts',
-  'Tiny Hand Services',
-  'Initiation Ceremony',
-  'Setup',
-  'Teardown',
-  'Decor & ambiance',
-  'Administration',
-  'Logistics',
-  'Sound & Music',
-  'Whatever is most helpful',
-  'Other',
-]
 
 export function VolunteerForm({ userEmail, userFirstName, userLastName }: {
   userEmail: string
@@ -136,7 +150,7 @@ export function VolunteerForm({ userEmail, userFirstName, userLastName }: {
       email: formData.get('email'),
       phone: formData.get('phone'),
       brings_to_glaum: formData.get('brings_to_glaum') || null,
-      role_interests: formData.getAll('role_interests'),
+      signup_intent: formData.getAll('signup_intent'),
       days_available: formData.getAll('days_available'),
       specific_interests: formData.get('specific_interests') || null,
       special_skills: formData.get('special_skills') || null,
@@ -245,13 +259,13 @@ export function VolunteerForm({ userEmail, userFirstName, userLastName }: {
 
             <div style={dividerStyle} />
 
-            <Field label="What brings you to Glåüm?">
-              <TextArea name="brings_to_glaum" placeholder="Tell us a little about how you found us and what draws you here." rows={4} />
+            <Field label="How would you like to contribute?">
+              <p style={{ fontSize: '0.8rem', opacity: 0.45, fontStyle: 'italic', marginBottom: '0.75rem' }}>Select all that apply</p>
+              <SignupIntentCheckboxes />
             </Field>
 
-            <Field label="What kinds of contributions interest you?">
-              <p style={{ fontSize: '0.8rem', opacity: 0.45, fontStyle: 'italic', marginBottom: '0.75rem' }}>Check all that apply</p>
-              <CheckboxGroup name="role_interests" options={ROLE_INTERESTS} />
+            <Field label="What brings you to Glåüm?">
+              <TextArea name="brings_to_glaum" placeholder="Tell us a little about how you found us and what draws you here." rows={4} />
             </Field>
 
             <Field label="What days are you likely available?">

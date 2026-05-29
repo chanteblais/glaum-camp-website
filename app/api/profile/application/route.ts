@@ -32,7 +32,7 @@ export async function PATCH(req: NextRequest) {
   for (const field of EDITABLE_APPLICATION_FIELDS) {
     if (field in body) {
       const value = body[field]
-      if (field === 'contributions') {
+      if (field === 'setup_preference') {
         updates[field] = Array.isArray(value) ? value : []
       } else {
         updates[field] = typeof value === 'string' ? value.trim() || null : value ?? null
