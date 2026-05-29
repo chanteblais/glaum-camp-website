@@ -33,15 +33,21 @@ export function HeaderClient() {
   const [rememberedEmail, setRememberedEmail] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   const signedIn = mounted && (Boolean(isSignedIn) || Boolean(serverAuth?.isSignedIn) || hasRememberedAuth)
   const userFirstName = user?.firstName ?? serverAuth?.firstName ?? rememberedFirstName
   const userEmail = user?.primaryEmailAddress?.emailAddress ?? serverAuth?.email ?? rememberedEmail
   const initials = userFirstName?.[0] ?? '✦'
+  const isAdmin = user?.publicMetadata?.role === 'admin'
 
   useEffect(() => {
     setMounted(true)
+
+    const checkMobile = () => setIsMobile(window.innerWidth < 768)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
 
     const params = new URLSearchParams(window.location.search)
     if (params.get('signed_in') === '1') {
@@ -58,6 +64,8 @@ export function HeaderClient() {
     setHasRememberedAuth(window.localStorage.getItem(AUTH_MEMORY_KEY) === 'true')
     setRememberedFirstName(window.localStorage.getItem(AUTH_NAME_KEY))
     setRememberedEmail(window.localStorage.getItem(AUTH_EMAIL_KEY))
+
+    return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
   useEffect(() => {
@@ -184,7 +192,7 @@ export function HeaderClient() {
           )}
           {[
             { href: '/profile', label: 'My Profile' },
-            { href: '/admin', label: 'Admin' },
+            ...(isAdmin ? [{ href: '/admin', label: 'Admin' }] : []),
           ].map(({ href, label }) => (
             <Link
               key={href}
@@ -262,6 +270,16 @@ export function HeaderClient() {
     </Link>
   )
 
+  const mobileMenuLink: React.CSSProperties = {
+    color: '#F3EDE6',
+    textDecoration: 'none',
+    fontSize: '1rem',
+    letterSpacing: '0.08em',
+    padding: '0.75rem 0',
+    borderBottom: '1px solid rgba(200,168,72,0.08)',
+    display: 'block',
+  }
+
   return (
     <header
       style={{
@@ -280,13 +298,15 @@ export function HeaderClient() {
         style={{
           maxWidth: '1200px',
           margin: '0 auto',
-          padding: '0 1.5rem',
+          padding: '0 1.25rem',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           height: '64px',
+          gap: '1rem',
         }}
       >
+        {/* Logo */}
         <Link
           href="/"
           style={{
@@ -296,103 +316,98 @@ export function HeaderClient() {
             textDecoration: 'none',
             letterSpacing: '0.05em',
             textShadow: '0 0 20px rgba(210, 57, 248, 0.6)',
+            flexShrink: 0,
           }}
         >
           Glåüm
-          <span style={{ color: '#F3EDE6', fontSize: '0.65rem', letterSpacing: '0.15em', marginLeft: '0.5rem', fontFamily: 'var(--font-libre-baskerville)', opacity: 0.6 }}>
-            sponsored by Shrimp™
-          </span>
+          {!isMobile && (
+            <span style={{ color: '#F3EDE6', fontSize: '0.65rem', letterSpacing: '0.15em', marginLeft: '0.5rem', fontFamily: 'var(--font-libre-baskerville)', opacity: 0.6 }}>
+              sponsored by Shrimp™
+            </span>
+          )}
         </Link>
 
-        <nav style={{ display: 'flex', gap: '2rem' }} className="hidden md:flex">
-          {navLinks.map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              style={{
-                color: '#F3EDE6',
-                textDecoration: 'none',
-                fontSize: '0.85rem',
-                letterSpacing: '0.08em',
-                opacity: 0.8,
-                transition: 'opacity 0.2s, color 0.2s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.opacity = '1'
-                e.currentTarget.style.color = '#C8A848'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.opacity = '0.8'
-                e.currentTarget.style.color = '#F3EDE6'
-              }}
+        {/* Desktop nav */}
+        {!isMobile && (
+          <nav style={{ display: 'flex', gap: '2rem', flex: 1, justifyContent: 'center' }}>
+            {navLinks.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                style={{ color: '#F3EDE6', textDecoration: 'none', fontSize: '0.85rem', letterSpacing: '0.08em', opacity: 0.8, transition: 'opacity 0.2s, color 0.2s' }}
+                onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = '#C8A848' }}
+                onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.8'; e.currentTarget.style.color = '#F3EDE6' }}
+              >
+                {link.label}
+              </a>
+            ))}
+          </nav>
+        )}
+
+        {/* Desktop auth slot */}
+        {!isMobile && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexShrink: 0 }}>
+            {authSlot}
+          </div>
+        )}
+
+        {/* Mobile right side: bell (if signed in) + hamburger */}
+        {isMobile && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+            {signedIn && <UserNotificationBell />}
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.4rem', color: '#C8A848', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              aria-label={menuOpen ? 'Close menu' : 'Open menu'}
             >
-              {link.label}
-            </a>
-          ))}
-        </nav>
-
-        <div className="hidden md:flex" style={{ minWidth: '72px', justifyContent: 'flex-end' }}>
-          {authSlot}
-        </div>
-
-        <button
-          onClick={() => setMenuOpen(!menuOpen)}
-          className="md:hidden"
-          style={{
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            padding: '0.5rem',
-            color: '#C8A848',
-          }}
-          aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-        >
-          <span style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.2rem' }}>
-            {menuOpen ? '✕' : '≡'}
-          </span>
-        </button>
+              {menuOpen ? (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
+                </svg>
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
-      {menuOpen && (
+      {/* Mobile menu */}
+      {isMobile && menuOpen && (
         <nav
           style={{
-            backgroundColor: 'rgba(26, 10, 36, 0.97)',
-            borderTop: '1px solid rgba(200, 168, 72, 0.15)',
-            padding: '1rem 1.5rem 1.5rem',
+            backgroundColor: 'rgba(20, 8, 30, 0.98)',
+            borderTop: '1px solid rgba(200,168,72,0.15)',
+            padding: '0.75rem 1.25rem 1.5rem',
             display: 'flex',
             flexDirection: 'column',
-            gap: '0',
-            overflowX: 'hidden',
           }}
         >
           {signedIn && (userFirstName || userEmail) && (
-            <div style={{ paddingBottom: '1rem', marginBottom: '0.5rem', borderBottom: '1px solid rgba(200,168,72,0.15)' }}>
-              {userFirstName && <p style={{ fontSize: '0.85rem', color: '#C8A848', opacity: 0.9 }}>{userFirstName}</p>}
-              {userEmail && <p style={{ fontSize: '0.75rem', color: '#F3EDE6', opacity: 0.35 }}>{userEmail}</p>}
+            <div style={{ padding: '0.75rem 0 1rem', marginBottom: '0.25rem', borderBottom: '1px solid rgba(200,168,72,0.15)' }}>
+              {userFirstName && <p style={{ fontSize: '0.85rem', color: '#C8A848', opacity: 0.9, margin: 0 }}>{userFirstName}</p>}
+              {userEmail && <p style={{ fontSize: '0.72rem', color: '#F3EDE6', opacity: 0.35, margin: '0.2rem 0 0' }}>{userEmail}</p>}
             </div>
           )}
+
           {navLinks.map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              onClick={() => setMenuOpen(false)}
-              style={{
-                color: '#F3EDE6',
-                textDecoration: 'none',
-                fontSize: '1rem',
-                letterSpacing: '0.08em',
-                padding: '0.75rem 0',
-                borderBottom: '1px solid rgba(200, 168, 72, 0.08)',
-              }}
-            >
+            <a key={link.href} href={link.href} onClick={() => setMenuOpen(false)} style={mobileMenuLink}>
               {link.label}
             </a>
           ))}
+
           {signedIn && (
             <>
-              <Link href="/profile" onClick={() => setMenuOpen(false)} style={{ color: '#C8A848', textDecoration: 'none', fontSize: '1rem', letterSpacing: '0.08em', padding: '0.75rem 0', borderBottom: '1px solid rgba(200, 168, 72, 0.08)' }}>
+              <Link href="/profile" onClick={() => setMenuOpen(false)} style={{ ...mobileMenuLink, color: '#C8A848' }}>
                 My Profile
               </Link>
+              {isAdmin && (
+                <Link href="/admin" onClick={() => setMenuOpen(false)} style={{ ...mobileMenuLink, color: '#C8A848', opacity: 0.7 }}>
+                  Admin
+                </Link>
+              )}
               <a
                 href="/api/sign-out"
                 onClick={() => {
@@ -403,14 +418,15 @@ export function HeaderClient() {
                   setRememberedFirstName(null)
                   setRememberedEmail(null)
                 }}
-                style={{ color: '#F3EDE6', textDecoration: 'none', cursor: 'pointer', fontSize: '1rem', letterSpacing: '0.08em', padding: '0.75rem 0', opacity: 0.4, textAlign: 'left' }}
+                style={{ ...mobileMenuLink, opacity: 0.4, borderBottom: 'none' }}
               >
                 Sign out
               </a>
             </>
           )}
+
           {!signedIn && (
-            <Link href="/sign-in" onClick={() => setMenuOpen(false)} style={{ color: '#F3EDE6', textDecoration: 'none', fontSize: '1rem', letterSpacing: '0.08em', padding: '0.75rem 0', opacity: 0.6 }}>
+            <Link href="/sign-in" onClick={() => setMenuOpen(false)} style={{ ...mobileMenuLink, opacity: 0.6, borderBottom: 'none' }}>
               Sign in
             </Link>
           )}
