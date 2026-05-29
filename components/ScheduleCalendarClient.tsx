@@ -13,7 +13,7 @@ type ScheduleEvent = {
   icon_type: string
   highlight: boolean
   is_recurring: boolean
-  all_hands: boolean
+  event_type: string | null
 }
 
 const DAYS = [
@@ -26,6 +26,20 @@ const DAYS = [
 ]
 
 const PX_PER_HOUR = 56
+
+// Colour palette per event type
+const EVENT_TYPE_STYLES: Record<string, { border: string; background: string; text: string }> = {
+  all_hands:    { border: 'rgba(40,200,190,0.45)',  background: 'rgba(40,200,190,0.1)',  text: '#28c8be' },
+  camp_tending: { border: 'rgba(240,90,20,0.55)',   background: 'rgba(240,90,20,0.12)',  text: '#e6781e' },
+  service:      { border: 'rgba(240,100,180,0.5)',   background: 'rgba(240,100,180,0.1)',  text: '#f064b4' },
+}
+const DEFAULT_STYLE = { border: 'rgba(200,168,72,0.15)', background: 'rgba(255,255,255,0.03)', text: '#F3EDE6' }
+
+function eventTypeStyle(event: ScheduleEvent) {
+  if (event.event_type && EVENT_TYPE_STYLES[event.event_type]) return EVENT_TYPE_STYLES[event.event_type]
+  if (event.highlight) return { border: 'rgba(200,168,72,0.4)', background: 'rgba(200,168,72,0.1)', text: '#F3EDE6' }
+  return DEFAULT_STYLE
+}
 
 // Parse the first time in a string like "9:00 PM – 11:00 PM" → minutes from midnight
 function parseMinutes(str: string): number | null {
@@ -103,16 +117,8 @@ function EventBlock({ event, style }: { event: ScheduleEvent; style: React.CSSPr
         position: 'absolute',
         left: '2px', right: '2px',
         borderRadius: '0.35rem',
-        border: event.all_hands
-          ? '1px solid rgba(210,57,248,0.45)'
-          : event.highlight
-          ? '1px solid rgba(200,168,72,0.4)'
-          : '1px solid rgba(200,168,72,0.15)',
-        background: event.all_hands
-          ? 'rgba(210,57,248,0.1)'
-          : event.highlight
-          ? 'rgba(200,168,72,0.1)'
-          : 'rgba(255,255,255,0.03)',
+        border: `1px solid ${eventTypeStyle(event).border}`,
+        background: eventTypeStyle(event).background,
         overflow: 'hidden',
         cursor: hasDetail ? 'pointer' : 'default',
         zIndex: expanded ? 10 : 1,
@@ -121,15 +127,15 @@ function EventBlock({ event, style }: { event: ScheduleEvent; style: React.CSSPr
       onClick={() => hasDetail && setExpanded(o => !o)}
     >
       <div style={{ padding: '0.25rem 0.35rem' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.25rem' }}>
-          <div style={{ color: '#C8A848', opacity: 0.65, flexShrink: 0, marginTop: '1px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem', textAlign: 'center' }}>
+          <div style={{ color: '#C8A848', opacity: 0.65 }}>
             <EventIcon type={event.icon_type} size={10} />
           </div>
-          <p style={{ fontSize: '0.68rem', color: event.all_hands ? '#e08aff' : '#F3EDE6', margin: 0, lineHeight: 1.3, fontWeight: (event.highlight || event.all_hands) ? 600 : 400, wordBreak: 'break-word' }}>
+          <p style={{ fontSize: '0.68rem', color: eventTypeStyle(event).text, margin: 0, lineHeight: 1.3, fontWeight: (event.highlight || !!event.event_type) ? 600 : 400, wordBreak: 'break-word' }}>
             {event.title}
           </p>
           {hasDetail && (
-            <span style={{ fontSize: '0.45rem', color: '#C8A848', opacity: 0.4, flexShrink: 0, marginTop: '2px', marginLeft: 'auto' }}>
+            <span style={{ fontSize: '0.45rem', color: '#C8A848', opacity: 0.4 }}>
               {expanded ? '▲' : '▼'}
             </span>
           )}
@@ -147,7 +153,9 @@ function EventBlock({ event, style }: { event: ScheduleEvent; style: React.CSSPr
 // ── Main Calendar ─────────────────────────────────────────────────────────────
 
 export function ScheduleCalendarClient({ events }: { events: ScheduleEvent[] }) {
-  const regular = events.filter(e => !e.is_recurring)
+  const regular = [...events.filter(e => !e.is_recurring)].sort((a, b) =>
+    (parseEventTimes(a.time).start ?? 9999) - (parseEventTimes(b.time).start ?? 9999)
+  )
   const recurring = events.filter(e => e.is_recurring)
   const untimed = regular.filter(e => !e.time)
 

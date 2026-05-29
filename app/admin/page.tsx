@@ -7,10 +7,10 @@ import { OverviewSection } from './OverviewSection'
 import { VolunteersSection } from './VolunteersSection'
 import { NotificationsSection } from './NotificationsSection'
 import { NotificationBell } from './NotificationBell'
+import { AdminTabBar } from './AdminTabBar'
 import { ScheduleManager } from './ScheduleManager'
 import { DepartmentsManager } from './DepartmentsManager'
 import { RoleRequestsSection } from './RoleRequestsSection'
-import { ShiftsManager } from './ShiftsManager'
 
 export default async function AdminPage() {
   const { userId } = await auth()
@@ -98,9 +98,11 @@ export default async function AdminPage() {
         <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(1.8rem, 5vw, 2.5rem)', color: '#C8A848', marginBottom: '0.5rem', textAlign: 'center' }}>
           ManyHands Registry
         </h1>
-        <p style={{ textAlign: 'center', opacity: 0.5, fontSize: '0.85rem', marginBottom: '3.5rem' }}>
+        <p style={{ textAlign: 'center', opacity: 0.5, fontSize: '0.85rem', marginBottom: '2.5rem' }}>
           {pending.length} pending · {approved.length} approved · {rejected.length} rejected · {cancelled.length} cancelled
         </p>
+
+        <AdminTabBar />
 
         <NotificationsSection initialNotifications={notifications ?? []} />
 
@@ -152,14 +154,6 @@ export default async function AdminPage() {
           summary="Roles grouped by department"
         >
           <DepartmentsManager />
-        </CollapsibleSection>
-
-        {/* ── SHIFTS ── */}
-        <CollapsibleSection
-          title="Shifts"
-          summary="3h volunteer shifts"
-        >
-          <ShiftsManager />
         </CollapsibleSection>
 
         {/* ── SCHEDULE ── */}

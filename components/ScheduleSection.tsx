@@ -6,7 +6,7 @@ export { ICON_TYPES } from '@/components/EventIcon'
 export async function ScheduleSection() {
   const { data } = await supabaseAdmin
     .from('schedule_events')
-    .select('id, day, time, title, subtitle, detail_desc, icon_type, highlight, is_recurring, all_hands')
+    .select('id, day, time, title, subtitle, detail_desc, icon_type, highlight, is_recurring, event_type')
     .eq('visible', true)
     .order('sort_order', { ascending: true })
 

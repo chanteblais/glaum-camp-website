@@ -16,10 +16,39 @@ type ScheduleEvent = {
   highlight: boolean
   is_recurring: boolean
   capacity: number | null
-  all_hands: boolean
+  event_type: string | null
 }
 
 const DAYS = ['Thursday', 'Friday', 'Saturday', 'Sunday', 'Wednesday', 'Tuesday', 'Monday']
+const DAY_ORDER: Record<string, number> = {
+  Wednesday: 0, Thursday: 1, Friday: 2, Saturday: 3, Sunday: 4, Monday: 5, Tuesday: 6,
+}
+
+// Parse a time string like "7:00 PM" or "7:00 PM – 10:00 PM" to minutes since midnight
+function parseStartMinutes(time: string): number {
+  if (!time) return 9999
+  const token = time.split(/[–—-]/)[0].trim()
+  const m = token.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i)
+  if (!m) {
+    if (/midnight/i.test(token)) return 24 * 60
+    if (/noon/i.test(token)) return 12 * 60
+    return 9999
+  }
+  let h = parseInt(m[1], 10)
+  const min = parseInt(m[2] ?? '0', 10)
+  const period = m[3]?.toLowerCase()
+  if (period === 'pm' && h < 12) h += 12
+  if (period === 'am' && h === 12) h = 0
+  return h * 60 + min
+}
+
+function sortChronologically(evs: ScheduleEvent[]): ScheduleEvent[] {
+  return [...evs].sort((a, b) => {
+    const dayDiff = (DAY_ORDER[a.day] ?? 99) - (DAY_ORDER[b.day] ?? 99)
+    if (dayDiff !== 0) return dayDiff
+    return parseStartMinutes(a.time) - parseStartMinutes(b.time)
+  })
+}
 
 // Normalise a single time token like "7", "7pm", "7:00pm", "19:00", "7:30 PM" → "7:00 PM"
 function normaliseToken(t: string): string {
@@ -52,7 +81,7 @@ function formatTime(raw: string): string {
 
 const blank = (): Omit<ScheduleEvent, 'id' | 'sort_order'> => ({
   day: 'Thursday', time: '', title: '', subtitle: '', detail_desc: '',
-  icon_type: 'star', visible: true, highlight: false, is_recurring: false, capacity: null, all_hands: false,
+  icon_type: 'star', visible: true, highlight: false, is_recurring: false, capacity: null, event_type: null,
 })
 
 const inputStyle: React.CSSProperties = {
@@ -253,7 +282,18 @@ function EventModal({
           <Toggle checked={form.visible} onChange={(v) => set('visible', v)} label="Visible on site" />
           <Toggle checked={form.highlight} onChange={(v) => set('highlight', v)} label="Highlight day" />
           <Toggle checked={form.is_recurring} onChange={(v) => set('is_recurring', v)} label="Daily recurring" />
-          <Toggle checked={form.all_hands} onChange={(v) => set('all_hands', v)} label="All-hands" />
+          <Field label="Event Type">
+            <select
+              style={{ ...inputStyle, fontSize: '0.82rem', cursor: 'pointer' }}
+              value={form.event_type ?? ''}
+              onChange={e => set('event_type', e.target.value || null)}
+            >
+              <option value="">General</option>
+              <option value="all_hands">All Hands</option>
+              <option value="camp_tending">Camp Tending</option>
+              <option value="service">Service</option>
+            </select>
+          </Field>
         </div>
 
         {error && <p style={{ color: '#ff8a8a', fontSize: '0.82rem', marginBottom: '0.75rem' }}>{error}</p>}
@@ -367,7 +407,7 @@ export function ScheduleManager() {
     const res = await fetch('/api/admin/schedule')
     if (res.ok) {
       const json = await res.json()
-      setEvents(json.events)
+      setEvents(sortChronologically(json.events))
     }
     setLoading(false)
   }
@@ -416,7 +456,7 @@ export function ScheduleManager() {
     setEvents((prev) => prev.map((e) => e.id === event.id ? { ...e, visible: !e.visible } : e))
   }
 
-  const handleDrop = async (group: ScheduleEvent[], targetId: string) => {
+const handleDrop = async (group: ScheduleEvent[], targetId: string) => {
     const fromId = draggedId.current
     if (!fromId || fromId === targetId) return
     setDragOverId(null)

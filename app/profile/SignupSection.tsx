@@ -138,8 +138,6 @@ function CurrentSignupCards({
   const dept = role ? departments.find(d => d.id === role.department_id) : null
   const event = scheduleEvents.find(e => e.id === signup?.schedule_event_id)
 
-  if (!role && !event) return null
-
   const hasRoleDetail = role && (role.purpose || role.responsibilities_before || role.responsibilities_during || role.ideal_for || role.commitment || role.commitment_period)
 
   async function handleOptOut() {
@@ -547,7 +545,7 @@ function DeptCard({
                             </p>
                           ) : (
                             <p style={{ fontSize: '0.78rem', opacity: 0.4, margin: 0, fontStyle: 'italic' }}>
-                              Select a shift below to confirm
+                              You can also select a shift below.
                             </p>
                           )}
                           {error && <p style={{ color: '#ff8a8a', fontSize: '0.75rem', margin: '0.35rem 0 0' }}>{error}</p>}
@@ -880,11 +878,6 @@ export function SignupSection() {
 
   async function handleSave() {
     if (!selectedRole || saving) return
-    // Non-approval roles require a shift selection
-    if (!selectedRoleRequiresApproval && !selectedShift) {
-      setError('Please select a shift below first.')
-      return
-    }
     setSaving(true); setError(null)
 
     const body: Record<string, string | null> = { role_id: selectedRole }
