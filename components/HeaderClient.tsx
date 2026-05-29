@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { useAuth, useUser } from '@clerk/nextjs'
+import { UserNotificationBell } from './UserNotificationBell'
 
 const AUTH_MEMORY_KEY = 'glaum-auth-signed-in'
 const AUTH_NAME_KEY = 'glaum-auth-first-name'
@@ -127,6 +128,8 @@ export function HeaderClient() {
   }, [])
 
   const authSlot = signedIn ? (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <UserNotificationBell />
     <div ref={dropdownRef} style={{ position: 'relative' }}>
       <button
         onClick={() => setDropdownOpen(!dropdownOpen)}
@@ -243,6 +246,7 @@ export function HeaderClient() {
         </div>
       )}
     </div>
+    </div>
   ) : (
     <Link
       href="/sign-in"
@@ -327,7 +331,7 @@ export function HeaderClient() {
           ))}
         </nav>
 
-        <div className="hidden md:flex" style={{ width: '72px', justifyContent: 'flex-end' }}>
+        <div className="hidden md:flex" style={{ minWidth: '72px', justifyContent: 'flex-end' }}>
           {authSlot}
         </div>
 

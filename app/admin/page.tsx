@@ -6,6 +6,8 @@ import { CollapsibleSection } from './CollapsibleSection'
 import { OverviewSection } from './OverviewSection'
 import { ContributionsSection } from './ContributionsSection'
 import { VolunteersSection } from './VolunteersSection'
+import { NotificationsSection } from './NotificationsSection'
+import { NotificationBell } from './NotificationBell'
 
 export default async function AdminPage() {
   const { userId } = await auth()
@@ -26,12 +28,20 @@ export default async function AdminPage() {
     .select('id, first_name, last_name, preferred_name, email, status, submitted_at, attendance, camp_relationship, camped_before, contributions')
     .order('submitted_at', { ascending: false })
 
+  const { data: notifications, error: notificationsError } = await supabaseAdmin
+    .from('admin_notifications')
+    .select('id, application_id, event_type, message, details, created_at, read_at')
+    .order('created_at', { ascending: false })
+    .limit(20)
+
   if (dbError) console.error('[Admin] Supabase query error:', dbError)
+  if (notificationsError) console.error('[Admin] Notifications query error:', notificationsError)
 
   const all = applications ?? []
   const pending = all.filter(a => a.status === 'pending')
   const approved = all.filter(a => a.status === 'approved')
   const rejected = all.filter(a => a.status === 'rejected')
+  const cancelled = all.filter(a => a.status === 'cancelled')
 
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
@@ -76,15 +86,20 @@ export default async function AdminPage() {
           <a href="/" style={{ fontSize: '0.8rem', letterSpacing: '0.1em', color: '#C8A848', textDecoration: 'none', opacity: 0.6 }}>
             ← Back to camp
           </a>
-          <span style={{ fontSize: '0.7rem', letterSpacing: '0.15em', color: '#D239F8', opacity: 0.6 }}>ADMIN</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+            <NotificationBell initialNotifications={notifications ?? []} />
+            <span style={{ fontSize: '0.7rem', letterSpacing: '0.15em', color: '#D239F8', opacity: 0.6 }}>ADMIN</span>
+          </div>
         </div>
 
         <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(1.8rem, 5vw, 2.5rem)', color: '#C8A848', marginBottom: '0.5rem', textAlign: 'center' }}>
           ManyHands Registry
         </h1>
         <p style={{ textAlign: 'center', opacity: 0.5, fontSize: '0.85rem', marginBottom: '3.5rem' }}>
-          {pending.length} pending · {approved.length} approved · {rejected.length} rejected
+          {pending.length} pending · {approved.length} approved · {rejected.length} rejected · {cancelled.length} cancelled
         </p>
+
+        <NotificationsSection initialNotifications={notifications ?? []} />
 
         {dbError && (
           <div style={{ padding: '1rem 1.5rem', border: '1px solid rgba(255,80,80,0.4)', borderRadius: '0.75rem', background: 'rgba(255,0,0,0.05)', marginBottom: '2rem' }}>
@@ -168,6 +183,18 @@ export default async function AdminPage() {
                   </p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                     {rejected.map(app => <ApplicationRow key={app.id} app={app} showActions={false} />)}
+                  </div>
+                </div>
+              )}
+
+              {cancelled.length > 0 && (
+                <div>
+                  <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.2), transparent)', marginBottom: '2rem' }} />
+                  <p style={{ fontSize: '0.7rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#ffb4b4', marginBottom: '1rem', opacity: 0.6 }}>
+                    Cancelled
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {cancelled.map(app => <ApplicationRow key={app.id} app={app} showActions={false} />)}
                   </div>
                 </div>
               )}

@@ -3,6 +3,9 @@ import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { SignOutBtn } from '@/components/SignOutBtn'
 import { RememberSignedIn } from '@/components/RememberSignedIn'
+import { ProfileSettings } from './ProfileSettings'
+import { VolunteerSettings } from './VolunteerSettings'
+import { UserNotificationBell } from '@/components/UserNotificationBell'
 
 export default async function ProfilePage() {
   const { userId } = await auth()
@@ -43,16 +46,27 @@ export default async function ProfilePage() {
   const kicker = application ? 'Member Profile' : volunteer ? 'Volunteer Profile' : null
 
   return (
-    <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1 }}>
+    <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
+      <img src="/hands-left.svg" alt="" aria-hidden style={{ position: 'fixed', left: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
+      <img src="/hands-right.svg" alt="" aria-hidden style={{ position: 'fixed', right: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
       <RememberSignedIn firstName={user?.firstName} email={email} />
-      <div style={{ maxWidth: '760px', margin: '0 auto', padding: '3rem 1.5rem 6rem' }}>
+      <div style={{ maxWidth: '760px', margin: '0 auto', padding: '3rem 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
 
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
           <a href="/" style={{ fontSize: '0.8rem', letterSpacing: '0.1em', color: '#C8A848', textDecoration: 'none', opacity: 0.6 }}>
             ← Back to camp
           </a>
-          <SignOutBtn />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <UserNotificationBell />
+            {application && (application.status === 'approved' || application.status === 'pending') && (
+              <ProfileSettings application={application} />
+            )}
+            {volunteer && volunteer.status === 'active' && !application && (
+              <VolunteerSettings volunteer={volunteer} />
+            )}
+            <SignOutBtn />
+          </div>
         </div>
 
         {/* Name header — shown for application and volunteer tracks */}
@@ -132,8 +146,8 @@ export default async function ProfilePage() {
                     textAlign: 'center',
                     padding: '0.75rem 1.5rem',
                     borderRadius: '9999px',
-                    border: '1px solid rgba(210,57,248,0.35)',
-                    color: '#D239F8',
+                    border: '1px solid rgba(210,57,248,0.7)',
+                    color: '#F3EDE6',
                     textDecoration: 'none',
                     letterSpacing: '0.1em',
                     fontSize: '0.82rem',
@@ -150,11 +164,41 @@ export default async function ProfilePage() {
         {/* ── CAMP APPLICATION STATES ── */}
         {application && !volunteer && application.status === 'pending' && (
           <div style={{ textAlign: 'center', padding: '3rem 2rem', border: '1px solid rgba(200,168,72,0.15)', borderRadius: '1rem', background: 'rgba(210,57,248,0.04)' }}>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <span style={{ display: 'inline-block', padding: '0.35rem 1.25rem', borderRadius: '9999px', backgroundColor: 'rgba(200,168,72,0.08)', border: '1px solid rgba(200,168,72,0.25)', fontSize: '0.75rem', letterSpacing: '0.12em', color: '#C8A848', opacity: 0.7 }}>
+                ○ PENDING PARTICIPANT
+              </span>
+            </div>
             <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.2rem', color: '#C8A848', marginBottom: '0.75rem' }}>
               Application under review.
             </p>
-            <p style={{ fontSize: '0.9rem', lineHeight: 1.7, opacity: 0.6 }}>
+            <p style={{ fontSize: '0.9rem', lineHeight: 1.7, opacity: 0.6, marginBottom: '0.75rem' }}>
               The Many Hands are deliberating. You'll receive an email when your application has been reviewed.
+            </p>
+            <p style={{ fontSize: '0.82rem', lineHeight: 1.7, opacity: 0.45 }}>
+              Need to update your details? Use the gear icon above.
+            </p>
+          </div>
+        )}
+
+        {application && application.status === 'cancelled' && (
+          <div style={{ textAlign: 'center', padding: '3rem 2rem', border: '1px solid rgba(255,120,120,0.2)', borderRadius: '1rem', background: 'rgba(255,0,0,0.04)' }}>
+            <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.2rem', color: '#ffb4b4', marginBottom: '0.75rem' }}>
+              Attendance cancelled
+            </p>
+            <p style={{ fontSize: '0.9rem', lineHeight: 1.7, opacity: 0.6 }}>
+              Your spot has been released. If your plans change again, reach out to camp organizers.
+            </p>
+          </div>
+        )}
+
+        {application && application.status === 'rejected' && (
+          <div style={{ textAlign: 'center', padding: '3rem 2rem', border: '1px solid rgba(200,168,72,0.12)', borderRadius: '1rem', background: 'rgba(255,255,255,0.02)' }}>
+            <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.2rem', color: '#C8A848', marginBottom: '0.75rem' }}>
+              Application not approved
+            </p>
+            <p style={{ fontSize: '0.9rem', lineHeight: 1.7, opacity: 0.6 }}>
+              If you have questions, please contact camp organizers.
             </p>
           </div>
         )}
@@ -218,7 +262,7 @@ export default async function ProfilePage() {
           <>
             <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
               <span style={{ display: 'inline-block', padding: '0.35rem 1.25rem', borderRadius: '9999px', backgroundColor: 'rgba(210,57,248,0.1)', border: '1px solid rgba(210,57,248,0.25)', fontSize: '0.75rem', letterSpacing: '0.12em', color: '#D239F8' }}>
-                ✦ VOLUNTEER
+                ✦ HELPING HAND
               </span>
             </div>
 
