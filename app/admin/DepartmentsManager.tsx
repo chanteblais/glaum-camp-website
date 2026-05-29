@@ -348,7 +348,7 @@ function DeptRow({
   onDrop: () => void
   onDragEnd: () => void
 }) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
 
   return (
     <div
