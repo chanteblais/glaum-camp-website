@@ -48,6 +48,8 @@ export function AvatarUpload({
 
       setPreview(data.avatarUrl)
       router.refresh()
+      // Signal the header to re-fetch nav-auth so the avatar circle updates immediately
+      window.dispatchEvent(new CustomEvent('glaum:avatar-updated', { detail: { avatarUrl: data.avatarUrl } }))
     } finally {
       setUploading(false)
       // Reset input so the same file can be re-selected
