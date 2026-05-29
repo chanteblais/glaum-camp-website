@@ -172,7 +172,7 @@ function CurrentSignupCards({
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <p style={{ fontSize: '0.68rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, margin: '0 0 0.4rem' }}>
+            <p style={{ fontSize: '0.68rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.85, margin: '0 0 0.4rem' }}>
               Your Role
             </p>
             {role && (
@@ -182,7 +182,7 @@ function CurrentSignupCards({
           {role ? (
             <>
               {dept && (
-                <p style={{ fontSize: '0.72rem', color: '#C8A848', opacity: 0.5, margin: '0 0 0.2rem', letterSpacing: '0.05em' }}>
+                <p style={{ fontSize: '0.72rem', color: '#C8A848', opacity: 0.75, margin: '0 0 0.2rem', letterSpacing: '0.05em' }}>
                   {dept.icon && `${dept.icon} `}{dept.name}
                 </p>
               )}
@@ -190,9 +190,6 @@ function CurrentSignupCards({
               {role.description && (
                 <p style={{ fontSize: '0.77rem', opacity: 0.45, margin: '0.25rem 0 0', lineHeight: 1.5 }}>{role.description}</p>
               )}
-              <div style={{ marginTop: '0.35rem' }}>
-                <CommitmentPill commitment={role.commitment} period={role.commitment_period} />
-              </div>
             </>
           ) : (
             <p style={{ fontSize: '0.85rem', opacity: 0.35, fontStyle: 'italic', margin: 0 }}>Not chosen</p>
@@ -202,6 +199,11 @@ function CurrentSignupCards({
         {/* Expanded detail + opt-out */}
         {role && roleExpanded && (
           <div style={{ borderTop: '1px solid rgba(200,168,72,0.1)' }}>
+            {(role.commitment || role.commitment_period) && (
+              <div style={{ padding: '0.5rem 1.25rem 0' }}>
+                <CommitmentPill commitment={role.commitment} period={role.commitment_period} />
+              </div>
+            )}
             {hasRoleDetail && (
               <div style={{ padding: '0.85rem 1.25rem' }}>
                 {role.purpose && (
@@ -269,7 +271,7 @@ function CurrentSignupCards({
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <p style={{ fontSize: '0.68rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#D239F8', opacity: 0.55, margin: '0 0 0.4rem' }}>
+            <p style={{ fontSize: '0.68rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#D239F8', opacity: 0.85, margin: '0 0 0.4rem' }}>
               Your Shift
             </p>
             {event && (
@@ -279,8 +281,8 @@ function CurrentSignupCards({
           {event ? (
             <>
               <p style={{ fontSize: '0.92rem', color: '#F3EDE6', margin: 0 }}>{event.title}</p>
-              {event.time && <p style={{ fontSize: '0.77rem', opacity: 0.45, margin: '0.25rem 0 0' }}>{event.time}</p>}
-              <p style={{ fontSize: '0.72rem', color: '#D239F8', opacity: 0.4, margin: '0.25rem 0 0', letterSpacing: '0.04em' }}>
+              {event.time && <p style={{ fontSize: '0.77rem', opacity: 0.7, margin: '0.25rem 0 0' }}>{event.time}</p>}
+              <p style={{ fontSize: '0.72rem', color: '#D239F8', opacity: 0.75, margin: '0.25rem 0 0', letterSpacing: '0.04em' }}>
                 {DAY_TO_DATE_LABEL[event.day] ?? event.day}
               </p>
             </>
@@ -415,8 +417,8 @@ function DeptCard({
   canConfirm: boolean
 }) {
   const hasSelectedRole = dept.roles.some(r => r.id === selectedRole)
-  const [open, setOpen] = useState(hasSelectedRole)
-  const [expandedRole, setExpandedRole] = useState<string | null>(selectedRole && hasSelectedRole ? selectedRole : null)
+  const [open, setOpen] = useState(false)
+  const [expandedRole, setExpandedRole] = useState<string | null>(null)
 
   return (
     <div style={{
@@ -506,12 +508,14 @@ function DeptCard({
                           {expandedRole === role.id ? '▲' : '▼'}
                         </span>
                       </div>
-                      <CommitmentPill commitment={role.commitment} period={role.commitment_period} />
                     </div>
                   </div>
                 </button>
                 {expandedRole === role.id && (
                   <>
+                    <div style={{ padding: '0.5rem 1rem 0', borderTop: '1px solid rgba(200,168,72,0.08)' }}>
+                      <CommitmentPill commitment={role.commitment} period={role.commitment_period} />
+                    </div>
                     <RoleDetailPanel role={role} />
                     {/* Confirm footer */}
                     <div style={{
@@ -610,7 +614,7 @@ function RolePicker({
 
   return (
     <div>
-      <p style={{ fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.6, marginBottom: '1rem' }}>
+      <p style={{ fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.85, marginBottom: '1rem', textAlign: 'center' }}>
         Choose a Role
       </p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -651,12 +655,15 @@ const DAY_TO_DATE_LABEL: Record<string, string> = {
 }
 
 function ShiftPicker({
-  scheduleEvents, selectedShift, signup, onChange,
+  scheduleEvents, selectedShift, signup, onChange, onConfirm, saving, error,
 }: {
   scheduleEvents: ScheduleEvent[]
   selectedShift: string | null
   signup: Signup | null
   onChange: (id: string) => void
+  onConfirm: () => void
+  saving: boolean
+  error: string | null
 }) {
   const [expandedEvent, setExpandedEvent] = useState<string | null>(null)
 
@@ -664,9 +671,20 @@ function ShiftPicker({
 
   return (
     <div>
-      <p style={{ fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#D239F8', opacity: 0.6, marginBottom: '1rem' }}>
-        Choose a Shift
-      </p>
+      {signup?.schedule_event_id ? (
+        <div style={{ marginBottom: '1rem', textAlign: 'center' }}>
+          <p style={{ fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#D239F8', opacity: 0.85, marginBottom: '0.25rem' }}>
+            Your Shift
+          </p>
+          <p style={{ fontSize: '0.9rem', color: '#F3EDE6', margin: 0 }}>
+            {scheduleEvents.find(e => e.id === signup.schedule_event_id)?.title ?? 'Shift confirmed'}
+          </p>
+        </div>
+      ) : (
+        <p style={{ fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#D239F8', opacity: 0.85, marginBottom: '1rem', textAlign: 'center' }}>
+          Choose a Shift
+        </p>
+      )}
 
       {/* Horizontally scrollable on mobile */}
       <div style={{ overflowX: 'auto', marginLeft: '-1.5rem', marginRight: '-1.5rem', paddingLeft: '1.5rem', paddingRight: '1.5rem' }}>
@@ -717,13 +735,17 @@ function ShiftPicker({
                             style={{
                               width: '100%', textAlign: 'left', padding: '0.5rem 0.6rem',
                               borderRadius: isExpanded ? '0.4rem 0.4rem 0 0' : '0.4rem',
-                              border: selected
+                              border: selected && ev.id === signup?.schedule_event_id
+                                ? '1px solid rgba(210,57,248,0.9)'
+                                : selected
                                 ? '1px solid rgba(210,57,248,0.6)'
                                 : full
                                   ? '1px solid rgba(255,80,80,0.2)'
                                   : '1px solid rgba(210,57,248,0.3)',
                               borderBottom: isExpanded ? 'none' : undefined,
-                              background: selected
+                              background: selected && ev.id === signup?.schedule_event_id
+                                ? 'rgba(210,57,248,0.22)'
+                                : selected
                                 ? 'rgba(210,57,248,0.12)'
                                 : full ? 'rgba(255,255,255,0.01)' : 'rgba(210,57,248,0.05)',
                               cursor: full ? 'not-allowed' : 'pointer',
@@ -799,13 +821,50 @@ function ShiftPicker({
           })}
         </div>
       </div>
+
+      {/* Confirm footer */}
+      {selectedShift && selectedShift !== signup?.schedule_event_id && (
+        <div style={{
+          marginTop: '1.25rem',
+          padding: '0.85rem 1.25rem',
+          borderTop: '1px solid rgba(210,57,248,0.15)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap',
+        }}>
+          <p style={{ fontSize: '0.8rem', color: '#D239F8', opacity: 0.8, margin: 0 }}>
+            {scheduleEvents.find(e => e.id === selectedShift)?.title ?? 'Shift selected'}
+          </p>
+          {signup?.schedule_event_id ? (
+            <p style={{ fontSize: '0.78rem', opacity: 0.5, fontStyle: 'italic', margin: 0 }}>
+              Cancel your current shift above before selecting a new one.
+            </p>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              {error && <p style={{ color: '#ff8a8a', fontSize: '0.75rem', margin: 0 }}>{error}</p>}
+              <button
+                onClick={onConfirm}
+                disabled={saving}
+                style={{
+                  padding: '0.5rem 1.25rem', borderRadius: '9999px',
+                  border: '1px solid rgba(210,57,248,0.5)',
+                  background: 'rgba(210,57,248,0.08)',
+                  color: '#F3EDE6', cursor: saving ? 'not-allowed' : 'pointer',
+                  fontSize: '0.8rem', letterSpacing: '0.06em',
+                  opacity: saving ? 0.5 : 1, transition: 'all 0.2s',
+                }}
+              >
+                {saving ? 'Saving…' : 'Confirm shift'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
 
 // ── Section Wrapper (owns state) ──────────────────────────────────────────────
 
-export function SignupSection() {
+export function SignupSection({ showPickers = true }: { showPickers?: boolean }) {
   const [departments, setDepartments] = useState<Department[]>([])
   const [scheduleEvents, setScheduleEvents] = useState<ScheduleEvent[]>([])
   const [signup, setSignup] = useState<Signup | null>(null)
@@ -917,6 +976,30 @@ export function SignupSection() {
     }))
   }
 
+  async function handleSaveShift() {
+    if (!selectedShift || saving) return
+    setSaving(true); setError(null)
+    const prevSignup = signup
+    const res = await fetch('/api/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ schedule_event_id: selectedShift }),
+    })
+    const data = await res.json()
+    if (!res.ok) { setError(data.error ?? 'Something went wrong'); setSaving(false); return }
+    setSignup(prev => prev
+      ? { ...prev, schedule_event_id: selectedShift }
+      : { role_id: null, schedule_event_id: selectedShift, role_approval_status: null }
+    )
+    setScheduleEvents(prev => prev.map(e => {
+      if (e.signed_up == null) return e
+      if (e.id === selectedShift && e.id !== prevSignup?.schedule_event_id) return { ...e, signed_up: e.signed_up + 1 }
+      if (e.id === prevSignup?.schedule_event_id && e.id !== selectedShift) return { ...e, signed_up: Math.max(0, e.signed_up - 1) }
+      return e
+    }))
+    setSaving(false)
+  }
+
   if (loading) return (
     <div style={{ padding: '1.5rem', border: '1px solid rgba(200,168,72,0.1)', borderRadius: '1rem', background: 'rgba(255,255,255,0.01)', marginBottom: '2.5rem' }}>
       <p style={{ opacity: 0.35, fontSize: '0.85rem', textAlign: 'center', margin: 0 }}>Loading…</p>
@@ -929,38 +1012,43 @@ export function SignupSection() {
     <div style={{ marginBottom: '2.5rem' }}>
       <CurrentSignupCards signup={signup} departments={departments} scheduleEvents={scheduleEvents} onOptOut={handleOptOut} onCancelShift={handleCancelShift} />
 
-      <div id="role-signup" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+      {showPickers && (
+        <div id="role-signup" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
 
-        {/* Role picker — confirm button lives inside the selected role card */}
-        {hasRoles && (
-          <div style={{ padding: '1.5rem', border: '1px solid rgba(200,168,72,0.15)', borderRadius: '1rem', background: 'rgba(255,255,255,0.01)' }}>
-            <RolePicker
-              departments={departments}
-              selectedRole={selectedRole}
-              selectedShiftEvent={selectedShiftEvent}
-              signup={signup}
-              saving={saving}
-              error={error}
-              onChange={setSelectedRole}
-              onDeselect={() => setSelectedRole(signup?.role_id ?? null)}
-              onConfirm={handleSave}
-              canConfirm={canSave}
-            />
-          </div>
-        )}
+          {/* Role picker — confirm button lives inside the selected role card */}
+          {hasRoles && (
+            <div style={{ padding: '1.5rem', border: '1px solid rgba(200,168,72,0.15)', borderRadius: '1rem', background: 'rgba(255,255,255,0.01)' }}>
+              <RolePicker
+                departments={departments}
+                selectedRole={selectedRole}
+                selectedShiftEvent={selectedShiftEvent}
+                signup={signup}
+                saving={saving}
+                error={error}
+                onChange={setSelectedRole}
+                onDeselect={() => setSelectedRole(signup?.role_id ?? null)}
+                onConfirm={handleSave}
+                canConfirm={canSave}
+              />
+            </div>
+          )}
 
-        {/* Calendar shift picker */}
-        {hasCalendarEvents && (
-          <div style={{ padding: '1.5rem', border: '1px solid rgba(210,57,248,0.15)', borderRadius: '1rem', background: 'rgba(210,57,248,0.02)' }}>
-            <ShiftPicker
-              scheduleEvents={scheduleEvents}
-              selectedShift={selectedShift}
-              signup={signup}
-              onChange={setSelectedShift}
-            />
-          </div>
-        )}
-      </div>
+          {/* Calendar shift picker */}
+          {hasCalendarEvents && (
+            <div style={{ padding: '1.5rem', border: '1px solid rgba(210,57,248,0.15)', borderRadius: '1rem', background: 'rgba(210,57,248,0.02)' }}>
+              <ShiftPicker
+                scheduleEvents={scheduleEvents}
+                selectedShift={selectedShift}
+                signup={signup}
+                onChange={setSelectedShift}
+                onConfirm={handleSaveShift}
+                saving={saving}
+                error={error}
+              />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

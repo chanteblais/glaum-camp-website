@@ -63,7 +63,7 @@ export default async function OverviewPage() {
   ] = await Promise.all([
     supabaseAdmin
       .from('applications')
-      .select('id, first_name, last_name, preferred_name, email, status, setup_preference, setup_limitations, setup_available, clerk_user_id')
+      .select('id, first_name, last_name, preferred_name, email, status, setup_preference, setup_limitations, setup_available, clerk_user_id, rideshare')
       .order('submitted_at', { ascending: false }),
     supabaseAdmin
       .from('camp_signups')
@@ -134,6 +134,13 @@ export default async function OverviewPage() {
     const prefs: string[] = (a.setup_preference as string[]) ?? []
     return prefs.length === 0
   })
+
+  // Rideshare
+  const RIDESHARE_OPTIONS = ['I need a ride', 'I can offer a ride', "I'm sorted", 'Not sure yet']
+  const rideshareGroups = RIDESHARE_OPTIONS.map(option => ({
+    label: option,
+    members: approved.filter(a => a.rideshare === option),
+  })).filter(g => g.members.length > 0)
 
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
@@ -268,6 +275,37 @@ export default async function OverviewPage() {
               </div>
             )}
           </div>
+        </section>
+
+        <div style={divider} />
+
+        {/* ── RIDESHARE ── */}
+        <section>
+          <p style={{ fontSize: '0.65rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, marginBottom: '1.25rem' }}>
+            Rideshare
+          </p>
+
+          {rideshareGroups.length === 0 ? (
+            <p style={{ fontSize: '0.85rem', opacity: 0.35, fontStyle: 'italic' }}>No rideshare responses yet.</p>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+              {rideshareGroups.map(({ label, members }) => {
+                const accent = label === 'I need a ride' ? 'rgba(210,57,248,0.2)'
+                  : label === 'I can offer a ride' ? 'rgba(80,200,160,0.2)'
+                  : 'rgba(200,168,72,0.15)'
+                const color = label === 'I need a ride' ? '#D239F8'
+                  : label === 'I can offer a ride' ? '#50c8a0'
+                  : '#C8A848'
+                return (
+                  <div key={label} style={{ ...card(), borderColor: accent }}>
+                    <p style={{ ...statLabel, color }}>{label}</p>
+                    <p style={{ ...statValue, fontSize: '1.5rem', color }}>{members.length}</p>
+                    <MemberPills members={members} />
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </section>
 
       </div>
