@@ -10,6 +10,7 @@ import { NotificationsSection } from './NotificationsSection'
 import { NotificationBell } from './NotificationBell'
 import { ScheduleManager } from './ScheduleManager'
 import { DepartmentsManager } from './DepartmentsManager'
+import { RoleRequestsSection } from './RoleRequestsSection'
 import { ShiftsManager } from './ShiftsManager'
 
 export default async function AdminPage() {
@@ -144,6 +145,14 @@ export default async function AdminPage() {
           summary={`${approved.length + pending.length} members`}
         >
           <ContributionsSection applications={all} />
+        </CollapsibleSection>
+
+        {/* ── ROLE REQUESTS ── */}
+        <CollapsibleSection
+          title="Role Requests"
+          summary="Pending approval"
+        >
+          <RoleRequestsSection />
         </CollapsibleSection>
 
         {/* ── DEPARTMENTS & ROLES ── */}

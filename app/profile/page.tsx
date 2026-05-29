@@ -32,6 +32,15 @@ export default async function ProfilePage() {
     .eq('clerk_user_id', userId)
     .maybeSingle()
 
+  // Fetch signup status for approved members
+  const { data: campSignup } = application?.status === 'approved'
+    ? await supabaseAdmin
+        .from('camp_signups')
+        .select('role_id, schedule_event_id, role_approval_status')
+        .eq('clerk_user_id', userId)
+        .maybeSingle()
+    : { data: null }
+
   // Link clerk_user_id for approved applications found by email
   if (application?.status === 'approved' && !application.clerk_user_id) {
     await supabaseAdmin
@@ -213,11 +222,56 @@ export default async function ProfilePage() {
 
         {application && application.status === 'approved' && (
           <>
-            <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
+            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
               <span style={{ display: 'inline-block', padding: '0.35rem 1.25rem', borderRadius: '9999px', backgroundColor: 'rgba(210,57,248,0.15)', border: '1px solid rgba(210,57,248,0.3)', fontSize: '0.75rem', letterSpacing: '0.12em', color: '#D239F8' }}>
                 ✦ APPROVED CAMPER
               </span>
             </div>
+
+            {/* Signup status banner — shown prominently before any other content */}
+            {(() => {
+              const hasRole = !!campSignup?.role_id
+              const hasShift = !!campSignup?.schedule_event_id
+              const isPending = campSignup?.role_approval_status === 'pending'
+              const allDone = hasRole && !isPending && hasShift
+
+              if (allDone) return (
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '2rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.65rem 1.25rem', borderRadius: '9999px', border: '1px solid rgba(100,200,120,0.3)', background: 'rgba(100,200,120,0.06)' }}>
+                    <span style={{ color: '#7dcf8e', fontSize: '0.75rem' }}>✓</span>
+                    <span style={{ fontSize: '0.78rem', color: '#7dcf8e', letterSpacing: '0.04em' }}>Role &amp; shift confirmed</span>
+                  </div>
+                </div>
+              )
+
+              if (isPending) return (
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '2rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.65rem 1.25rem', borderRadius: '9999px', border: '1px solid rgba(210,57,248,0.3)', background: 'rgba(210,57,248,0.06)' }}>
+                    <span style={{ color: '#D239F8', fontSize: '0.75rem' }}>○</span>
+                    <span style={{ fontSize: '0.78rem', color: '#D239F8', letterSpacing: '0.04em' }}>Role request pending approval</span>
+                  </div>
+                </div>
+              )
+
+              const missing = []
+              if (!hasRole) missing.push('a role')
+              if (!hasShift) missing.push('a shift')
+              if (!missing.length) return null
+
+              return (
+                <div style={{ marginBottom: '2rem', padding: '0.9rem 1.25rem', borderRadius: '0.85rem', border: '1px solid rgba(210,168,50,0.4)', background: 'rgba(210,168,50,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <span style={{ fontSize: '1rem' }}>⚠</span>
+                    <span style={{ fontSize: '0.88rem', color: '#C8A848' }}>
+                      You still need to choose {missing.join(' and ')}.
+                    </span>
+                  </div>
+                  <a href="#role-signup" style={{ fontSize: '0.8rem', color: '#C8A848', opacity: 0.7, textDecoration: 'underline', textUnderlineOffset: '2px', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    Go to signup →
+                  </a>
+                </div>
+              )
+            })()}
 
             <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.3), transparent)', marginBottom: '2.5rem' }} />
 

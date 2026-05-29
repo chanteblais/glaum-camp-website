@@ -366,7 +366,7 @@ function DeptRow({
       }}
     >
       {/* Department header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.9rem 1rem', cursor: 'grab' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.9rem 1rem', cursor: 'grab', background: 'rgba(200,168,72,0.06)', borderBottom: open ? '1px solid rgba(200,168,72,0.12)' : 'none' }}>
         <span style={{ color: '#C8A848', opacity: 0.25, fontSize: '1rem', userSelect: 'none', flexShrink: 0 }}>⠿</span>
         {dept.icon && <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>{dept.icon}</span>}
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -389,23 +389,26 @@ function DeptRow({
 
       {/* Roles list */}
       {open && (
-        <div style={{ borderTop: '1px solid rgba(200,168,72,0.08)', padding: '0.75rem 1rem 1rem' }}>
-          {dept.roles.length === 0 && (
-            <p style={{ fontSize: '0.78rem', opacity: 0.35, fontStyle: 'italic', marginBottom: '0.75rem' }}>No roles yet.</p>
-          )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: dept.roles.length > 0 ? '0.75rem' : 0 }}>
-            {dept.roles.map(role => (
-              <RoleRow
-                key={role.id}
-                role={role}
-                onEdit={() => onEditRole(role)}
-                onDelete={() => onDeleteRole(role.id)}
-              />
-            ))}
+        <div style={{ padding: '0.85rem 1rem 1rem 1.25rem' }}>
+          {/* Left accent line + indented roles */}
+          <div style={{ borderLeft: '2px solid rgba(200,168,72,0.2)', paddingLeft: '0.85rem' }}>
+            {dept.roles.length === 0 && (
+              <p style={{ fontSize: '0.78rem', opacity: 0.35, fontStyle: 'italic', marginBottom: '0.75rem' }}>No roles yet.</p>
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: dept.roles.length > 0 ? '0.75rem' : 0 }}>
+              {dept.roles.map(role => (
+                <RoleRow
+                  key={role.id}
+                  role={role}
+                  onEdit={() => onEditRole(role)}
+                  onDelete={() => onDeleteRole(role.id)}
+                />
+              ))}
+            </div>
+            <button onClick={onAddRole} style={{ fontSize: '0.78rem', color: '#C8A848', opacity: 0.6, background: 'none', border: '1px dashed rgba(200,168,72,0.25)', borderRadius: '0.5rem', padding: '0.4rem 0.85rem', cursor: 'pointer', letterSpacing: '0.04em' }}>
+              + Add role
+            </button>
           </div>
-          <button onClick={onAddRole} style={{ fontSize: '0.78rem', color: '#C8A848', opacity: 0.6, background: 'none', border: '1px dashed rgba(200,168,72,0.25)', borderRadius: '0.5rem', padding: '0.4rem 0.85rem', cursor: 'pointer', letterSpacing: '0.04em' }}>
-            + Add role
-          </button>
         </div>
       )}
     </div>
