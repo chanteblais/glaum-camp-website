@@ -1,5 +1,6 @@
 import { auth, clerkClient, currentUser } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
+import { supabaseAdmin } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,11 +48,37 @@ export async function GET(req: Request) {
     )
   }
 
+  const email = user.emailAddresses[0]?.emailAddress ?? null
+
+  // Fetch avatar from whichever table has a record for this user
+  let avatarUrl: string | null = null
+  const { data: appRow } = await supabaseAdmin
+    .from('applications')
+    .select('avatar_url')
+    .or(`clerk_user_id.eq.${userId}${email ? `,email.eq.${email}` : ''}`)
+    .not('avatar_url', 'is', null)
+    .limit(1)
+    .maybeSingle()
+
+  if (appRow?.avatar_url) {
+    avatarUrl = appRow.avatar_url
+  } else {
+    const { data: volRow } = await supabaseAdmin
+      .from('volunteers')
+      .select('avatar_url')
+      .eq('clerk_user_id', userId)
+      .not('avatar_url', 'is', null)
+      .limit(1)
+      .maybeSingle()
+    avatarUrl = volRow?.avatar_url ?? null
+  }
+
   return NextResponse.json(
     {
       isSignedIn: true,
       firstName: user.firstName ?? null,
-      email: user.emailAddresses[0]?.emailAddress ?? null,
+      email,
+      avatarUrl,
     },
     { headers: { 'Cache-Control': 'no-store' } }
   )

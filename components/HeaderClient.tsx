@@ -13,6 +13,7 @@ type NavAuthState = {
   isSignedIn: boolean
   firstName?: string | null
   email?: string | null
+  avatarUrl?: string | null
 }
 
 const navLinks = [
@@ -39,6 +40,7 @@ export function HeaderClient() {
   const signedIn = mounted && (Boolean(isSignedIn) || Boolean(serverAuth?.isSignedIn) || hasRememberedAuth)
   const userFirstName = user?.firstName ?? serverAuth?.firstName ?? rememberedFirstName
   const userEmail = user?.primaryEmailAddress?.emailAddress ?? serverAuth?.email ?? rememberedEmail
+  const avatarUrl = serverAuth?.avatarUrl ?? null
   const initials = userFirstName?.[0] ?? '✦'
   const isAdmin = user?.publicMetadata?.role === 'admin'
 
@@ -135,6 +137,16 @@ export function HeaderClient() {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
+  // Instantly reflect a new avatar upload without waiting for next nav-auth poll
+  useEffect(() => {
+    function handleAvatarUpdate(e: Event) {
+      const url = (e as CustomEvent).detail?.avatarUrl
+      if (url) setServerAuth((prev) => prev ? { ...prev, avatarUrl: url } : prev)
+    }
+    window.addEventListener('glaum:avatar-updated', handleAvatarUpdate)
+    return () => window.removeEventListener('glaum:avatar-updated', handleAvatarUpdate)
+  }, [])
+
   const authSlot = signedIn ? (
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
       <UserNotificationBell />
@@ -166,7 +178,13 @@ export function HeaderClient() {
         }}
         aria-label="Account menu"
       >
-        {initials}
+        {avatarUrl ? (
+          <img
+            src={avatarUrl}
+            alt={userFirstName ?? 'Profile'}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
+          />
+        ) : initials}
       </button>
 
       {dropdownOpen && (
@@ -320,11 +338,9 @@ export function HeaderClient() {
           }}
         >
           Glåüm
-          {!isMobile && (
-            <span style={{ color: '#F3EDE6', fontSize: '0.65rem', letterSpacing: '0.15em', marginLeft: '0.5rem', fontFamily: 'var(--font-libre-baskerville)', opacity: 0.6 }}>
-              sponsored by Shrimp™
-            </span>
-          )}
+          <span style={{ color: '#F3EDE6', fontSize: '0.65rem', letterSpacing: '0.15em', marginLeft: '0.5rem', fontFamily: 'var(--font-libre-baskerville)', opacity: 0.6 }}>
+            sponsored by Shrimp™
+          </span>
         </Link>
 
         {/* Desktop nav */}
