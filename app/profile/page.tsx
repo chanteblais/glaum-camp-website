@@ -6,6 +6,7 @@ import { RememberSignedIn } from '@/components/RememberSignedIn'
 import { ProfileSettings } from './ProfileSettings'
 import { VolunteerSettings } from './VolunteerSettings'
 import { UserNotificationBell } from '@/components/UserNotificationBell'
+import { AvatarUpload } from '@/components/AvatarUpload'
 
 export default async function ProfilePage() {
   const { userId } = await auth()
@@ -72,6 +73,12 @@ export default async function ProfilePage() {
         {/* Name header — shown for application and volunteer tracks */}
         {(application || volunteer) && (
           <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.25rem' }}>
+              <AvatarUpload
+                initialUrl={application?.avatar_url ?? volunteer?.avatar_url ?? null}
+                displayName={displayName}
+              />
+            </div>
             {kicker && (
               <p style={{ fontSize: '0.65rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: '#D239F8', marginBottom: '0.75rem', opacity: 0.85 }}>
                 {kicker}
