@@ -63,9 +63,9 @@ function Row({ circleContent, title, description, tag }: {
   tag: string
 }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', padding: '1.1rem 0' }}>
+    <div className="commitments-row">
       <CircleIcon>{circleContent}</CircleIcon>
-      <div style={{ flex: 1, minWidth: 0, paddingRight: '5rem' }}>
+      <div className="commitments-row-text">
         <p style={{ fontSize: '0.95rem', fontWeight: 400, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#EDE0C8', margin: '0 0 0.2rem', lineHeight: 1.9 }}>
           {title}
         </p>
@@ -86,6 +86,16 @@ export function CommitmentsSection({ contributions, role, dept, shift, roleAppro
 
   return (
     <div style={{ border: '1.5px solid rgba(200,168,72,0.7)', borderRadius: '1rem', background: 'rgba(10,0,20,0.6)', overflow: 'hidden', boxShadow: '0 0 0 1px rgba(200,168,72,0.12), 0 0 24px rgba(200,168,72,0.08)' }}>
+      <style>{`
+        .commitments-rows { padding: 0 2rem; }
+        .commitments-row  { display: flex; align-items: center; gap: 1.5rem; padding: 1.1rem 0; }
+        .commitments-row-text { flex: 1; min-width: 0; padding-right: 0.5rem; }
+        @media (max-width: 480px) {
+          .commitments-rows { padding: 0 1rem; }
+          .commitments-row  { gap: 0.85rem; }
+          .commitments-row-text { padding-right: 0; }
+        }
+      `}</style>
       {/* Header */}
       <div style={{ padding: '1.1rem 1.5rem 1rem', textAlign: 'center' }}>
         <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.6rem', color: '#C8A848', margin: '0 0 1rem', letterSpacing: '0.1em', textShadow: '0 0 20px rgba(200,168,72,0.4)' }}>
@@ -95,7 +105,7 @@ export function CommitmentsSection({ contributions, role, dept, shift, roleAppro
       </div>
 
       {/* Rows */}
-      <div style={{ padding: '0 2rem' }}>
+      <div className="commitments-rows">
         {/* Contributions */}
         {contributions.map((c, i) => {
           const meta = CONTRIBUTION_META[c] ?? { icon: '✦', desc: null }
