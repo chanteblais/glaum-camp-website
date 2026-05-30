@@ -1,6 +1,6 @@
 'use client'
 
-import { useId, useState } from 'react'
+import { useId, useState, useEffect } from 'react'
 
 export type PersonalEvent = {
   id: string
@@ -27,8 +27,6 @@ const DAY_META: { label: string; short: string; month: string; date: number }[] 
 const PX_PER_HOUR = 40
 const GOLD = '#C8A848'
 const CREAM = '#F3EAE5'
-const MAGENTA = '#B650C8'
-const DEEP_PURPLE = '#16051F'
 const PANEL_BG = 'radial-gradient(circle at 50% 0%, rgba(92, 28, 110, 0.24), rgba(15, 0, 28, 0.94) 46%, rgba(8, 0, 18, 0.98) 100%)'
 const GRID_LINE = 'rgba(200,168,72,0.12)'
 
@@ -62,7 +60,6 @@ function eventColors(ev: PersonalEvent): EventColors {
   if (ev.event_type === 'service') {
     return { border: 'rgba(182,80,200,0.85)', bg: 'linear-gradient(145deg, rgba(86,13,94,0.86), rgba(42,4,64,0.94))', time: '#D889E0', title: CREAM, subtitle: '#D7A6D8', label }
   }
-  // contribution / default
   return { border: '#8F329D', bg: 'linear-gradient(145deg, rgba(59,7,78,0.9), rgba(32,4,52,0.96))', time: '#C86BD0', title: CREAM, subtitle: '#C49AC1', label }
 }
 
@@ -110,21 +107,9 @@ function EventCard({ event, top, height }: { event: PersonalEvent; top: number; 
   )
 }
 
-export function PersonalScheduleCalendar({ events }: { events: PersonalEvent[] }) {
-  const [collapsed, setCollapsed] = useState(false)
-  const rawId = useId()
-  const calendarId = `personal-schedule-${rawId.replace(/:/g, '')}`
-
-  const timed = events.filter(e => !!e.time)
-  const untimed = events.filter(e => !e.time)
-  const activeDays = DAY_META.filter(d => events.some(e => e.day === d.label))
-  const columnCount = Math.max(activeDays.length, 1)
-
-  if (activeDays.length === 0 && untimed.length === 0) return null
-
-  // Compute time window
+function buildTimeWindow(events: PersonalEvent[]) {
   const allMinutes: number[] = []
-  timed.forEach(e => {
+  events.filter(e => !!e.time).forEach(e => {
     const { start, end } = parseEventTimes(e.time)
     if (start != null) allMinutes.push(start)
     if (end != null) allMinutes.push(end)
@@ -134,7 +119,6 @@ export function PersonalScheduleCalendar({ events }: { events: PersonalEvent[] }
   const maxMin = allMinutes.length ? Math.max(...allMinutes) + PADDING : 22 * 60
   const START_HOUR = Math.floor(minMin / 60)
   const END_HOUR = Math.ceil(maxMin / 60)
-  const TOTAL_HEIGHT = (END_HOUR - START_HOUR) * PX_PER_HOUR
 
   const hourLabels: { hour: number; label: string }[] = []
   for (let h = START_HOUR; h <= END_HOUR; h++) {
@@ -146,6 +130,73 @@ export function PersonalScheduleCalendar({ events }: { events: PersonalEvent[] }
     hourLabels.push({ hour: h, label: `${h12} ${ampm}` })
   }
 
+  return { START_HOUR, END_HOUR, TOTAL_HEIGHT: (END_HOUR - START_HOUR) * PX_PER_HOUR, hourLabels }
+}
+
+function SingleDayGrid({ dayEvents, allEvents }: { dayEvents: PersonalEvent[]; allEvents: PersonalEvent[] }) {
+  const { START_HOUR, END_HOUR, TOTAL_HEIGHT, hourLabels } = buildTimeWindow(allEvents)
+  const timed = dayEvents.filter(e => !!e.time)
+
+  return (
+    <div style={{ display: 'flex', gap: '0' }}>
+      <div style={{ width: '46px', flexShrink: 0, position: 'relative', height: TOTAL_HEIGHT, marginTop: '44px', borderRight: '1px solid rgba(200,168,72,0.14)' }}>
+        {hourLabels.map(({ hour, label }) => (
+          <div key={hour} style={{
+            position: 'absolute', top: (hour - START_HOUR) * PX_PER_HOUR - 7, right: '10px',
+            fontSize: '0.6rem', color: GOLD,
+            opacity: label === 'NOON' || label === 'MIDN' ? 0.8 : 0.4,
+            whiteSpace: 'nowrap', textAlign: 'right', letterSpacing: '0.04em',
+            fontWeight: label === 'NOON' ? 600 : 400,
+          }}>{label}</div>
+        ))}
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{ height: '44px', borderBottom: `1px solid ${GRID_LINE}` }} />
+        <div style={{ position: 'relative', height: TOTAL_HEIGHT, background: 'linear-gradient(180deg, rgba(255,255,255,0.012), rgba(255,255,255,0.004))' }}>
+          {hourLabels.map(({ hour, label }) => (
+            <div key={hour} style={{
+              position: 'absolute', top: (hour - START_HOUR) * PX_PER_HOUR, left: 0, right: 0,
+              borderTop: `1px solid rgba(200,168,72,${label === 'NOON' ? '0.18' : '0.08'})`,
+            }} />
+          ))}
+          {timed.map(ev => {
+            const { start, end } = parseEventTimes(ev.time)
+            if (start === null) return null
+            const top = ((start / 60) - START_HOUR) * PX_PER_HOUR
+            const height = end
+              ? Math.max((Math.min(end / 60, END_HOUR) - Math.max(start / 60, START_HOUR)) * PX_PER_HOUR, 36)
+              : Math.max(PX_PER_HOUR * 0.85, 40)
+            return <EventCard key={ev.id} event={ev} top={top} height={height} />
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function PersonalScheduleCalendar({ events }: { events: PersonalEvent[] }) {
+  const [collapsed, setCollapsed] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+  const [selectedDay, setSelectedDay] = useState<string | null>(null)
+  const rawId = useId()
+  const calendarId = `personal-schedule-${rawId.replace(/:/g, '')}`
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+
+  const timed = events.filter(e => !!e.time)
+  const untimed = events.filter(e => !e.time)
+  const activeDays = DAY_META.filter(d => events.some(e => e.day === d.label))
+  const activeDay = selectedDay ?? activeDays[0]?.label ?? null
+
+  if (activeDays.length === 0 && untimed.length === 0) return null
+
+  const { START_HOUR, END_HOUR, TOTAL_HEIGHT, hourLabels } = buildTimeWindow(events)
+
   return (
     <div style={{
       marginBottom: '2.5rem',
@@ -155,7 +206,6 @@ export function PersonalScheduleCalendar({ events }: { events: PersonalEvent[] }
       overflow: 'hidden',
       boxShadow: '0 0 0 1px rgba(200,168,72,0.18), 0 0 28px rgba(182,80,200,0.12), inset 0 0 40px rgba(182,80,200,0.06)',
     }}>
-      {/* Header */}
       <button
         onClick={() => setCollapsed(o => !o)}
         style={{
@@ -166,112 +216,126 @@ export function PersonalScheduleCalendar({ events }: { events: PersonalEvent[] }
         }}
       >
         <span style={{ width: '1.25rem', flexShrink: 0 }} />
-
         <div style={{ flex: 1, textAlign: 'center' }}>
           <span style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.9rem', color: GOLD, letterSpacing: '0.16em', textShadow: '0 1px 0 rgba(0,0,0,0.75), 0 0 18px rgba(200,168,72,0.28)' }}>
             Your Schedule
           </span>
         </div>
-
         <span style={{ fontSize: '0.75rem', color: GOLD, opacity: 0.72, width: '1.25rem', textAlign: 'right', flexShrink: 0 }}>
           {collapsed ? '▼' : '▲'}
         </span>
       </button>
 
       {!collapsed && (
-        <div style={{ padding: '1.15rem 2rem 0' }}>
-          <style>{`
-            @media (max-width: 760px) {
-              #${calendarId} .schedule-scroll {
-                overflow-x: auto;
-                padding-bottom: 0.5rem;
-              }
-              #${calendarId} .schedule-grid {
-                min-width: ${Math.max(columnCount * 168 + 46, 560)}px;
-              }
-            }
-          `}</style>
-          <div id={calendarId} className="schedule-scroll">
-            <div className="schedule-grid" style={{ display: 'flex', gap: '0' }}>
-              {/* Time axis */}
-              <div style={{ width: '46px', flexShrink: 0, position: 'relative', height: TOTAL_HEIGHT, marginTop: '44px', borderRight: '1px solid rgba(200,168,72,0.14)' }}>
-                {hourLabels.map(({ hour, label }) => (
-                  <div key={hour} style={{
-                    position: 'absolute',
-                    top: (hour - START_HOUR) * PX_PER_HOUR - 7,
-                    right: '10px',
-                    fontSize: '0.6rem',
-                    color: GOLD,
-                    opacity: label === 'NOON' || label === 'MIDN' ? 0.8 : 0.4,
-                    whiteSpace: 'nowrap',
-                    textAlign: 'right',
-                    letterSpacing: '0.04em',
-                    fontWeight: label === 'NOON' ? 600 : 400,
-                  }}>
-                    {label}
+        <div style={{ padding: '1.15rem 1.25rem 0' }}>
+
+          {isMobile ? (
+            <>
+              {/* Day tab bar */}
+              {activeDays.length > 1 && (
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', overflowX: 'auto', paddingBottom: '0.25rem' }}>
+                  {activeDays.map(day => {
+                    const active = activeDay === day.label
+                    return (
+                      <button
+                        key={day.label}
+                        onClick={() => setSelectedDay(day.label)}
+                        style={{
+                          flexShrink: 0,
+                          padding: '0.4rem 0.9rem',
+                          borderRadius: '9999px',
+                          border: `1px solid ${active ? 'rgba(200,168,72,0.7)' : 'rgba(200,168,72,0.2)'}`,
+                          background: active ? 'rgba(200,168,72,0.12)' : 'transparent',
+                          color: active ? GOLD : 'rgba(200,168,72,0.5)',
+                          cursor: 'pointer',
+                          fontSize: '0.72rem',
+                          letterSpacing: '0.1em',
+                          fontWeight: active ? 700 : 400,
+                          textAlign: 'center',
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        <span style={{ display: 'block' }}>{day.short}</span>
+                        <span style={{ display: 'block', fontSize: '0.65rem', opacity: 0.8 }}>{day.date}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+              {activeDay && (
+                <SingleDayGrid
+                  dayEvents={events.filter(e => e.day === activeDay)}
+                  allEvents={events}
+                />
+              )}
+            </>
+          ) : (
+            <>
+              <style>{`
+                @media (max-width: 760px) {
+                  #${calendarId} .schedule-scroll { overflow-x: auto; padding-bottom: 0.5rem; }
+                  #${calendarId} .schedule-grid   { min-width: ${Math.max(activeDays.length * 168 + 46, 560)}px; }
+                }
+              `}</style>
+              <div id={calendarId} className="schedule-scroll">
+                <div className="schedule-grid" style={{ display: 'flex', gap: '0' }}>
+                  <div style={{ width: '46px', flexShrink: 0, position: 'relative', height: TOTAL_HEIGHT, marginTop: '44px', borderRight: '1px solid rgba(200,168,72,0.14)' }}>
+                    {hourLabels.map(({ hour, label }) => (
+                      <div key={hour} style={{
+                        position: 'absolute', top: (hour - START_HOUR) * PX_PER_HOUR - 7, right: '10px',
+                        fontSize: '0.6rem', color: GOLD,
+                        opacity: label === 'NOON' || label === 'MIDN' ? 0.8 : 0.4,
+                        whiteSpace: 'nowrap', textAlign: 'right', letterSpacing: '0.04em',
+                        fontWeight: label === 'NOON' ? 600 : 400,
+                      }}>{label}</div>
+                    ))}
                   </div>
-                ))}
+                  <div style={{ flex: 1, display: 'grid', gridTemplateColumns: `repeat(${activeDays.length}, minmax(168px, 1fr))`, gap: '0' }}>
+                    {activeDays.map(day => {
+                      const dayEvents = timed
+                        .filter(e => e.day === day.label)
+                        .sort((a, b) => (parseEventTimes(a.time).start ?? 0) - (parseEventTimes(b.time).start ?? 0))
+                      return (
+                        <div key={day.label}>
+                          <div style={{
+                            height: '44px', textAlign: 'center',
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                            paddingBottom: '6px',
+                            borderLeft: '1px solid rgba(200,168,72,0.16)',
+                            borderBottom: `1px solid ${GRID_LINE}`,
+                          }}>
+                            <span style={{ fontSize: '0.8rem', letterSpacing: '0.11em', color: GOLD, opacity: 0.94, fontWeight: 700, textShadow: '0 1px 0 rgba(0,0,0,0.7)' }}>{day.short}</span>
+                            <span style={{ fontSize: '0.72rem', letterSpacing: '0.05em', color: GOLD, opacity: 0.78, marginTop: '1px', fontWeight: 500, textShadow: '0 1px 0 rgba(0,0,0,0.7)' }}>{day.month} {day.date}</span>
+                          </div>
+                          <div style={{
+                            position: 'relative', height: TOTAL_HEIGHT,
+                            borderLeft: '1px solid rgba(200,168,72,0.16)',
+                            background: 'linear-gradient(180deg, rgba(255,255,255,0.012), rgba(255,255,255,0.004))',
+                          }}>
+                            {hourLabels.map(({ hour, label }) => (
+                              <div key={hour} style={{
+                                position: 'absolute', top: (hour - START_HOUR) * PX_PER_HOUR, left: 0, right: 0,
+                                borderTop: `1px solid rgba(200,168,72,${label === 'NOON' ? '0.18' : '0.08'})`,
+                              }} />
+                            ))}
+                            {dayEvents.map(ev => {
+                              const { start, end } = parseEventTimes(ev.time)
+                              if (start === null) return null
+                              const top = ((start / 60) - START_HOUR) * PX_PER_HOUR
+                              const height = end
+                                ? Math.max((Math.min(end / 60, END_HOUR) - Math.max(start / 60, START_HOUR)) * PX_PER_HOUR, 36)
+                                : Math.max(PX_PER_HOUR * 0.85, 40)
+                              return <EventCard key={ev.id} event={ev} top={top} height={height} />
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
               </div>
-
-              {/* Day columns */}
-              <div style={{ flex: 1, display: 'grid', gridTemplateColumns: `repeat(${activeDays.length}, minmax(168px, 1fr))`, gap: '0' }}>
-                {activeDays.map(day => {
-                  const dayEvents = timed
-                    .filter(e => e.day === day.label)
-                    .sort((a, b) => (parseEventTimes(a.time).start ?? 0) - (parseEventTimes(b.time).start ?? 0))
-
-                  return (
-                    <div key={day.label}>
-                      {/* Day header */}
-                      <div style={{
-                        height: '44px', textAlign: 'center',
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                        paddingBottom: '6px',
-                        borderRadius: 0,
-                        background: 'transparent',
-                        borderLeft: '1px solid rgba(200,168,72,0.16)',
-                        borderBottom: `1px solid ${GRID_LINE}`,
-                      }}>
-                        <span style={{ fontSize: '0.8rem', letterSpacing: '0.11em', color: GOLD, opacity: 0.94, fontWeight: 700, textShadow: '0 1px 0 rgba(0,0,0,0.7)' }}>
-                          {day.short}
-                        </span>
-                        <span style={{ fontSize: '0.72rem', letterSpacing: '0.05em', color: GOLD, opacity: 0.78, marginTop: '1px', fontWeight: 500, textShadow: '0 1px 0 rgba(0,0,0,0.7)' }}>
-                          {day.month} {day.date}
-                        </span>
-                      </div>
-
-                      {/* Event area */}
-                      <div style={{
-                        position: 'relative', height: TOTAL_HEIGHT,
-                        borderLeft: '1px solid rgba(200,168,72,0.16)',
-                        borderRadius: 0,
-                        background: 'linear-gradient(180deg, rgba(255,255,255,0.012), rgba(255,255,255,0.004))',
-                      }}>
-                        {hourLabels.map(({ hour, label }) => (
-                          <div key={hour} style={{
-                            position: 'absolute',
-                            top: (hour - START_HOUR) * PX_PER_HOUR,
-                            left: 0, right: 0,
-                            borderTop: `1px solid rgba(200,168,72,${label === 'NOON' ? '0.18' : '0.08'})`,
-                          }} />
-                        ))}
-
-                        {dayEvents.map(ev => {
-                          const { start, end } = parseEventTimes(ev.time)
-                          if (start === null) return null
-                          const top = ((start / 60) - START_HOUR) * PX_PER_HOUR
-                          const height = end
-                            ? Math.max((Math.min(end / 60, END_HOUR) - Math.max(start / 60, START_HOUR)) * PX_PER_HOUR, 36)
-                            : Math.max(PX_PER_HOUR * 0.85, 40)
-                          return <EventCard key={ev.id} event={ev} top={top} height={height} />
-                        })}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
+            </>
+          )}
 
           {untimed.length > 0 && (
             <div style={{ marginTop: '1.1rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -283,7 +347,6 @@ export function PersonalScheduleCalendar({ events }: { events: PersonalEvent[] }
             </div>
           )}
 
-          {/* Footer */}
           <div style={{ padding: '1rem 0 1.15rem', marginTop: '1rem', borderTop: '1px solid rgba(200,168,72,0.13)' }}>
             <a href="/#schedule" style={{ fontSize: '0.78rem', color: '#E37AE9', opacity: 0.92, textDecoration: 'none', letterSpacing: '0.03em', fontWeight: 700, textShadow: '0 0 14px rgba(227,122,233,0.28)' }}>
               View full calendar →

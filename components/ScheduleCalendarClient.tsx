@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { EventIcon } from '@/components/EventIcon'
 
 type ScheduleEvent = {
@@ -156,6 +156,16 @@ function EventBlock({ event, style }: { event: ScheduleEvent; style: React.CSSPr
 // ── Main Calendar ─────────────────────────────────────────────────────────────
 
 export function ScheduleCalendarClient({ events }: { events: ScheduleEvent[] }) {
+  const [isMobile, setIsMobile] = useState(false)
+  const [selectedDay, setSelectedDay] = useState<string>(DAYS[0].label)
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+
   const regular = [...events.filter(e => !e.is_recurring)].sort((a, b) => {
     const dayDiff = (DAY_ORDER[a.day] ?? 99) - (DAY_ORDER[b.day] ?? 99)
     if (dayDiff !== 0) return dayDiff
@@ -183,93 +193,131 @@ export function ScheduleCalendarClient({ events }: { events: ScheduleEvent[] }) 
   return (
     <div>
       {/* Time-based calendar grid */}
-      <div style={{ display: 'flex', gap: '0' }}>
+      {isMobile ? (
+        // ── Mobile: day tab picker + single column ──
+        <div>
+          <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem', overflowX: 'auto', paddingBottom: '0.25rem' }}>
+            {DAYS.map(day => {
+              const active = selectedDay === day.label
+              return (
+                <button
+                  key={day.label}
+                  onClick={() => setSelectedDay(day.label)}
+                  style={{
+                    flexShrink: 0,
+                    padding: '0.4rem 0.9rem',
+                    borderRadius: '9999px',
+                    border: `1px solid ${active ? 'rgba(200,168,72,0.7)' : 'rgba(200,168,72,0.2)'}`,
+                    background: active ? 'rgba(200,168,72,0.1)' : 'transparent',
+                    color: active ? '#C8A848' : 'rgba(200,168,72,0.5)',
+                    cursor: 'pointer',
+                    fontSize: '0.72rem',
+                    letterSpacing: '0.08em',
+                    fontWeight: active ? 700 : 400,
+                    textAlign: 'center',
+                    lineHeight: 1.4,
+                  }}
+                >
+                  <span style={{ display: 'block' }}>{day.short}</span>
+                  <span style={{ display: 'block', fontSize: '0.65rem', opacity: 0.8 }}>{day.date}</span>
+                </button>
+              )
+            })}
+          </div>
 
-        {/* Time axis */}
-        <div style={{ width: '44px', flexShrink: 0, position: 'relative', height: TOTAL_HEIGHT, marginTop: '52px' }}>
-          {HOUR_LABELS.map(({ hour, label }) => (
-            <div key={hour} style={{
-              position: 'absolute',
-              top: (hour - START_HOUR) * PX_PER_HOUR - 7,
-              left: 0,
-              right: '6px',
-              fontSize: '0.58rem',
-              color: '#C8A848',
-              opacity: label === 'Midnight' || label === 'Noon' ? 0.7 : 0.35,
-              whiteSpace: 'nowrap',
-              textAlign: 'right',
-              letterSpacing: '0.02em',
-              fontWeight: label === 'Midnight' || label === 'Noon' ? 600 : 400,
-            }}>
-              {label}
+          <div style={{ display: 'flex', gap: '0' }}>
+            {/* Time axis */}
+            <div style={{ width: '44px', flexShrink: 0, position: 'relative', height: TOTAL_HEIGHT, marginTop: '0' }}>
+              {HOUR_LABELS.map(({ hour, label }) => (
+                <div key={hour} style={{
+                  position: 'absolute',
+                  top: (hour - START_HOUR) * PX_PER_HOUR - 7,
+                  left: 0, right: '6px',
+                  fontSize: '0.58rem', color: '#C8A848',
+                  opacity: label === 'Midnight' || label === 'Noon' ? 0.7 : 0.35,
+                  whiteSpace: 'nowrap', textAlign: 'right',
+                  letterSpacing: '0.02em',
+                  fontWeight: label === 'Midnight' || label === 'Noon' ? 600 : 400,
+                }}>{label}</div>
+              ))}
             </div>
-          ))}
+            {/* Single day column */}
+            <div style={{ flex: 1, position: 'relative', height: TOTAL_HEIGHT, border: '1px solid rgba(200,168,72,0.12)', borderRadius: '0.5rem', background: 'rgba(255,255,255,0.01)', overflow: 'visible' }}>
+              {HOUR_LABELS.map(({ hour, label }) => (
+                <div key={hour} style={{
+                  position: 'absolute', top: (hour - START_HOUR) * PX_PER_HOUR, left: 0, right: 0,
+                  borderTop: `1px solid rgba(200,168,72,${label === 'Midnight' || label === 'Noon' ? '0.15' : '0.06'})`,
+                }} />
+              ))}
+              {regular.filter(e => e.day === selectedDay).map(ev => {
+                const { start, end } = parseEventTimes(ev.time)
+                if (start === null) return null
+                const top = minutesToTop(start, START_HOUR)
+                const height = end ? minutesToHeight(start, end, START_HOUR, END_HOUR) : Math.max(PX_PER_HOUR * 0.75, 32)
+                return <EventBlock key={ev.id} event={ev} style={{ top, height }} />
+              })}
+            </div>
+          </div>
         </div>
-
-        {/* Day columns */}
-        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.4rem' }}>
-          {DAYS.map(day => {
-            const dayEvents = regular.filter(e => e.day === day.label)
-
-            return (
-              <div key={day.label}>
-                {/* Day header */}
-                <div style={{
-                  height: '52px',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  borderRadius: '0.5rem 0.5rem 0 0',
-                  background: 'rgba(200,168,72,0.07)',
-                  border: '1px solid rgba(200,168,72,0.2)',
-                  borderBottom: 'none',
-                  marginBottom: '0',
-                }}>
-                  <p style={{ fontSize: '0.58rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.6, margin: 0 }}>
-                    {day.short}
-                  </p>
-                  <p style={{ fontSize: '1rem', color: '#F3EDE6', margin: '0.1rem 0 0', fontFamily: 'TokyoDreams, serif' }}>
-                    {day.date}
-                  </p>
+      ) : (
+        // ── Desktop: all 6 day columns ──
+        <div style={{ display: 'flex', gap: '0' }}>
+          <div style={{ width: '44px', flexShrink: 0, position: 'relative', height: TOTAL_HEIGHT, marginTop: '52px' }}>
+            {HOUR_LABELS.map(({ hour, label }) => (
+              <div key={hour} style={{
+                position: 'absolute',
+                top: (hour - START_HOUR) * PX_PER_HOUR - 7,
+                left: 0, right: '6px',
+                fontSize: '0.58rem', color: '#C8A848',
+                opacity: label === 'Midnight' || label === 'Noon' ? 0.7 : 0.35,
+                whiteSpace: 'nowrap', textAlign: 'right',
+                letterSpacing: '0.02em',
+                fontWeight: label === 'Midnight' || label === 'Noon' ? 600 : 400,
+              }}>{label}</div>
+            ))}
+          </div>
+          <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.4rem' }}>
+            {DAYS.map(day => {
+              const dayEvents = regular.filter(e => e.day === day.label)
+              return (
+                <div key={day.label}>
+                  <div style={{
+                    height: '52px',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    borderRadius: '0.5rem 0.5rem 0 0',
+                    background: 'rgba(200,168,72,0.07)',
+                    border: '1px solid rgba(200,168,72,0.2)',
+                    borderBottom: 'none',
+                  }}>
+                    <p style={{ fontSize: '0.58rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.6, margin: 0 }}>{day.short}</p>
+                    <p style={{ fontSize: '1rem', color: '#F3EDE6', margin: '0.1rem 0 0', fontFamily: 'TokyoDreams, serif' }}>{day.date}</p>
+                  </div>
+                  <div style={{
+                    position: 'relative', height: TOTAL_HEIGHT,
+                    border: '1px solid rgba(200,168,72,0.12)',
+                    borderRadius: '0 0 0.5rem 0.5rem',
+                    background: 'rgba(255,255,255,0.01)', overflow: 'visible',
+                  }}>
+                    {HOUR_LABELS.map(({ hour, label }) => (
+                      <div key={hour} style={{
+                        position: 'absolute', top: (hour - START_HOUR) * PX_PER_HOUR, left: 0, right: 0,
+                        borderTop: `1px solid rgba(200,168,72,${label === 'Midnight' || label === 'Noon' ? '0.15' : '0.06'})`,
+                      }} />
+                    ))}
+                    {dayEvents.map(ev => {
+                      const { start, end } = parseEventTimes(ev.time)
+                      if (start === null) return null
+                      const top = minutesToTop(start, START_HOUR)
+                      const height = end ? minutesToHeight(start, end, START_HOUR, END_HOUR) : Math.max(PX_PER_HOUR * 0.75, 32)
+                      return <EventBlock key={ev.id} event={ev} style={{ top, height }} />
+                    })}
+                  </div>
                 </div>
-
-                {/* Timed event area */}
-                <div style={{
-                  position: 'relative',
-                  height: TOTAL_HEIGHT,
-                  border: '1px solid rgba(200,168,72,0.12)',
-                  borderRadius: '0 0 0.5rem 0.5rem',
-                  background: 'rgba(255,255,255,0.01)',
-                  overflow: 'visible',
-                }}>
-                  {/* Hour grid lines */}
-                  {HOUR_LABELS.map(({ hour, label }) => (
-                    <div key={hour} style={{
-                      position: 'absolute',
-                      top: (hour - START_HOUR) * PX_PER_HOUR,
-                      left: 0, right: 0,
-                      borderTop: `1px solid rgba(200,168,72,${label === 'Midnight' || label === 'Noon' ? '0.15' : '0.06'})`,
-                    }} />
-                  ))}
-
-                  {/* Events */}
-                  {dayEvents.map(ev => {
-                    const { start, end } = parseEventTimes(ev.time)
-                    if (start === null) return null
-                    const top = minutesToTop(start, START_HOUR)
-                    const height = end ? minutesToHeight(start, end, START_HOUR, END_HOUR) : Math.max(PX_PER_HOUR * 0.75, 32)
-                    return (
-                      <EventBlock
-                        key={ev.id}
-                        event={ev}
-                        style={{ top, height }}
-                      />
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Untimed events */}
       {untimed.length > 0 && (

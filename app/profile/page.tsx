@@ -85,11 +85,16 @@ export default async function ProfilePage() {
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
       <style>{`
-        .profile-main-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 1.25rem; align-items: start; margin-bottom: 2.5rem; }
+        .profile-main-grid  { display: grid; grid-template-columns: 2fr 1fr; gap: 1.25rem; align-items: start; margin-bottom: 2.5rem; }
         .profile-info-grid  { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 2.5rem; }
-        @media (max-width: 640px) {
-          .profile-main-grid { grid-template-columns: 1fr; }
+        .profile-badge-row  { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 1.5rem; margin-bottom: 1rem; }
+        .profile-badge-left { display: flex; justify-content: flex-end; }
+        @media (max-width: 560px) {
+          .profile-main-grid  { grid-template-columns: 1fr; }
           .profile-info-grid  { grid-template-columns: 1fr; }
+          .profile-badge-row  { grid-template-columns: 1fr; justify-items: center; }
+          .profile-badge-left { justify-content: center; }
+          .profile-badge-spacer { display: none; }
         }
       `}</style>
       <img src="/hands-left.svg" alt="" aria-hidden style={{ position: 'fixed', left: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
@@ -128,14 +133,29 @@ export default async function ProfilePage() {
             alignItems: 'center',
           }}>
 
-            {/* Centre column — avatar + name */}
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.75rem' }}>
-                <AvatarUpload
-                  initialUrl={application?.avatar_url ?? volunteer?.avatar_url ?? null}
-                  displayName={displayName}
-                />
+            {/* Badge + avatar row — badge left, avatar centered, spacer right */}
+            <div className="profile-badge-row">
+              <div className="profile-badge-left">
+                {application?.status === 'approved' && badgeRoleName ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={`/api/badge?role=${encodeURIComponent(badgeRoleName)}&dept=${encodeURIComponent(badgeDeptName ?? '')}`}
+                    alt={`${badgeRoleName} badge`}
+                    width={175}
+                    height={203}
+                    style={{ display: 'block', transform: 'translate(-40px, -28px)', filter: 'drop-shadow(0 8px 24px rgba(0,0,0,0.6)) drop-shadow(0 2px 8px rgba(0,0,0,0.4))' }}
+                  />
+                ) : <div />}
               </div>
+              <AvatarUpload
+                initialUrl={application?.avatar_url ?? volunteer?.avatar_url ?? null}
+                displayName={displayName}
+              />
+              <div className="profile-badge-spacer" />
+            </div>
+
+            {/* Name + meta */}
+            <div style={{ textAlign: 'center' }}>
               {kicker && (
                 <p style={{ fontSize: '0.65rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: '#D239F8', marginBottom: '0.3rem', opacity: 0.85 }}>
                   {kicker}
