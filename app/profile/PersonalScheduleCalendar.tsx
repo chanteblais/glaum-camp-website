@@ -1,7 +1,6 @@
 'use client'
 
-import { useState } from 'react'
-import { EventIcon } from '@/components/EventIcon'
+import { useId, useState } from 'react'
 
 export type PersonalEvent = {
   id: string
@@ -16,31 +15,22 @@ export type PersonalEvent = {
   isPersonal: boolean
 }
 
-const DAY_META: { label: string; short: string; date: number }[] = [
-  { label: 'Wednesday', short: 'Wed', date: 23 },
-  { label: 'Thursday',  short: 'Thu', date: 24 },
-  { label: 'Friday',    short: 'Fri', date: 25 },
-  { label: 'Saturday',  short: 'Sat', date: 26 },
-  { label: 'Sunday',    short: 'Sun', date: 27 },
-  { label: 'Monday',    short: 'Mon', date: 28 },
+const DAY_META: { label: string; short: string; month: string; date: number }[] = [
+  { label: 'Wednesday', short: 'WED', month: 'JULY', date: 23 },
+  { label: 'Thursday',  short: 'THU', month: 'JULY', date: 24 },
+  { label: 'Friday',    short: 'FRI', month: 'JULY', date: 25 },
+  { label: 'Saturday',  short: 'SAT', month: 'JULY', date: 26 },
+  { label: 'Sunday',    short: 'SUN', month: 'JULY', date: 27 },
+  { label: 'Monday',    short: 'MON', month: 'JULY', date: 28 },
 ]
-const DAY_ORDER: Record<string, number> = Object.fromEntries(DAY_META.map((d, i) => [d.label, i]))
 
 const PX_PER_HOUR = 56
-
-const EVENT_TYPE_STYLES: Record<string, { border: string; background: string; text: string }> = {
-  all_hands:    { border: 'rgba(40,200,190,0.45)',  background: 'rgba(40,200,190,0.1)',  text: '#28c8be' },
-  camp_tending: { border: 'rgba(240,90,20,0.55)',   background: 'rgba(240,90,20,0.12)',  text: '#e6781e' },
-  service:      { border: 'rgba(240,100,180,0.5)',  background: 'rgba(240,100,180,0.1)', text: '#f064b4' },
-}
-const DEFAULT_STYLE = { border: 'rgba(200,168,72,0.25)', background: 'rgba(200,168,72,0.05)', text: '#F3EDE6' }
-
-function eventStyle(ev: PersonalEvent) {
-  if (ev.isPersonal && !ev.event_type) return DEFAULT_STYLE
-  if (ev.event_type && EVENT_TYPE_STYLES[ev.event_type]) return EVENT_TYPE_STYLES[ev.event_type]
-  if (ev.highlight) return { border: 'rgba(200,168,72,0.25)', background: 'rgba(200,168,72,0.04)', text: '#F3EDE6' }
-  return DEFAULT_STYLE
-}
+const GOLD = '#C8A848'
+const CREAM = '#F3EAE5'
+const MAGENTA = '#B650C8'
+const DEEP_PURPLE = '#16051F'
+const PANEL_BG = 'radial-gradient(circle at 50% 0%, rgba(92, 28, 110, 0.24), rgba(15, 0, 28, 0.94) 46%, rgba(8, 0, 18, 0.98) 100%)'
+const GRID_LINE = 'rgba(200,168,72,0.12)'
 
 function parseMinutes(str: string): number | null {
   const match = str.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i)
@@ -49,7 +39,7 @@ function parseMinutes(str: string): number | null {
   const m = parseInt(match[2])
   const ap = match[3].toUpperCase()
   if (ap === 'PM' && h !== 12) h += 12
-  if (ap === 'AM' && h === 12) h = 24
+  if (ap === 'AM' && h === 12) h = 0
   return h * 60 + m
 }
 
@@ -59,80 +49,113 @@ function parseEventTimes(timeStr: string | null) {
   return { start: parseMinutes(parts[0]), end: parts[1] ? parseMinutes(parts[1]) : null }
 }
 
-function buildHourLabels(startHour: number, endHour: number) {
-  const labels: { hour: number; label: string }[] = []
-  for (let h = startHour; h <= endHour; h++) {
-    const d = h % 24
-    const h12 = d === 0 ? 12 : d > 12 ? d - 12 : d
-    const ampm = d < 12 || d === 0 ? 'AM' : 'PM'
-    labels.push({ hour: h, label: d === 0 ? 'Midnight' : d === 12 ? 'Noon' : `${h12} ${ampm}` })
+type EventColors = { border: string; bg: string; time: string; title: string; subtitle: string; label?: string }
+
+function eventColors(ev: PersonalEvent): EventColors {
+  if (ev.isPersonal && ev.event_type !== 'all_hands') {
+    return {
+      border: '#9A36A8',
+      bg: 'linear-gradient(145deg, rgba(81,12,102,0.94), rgba(43,5,68,0.96))',
+      time: '#D889E0',
+      title: CREAM,
+      subtitle: '#D7A6D8',
+      label: 'Your Shift',
+    }
   }
-  return labels
+  if (ev.event_type === 'all_hands') {
+    return {
+      border: '#5FA58E',
+      bg: 'linear-gradient(145deg, rgba(13,50,72,0.9), rgba(11,27,50,0.92))',
+      time: '#76C7B2',
+      title: CREAM,
+      subtitle: '#AD759A',
+    }
+  }
+  if (ev.event_type === 'camp_tending') {
+    return {
+      border: '#B68018',
+      bg: 'linear-gradient(145deg, rgba(36,15,43,0.92), rgba(18,5,30,0.94))',
+      time: '#D19B30',
+      title: GOLD,
+      subtitle: CREAM,
+    }
+  }
+
+  if (ev.event_type === 'service') {
+    return {
+      border: 'rgba(182,80,200,0.85)',
+      bg: 'linear-gradient(145deg, rgba(86,13,94,0.86), rgba(42,4,64,0.94))',
+      time: '#D889E0',
+      title: CREAM,
+      subtitle: '#D7A6D8',
+    }
+  }
+  // contribution / default — inherits shift palette
+  return {
+    border: '#8F329D',
+    bg: 'linear-gradient(145deg, rgba(59,7,78,0.9), rgba(32,4,52,0.96))',
+    time: '#C86BD0',
+    title: CREAM,
+    subtitle: '#C49AC1',
+  }
 }
 
-function EventBlock({ event, style }: { event: PersonalEvent; style: React.CSSProperties }) {
-  const [expanded, setExpanded] = useState(false)
-  const expandedText = event.detail_desc || event.subtitle
-  const s = eventStyle(event)
+function EventCard({ event, top, height }: { event: PersonalEvent; top: number; height: number }) {
+  const c = eventColors(event)
+  const tall = height >= 66
+  const isPersonalShift = event.isPersonal && event.event_type !== 'all_hands'
+  const isDinner = event.event_type === 'camp_tending'
 
   return (
-    <div
-      onClick={() => expandedText && setExpanded(o => !o)}
-      style={{
-        ...style,
-        position: 'absolute',
-        left: '2px', right: '2px',
-        borderRadius: '0.35rem',
-        border: `1px solid ${event.isPersonal && !event.event_type?.includes('all_hands') ? 'rgba(210,57,248,0.5)' : s.border}`,
-        background: event.isPersonal && !event.event_type?.includes('all_hands') ? 'rgba(210,57,248,0.1)' : s.background,
-        boxShadow: event.isPersonal && event.event_type !== 'all_hands'
-          ? '0 0 8px rgba(210,57,248,0.2)'
-          : event.highlight ? '0 0 10px rgba(200,168,72,0.35)' : undefined,
-        overflow: 'hidden',
-        cursor: expandedText ? 'pointer' : 'default',
-        zIndex: expanded ? 10 : 1,
-      }}
-    >
-      <div style={{ padding: '0.25rem 0.35rem' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem', textAlign: 'center' }}>
-          <div style={{ color: '#C8A848', opacity: 0.65 }}>
-            <EventIcon type={event.icon_type} size={10} />
-          </div>
-          <p style={{
-            fontSize: '0.68rem',
-            color: event.isPersonal && event.event_type !== 'all_hands' ? '#D239F8' : s.text,
-            margin: 0, lineHeight: 1.3,
-            fontWeight: event.isPersonal || event.highlight ? 600 : 400,
-            wordBreak: 'break-word',
-          }}>
-            {event.title}
-          </p>
-          {event.isPersonal && event.event_type !== 'all_hands' && (
-            <span style={{ fontSize: '0.5rem', color: '#D239F8', opacity: 0.6, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-              your shift
-            </span>
-          )}
-          {expandedText && (
-            <span style={{ fontSize: '0.45rem', color: '#C8A848', opacity: 0.4 }}>{expanded ? '▲' : '▼'}</span>
-          )}
-        </div>
-        {expanded && expandedText && (
-          <div style={{ marginTop: '0.3rem', paddingTop: '0.3rem', borderTop: '1px solid rgba(200,168,72,0.1)' }}>
-            <p style={{ fontSize: '0.65rem', opacity: 0.6, margin: 0, lineHeight: 1.5, textAlign: 'center' }}>{expandedText}</p>
-          </div>
-        )}
-      </div>
+    <div style={{
+      position: 'absolute', top, height,
+      left: '10px', right: '10px',
+      borderRadius: '8px',
+      border: `1.5px solid ${c.border}`,
+      background: c.bg,
+      padding: tall ? '14px 12px' : '8px 10px',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start',
+      overflow: 'hidden',
+      boxShadow: isPersonalShift
+        ? `0 0 20px rgba(182,80,200,0.28), inset 0 0 24px rgba(20,0,30,0.35)`
+        : `inset 0 0 20px rgba(0,0,0,0.22), 0 0 10px rgba(0,0,0,0.12)`,
+    }}>
+      {event.time && (
+        <p style={{ fontSize: '0.68rem', color: c.time, margin: `0 0 ${tall ? 7 : 3}px`, letterSpacing: '0.02em', lineHeight: 1.1, fontWeight: 600, textAlign: 'center', textShadow: '0 1px 0 rgba(0,0,0,0.45)' }}>
+          {event.time}
+        </p>
+      )}
+      <p style={{ fontSize: tall ? '0.88rem' : '0.72rem', fontWeight: 700, color: c.title, margin: 0, lineHeight: 1.2, wordBreak: 'break-word', textAlign: 'center', textShadow: '0 1px 0 rgba(0,0,0,0.75)' }}>
+        {isDinner ? '☕ ' : ''}{event.title}
+      </p>
+      {event.subtitle && tall && (
+        <p style={{ fontSize: '0.72rem', color: c.subtitle, margin: '8px 0 0', lineHeight: 1.3, fontWeight: 500, textAlign: 'center', textShadow: '0 1px 0 rgba(0,0,0,0.5)' }}>
+          {event.subtitle}
+        </p>
+      )}
+      {c.label && tall && (
+        <p style={{ fontSize: '0.68rem', color: c.subtitle, margin: '10px 0 0', letterSpacing: '0.02em', opacity: 0.98, textAlign: 'center', fontWeight: 600, textShadow: '0 1px 0 rgba(0,0,0,0.45)' }}>
+          {c.label}
+        </p>
+      )}
+      {isPersonalShift && tall && height >= 100 && (
+        <p style={{ fontSize: '1.15rem', color: GOLD, opacity: 0.82, margin: '26px 0 0', lineHeight: 1, textAlign: 'center', textShadow: '0 0 12px rgba(200,168,72,0.45)' }}>✦</p>
+      )}
     </div>
   )
 }
 
 export function PersonalScheduleCalendar({ events }: { events: PersonalEvent[] }) {
+  const [collapsed, setCollapsed] = useState(false)
+  const rawId = useId()
+  const calendarId = `personal-schedule-${rawId.replace(/:/g, '')}`
+
   const timed = events.filter(e => !!e.time)
   const untimed = events.filter(e => !e.time)
+  const activeDays = DAY_META.filter(d => events.some(e => e.day === d.label))
+  const columnCount = Math.max(activeDays.length, 1)
 
-  // Only show days that have at least one event
-  const activeDayLabels = new Set(events.map(e => e.day))
-  const activeDays = DAY_META.filter(d => activeDayLabels.has(d.label))
+  if (activeDays.length === 0 && untimed.length === 0) return null
 
   // Compute time window
   const allMinutes: number[] = []
@@ -142,113 +165,164 @@ export function PersonalScheduleCalendar({ events }: { events: PersonalEvent[] }
     if (end != null) allMinutes.push(end)
   })
   const PADDING = 30
-  const minMinutes = allMinutes.length ? Math.min(...allMinutes) - PADDING : 8 * 60
-  const maxMinutes = allMinutes.length ? Math.max(...allMinutes) + PADDING : 24 * 60
-  const START_HOUR = Math.floor(minMinutes / 60)
-  const END_HOUR = Math.ceil(maxMinutes / 60)
+  const minMin = allMinutes.length ? Math.min(...allMinutes) - PADDING : 8 * 60
+  const maxMin = allMinutes.length ? Math.max(...allMinutes) + PADDING : 22 * 60
+  const START_HOUR = Math.floor(minMin / 60)
+  const END_HOUR = Math.ceil(maxMin / 60)
   const TOTAL_HEIGHT = (END_HOUR - START_HOUR) * PX_PER_HOUR
-  const HOUR_LABELS = buildHourLabels(START_HOUR, END_HOUR)
 
-  if (activeDays.length === 0 && untimed.length === 0) return null
-
-  const cols = activeDays.length
-  const colStyle: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: `repeat(${cols}, 1fr)`,
-    gap: '0.4rem',
+  const hourLabels: { hour: number; label: string }[] = []
+  for (let h = START_HOUR; h <= END_HOUR; h++) {
+    const d = h % 24
+    if (d === 12) { hourLabels.push({ hour: h, label: 'NOON' }); continue }
+    if (d === 0)  { hourLabels.push({ hour: h, label: 'MIDN' }); continue }
+    const h12 = d > 12 ? d - 12 : d
+    const ampm = d < 12 ? 'AM' : 'PM'
+    hourLabels.push({ hour: h, label: `${h12} ${ampm}` })
   }
 
   return (
-    <div>
-      <div style={{ display: 'flex', gap: '0' }}>
-        {/* Time axis */}
-        <div style={{ width: '44px', flexShrink: 0, position: 'relative', height: TOTAL_HEIGHT, marginTop: '52px' }}>
-          {HOUR_LABELS.map(({ hour, label }) => (
-            <div key={hour} style={{
-              position: 'absolute',
-              top: (hour - START_HOUR) * PX_PER_HOUR - 7,
-              left: 0, right: '6px',
-              fontSize: '0.58rem',
-              color: '#C8A848',
-              opacity: label === 'Midnight' || label === 'Noon' ? 0.7 : 0.35,
-              whiteSpace: 'nowrap',
-              textAlign: 'right',
-              letterSpacing: '0.02em',
-              fontWeight: label === 'Midnight' || label === 'Noon' ? 600 : 400,
-            }}>
-              {label}
+    <div style={{
+      marginBottom: '2.5rem',
+      border: `1.5px solid ${GOLD}`,
+      borderRadius: '1rem',
+      background: PANEL_BG,
+      overflow: 'hidden',
+      boxShadow: '0 0 0 1px rgba(200,168,72,0.18), 0 0 28px rgba(182,80,200,0.12), inset 0 0 40px rgba(182,80,200,0.06)',
+    }}>
+      {/* Header */}
+      <button
+        onClick={() => setCollapsed(o => !o)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '1.45rem 2rem 1.25rem',
+          background: 'none', border: 'none', borderBottom: collapsed ? 'none' : '1px solid rgba(200,168,72,0.24)',
+          cursor: 'pointer', color: 'inherit',
+        }}
+      >
+        {/* Empty spacer to balance the toggle button */}
+        <span style={{ width: '1.25rem', flexShrink: 0, color: GOLD, opacity: 0.95, fontSize: '1.05rem' }}>▣</span>
+
+        <div style={{ flex: 1, textAlign: 'center' }}>
+          <span style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.45rem', color: GOLD, letterSpacing: '0.16em', textShadow: '0 1px 0 rgba(0,0,0,0.75), 0 0 18px rgba(200,168,72,0.28)' }}>
+            Your Schedule
+          </span>
+        </div>
+
+        <span style={{ fontSize: '0.75rem', color: GOLD, opacity: 0.72, width: '1.25rem', textAlign: 'right', flexShrink: 0 }}>
+          {collapsed ? '▼' : '▲'}
+        </span>
+      </button>
+
+      {!collapsed && (
+        <div style={{ padding: '1.15rem 2rem 0' }}>
+          <style>{`
+            @media (max-width: 760px) {
+              #${calendarId} .schedule-scroll {
+                overflow-x: auto;
+                padding-bottom: 0.5rem;
+              }
+              #${calendarId} .schedule-grid {
+                min-width: ${Math.max(columnCount * 168 + 46, 560)}px;
+              }
+            }
+          `}</style>
+          <div id={calendarId} className="schedule-scroll">
+            <div className="schedule-grid" style={{ display: 'flex', gap: '0' }}>
+              {/* Time axis */}
+              <div style={{ width: '46px', flexShrink: 0, position: 'relative', height: TOTAL_HEIGHT, marginTop: '58px', borderRight: '1px solid rgba(200,168,72,0.14)' }}>
+                {hourLabels.map(({ hour, label }) => (
+                  <div key={hour} style={{
+                    position: 'absolute',
+                    top: (hour - START_HOUR) * PX_PER_HOUR - 7,
+                    right: '10px',
+                    fontSize: '0.6rem',
+                    color: GOLD,
+                    opacity: label === 'NOON' || label === 'MIDN' ? 0.8 : 0.4,
+                    whiteSpace: 'nowrap',
+                    textAlign: 'right',
+                    letterSpacing: '0.04em',
+                    fontWeight: label === 'NOON' ? 600 : 400,
+                  }}>
+                    {label}
+                  </div>
+                ))}
+              </div>
+
+              {/* Day columns */}
+              <div style={{ flex: 1, display: 'grid', gridTemplateColumns: `repeat(${activeDays.length}, minmax(168px, 1fr))`, gap: '0' }}>
+                {activeDays.map(day => {
+                  const dayEvents = timed
+                    .filter(e => e.day === day.label)
+                    .sort((a, b) => (parseEventTimes(a.time).start ?? 0) - (parseEventTimes(b.time).start ?? 0))
+
+                  return (
+                    <div key={day.label}>
+                      {/* Day header */}
+                      <div style={{
+                        height: '58px', textAlign: 'center',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                        borderRadius: 0,
+                        background: 'transparent',
+                        borderLeft: '1px solid rgba(200,168,72,0.16)',
+                        borderBottom: `1px solid ${GRID_LINE}`,
+                      }}>
+                        <span style={{ fontSize: '0.62rem', letterSpacing: '0.11em', color: GOLD, opacity: 0.94, fontWeight: 700, textShadow: '0 1px 0 rgba(0,0,0,0.7)' }}>
+                          {day.short}
+                        </span>
+                        <span style={{ fontSize: '0.58rem', letterSpacing: '0.05em', color: GOLD, opacity: 0.78, marginTop: '2px', fontWeight: 500, textShadow: '0 1px 0 rgba(0,0,0,0.7)' }}>
+                          {day.month} {day.date}
+                        </span>
+                      </div>
+
+                      {/* Event area */}
+                      <div style={{
+                        position: 'relative', height: TOTAL_HEIGHT,
+                        borderLeft: '1px solid rgba(200,168,72,0.16)',
+                        borderRadius: 0,
+                        background: 'linear-gradient(180deg, rgba(255,255,255,0.012), rgba(255,255,255,0.004))',
+                      }}>
+                        {hourLabels.map(({ hour, label }) => (
+                          <div key={hour} style={{
+                            position: 'absolute',
+                            top: (hour - START_HOUR) * PX_PER_HOUR,
+                            left: 0, right: 0,
+                            borderTop: `1px solid rgba(200,168,72,${label === 'NOON' ? '0.18' : '0.08'})`,
+                          }} />
+                        ))}
+
+                        {dayEvents.map(ev => {
+                          const { start, end } = parseEventTimes(ev.time)
+                          if (start === null) return null
+                          const top = ((start / 60) - START_HOUR) * PX_PER_HOUR
+                          const height = end
+                            ? Math.max((Math.min(end / 60, END_HOUR) - Math.max(start / 60, START_HOUR)) * PX_PER_HOUR, 36)
+                            : Math.max(PX_PER_HOUR * 0.85, 40)
+                          return <EventCard key={ev.id} event={ev} top={top} height={height} />
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
-          ))}
-        </div>
+          </div>
 
-        {/* Day columns — only active days */}
-        <div style={{ flex: 1, ...colStyle }}>
-          {activeDays.map(day => {
-            const dayEvents = timed
-              .filter(e => e.day === day.label)
-              .sort((a, b) => (parseEventTimes(a.time).start ?? 0) - (parseEventTimes(b.time).start ?? 0))
-
-            return (
-              <div key={day.label}>
-                <div style={{
-                  height: '52px',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  borderRadius: '0.5rem 0.5rem 0 0',
-                  background: 'rgba(200,168,72,0.07)',
-                  border: '1px solid rgba(200,168,72,0.2)',
-                  borderBottom: 'none',
-                }}>
-                  <p style={{ fontSize: '0.58rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.6, margin: 0 }}>
-                    {day.short}
-                  </p>
-                  <p style={{ fontSize: '1rem', color: '#F3EDE6', margin: '0.1rem 0 0', fontFamily: 'TokyoDreams, serif' }}>
-                    {day.date}
-                  </p>
+          {untimed.length > 0 && (
+            <div style={{ marginTop: '1.1rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+              {untimed.map(ev => (
+                <div key={ev.id} style={{ padding: '0.42rem 0.8rem', border: '1px solid rgba(200,168,72,0.28)', borderRadius: '7px', background: 'rgba(200,168,72,0.06)' }}>
+                  <span style={{ fontSize: '0.78rem', color: GOLD, opacity: 0.8 }}>{ev.day} · {ev.title}</span>
                 </div>
+              ))}
+            </div>
+          )}
 
-                <div style={{
-                  position: 'relative',
-                  height: TOTAL_HEIGHT,
-                  border: '1px solid rgba(200,168,72,0.12)',
-                  borderRadius: '0 0 0.5rem 0.5rem',
-                  background: 'rgba(255,255,255,0.01)',
-                }}>
-                  {HOUR_LABELS.map(({ hour, label }) => (
-                    <div key={hour} style={{
-                      position: 'absolute',
-                      top: (hour - START_HOUR) * PX_PER_HOUR,
-                      left: 0, right: 0,
-                      borderTop: `1px solid rgba(200,168,72,${label === 'Midnight' || label === 'Noon' ? '0.15' : '0.06'})`,
-                    }} />
-                  ))}
-
-                  {dayEvents.map(ev => {
-                    const { start, end } = parseEventTimes(ev.time)
-                    if (start === null) return null
-                    const top = ((start / 60) - START_HOUR) * PX_PER_HOUR
-                    const height = end
-                      ? Math.max((Math.min(end / 60, END_HOUR) - Math.max(start / 60, START_HOUR)) * PX_PER_HOUR, 28)
-                      : Math.max(PX_PER_HOUR * 0.75, 32)
-                    return <EventBlock key={ev.id} event={ev} style={{ top, height }} />
-                  })}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      {untimed.length > 0 && (
-        <div style={{ marginTop: '1.25rem' }}>
-          <p style={{ fontSize: '0.62rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.45, marginBottom: '0.6rem' }}>
-            No fixed time
-          </p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-            {untimed.map(ev => (
-              <div key={ev.id} style={{ padding: '0.35rem 0.75rem', border: `1px solid ${ev.isPersonal ? 'rgba(210,57,248,0.35)' : 'rgba(200,168,72,0.15)'}`, borderRadius: '0.5rem', background: 'rgba(255,255,255,0.02)' }}>
-                <p style={{ fontSize: '0.78rem', color: '#F3EDE6', margin: 0 }}>{ev.day} · {ev.title}</p>
-              </div>
-            ))}
+          {/* Footer */}
+          <div style={{ padding: '1rem 0 1.15rem', marginTop: '1rem', borderTop: '1px solid rgba(200,168,72,0.13)' }}>
+            <a href="/#schedule" style={{ fontSize: '0.78rem', color: '#E37AE9', opacity: 0.92, textDecoration: 'none', letterSpacing: '0.03em', fontWeight: 700, textShadow: '0 0 14px rgba(227,122,233,0.28)' }}>
+              View full calendar →
+            </a>
           </div>
         </div>
       )}
