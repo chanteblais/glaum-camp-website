@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { ApplicationRow } from './ApplicationRow'
 import { CollapsibleSection } from './CollapsibleSection'
-import { OverviewSection } from './OverviewSection'
 import { VolunteersSection } from './VolunteersSection'
 import { NotificationsSection } from './NotificationsSection'
 import { NotificationBell } from './NotificationBell'
@@ -136,13 +135,6 @@ export default async function AdminPage() {
           />
         </CollapsibleSection>
 
-        {/* ── OVERVIEW ── */}
-        <CollapsibleSection
-          title="Overview"
-          summary={`${approved.length + pending.length} active`}
-        >
-          <OverviewSection applications={all} />
-        </CollapsibleSection>
 
 {/* ── ROLE REQUESTS ── */}
         <CollapsibleSection
