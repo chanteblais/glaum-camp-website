@@ -159,36 +159,24 @@ function CurrentSignupCards({
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '2.5rem' }}>
 
-      {/* Role card — expandable */}
-      <div style={{
-        border: '1px solid rgba(200,168,72,0.15)', borderRadius: '0.75rem',
-        background: 'rgba(255,255,255,0.02)', overflow: 'hidden',
-      }}>
+      {/* Role card — plain, since the badge now lives in the profile header */}
+      <div style={{ border: '1px solid rgba(200,168,72,0.15)', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.02)', overflow: 'hidden' }}>
         <button
           onClick={() => role && setRoleExpanded(o => !o)}
-          style={{
-            width: '100%', textAlign: 'left', padding: '1rem 1.25rem',
-            background: 'none', border: 'none', cursor: role ? 'pointer' : 'default', display: 'block',
-          }}
+          style={{ width: '100%', textAlign: 'left', padding: '1rem 1.25rem', background: 'none', border: 'none', cursor: role ? 'pointer' : 'default', display: 'block' }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <p style={{ fontSize: '0.68rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.85, margin: '0 0 0.4rem' }}>
               Your Role
             </p>
-            {role && (
-              <span style={{ fontSize: '0.6rem', color: '#C8A848', opacity: 0.4 }}>{roleExpanded ? '▲' : '▼'}</span>
-            )}
+            {role && <span style={{ fontSize: '0.6rem', color: '#C8A848', opacity: 0.4 }}>{roleExpanded ? '▲' : '▼'}</span>}
           </div>
           {role ? (
             <>
-              {dept && (
-                <p style={{ fontSize: '0.72rem', color: '#C8A848', opacity: 0.75, margin: '0 0 0.2rem', letterSpacing: '0.05em' }}>
-                  {dept.icon && `${dept.icon} `}{dept.name}
-                </p>
-              )}
+              {dept && <p style={{ fontSize: '0.72rem', color: '#C8A848', opacity: 0.75, margin: '0 0 0.2rem', letterSpacing: '0.05em' }}>{dept.icon && `${dept.icon} `}{dept.name}</p>}
               <p style={{ fontSize: '0.92rem', color: '#F3EDE6', margin: 0 }}>{role.name}</p>
-              {role.description && (
-                <p style={{ fontSize: '0.77rem', opacity: 0.45, margin: '0.25rem 0 0', lineHeight: 1.5 }}>{role.description}</p>
+              {(role.commitment || role.commitment_period) && (
+                <div style={{ marginTop: '0.4rem' }}><CommitmentPill commitment={role.commitment} period={role.commitment_period} /></div>
               )}
             </>
           ) : (
@@ -196,61 +184,18 @@ function CurrentSignupCards({
           )}
         </button>
 
-        {/* Expanded detail + opt-out */}
         {role && roleExpanded && (
           <div style={{ borderTop: '1px solid rgba(200,168,72,0.1)' }}>
-            {(role.commitment || role.commitment_period) && (
-              <div style={{ padding: '0.5rem 1.25rem 0' }}>
-                <CommitmentPill commitment={role.commitment} period={role.commitment_period} />
-              </div>
-            )}
             {hasRoleDetail && (
               <div style={{ padding: '0.85rem 1.25rem' }}>
-                {role.purpose && (
-                  <div style={{ marginBottom: '0.75rem' }}>
-                    <p style={{ fontSize: '0.63rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.5, marginBottom: '0.3rem' }}>Purpose</p>
-                    <p style={{ fontSize: '0.8rem', lineHeight: 1.65, opacity: 0.7, margin: 0 }}>{role.purpose}</p>
-                  </div>
-                )}
-                {role.responsibilities_before && (
-                  <div style={{ marginBottom: '0.75rem' }}>
-                    <p style={{ fontSize: '0.63rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.5, marginBottom: '0.3rem' }}>Before Event</p>
-                    <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
-                      {role.responsibilities_before.split('\n').filter(Boolean).map((l, i) => (
-                        <li key={i} style={{ fontSize: '0.8rem', lineHeight: 1.65, opacity: 0.7 }}>{l}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {role.responsibilities_during && (
-                  <div style={{ marginBottom: '0.75rem' }}>
-                    <p style={{ fontSize: '0.63rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.5, marginBottom: '0.3rem' }}>During Event</p>
-                    <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
-                      {role.responsibilities_during.split('\n').filter(Boolean).map((l, i) => (
-                        <li key={i} style={{ fontSize: '0.8rem', lineHeight: 1.65, opacity: 0.7 }}>{l}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {role.ideal_for && (
-                  <div>
-                    <p style={{ fontSize: '0.63rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.5, marginBottom: '0.3rem' }}>Ideal For</p>
-                    <p style={{ fontSize: '0.8rem', lineHeight: 1.65, opacity: 0.7, fontStyle: 'italic', margin: 0 }}>{role.ideal_for}</p>
-                  </div>
-                )}
+                {role.purpose && <div style={{ marginBottom: '0.75rem' }}><p style={{ fontSize: '0.63rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.5, marginBottom: '0.3rem' }}>Purpose</p><p style={{ fontSize: '0.8rem', lineHeight: 1.65, opacity: 0.7, margin: 0 }}>{role.purpose}</p></div>}
+                {role.responsibilities_before && <div style={{ marginBottom: '0.75rem' }}><p style={{ fontSize: '0.63rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.5, marginBottom: '0.3rem' }}>Before Event</p><ul style={{ margin: 0, paddingLeft: '1.1rem' }}>{role.responsibilities_before.split('\n').filter(Boolean).map((l, i) => <li key={i} style={{ fontSize: '0.8rem', lineHeight: 1.65, opacity: 0.7 }}>{l}</li>)}</ul></div>}
+                {role.responsibilities_during && <div style={{ marginBottom: '0.75rem' }}><p style={{ fontSize: '0.63rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.5, marginBottom: '0.3rem' }}>During Event</p><ul style={{ margin: 0, paddingLeft: '1.1rem' }}>{role.responsibilities_during.split('\n').filter(Boolean).map((l, i) => <li key={i} style={{ fontSize: '0.8rem', lineHeight: 1.65, opacity: 0.7 }}>{l}</li>)}</ul></div>}
+                {role.ideal_for && <div><p style={{ fontSize: '0.63rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.5, marginBottom: '0.3rem' }}>Ideal For</p><p style={{ fontSize: '0.8rem', lineHeight: 1.65, opacity: 0.7, fontStyle: 'italic', margin: 0 }}>{role.ideal_for}</p></div>}
               </div>
             )}
             <div style={{ padding: '0.75rem 1.25rem', borderTop: hasRoleDetail ? '1px solid rgba(200,168,72,0.08)' : undefined }}>
-              <button
-                onClick={handleOptOut}
-                disabled={optingOut}
-                style={{
-                  background: 'none', border: '1px solid rgba(255,80,80,0.25)', borderRadius: '9999px',
-                  color: '#ff8a8a', cursor: 'pointer', padding: '0.35rem 0.85rem',
-                  fontSize: '0.75rem', opacity: optingOut ? 0.4 : 0.75,
-                  transition: 'opacity 0.15s',
-                }}
-              >
+              <button onClick={handleOptOut} disabled={optingOut} style={{ background: 'none', border: '1px solid rgba(255,80,80,0.25)', borderRadius: '9999px', color: '#ff8a8a', cursor: 'pointer', padding: '0.35rem 0.85rem', fontSize: '0.75rem', opacity: optingOut ? 0.4 : 0.75 }}>
                 {optingOut ? 'Removing…' : 'Opt out of this role'}
               </button>
             </div>
