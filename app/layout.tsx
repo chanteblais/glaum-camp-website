@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Libre_Baskerville } from 'next/font/google'
+import { Libre_Baskerville, Marcellus, Cormorant_Garamond } from 'next/font/google'
 import { ClerkProvider } from '@clerk/nextjs'
 import { headers } from 'next/headers'
 import { clerkFallbackHome, resolveSiteOrigin } from '@/lib/site-origin'
@@ -9,6 +9,18 @@ const libreBaskerville = Libre_Baskerville({
   subsets: ['latin'],
   weight: ['400', '700'],
   variable: '--font-libre-baskerville',
+})
+
+const marcellus = Marcellus({
+  subsets: ['latin'],
+  weight: ['400'],
+  variable: '--font-marcellus',
+})
+
+const cormorantGaramond = Cormorant_Garamond({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700'],
+  variable: '--font-cormorant-garamond',
 })
 
 export const metadata: Metadata = {
@@ -39,7 +51,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     >
       <html lang="en">
         <body
-          className={libreBaskerville.variable}
+          className={`${libreBaskerville.variable} ${marcellus.variable} ${cormorantGaramond.variable}`}
           style={{ fontFamily: 'var(--font-libre-baskerville), Georgia, serif' }}
         >
           <div className="site-shell">{children}</div>

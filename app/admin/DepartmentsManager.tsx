@@ -368,7 +368,11 @@ function DeptRow({
       {/* Department header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.9rem 1rem', cursor: 'grab', background: 'rgba(200,168,72,0.06)', borderBottom: open ? '1px solid rgba(200,168,72,0.12)' : 'none' }}>
         <span style={{ color: '#C8A848', opacity: 0.25, fontSize: '1rem', userSelect: 'none', flexShrink: 0 }}>⠿</span>
-        {dept.icon && <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>{dept.icon}</span>}
+        {dept.icon && (
+          dept.icon.startsWith('/')
+            ? <img src={dept.icon} alt="" aria-hidden style={{ width: '1.4rem', height: '1.4rem', objectFit: 'contain', flexShrink: 0 }} />
+            : <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>{dept.icon}</span>
+        )}
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ fontSize: '0.92rem', color: '#F3EDE6', margin: 0, fontWeight: 600 }}>{dept.name}</p>
           {dept.description && (

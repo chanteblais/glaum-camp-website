@@ -24,7 +24,7 @@ const DAY_META: { label: string; short: string; month: string; date: number }[] 
   { label: 'Monday',    short: 'MON', month: 'JULY', date: 28 },
 ]
 
-const PX_PER_HOUR = 56
+const PX_PER_HOUR = 40
 const GOLD = '#C8A848'
 const CREAM = '#F3EAE5'
 const MAGENTA = '#B650C8'
@@ -52,59 +52,24 @@ function parseEventTimes(timeStr: string | null) {
 type EventColors = { border: string; bg: string; time: string; title: string; subtitle: string; label?: string }
 
 function eventColors(ev: PersonalEvent): EventColors {
-  if (ev.isPersonal && ev.event_type !== 'all_hands') {
-    return {
-      border: '#9A36A8',
-      bg: 'linear-gradient(145deg, rgba(81,12,102,0.94), rgba(43,5,68,0.96))',
-      time: '#D889E0',
-      title: CREAM,
-      subtitle: '#D7A6D8',
-      label: 'Your Shift',
-    }
-  }
+  const label = ev.isPersonal && ev.event_type !== 'all_hands' ? 'Your Shift' : undefined
   if (ev.event_type === 'all_hands') {
-    return {
-      border: '#5FA58E',
-      bg: 'linear-gradient(145deg, rgba(13,50,72,0.9), rgba(11,27,50,0.92))',
-      time: '#76C7B2',
-      title: CREAM,
-      subtitle: '#AD759A',
-    }
+    return { border: '#5FA58E', bg: 'linear-gradient(145deg, rgba(13,50,72,0.9), rgba(11,27,50,0.92))', time: '#76C7B2', title: CREAM, subtitle: '#AD759A', label }
   }
   if (ev.event_type === 'camp_tending') {
-    return {
-      border: '#B68018',
-      bg: 'linear-gradient(145deg, rgba(36,15,43,0.92), rgba(18,5,30,0.94))',
-      time: '#D19B30',
-      title: GOLD,
-      subtitle: CREAM,
-    }
+    return { border: '#B68018', bg: 'linear-gradient(145deg, rgba(36,15,43,0.92), rgba(18,5,30,0.94))', time: '#D19B30', title: GOLD, subtitle: CREAM, label }
   }
-
   if (ev.event_type === 'service') {
-    return {
-      border: 'rgba(182,80,200,0.85)',
-      bg: 'linear-gradient(145deg, rgba(86,13,94,0.86), rgba(42,4,64,0.94))',
-      time: '#D889E0',
-      title: CREAM,
-      subtitle: '#D7A6D8',
-    }
+    return { border: 'rgba(182,80,200,0.85)', bg: 'linear-gradient(145deg, rgba(86,13,94,0.86), rgba(42,4,64,0.94))', time: '#D889E0', title: CREAM, subtitle: '#D7A6D8', label }
   }
-  // contribution / default — inherits shift palette
-  return {
-    border: '#8F329D',
-    bg: 'linear-gradient(145deg, rgba(59,7,78,0.9), rgba(32,4,52,0.96))',
-    time: '#C86BD0',
-    title: CREAM,
-    subtitle: '#C49AC1',
-  }
+  // contribution / default
+  return { border: '#8F329D', bg: 'linear-gradient(145deg, rgba(59,7,78,0.9), rgba(32,4,52,0.96))', time: '#C86BD0', title: CREAM, subtitle: '#C49AC1', label }
 }
 
 function EventCard({ event, top, height }: { event: PersonalEvent; top: number; height: number }) {
   const c = eventColors(event)
   const tall = height >= 66
   const isPersonalShift = event.isPersonal && event.event_type !== 'all_hands'
-  const isDinner = event.event_type === 'camp_tending'
 
   return (
     <div style={{
@@ -113,7 +78,7 @@ function EventCard({ event, top, height }: { event: PersonalEvent; top: number; 
       borderRadius: '8px',
       border: `1.5px solid ${c.border}`,
       background: c.bg,
-      padding: tall ? '14px 12px' : '8px 10px',
+      padding: tall ? '18px 12px' : '10px 10px',
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start',
       overflow: 'hidden',
       boxShadow: isPersonalShift
@@ -121,20 +86,20 @@ function EventCard({ event, top, height }: { event: PersonalEvent; top: number; 
         : `inset 0 0 20px rgba(0,0,0,0.22), 0 0 10px rgba(0,0,0,0.12)`,
     }}>
       {event.time && (
-        <p style={{ fontSize: '0.68rem', color: c.time, margin: `0 0 ${tall ? 7 : 3}px`, letterSpacing: '0.02em', lineHeight: 1.1, fontWeight: 600, textAlign: 'center', textShadow: '0 1px 0 rgba(0,0,0,0.45)' }}>
+        <p style={{ fontSize: '0.58rem', color: c.time, margin: `0 0 ${tall ? 9 : 4}px`, letterSpacing: '0.02em', lineHeight: 1.1, fontWeight: 600, textAlign: 'center', textShadow: '0 1px 0 rgba(0,0,0,0.45)' }}>
           {event.time}
         </p>
       )}
-      <p style={{ fontSize: tall ? '0.88rem' : '0.72rem', fontWeight: 700, color: c.title, margin: 0, lineHeight: 1.2, wordBreak: 'break-word', textAlign: 'center', textShadow: '0 1px 0 rgba(0,0,0,0.75)' }}>
-        {isDinner ? '☕ ' : ''}{event.title}
+      <p style={{ fontSize: tall ? '0.82rem' : '0.68rem', fontWeight: 700, color: c.title, margin: 0, lineHeight: 1.2, wordBreak: 'break-word', textAlign: 'center', textShadow: '0 1px 0 rgba(0,0,0,0.75)' }}>
+        {event.title}
       </p>
       {event.subtitle && tall && (
-        <p style={{ fontSize: '0.72rem', color: c.subtitle, margin: '8px 0 0', lineHeight: 1.3, fontWeight: 500, textAlign: 'center', textShadow: '0 1px 0 rgba(0,0,0,0.5)' }}>
+        <p style={{ fontSize: '0.6rem', color: c.subtitle, margin: '11px 0 0', lineHeight: 1.3, fontWeight: 500, textAlign: 'center', textShadow: '0 1px 0 rgba(0,0,0,0.5)' }}>
           {event.subtitle}
         </p>
       )}
       {c.label && tall && (
-        <p style={{ fontSize: '0.68rem', color: c.subtitle, margin: '10px 0 0', letterSpacing: '0.02em', opacity: 0.98, textAlign: 'center', fontWeight: 600, textShadow: '0 1px 0 rgba(0,0,0,0.45)' }}>
+        <p style={{ fontSize: '0.58rem', color: c.subtitle, margin: '13px 0 0', letterSpacing: '0.02em', opacity: 0.98, textAlign: 'center', fontWeight: 600, textShadow: '0 1px 0 rgba(0,0,0,0.45)' }}>
           {c.label}
         </p>
       )}
@@ -195,16 +160,15 @@ export function PersonalScheduleCalendar({ events }: { events: PersonalEvent[] }
         onClick={() => setCollapsed(o => !o)}
         style={{
           width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '1.45rem 2rem 1.25rem',
+          padding: '0.75rem 2rem 0.65rem',
           background: 'none', border: 'none', borderBottom: collapsed ? 'none' : '1px solid rgba(200,168,72,0.24)',
           cursor: 'pointer', color: 'inherit',
         }}
       >
-        {/* Empty spacer to balance the toggle button */}
-        <span style={{ width: '1.25rem', flexShrink: 0, color: GOLD, opacity: 0.95, fontSize: '1.05rem' }}>▣</span>
+        <span style={{ width: '1.25rem', flexShrink: 0 }} />
 
         <div style={{ flex: 1, textAlign: 'center' }}>
-          <span style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.45rem', color: GOLD, letterSpacing: '0.16em', textShadow: '0 1px 0 rgba(0,0,0,0.75), 0 0 18px rgba(200,168,72,0.28)' }}>
+          <span style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.9rem', color: GOLD, letterSpacing: '0.16em', textShadow: '0 1px 0 rgba(0,0,0,0.75), 0 0 18px rgba(200,168,72,0.28)' }}>
             Your Schedule
           </span>
         </div>
@@ -230,7 +194,7 @@ export function PersonalScheduleCalendar({ events }: { events: PersonalEvent[] }
           <div id={calendarId} className="schedule-scroll">
             <div className="schedule-grid" style={{ display: 'flex', gap: '0' }}>
               {/* Time axis */}
-              <div style={{ width: '46px', flexShrink: 0, position: 'relative', height: TOTAL_HEIGHT, marginTop: '58px', borderRight: '1px solid rgba(200,168,72,0.14)' }}>
+              <div style={{ width: '46px', flexShrink: 0, position: 'relative', height: TOTAL_HEIGHT, marginTop: '44px', borderRight: '1px solid rgba(200,168,72,0.14)' }}>
                 {hourLabels.map(({ hour, label }) => (
                   <div key={hour} style={{
                     position: 'absolute',
@@ -260,17 +224,18 @@ export function PersonalScheduleCalendar({ events }: { events: PersonalEvent[] }
                     <div key={day.label}>
                       {/* Day header */}
                       <div style={{
-                        height: '58px', textAlign: 'center',
+                        height: '44px', textAlign: 'center',
                         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                        paddingBottom: '6px',
                         borderRadius: 0,
                         background: 'transparent',
                         borderLeft: '1px solid rgba(200,168,72,0.16)',
                         borderBottom: `1px solid ${GRID_LINE}`,
                       }}>
-                        <span style={{ fontSize: '0.62rem', letterSpacing: '0.11em', color: GOLD, opacity: 0.94, fontWeight: 700, textShadow: '0 1px 0 rgba(0,0,0,0.7)' }}>
+                        <span style={{ fontSize: '0.8rem', letterSpacing: '0.11em', color: GOLD, opacity: 0.94, fontWeight: 700, textShadow: '0 1px 0 rgba(0,0,0,0.7)' }}>
                           {day.short}
                         </span>
-                        <span style={{ fontSize: '0.58rem', letterSpacing: '0.05em', color: GOLD, opacity: 0.78, marginTop: '2px', fontWeight: 500, textShadow: '0 1px 0 rgba(0,0,0,0.7)' }}>
+                        <span style={{ fontSize: '0.72rem', letterSpacing: '0.05em', color: GOLD, opacity: 0.78, marginTop: '1px', fontWeight: 500, textShadow: '0 1px 0 rgba(0,0,0,0.7)' }}>
                           {day.month} {day.date}
                         </span>
                       </div>

@@ -63,7 +63,7 @@ export async function PersonalSchedule({ userId, contributions }: Props) {
   if (events.length === 0) return null
 
   return (
-    <div style={{ marginBottom: '2.5rem', marginLeft: '-7rem', marginRight: '-7rem' }}>
+    <div style={{ marginBottom: '2.5rem' }}>
       <PersonalScheduleCalendar events={events} />
     </div>
   )
