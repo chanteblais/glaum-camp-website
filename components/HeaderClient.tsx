@@ -218,6 +218,7 @@ export function HeaderClient() {
           )}
           {[
             { href: '/profile', label: 'My Profile' },
+            { href: '/members', label: 'Many Hands' },
             ...(isAdmin ? [{ href: '/admin', label: 'Admin' }] : []),
           ].map(({ href, label }) => (
             <Link
@@ -354,7 +355,7 @@ export function HeaderClient() {
         {/* Desktop nav */}
         {!isMobile && (
           <nav style={{ display: 'flex', gap: '2rem', flex: 1, justifyContent: 'center' }}>
-            {navLinks.map((link) => (
+            {[...navLinks, ...(signedIn ? [{ href: '/members', label: 'Many Hands' }] : [])].map((link) => (
               <a
                 key={link.href}
                 href={link.href}
@@ -416,7 +417,7 @@ export function HeaderClient() {
             </div>
           )}
 
-          {navLinks.map((link) => (
+          {[...navLinks, ...(signedIn ? [{ href: '/members', label: 'Many Hands' }] : [])].map((link) => (
             <a key={link.href} href={link.href} onClick={() => setMenuOpen(false)} style={mobileMenuLink}>
               {link.label}
             </a>
@@ -426,6 +427,9 @@ export function HeaderClient() {
             <>
               <Link href="/profile" onClick={() => setMenuOpen(false)} style={{ ...mobileMenuLink, color: '#C8A848' }}>
                 My Profile
+              </Link>
+              <Link href="/members" onClick={() => setMenuOpen(false)} style={{ ...mobileMenuLink, color: '#C8A848', opacity: 0.8 }}>
+                Many Hands
               </Link>
               {isAdmin && (
                 <Link href="/admin" onClick={() => setMenuOpen(false)} style={{ ...mobileMenuLink, color: '#C8A848', opacity: 0.7 }}>

@@ -345,6 +345,16 @@ export default async function ProfilePage() {
                 Location details, logistics, and camp-specific information will appear here closer to the event. Keep an eye on your email.
               </p>
             </div>
+
+            <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.2), transparent)', margin: '2.5rem 0' }} />
+
+            <a href="/members" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem 1.5rem', border: '1px solid rgba(200,168,72,0.18)', borderRadius: '1rem', background: 'rgba(200,168,72,0.03)', textDecoration: 'none' }}>
+              <div>
+                <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.1rem', color: '#C8A848', margin: '0 0 0.2rem' }}>Many Hands</p>
+                <p style={{ fontSize: '0.8rem', opacity: 0.45, margin: 0 }}>View your fellow camp members</p>
+              </div>
+              <span style={{ fontSize: '1rem', color: '#C8A848', opacity: 0.4 }}>→</span>
+            </a>
           </>
         )}
 
