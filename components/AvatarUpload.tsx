@@ -60,6 +60,7 @@ export function AvatarUpload({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
       <button
+        id="avatar-upload"
         type="button"
         onClick={() => inputRef.current?.click()}
         disabled={uploading}

@@ -1,7 +1,10 @@
+'use client'
+
 type AttunementTask = {
   id: string
   label: string
   done: boolean
+  section?: 'photo' | 'contribution'
 }
 
 type Props = {
@@ -114,7 +117,17 @@ export function AttunementStatus({ tasks }: Props) {
         {/* Task list */}
         <div style={{ padding: '0.6rem 1.75rem 0.7rem', position: 'relative', zIndex: 1 }}>
           {tasks.map(task => (
-            <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: '0.72rem', padding: '0.65rem 0' }}>
+            <div
+            key={task.id}
+            onClick={() => {
+              if (!task.done && task.section) {
+                window.dispatchEvent(new CustomEvent('glaum:open-settings', { detail: { section: task.section } }))
+              }
+            }}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.72rem', padding: '0.65rem 0.5rem', cursor: !task.done && task.section ? 'pointer' : 'default', borderRadius: '0.4rem', transition: 'background 0.15s', background: 'transparent' }}
+            onMouseEnter={e => { if (!task.done && task.section) e.currentTarget.style.background = 'rgba(122,85,32,0.1)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+          >
               <div style={{
                 width: '1.4rem', height: '1.4rem', borderRadius: '50%', flexShrink: 0,
                 border: task.done ? 'none' : '1.25px solid rgba(100,70,25,0.72)',
@@ -137,8 +150,12 @@ export function AttunementStatus({ tasks }: Props) {
                 fontWeight: task.done ? 600 : 500,
                 letterSpacing: '0.01em',
                 textShadow: '0 1px 0 rgba(255,255,255,0.42)',
+                flex: 1,
               }}>
                 {task.label}
+                {!task.done && task.section && (
+                  <span style={{ fontSize: '0.78rem', color: '#9B6A2A', marginLeft: '0.5rem', fontStyle: 'italic' }}>tap to fix →</span>
+                )}
               </span>
             </div>
           ))}
@@ -149,27 +166,29 @@ export function AttunementStatus({ tasks }: Props) {
         </div>
 
         {/* Status footer */}
-        <div style={{ padding: '0.72rem 1.45rem 1.25rem', display: 'flex', gap: '0.78rem', alignItems: 'center', position: 'relative', zIndex: 1 }}>
+        <div style={{ padding: '0.72rem 1.45rem 1.25rem', display: 'flex', gap: '1rem', alignItems: 'flex-start', position: 'relative', zIndex: 1 }}>
           <img
             src="/handicon.png"
             alt=""
             aria-hidden
-            style={{ width: '48px', height: '48px', objectFit: 'contain', opacity: 0.78, filter: 'sepia(0.82) saturate(1.35) brightness(0.76)' }}
+            style={{ width: '52px', height: '52px', flexShrink: 0, objectFit: 'contain', opacity: 0.78, filter: 'sepia(0.82) saturate(1.35) brightness(0.76)' }}
           />
-          <div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             {allDone ? (
               <>
-                <p style={{ fontSize: '1rem', fontWeight: 700, letterSpacing: '0.08em', color: '#7A4E0E', margin: '0 0 0.2rem', textTransform: 'uppercase', fontFamily: 'var(--font-cormorant-garamond), serif', textShadow: '0 0 12px rgba(180,120,30,0.5), 0 1px 0 rgba(255,255,255,0.3)' }}>
+                <p style={{ fontSize: '1.2rem', fontWeight: 700, letterSpacing: '0.08em', color: '#7A4E0E', margin: '0 0 0.2rem', textTransform: 'uppercase', fontFamily: 'var(--font-cormorant-garamond), serif', textShadow: '0 0 12px rgba(180,120,30,0.5), 0 1px 0 rgba(255,255,255,0.3)' }}>
                   Fully Attuned
                 </p>
-                <p style={{ fontSize: '0.95rem', color: '#5C3D1A', margin: 0, fontFamily: 'var(--font-cormorant-garamond), serif', lineHeight: 1.4 }}>All preparations complete.</p>
+                <p style={{ fontSize: '1.05rem', color: '#5C3D1A', margin: 0, fontFamily: 'var(--font-cormorant-garamond), serif', lineHeight: 1.4 }}>All preparations complete.</p>
               </>
             ) : (
               <>
-                <p style={{ fontSize: '0.68rem', fontWeight: 700, color: '#8B2DB8', margin: '0 0 0.16rem', fontFamily: 'var(--font-cormorant-garamond), serif', textShadow: '0 1px 0 rgba(255,255,255,0.35)' }}>
+                <p style={{ fontSize: '1.2rem', fontWeight: 700, letterSpacing: '0.08em', color: '#7A4E0E', margin: '0 0 0.2rem', textTransform: 'uppercase', fontFamily: 'var(--font-cormorant-garamond), serif', textShadow: '0 0 12px rgba(180,120,30,0.5), 0 1px 0 rgba(255,255,255,0.3)' }}>
+                  Status: {statusLabel}
+                </p>
+                <p style={{ fontSize: '1.05rem', fontWeight: 700, color: '#250838', margin: 0, fontFamily: 'var(--font-cormorant-garamond), serif', lineHeight: 1.4, textShadow: '0 0 8px rgba(150,40,220,0.4), 0 0 18px rgba(150,40,220,0.2), 0 1px 0 rgba(255,255,255,0.35)' }}>
                   {remaining} item{remaining !== 1 ? 's' : ''} require{remaining === 1 ? 's' : ''} attention
                 </p>
-                <p style={{ fontSize: '12px', color: '#2F1F12', margin: 0, fontFamily: 'var(--font-cormorant-garamond), serif', lineHeight: 1.2 }}><strong>Status:</strong> {statusLabel}</p>
               </>
             )}
           </div>

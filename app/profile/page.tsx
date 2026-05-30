@@ -270,9 +270,6 @@ export default async function ProfilePage() {
 
         {application && application.status === 'approved' && (
           <>
-            {!(contributions.length > 0 && !!campSignup?.role_id && campSignup?.role_approval_status !== 'pending' && !!campSignup?.schedule_event_id && !!(application?.avatar_url)) && (
-              <TaskStatus track="approved" campSignup={campSignup} contributions={contributions} />
-            )}
 
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.25rem', alignItems: 'start', marginBottom: '2.5rem' }}>
               <CommitmentsSection
@@ -285,8 +282,8 @@ export default async function ProfilePage() {
               <div>
                 <AttunementStatus tasks={[
                   { id: 'approved',      label: 'Application Approved',  done: true },
-                  { id: 'photo',         label: 'Photo Uploaded',         done: !!(application?.avatar_url) },
-                  { id: 'contribution',  label: 'Contribution Selected',  done: contributions.length > 0 },
+                  { id: 'photo',         label: 'Photo Uploaded',         done: !!(application?.avatar_url),  section: 'photo' as const },
+                  { id: 'contribution',  label: 'Contribution Selected',  done: contributions.length > 0,     section: 'contribution' as const },
                   { id: 'role',          label: 'Role Selected',          done: !!campSignup?.role_id && campSignup?.role_approval_status !== 'pending' },
                   { id: 'shift',         label: 'Shift Assigned',         done: !!campSignup?.schedule_event_id },
                 ]} />

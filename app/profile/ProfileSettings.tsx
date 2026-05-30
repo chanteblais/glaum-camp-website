@@ -117,6 +117,30 @@ export function ProfileSettings({ application }: { application: ApplicationData 
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [view])
 
+  useEffect(() => {
+    function handleOpenSettings(e: Event) {
+      const section = (e as CustomEvent).detail?.section as 'photo' | 'contribution' | undefined
+      if (section === 'photo') {
+        // Photo is the avatar on the page — just scroll to it
+        document.getElementById('avatar-upload')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        document.getElementById('avatar-upload')?.click()
+        return
+      }
+      setMenuOpen(false)
+      setView('edit')
+      setError(null)
+      setSuccess(null)
+      if (section) {
+        setTimeout(() => {
+          const el = document.getElementById(`settings-field-${section}`)
+          el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }, 100)
+      }
+    }
+    window.addEventListener('glaum:open-settings', handleOpenSettings)
+    return () => window.removeEventListener('glaum:open-settings', handleOpenSettings)
+  }, [])
+
   const closeAll = () => {
     setMenuOpen(false)
     setView(null)
@@ -394,7 +418,7 @@ export function ProfileSettings({ application }: { application: ApplicationData 
           </Field>
 
           <Field label="Contributions">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+            <div id="settings-field-contribution" style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
               {SETUP_PREFERENCE_OPTIONS.map((option) => (
                 <label
                   key={option}
