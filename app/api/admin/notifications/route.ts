@@ -31,6 +31,7 @@ export async function GET() {
   return NextResponse.json({ notifications: data ?? [] })
 }
 
+// Mark all unread as read
 export async function PATCH() {
   if (!(await requireAdmin())) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -41,6 +42,24 @@ export async function PATCH() {
     .from('admin_notifications')
     .update({ read_at: now })
     .is('read_at', null)
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  return NextResponse.json({ success: true })
+}
+
+// Clear all notifications
+export async function DELETE() {
+  if (!(await requireAdmin())) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const { error } = await supabaseAdmin
+    .from('admin_notifications')
+    .delete()
+    .neq('id', '00000000-0000-0000-0000-000000000000') // delete all rows
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })

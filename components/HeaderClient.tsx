@@ -106,6 +106,13 @@ export function HeaderClient() {
             if (data?.isSignedIn) {
               window.localStorage.setItem(AUTH_MEMORY_KEY, 'true')
               setHasRememberedAuth(true)
+            } else {
+              window.localStorage.removeItem(AUTH_MEMORY_KEY)
+              window.localStorage.removeItem(AUTH_NAME_KEY)
+              window.localStorage.removeItem(AUTH_EMAIL_KEY)
+              setHasRememberedAuth(false)
+              setRememberedFirstName(null)
+              setRememberedEmail(null)
             }
             return
           }
