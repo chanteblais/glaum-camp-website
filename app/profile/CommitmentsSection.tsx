@@ -33,8 +33,8 @@ const TAG_STYLES: Record<string, { color: string; border: string; bg: string }> 
 function CircleIcon({ children }: { children: React.ReactNode }) {
   return (
     <div style={{
-      width: '52px', height: '52px', borderRadius: '50%', flexShrink: 0,
-      border: '1.5px solid rgba(200,168,72,0.4)',
+      width: '74px', height: '74px', borderRadius: '50%', flexShrink: 0,
+      border: '1.5px solid #C07C26',
       background: 'radial-gradient(circle at 42% 38%, rgba(200,168,72,0.14), rgba(8,0,18,0.85))',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
@@ -63,14 +63,14 @@ function Row({ circleContent, title, description, tag }: {
   tag: string
 }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.85rem 0' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', padding: '1.1rem 0' }}>
       <CircleIcon>{circleContent}</CircleIcon>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: '0.82rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#F3EDE6', margin: '0 0 0.2rem' }}>
+      <div style={{ flex: 1, minWidth: 0, paddingRight: '5rem' }}>
+        <p style={{ fontSize: '0.95rem', fontWeight: 400, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#EDE0C8', margin: '0 0 0.2rem', lineHeight: 1.9 }}>
           {title}
         </p>
         {description && (
-          <p style={{ fontSize: '0.8rem', opacity: 0.55, lineHeight: 1.5, margin: 0 }}>{description}</p>
+          <p style={{ fontSize: '0.78rem', color: '#B0947A', lineHeight: 2.1, margin: 0, whiteSpace: 'pre-line' }}>{description}</p>
         )}
       </div>
       <Tag label={tag} />
@@ -85,29 +85,30 @@ export function CommitmentsSection({ contributions, role, dept, shift, roleAppro
   const isPending = roleApprovalStatus === 'pending'
 
   return (
-    <div style={{ marginBottom: '2.5rem', border: '1.5px solid rgba(200,168,72,0.7)', borderRadius: '1rem', background: 'rgba(10,0,20,0.6)', overflow: 'hidden', boxShadow: '0 0 0 1px rgba(200,168,72,0.12), 0 0 24px rgba(200,168,72,0.08)' }}>
+    <div style={{ border: '1.5px solid rgba(200,168,72,0.7)', borderRadius: '1rem', background: 'rgba(10,0,20,0.6)', overflow: 'hidden', boxShadow: '0 0 0 1px rgba(200,168,72,0.12), 0 0 24px rgba(200,168,72,0.08)' }}>
       {/* Header */}
-      <div style={{ padding: '1.1rem 1.5rem 1rem', borderBottom: '1px solid rgba(200,168,72,0.3)', textAlign: 'center' }}>
-        <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.3rem', color: '#C8A848', margin: 0, letterSpacing: '0.1em', textShadow: '0 0 20px rgba(200,168,72,0.4)' }}>
+      <div style={{ padding: '1.1rem 1.5rem 1rem', textAlign: 'center' }}>
+        <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.6rem', color: '#C8A848', margin: '0 0 1rem', letterSpacing: '0.1em', textShadow: '0 0 20px rgba(200,168,72,0.4)' }}>
           Your Commitments
         </p>
+        <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent 5%, rgba(200,168,72,0.5) 20%, rgba(200,168,72,0.5) 80%, transparent 95%)' }} />
       </div>
 
       {/* Rows */}
-      <div style={{ padding: '0 1.5rem' }}>
+      <div style={{ padding: '0 2rem' }}>
         {/* Contributions */}
         {contributions.map((c, i) => {
           const meta = CONTRIBUTION_META[c] ?? { icon: '✦', desc: null }
           return (
             <div key={c}>
               <Row
-                circleContent={<span style={{ fontSize: '1.3rem', lineHeight: 1 }}>{meta.icon}</span>}
+                circleContent={<span style={{ fontSize: '1.8rem', lineHeight: 1 }}>{meta.icon}</span>}
                 title={c}
                 description={meta.desc}
                 tag="CONTRIBUTION"
               />
               {(i < contributions.length - 1 || role || shift) && (
-                <div style={{ height: '1px', background: 'rgba(200,168,72,0.18)' }} />
+                <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.3), transparent)' }} />
               )}
             </div>
           )
@@ -119,14 +120,16 @@ export function CommitmentsSection({ contributions, role, dept, shift, roleAppro
             <Row
               circleContent={
                 dept?.icon
-                  ? <span style={{ fontSize: '1.3rem', lineHeight: 1 }}>{dept.icon}</span>
-                  : <img src="/handicon.png" alt="" aria-hidden style={{ width: '26px', height: '26px', objectFit: 'contain', opacity: 0.85 }} />
+                  ? dept.icon.startsWith('/')
+                    ? <img src={dept.icon} alt="" aria-hidden style={{ width: '68%', height: '68%', objectFit: 'contain', opacity: 0.85 }} />
+                    : <span style={{ fontSize: '1.8rem', lineHeight: 1 }}>{dept.icon}</span>
+                  : <img src="/handicon.png" alt="" aria-hidden style={{ width: '68%', height: '68%', objectFit: 'contain', opacity: 0.85 }} />
               }
               title={isPending ? `${role.name} (pending)` : role.name}
               description={role.description || role.purpose}
               tag="DESIGNATION"
             />
-            {shift && <div style={{ height: '1px', background: 'rgba(200,168,72,0.18)' }} />}
+            {shift && <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.3), transparent)' }} />}
           </div>
         )}
 
@@ -135,19 +138,19 @@ export function CommitmentsSection({ contributions, role, dept, shift, roleAppro
           <Row
             circleContent={
               <div style={{ color: '#C8A848', opacity: 0.75 }}>
-                <EventIcon type={shift.icon_type} size={22} />
+                <EventIcon type={shift.icon_type} size={48} />
               </div>
             }
             title={shift.title}
-            description={[DAY_LABELS[shift.day] ?? shift.day, shift.time].filter(Boolean).join('\n')}
+            description={`${DAY_LABELS[shift.day] ?? shift.day}\n${shift.time}`}
             tag="SHIFT"
           />
         )}
       </div>
 
       {/* Footer */}
-      <div style={{ padding: '0.85rem 1.5rem', borderTop: '1px solid rgba(200,168,72,0.3)' }}>
-        <a href="/apply" style={{ fontSize: '0.78rem', color: '#C8A848', opacity: 0.55, textDecoration: 'none', letterSpacing: '0.04em' }}>
+      <div style={{ padding: '1rem 2rem' }}>
+        <a href="/apply" style={{ fontSize: '0.78rem', color: '#C8A848', opacity: 0.85, textDecoration: 'none', letterSpacing: '0.04em' }}>
           Manage commitments →
         </a>
       </div>

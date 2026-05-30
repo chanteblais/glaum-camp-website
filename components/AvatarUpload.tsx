@@ -66,10 +66,11 @@ export function AvatarUpload({
         aria-label="Change profile picture"
         style={{
           position: 'relative',
-          width: '96px',
-          height: '96px',
+          width: '260px',
+          height: '260px',
           borderRadius: '50%',
-          border: '2px solid rgba(200,168,72,0.3)',
+          border: '3px solid #6F491F',
+          boxShadow: '0 0 0 1px rgba(60,35,10,0.6), 0 0 20px rgba(111,73,31,0.25), 0 8px 32px rgba(0,0,0,0.55)',
           background: 'rgba(200,168,72,0.08)',
           cursor: uploading ? 'wait' : 'pointer',
           overflow: 'hidden',

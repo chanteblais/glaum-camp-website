@@ -13,6 +13,7 @@ import { CommitmentsSection } from './CommitmentsSection'
 import { TaskStatus } from './TaskStatus'
 import { PersonalSchedule } from './PersonalSchedule'
 import { RoleBadge } from './RoleBadge'
+import { AttunementStatus } from './AttunementStatus'
 
 export default async function ProfilePage() {
   const { userId } = await auth()
@@ -86,7 +87,7 @@ export default async function ProfilePage() {
       <img src="/hands-left.svg" alt="" aria-hidden style={{ position: 'fixed', left: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
       <img src="/hands-right.svg" alt="" aria-hidden style={{ position: 'fixed', right: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
       <RememberSignedIn firstName={user?.firstName} email={email} />
-      <div style={{ maxWidth: '760px', margin: '0 auto', padding: '3rem 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
+      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '3rem 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
 
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
@@ -114,43 +115,40 @@ export default async function ProfilePage() {
         {(application || volunteer) && (
           <div style={{
             marginBottom: '3rem',
-            display: 'grid',
-            gridTemplateColumns: application?.status === 'approved' && badgeRoleName ? '160px 1fr 160px' : '1fr',
+            display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
-            gap: '1rem',
           }}>
-
-            {/* Left column — badge (approved campers with a role only) */}
-            {application?.status === 'approved' && badgeRoleName && (
-              <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center' }}>
-                <RoleBadge roleName={badgeRoleName} deptName={badgeDeptName} deptIcon={badgeDeptIcon} />
-              </div>
-            )}
 
             {/* Centre column — avatar + name */}
             <div style={{ textAlign: 'center' }}>
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.75rem' }}>
                 <AvatarUpload
                   initialUrl={application?.avatar_url ?? volunteer?.avatar_url ?? null}
                   displayName={displayName}
                 />
               </div>
               {kicker && (
-                <p style={{ fontSize: '0.65rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: '#D239F8', marginBottom: '0.75rem', opacity: 0.85 }}>
+                <p style={{ fontSize: '0.65rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: '#D239F8', marginBottom: '0.3rem', opacity: 0.85 }}>
                   {kicker}
                 </p>
               )}
-              <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 6vw, 3rem)', color: '#C8A848', marginBottom: '0.25rem', textShadow: '0 0 40px rgba(210,57,248,0.4)' }}>
+              <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 6vw, 3rem)', color: '#C8A848', marginBottom: '0.15rem', textShadow: '0 0 40px rgba(210,57,248,0.4)' }}>
                 {displayName}
               </h1>
               {application?.pronouns && (
-                <p style={{ fontSize: '0.85rem', opacity: 0.5, marginBottom: '0.25rem' }}>{application.pronouns}</p>
+                <p style={{ fontSize: '0.85rem', opacity: 0.5, marginBottom: '0.1rem' }}>{application.pronouns}</p>
               )}
-              <p style={{ fontSize: '0.8rem', opacity: 0.4 }}>{email}</p>
+              <p style={{ fontSize: '0.8rem', opacity: 0.4, marginTop: '-0.1rem', marginBottom: '0' }}>{email}</p>
+              {application?.status === 'approved' && (
+                <div style={{ marginTop: '0.5rem' }}>
+                  <span style={{ display: 'inline-block', padding: '0.35rem 1.25rem', borderRadius: '9999px', backgroundColor: 'rgba(210,57,248,0.15)', border: '1px solid rgba(210,57,248,0.3)', fontSize: '0.75rem', letterSpacing: '0.12em', color: '#D239F8' }}>
+                    ✦ APPROVED CAMPER
+                  </span>
+                </div>
+              )}
             </div>
 
-            {/* Right column — empty counterbalance so centre stays centred */}
-            {application?.status === 'approved' && badgeRoleName && <div />}
           </div>
         )}
 
@@ -272,21 +270,28 @@ export default async function ProfilePage() {
 
         {application && application.status === 'approved' && (
           <>
-            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-              <span style={{ display: 'inline-block', padding: '0.35rem 1.25rem', borderRadius: '9999px', backgroundColor: 'rgba(210,57,248,0.15)', border: '1px solid rgba(210,57,248,0.3)', fontSize: '0.75rem', letterSpacing: '0.12em', color: '#D239F8' }}>
-                ✦ APPROVED CAMPER
-              </span>
+            {!(contributions.length > 0 && !!campSignup?.role_id && campSignup?.role_approval_status !== 'pending' && !!campSignup?.schedule_event_id && !!(application?.avatar_url)) && (
+              <TaskStatus track="approved" campSignup={campSignup} contributions={contributions} />
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.25rem', alignItems: 'start', marginBottom: '2.5rem' }}>
+              <CommitmentsSection
+                contributions={contributions}
+                role={roleInfo ? { name: roleInfo.name ?? '', description: roleInfo.description ?? null, purpose: roleInfo.purpose ?? null } : null}
+                dept={roleInfo?.departments ? { name: roleInfo.departments.name ?? '', icon: roleInfo.departments.icon ?? null } : null}
+                shift={shiftInfo ? { title: shiftInfo.title ?? '', day: shiftInfo.day ?? '', time: shiftInfo.time ?? '', icon_type: shiftInfo.icon_type ?? 'star' } : null}
+                roleApprovalStatus={campSignup?.role_approval_status ?? null}
+              />
+              <div>
+                <AttunementStatus tasks={[
+                  { id: 'approved',      label: 'Application Approved',  done: true },
+                  { id: 'photo',         label: 'Photo Uploaded',         done: !!(application?.avatar_url) },
+                  { id: 'contribution',  label: 'Contribution Selected',  done: contributions.length > 0 },
+                  { id: 'role',          label: 'Role Selected',          done: !!campSignup?.role_id && campSignup?.role_approval_status !== 'pending' },
+                  { id: 'shift',         label: 'Shift Assigned',         done: !!campSignup?.schedule_event_id },
+                ]} />
+              </div>
             </div>
-
-            <TaskStatus track="approved" campSignup={campSignup} contributions={contributions} />
-
-            <CommitmentsSection
-              contributions={contributions}
-              role={roleInfo ? { name: roleInfo.name ?? '', description: roleInfo.description ?? null, purpose: roleInfo.purpose ?? null } : null}
-              dept={roleInfo?.departments ? { name: roleInfo.departments.name ?? '', icon: roleInfo.departments.icon ?? null } : null}
-              shift={shiftInfo ? { title: shiftInfo.title ?? '', day: shiftInfo.day ?? '', time: shiftInfo.time ?? '', icon_type: shiftInfo.icon_type ?? 'star' } : null}
-              roleApprovalStatus={campSignup?.role_approval_status ?? null}
-            />
             <PersonalSchedule userId={userId} contributions={contributions} />
 
             <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.3), transparent)', marginBottom: '2.5rem' }} />
