@@ -100,7 +100,10 @@ function DeptModal({
           {initial.name ? 'Edit Department' : 'New Department'}
         </p>
         <Field label="Name">
-          <input style={inputStyle} value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Food & Drink" />
+          <input style={inputStyle} value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Food & Drink" maxLength={40} />
+          <p style={{ fontSize: '0.7rem', margin: '0.3rem 0 0', opacity: form.name.length > 32 ? 1 : 0.35, color: form.name.length >= 40 ? '#ff8a8a' : form.name.length > 32 ? '#C8A848' : '#F3EDE6' }}>
+            {form.name.length}/40 — shorter names fit better on the badge
+          </p>
         </Field>
         <Field label="Description (optional)">
           <textarea style={{ ...inputStyle, resize: 'vertical', minHeight: '72px' }} value={form.description} onChange={e => set('description', e.target.value)} placeholder="What does this department handle?" />
@@ -154,7 +157,10 @@ function RoleModal({
         {/* ── Basics ── */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1rem', alignItems: 'start' }}>
           <Field label="Role Name">
-            <input style={inputStyle} value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Shift Coordinator" />
+            <input style={inputStyle} value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Shift Coordinator" maxLength={28} />
+            <p style={{ fontSize: '0.7rem', margin: '0.3rem 0 0', opacity: form.name.length > 22 ? 1 : 0.35, color: form.name.length >= 28 ? '#ff8a8a' : form.name.length > 22 ? '#C8A848' : '#F3EDE6' }}>
+              {form.name.length}/28 — shorter names fit better on the badge
+            </p>
           </Field>
           <Field label="Capacity">
             <input style={{ ...inputStyle, width: '80px' }} type="number" min={1} value={form.capacity} onChange={e => set('capacity', parseInt(e.target.value) || 1)} />
