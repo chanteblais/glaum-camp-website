@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { SuggestRoleModal } from './SuggestRoleModal'
 
 type Role = {
   id: string
@@ -173,7 +174,12 @@ function CurrentSignupCards({
           </div>
           {role ? (
             <>
-              {dept && <p style={{ fontSize: '0.72rem', color: '#C8A848', opacity: 0.75, margin: '0 0 0.2rem', letterSpacing: '0.05em' }}>{dept.icon && `${dept.icon} `}{dept.name}</p>}
+              {dept && (
+                <p style={{ fontSize: '0.72rem', color: '#C8A848', opacity: 0.75, margin: '0 0 0.2rem', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  {dept.icon && (dept.icon.startsWith('/') ? <img src={dept.icon} alt="" aria-hidden style={{ width: '1rem', height: '1rem', objectFit: 'contain', flexShrink: 0 }} /> : <span>{dept.icon}</span>)}
+                  {dept.name}
+                </p>
+              )}
               <p style={{ fontSize: '0.92rem', color: '#F3EDE6', margin: 0 }}>{role.name}</p>
               {(role.commitment || role.commitment_period) && (
                 <div style={{ marginTop: '0.4rem' }}><CommitmentPill commitment={role.commitment} period={role.commitment_period} /></div>
@@ -380,7 +386,7 @@ function DeptCard({
           display: 'flex', alignItems: 'center', gap: '0.65rem',
         }}
       >
-        {dept.icon && <span style={{ fontSize: '1.2rem', flexShrink: 0 }}>{dept.icon}</span>}
+        {dept.icon && (dept.icon.startsWith('/') ? <img src={dept.icon} alt="" aria-hidden style={{ width: '1.4rem', height: '1.4rem', objectFit: 'contain', flexShrink: 0 }} /> : <span style={{ fontSize: '1.2rem', flexShrink: 0 }}>{dept.icon}</span>)}
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ fontSize: '0.9rem', color: '#C8A848', margin: 0, fontWeight: 600, letterSpacing: '0.03em' }}>
             {dept.name}
@@ -819,6 +825,7 @@ export function SignupSection({ showPickers = true }: { showPickers?: boolean })
   const [selectedShift, setSelectedShift] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showSuggest, setShowSuggest] = useState(false)
 
   useEffect(() => {
     fetch('/api/signup')
@@ -955,6 +962,7 @@ export function SignupSection({ showPickers = true }: { showPickers?: boolean })
 
   return (
     <div style={{ marginBottom: '2.5rem' }}>
+      {showSuggest && <SuggestRoleModal onClose={() => setShowSuggest(false)} />}
       <CurrentSignupCards signup={signup} departments={departments} scheduleEvents={scheduleEvents} onOptOut={handleOptOut} onCancelShift={handleCancelShift} />
 
       {showPickers && (
@@ -977,6 +985,16 @@ export function SignupSection({ showPickers = true }: { showPickers?: boolean })
               />
             </div>
           )}
+
+          {/* Suggest a role */}
+          <div style={{ textAlign: 'center', padding: '0.5rem 0' }}>
+            <button
+              onClick={() => setShowSuggest(true)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.78rem', color: '#C8A848', opacity: 0.5, letterSpacing: '0.04em', textDecoration: 'underline', textUnderlineOffset: '3px' }}
+            >
+              Don't see a role that fits? Suggest one →
+            </button>
+          </div>
 
           {/* Calendar shift picker */}
           {hasCalendarEvents && (

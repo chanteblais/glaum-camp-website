@@ -10,6 +10,7 @@ import { AdminTabBar } from './AdminTabBar'
 import { ScheduleManager } from './ScheduleManager'
 import { DepartmentsManager } from './DepartmentsManager'
 import { RoleRequestsSection } from './RoleRequestsSection'
+import { RoleSuggestionsSection } from './RoleSuggestionsSection'
 
 export default async function AdminPage() {
   const { userId } = await auth()
@@ -142,6 +143,14 @@ export default async function AdminPage() {
           summary="Pending approval"
         >
           <RoleRequestsSection />
+        </CollapsibleSection>
+
+        {/* ── ROLE SUGGESTIONS ── */}
+        <CollapsibleSection
+          title="Role Suggestions"
+          summary="Submitted by members"
+        >
+          <RoleSuggestionsSection />
         </CollapsibleSection>
 
         {/* ── DEPARTMENTS & ROLES ── */}

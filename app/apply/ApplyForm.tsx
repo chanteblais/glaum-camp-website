@@ -73,13 +73,14 @@ function Field({ label, children, optional }: { label: string; children: React.R
   )
 }
 
-function TextInput({ name, placeholder, type = 'text', required }: { name: string; placeholder?: string; type?: string; required?: boolean }) {
+function TextInput({ name, placeholder, type = 'text', required, maxLength }: { name: string; placeholder?: string; type?: string; required?: boolean; maxLength?: number }) {
   return (
     <input
       type={type}
       name={name}
       placeholder={placeholder}
       required={required}
+      maxLength={maxLength}
       style={inputStyle}
       onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(210,57,248,0.6)' }}
       onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(200,168,72,0.25)' }}
@@ -458,16 +459,16 @@ export function ApplyForm({ userEmail }: { userEmail: string }) {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                 <Field label="First Name">
-                  <TextInput name="first_name" placeholder="First name" required />
+                  <TextInput name="first_name" placeholder="First name" required maxLength={50} />
                 </Field>
                 <Field label="Last Name">
-                  <TextInput name="last_name" placeholder="Last name" required />
+                  <TextInput name="last_name" placeholder="Last name" required maxLength={50} />
                 </Field>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                 <Field label="Preferred Name" optional>
-                  <TextInput name="preferred_name" placeholder="If different from first name" />
+                  <TextInput name="preferred_name" placeholder="If different from first name" maxLength={50} />
                 </Field>
                 <Field label="Pronouns" optional>
                   <TextInput name="pronouns" placeholder="e.g. she/her, they/them" />
