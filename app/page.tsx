@@ -9,6 +9,7 @@ import { AttunementStatus } from '@/app/profile/AttunementStatus'
 import { DashboardCommitments } from '@/app/profile/DashboardCommitments'
 import { PersonalSchedule } from '@/app/profile/PersonalSchedule'
 import { HomePageEditor } from './HomePageEditor'
+import { supabaseResizedUrl } from '@/lib/supabase-image'
 
 export const dynamic = 'force-dynamic'
 
@@ -190,13 +191,14 @@ export default async function Home() {
               display: 'flex',
               alignItems: 'stretch',
             }}>
-              <div style={{
-                position: 'absolute', inset: 0,
-                backgroundImage: 'url(/glaum-camp.png)',
-                backgroundSize: 'cover',
-                backgroundPosition: 'center 40%',
-                filter: 'brightness(0.38) saturate(1.2)',
-              }} />
+              <Image
+                src="/glaum-camp.jpg"
+                alt=""
+                fill
+                priority
+                sizes="(max-width: 1100px) 100vw, 1100px"
+                style={{ objectFit: 'cover', objectPosition: 'center 40%', filter: 'brightness(0.38) saturate(1.2)' }}
+              />
               <div style={{
                 position: 'absolute', inset: 0,
                 background: 'linear-gradient(90deg, rgba(26,10,36,0.95) 0%, rgba(26,10,36,0.65) 55%, rgba(26,10,36,0.15) 100%)',
@@ -385,7 +387,7 @@ export default async function Home() {
                   }}>
                     {spotlightMember.avatar_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={spotlightMember.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <img src={supabaseResizedUrl(spotlightMember.avatar_url, 220) ?? ''} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
                       <span style={{ fontSize: '2rem', opacity: 0.2 }}>✦</span>
                     )}
@@ -473,7 +475,7 @@ export default async function Home() {
                       }}>
                         {item.avatar_url
                           // eslint-disable-next-line @next/next/no-img-element
-                          ? <img src={item.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ? <img src={supabaseResizedUrl(item.avatar_url, 56) ?? ''} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           : <span style={{ fontSize: '0.65rem', opacity: 0.3 }}>✦</span>
                         }
                       </div>
@@ -577,7 +579,7 @@ export default async function Home() {
             }}
           >
             <Image
-              src="/glaum-camp.png"
+              src="/glaum-camp.jpg"
               alt="Glåüm Camp — Gather, Connect, Attune. Sponsored by Shrimp™"
               width={1200}
               height={675}

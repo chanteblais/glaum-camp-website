@@ -3,6 +3,8 @@ import { redirect, notFound } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { CommitmentsSection } from '@/app/profile/CommitmentsSection'
 
+import { supabaseResizedUrl } from '@/lib/supabase-image'
+
 export default async function MemberPage({ params }: { params: { id: string } }) {
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
@@ -109,7 +111,7 @@ export default async function MemberPage({ params }: { params: { id: string } })
             }}>
               {member.avatar_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={member.avatar_url} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img src={supabaseResizedUrl(member.avatar_url, 520) ?? ''} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
                 <span style={{ fontFamily: 'TokyoDreams, serif', fontSize: '3rem', color: '#C8A848', opacity: 0.5 }}>
                   {displayName.charAt(0).toUpperCase()}
