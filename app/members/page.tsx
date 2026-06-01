@@ -2,6 +2,8 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 
+import { supabaseResizedUrl } from '@/lib/supabase-image'
+
 export default async function MembersPage() {
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
@@ -115,7 +117,7 @@ export default async function MembersPage() {
                 }}>
                   {member.avatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={member.avatarUrl} alt={member.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={supabaseResizedUrl(member.avatarUrl, 160) ?? ''} alt={member.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
                     <span style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.4rem', color: '#C8A848', opacity: 0.6 }}>
                       {member.name.charAt(0).toUpperCase()}
