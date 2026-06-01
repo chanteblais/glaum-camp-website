@@ -1,0 +1,284 @@
+'use client'
+
+import { useState, useEffect, useRef, useCallback } from 'react'
+
+type Message = {
+  id: string
+  sender_clerk_id: string
+  recipient_clerk_id: string
+  body: string
+  read_at: string | null
+  created_at: string
+}
+
+type Props = {
+  currentUserId: string
+  recipientId: string
+  displayName: string
+  avatarUrl: string | null
+  pronouns: string | null
+}
+
+const MAX_CHARS = 2000
+
+function formatTime(iso: string) {
+  const d = new Date(iso)
+  const now = new Date()
+  const isToday = d.toDateString() === now.toDateString()
+  if (isToday) return d.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' })
+  const isThisYear = d.getFullYear() === now.getFullYear()
+  return d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric', ...(isThisYear ? {} : { year: 'numeric' }), hour: 'numeric', minute: '2-digit' })
+}
+
+export function ThreadClient({ currentUserId, recipientId, displayName, avatarUrl, pronouns }: Props) {
+  const [messages, setMessages] = useState<Message[]>([])
+  const [loading, setLoading] = useState(true)
+  const [body, setBody] = useState('')
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const bottomRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const initials = displayName.charAt(0).toUpperCase()
+
+  const fetchMessages = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/messages/${recipientId}`, { cache: 'no-store' })
+      const data = await res.json()
+      setMessages(data.messages ?? [])
+      setLoading(false)
+    } catch {
+      setLoading(false)
+    }
+  }, [recipientId])
+
+  useEffect(() => {
+    fetchMessages()
+    const interval = setInterval(fetchMessages, 12000)
+    return () => clearInterval(interval)
+  }, [fetchMessages])
+
+  // Scroll to bottom when messages load or new ones arrive
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages.length])
+
+  const handleSend = async () => {
+    const trimmed = body.trim()
+    if (!trimmed || sending) return
+    setSending(true)
+    setError(null)
+
+    const res = await fetch('/api/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recipientId, body: trimmed }),
+    })
+
+    if (res.ok) {
+      setBody('')
+      await fetchMessages()
+    } else {
+      const d = await res.json()
+      setError(d.error ?? 'Failed to send')
+    }
+    setSending(false)
+    textareaRef.current?.focus()
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSend()
+    }
+  }
+
+  const charsLeft = MAX_CHARS - body.length
+  const isOver = charsLeft < 0
+
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', maxWidth: '720px', width: '100%', margin: '0 auto', padding: '0 1.5rem', position: 'relative', zIndex: 1 }}>
+
+      {/* Thread header */}
+      <div style={{
+        paddingTop: '5.5rem',
+        paddingBottom: '1.25rem',
+        borderBottom: '1px solid rgba(200,168,72,0.15)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.85rem',
+        position: 'sticky',
+        top: 0,
+        background: 'rgba(26,10,36,0.92)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        zIndex: 10,
+      }}>
+        <a href="/messages" style={{ color: '#C8A848', opacity: 0.5, textDecoration: 'none', fontSize: '0.8rem', letterSpacing: '0.08em', flexShrink: 0 }}>
+          ←
+        </a>
+        <a
+          href={`/members/${recipientId}`}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', textDecoration: 'none', color: 'inherit' }}
+        >
+          <div style={{
+            width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
+            border: '1px solid rgba(111,73,31,0.7)',
+            background: 'rgba(200,168,72,0.08)',
+            overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={avatarUrl} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <span style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1rem', color: '#C8A848', opacity: 0.6 }}>{initials}</span>
+            )}
+          </div>
+          <div>
+            <p style={{ margin: 0, fontFamily: 'TokyoDreams, serif', fontSize: '1.05rem', color: '#C8A848' }}>{displayName}</p>
+            {pronouns && <p style={{ margin: 0, fontSize: '0.7rem', opacity: 0.4 }}>{pronouns}</p>}
+          </div>
+        </a>
+      </div>
+
+      {/* Messages */}
+      <div style={{ flex: 1, paddingTop: '1.5rem', paddingBottom: '1rem', overflowY: 'auto' }}>
+        {loading && (
+          <p style={{ textAlign: 'center', opacity: 0.4, fontStyle: 'italic', fontSize: '0.9rem' }}>Loading…</p>
+        )}
+
+        {!loading && messages.length === 0 && (
+          <p style={{ textAlign: 'center', opacity: 0.4, fontStyle: 'italic', fontSize: '0.9rem', marginTop: '3rem' }}>
+            No messages yet. Say hello!
+          </p>
+        )}
+
+        {messages.map((msg, i) => {
+          const isMe = msg.sender_clerk_id === currentUserId
+          const prev = i > 0 ? messages[i - 1] : null
+          const showTime = !prev || new Date(msg.created_at).getTime() - new Date(prev.created_at).getTime() > 5 * 60 * 1000
+
+          return (
+            <div key={msg.id}>
+              {showTime && (
+                <p style={{ textAlign: 'center', fontSize: '0.68rem', opacity: 0.3, margin: '1rem 0 0.5rem', letterSpacing: '0.05em' }}>
+                  {formatTime(msg.created_at)}
+                </p>
+              )}
+              <div style={{
+                display: 'flex',
+                justifyContent: isMe ? 'flex-end' : 'flex-start',
+                marginBottom: '0.35rem',
+              }}>
+                <div style={{
+                  maxWidth: '72%',
+                  padding: '0.6rem 0.9rem',
+                  borderRadius: isMe ? '1.1rem 1.1rem 0.25rem 1.1rem' : '1.1rem 1.1rem 1.1rem 0.25rem',
+                  background: isMe
+                    ? 'rgba(210,57,248,0.18)'
+                    : 'rgba(200,168,72,0.09)',
+                  border: isMe
+                    ? '1px solid rgba(210,57,248,0.25)'
+                    : '1px solid rgba(200,168,72,0.15)',
+                  fontSize: '0.9rem',
+                  lineHeight: 1.5,
+                  color: '#F3EDE6',
+                  wordBreak: 'break-word',
+                  whiteSpace: 'pre-wrap',
+                }}>
+                  {msg.body}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Compose */}
+      <div style={{
+        paddingTop: '0.85rem',
+        paddingBottom: '2rem',
+        borderTop: '1px solid rgba(200,168,72,0.12)',
+        position: 'sticky',
+        bottom: 0,
+        background: 'rgba(26,10,36,0.92)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+      }}>
+        {error && (
+          <p style={{ color: '#f87171', fontSize: '0.78rem', marginBottom: '0.5rem', opacity: 0.85 }}>{error}</p>
+        )}
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end' }}>
+          <div style={{ flex: 1, position: 'relative' }}>
+            <textarea
+              ref={textareaRef}
+              value={body}
+              onChange={e => setBody(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={`Message ${displayName}…`}
+              maxLength={MAX_CHARS}
+              rows={1}
+              style={{
+                width: '100%',
+                padding: '0.65rem 0.9rem',
+                background: 'rgba(255,255,255,0.04)',
+                border: `1px solid ${isOver ? 'rgba(248,113,113,0.5)' : 'rgba(200,168,72,0.2)'}`,
+                borderRadius: '0.75rem',
+                color: '#F3EDE6',
+                fontSize: '0.9rem',
+                resize: 'none',
+                outline: 'none',
+                fontFamily: 'var(--font-libre-baskerville), Georgia, serif',
+                lineHeight: 1.5,
+                transition: 'border-color 0.15s',
+                boxSizing: 'border-box',
+                maxHeight: '160px',
+                overflowY: 'auto',
+              }}
+              onFocus={e => { e.target.style.borderColor = 'rgba(210,57,248,0.45)' }}
+              onBlur={e => { e.target.style.borderColor = isOver ? 'rgba(248,113,113,0.5)' : 'rgba(200,168,72,0.2)' }}
+              onInput={e => {
+                const t = e.currentTarget
+                t.style.height = 'auto'
+                t.style.height = Math.min(t.scrollHeight, 160) + 'px'
+              }}
+            />
+            {body.length > MAX_CHARS * 0.8 && (
+              <span style={{
+                position: 'absolute', bottom: '0.45rem', right: '0.6rem',
+                fontSize: '0.65rem', opacity: 0.4,
+                color: isOver ? '#f87171' : '#F3EDE6',
+              }}>
+                {charsLeft}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={handleSend}
+            disabled={!body.trim() || sending || isOver}
+            style={{
+              padding: '0.65rem 1.25rem',
+              background: body.trim() && !isOver ? 'rgba(210,57,248,0.2)' : 'rgba(255,255,255,0.04)',
+              border: `1px solid ${body.trim() && !isOver ? 'rgba(210,57,248,0.4)' : 'rgba(200,168,72,0.1)'}`,
+              borderRadius: '0.75rem',
+              color: body.trim() && !isOver ? '#D239F8' : '#F3EDE6',
+              fontSize: '0.82rem',
+              fontFamily: 'TokyoDreams, serif',
+              letterSpacing: '0.06em',
+              cursor: body.trim() && !isOver && !sending ? 'pointer' : 'not-allowed',
+              opacity: body.trim() && !isOver && !sending ? 1 : 0.35,
+              transition: 'all 0.15s',
+              flexShrink: 0,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {sending ? '…' : 'Send'}
+          </button>
+        </div>
+        <p style={{ fontSize: '0.68rem', opacity: 0.25, marginTop: '0.4rem', marginBottom: 0 }}>
+          Enter to send · Shift+Enter for new line
+        </p>
+      </div>
+    </div>
+  )
+}
