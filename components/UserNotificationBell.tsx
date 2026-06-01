@@ -160,6 +160,10 @@ export function UserNotificationBell() {
                     case 'role_request_approved':   return { href: '/profile', label: 'Go to profile →' }
                     case 'role_request_rejected':   return { href: '/profile#role-signup', label: 'Choose another role →' }
                     case 'volunteer_approved':       return { href: '/profile', label: 'Go to profile →' }
+                    case 'new_message': {
+                      const senderId = (n.details as Record<string,string> | null)?.senderId
+                      return senderId ? { href: `/messages/${senderId}`, label: 'View message →' } : { href: '/messages', label: 'View messages →' }
+                    }
                     default: return null
                   }
                 })()

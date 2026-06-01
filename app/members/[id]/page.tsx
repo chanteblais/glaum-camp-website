@@ -125,8 +125,27 @@ export default async function MemberPage({ params }: { params: { id: string } })
               {displayName}
             </h1>
             {member.pronouns && (
-              <p style={{ fontSize: '0.85rem', opacity: 0.5, marginBottom: 0 }}>{member.pronouns}</p>
+              <p style={{ fontSize: '0.85rem', opacity: 0.5, marginBottom: '0.6rem' }}>{member.pronouns}</p>
             )}
+            <a
+              href={`/messages/${member.clerk_user_id}`}
+              style={{
+                display: 'inline-block',
+                marginTop: '0.75rem',
+                padding: '0.45rem 1.25rem',
+                borderRadius: '9999px',
+                border: '1px solid rgba(210,57,248,0.35)',
+                color: '#D239F8',
+                fontSize: '0.78rem',
+                letterSpacing: '0.1em',
+                textDecoration: 'none',
+                opacity: 0.85,
+                transition: 'all 0.15s',
+                fontFamily: 'TokyoDreams, serif',
+              }}
+            >
+              ✉ Message
+            </a>
           </div>
         </div>
 

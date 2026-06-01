@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useAuth, useUser } from '@clerk/nextjs'
 import { UserNotificationBell } from './UserNotificationBell'
 import { NotificationBell } from '@/app/admin/NotificationBell'
+import { MessagesNavLink } from './MessagesNavLink'
 
 const AUTH_MEMORY_KEY = 'glaum-auth-signed-in'
 const AUTH_NAME_KEY = 'glaum-auth-first-name'
@@ -29,6 +30,7 @@ const memberNavLinks = [
   { href: '/', label: 'Home' },
   { href: '/schedule', label: 'Schedule' },
   { href: '/members', label: 'Many Hands' },
+  { href: '/messages', label: 'Messages', badge: true },
   { href: '/profile', label: 'My Profile' },
 ]
 
@@ -364,15 +366,22 @@ export function HeaderClient() {
         {!isMobile && (
           <nav style={{ display: 'flex', gap: '2rem', flex: 1, justifyContent: 'center' }}>
             {activeNavLinks.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                style={{ color: '#F3EDE6', textDecoration: 'none', fontSize: '0.85rem', letterSpacing: '0.08em', opacity: 0.8, transition: 'opacity 0.2s, color 0.2s' }}
-                onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = '#C8A848' }}
-                onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.8'; e.currentTarget.style.color = '#F3EDE6' }}
-              >
-                {link.label}
-              </a>
+              'badge' in link && link.badge ? (
+                <MessagesNavLink
+                  key={link.href}
+                  style={{ color: '#F3EDE6', textDecoration: 'none', fontSize: '0.85rem', letterSpacing: '0.08em', opacity: 0.8 }}
+                />
+              ) : (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  style={{ color: '#F3EDE6', textDecoration: 'none', fontSize: '0.85rem', letterSpacing: '0.08em', opacity: 0.8, transition: 'opacity 0.2s, color 0.2s' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = '#C8A848' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.8'; e.currentTarget.style.color = '#F3EDE6' }}
+                >
+                  {link.label}
+                </a>
+              )
             ))}
           </nav>
         )}
@@ -426,9 +435,16 @@ export function HeaderClient() {
           )}
 
           {activeNavLinks.map((link) => (
-            <a key={link.href} href={link.href} onClick={() => setMenuOpen(false)} style={mobileMenuLink}>
-              {link.label}
-            </a>
+            'badge' in link && link.badge ? (
+              <MessagesNavLink
+                key={link.href}
+                style={{ ...mobileMenuLink, display: 'flex', alignItems: 'center' }}
+              />
+            ) : (
+              <a key={link.href} href={link.href} onClick={() => setMenuOpen(false)} style={mobileMenuLink}>
+                {link.label}
+              </a>
+            )
           ))}
 
           {signedIn && (
