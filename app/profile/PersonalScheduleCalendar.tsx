@@ -351,7 +351,7 @@ export function PersonalScheduleCalendar({ events }: { events: PersonalEvent[] }
           )}
 
           <div style={{ padding: '1rem 0 1.15rem', marginTop: '1rem', borderTop: '1px solid rgba(200,168,72,0.13)' }}>
-            <a href="/#schedule" style={{ fontSize: '0.78rem', color: '#E37AE9', opacity: 0.92, textDecoration: 'none', letterSpacing: '0.03em', fontWeight: 700, textShadow: '0 0 14px rgba(227,122,233,0.28)' }}>
+            <a href="/schedule" style={{ fontSize: '0.78rem', color: '#E37AE9', opacity: 0.92, textDecoration: 'none', letterSpacing: '0.03em', fontWeight: 700, textShadow: '0 0 14px rgba(227,122,233,0.28)' }}>
               View full calendar →
             </a>
           </div>

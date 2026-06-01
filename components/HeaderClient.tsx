@@ -12,16 +12,24 @@ const AUTH_EMAIL_KEY = 'glaum-auth-email'
 
 type NavAuthState = {
   isSignedIn: boolean
+  isApproved?: boolean
   firstName?: string | null
   email?: string | null
   avatarUrl?: string | null
 }
 
-const navLinks = [
+const publicNavLinks = [
   { href: '#about', label: 'About' },
   { href: '#participate', label: 'Participate' },
-  { href: '#schedule', label: 'Schedule' },
+  { href: '/schedule', label: 'Schedule' },
   { href: '/apply', label: 'Apply' },
+]
+
+const memberNavLinks = [
+  { href: '/', label: 'Home' },
+  { href: '/schedule', label: 'Schedule' },
+  { href: '/members', label: 'Many Hands' },
+  { href: '/profile', label: 'My Profile' },
 ]
 
 export function HeaderClient() {
@@ -39,11 +47,13 @@ export function HeaderClient() {
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   const signedIn = mounted && (Boolean(isSignedIn) || Boolean(serverAuth?.isSignedIn) || hasRememberedAuth)
+  const isApproved = Boolean(serverAuth?.isApproved)
   const userFirstName = user?.firstName ?? serverAuth?.firstName ?? rememberedFirstName
   const userEmail = user?.primaryEmailAddress?.emailAddress ?? serverAuth?.email ?? rememberedEmail
   const avatarUrl = serverAuth?.avatarUrl ?? null
   const initials = userFirstName?.[0] ?? '✦'
   const isAdmin = user?.publicMetadata?.role === 'admin'
+  const activeNavLinks = signedIn && isApproved ? memberNavLinks : publicNavLinks
 
   useEffect(() => {
     setMounted(true)
@@ -217,8 +227,6 @@ export function HeaderClient() {
             </div>
           )}
           {[
-            { href: '/profile', label: 'My Profile' },
-            { href: '/members', label: 'Many Hands' },
             ...(isAdmin ? [{ href: '/admin', label: 'Admin' }] : []),
           ].map(({ href, label }) => (
             <Link
@@ -355,7 +363,7 @@ export function HeaderClient() {
         {/* Desktop nav */}
         {!isMobile && (
           <nav style={{ display: 'flex', gap: '2rem', flex: 1, justifyContent: 'center' }}>
-            {[...navLinks, ...(signedIn ? [{ href: '/members', label: 'Many Hands' }] : [])].map((link) => (
+            {activeNavLinks.map((link) => (
               <a
                 key={link.href}
                 href={link.href}
@@ -417,7 +425,7 @@ export function HeaderClient() {
             </div>
           )}
 
-          {[...navLinks, ...(signedIn ? [{ href: '/members', label: 'Many Hands' }] : [])].map((link) => (
+          {activeNavLinks.map((link) => (
             <a key={link.href} href={link.href} onClick={() => setMenuOpen(false)} style={mobileMenuLink}>
               {link.label}
             </a>
@@ -425,12 +433,6 @@ export function HeaderClient() {
 
           {signedIn && (
             <>
-              <Link href="/profile" onClick={() => setMenuOpen(false)} style={{ ...mobileMenuLink, color: '#C8A848' }}>
-                My Profile
-              </Link>
-              <Link href="/members" onClick={() => setMenuOpen(false)} style={{ ...mobileMenuLink, color: '#C8A848', opacity: 0.8 }}>
-                Many Hands
-              </Link>
               {isAdmin && (
                 <Link href="/admin" onClick={() => setMenuOpen(false)} style={{ ...mobileMenuLink, color: '#C8A848', opacity: 0.7 }}>
                   Admin

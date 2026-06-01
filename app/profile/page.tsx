@@ -1,12 +1,10 @@
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
-import { SignOutBtn } from '@/components/SignOutBtn'
 import { RememberSignedIn } from '@/components/RememberSignedIn'
+import { Header } from '@/components/Header'
 import { ProfileSettings } from './ProfileSettings'
 import { VolunteerSettings } from './VolunteerSettings'
-import { UserNotificationBell } from '@/components/UserNotificationBell'
-import { NotificationBell } from '@/app/admin/NotificationBell'
 import { AvatarUpload } from '@/components/AvatarUpload'
 import { SignupSection } from './SignupSection'
 import { CommitmentsSection } from './CommitmentsSection'
@@ -84,6 +82,7 @@ export default async function ProfilePage() {
 
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
+      <Header />
       <style>{`
         .profile-main-grid  { display: grid; grid-template-columns: 2fr 1fr; gap: 1.25rem; align-items: start; margin-bottom: 2.5rem; }
         .profile-info-grid  { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 2.5rem; }
@@ -100,29 +99,7 @@ export default async function ProfilePage() {
       <img src="/hands-left.svg" alt="" aria-hidden style={{ position: 'fixed', left: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
       <img src="/hands-right.svg" alt="" aria-hidden style={{ position: 'fixed', right: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
       <RememberSignedIn firstName={user?.firstName} email={email} />
-      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '3rem 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
-
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
-          <a href="/" style={{ fontSize: '0.8rem', letterSpacing: '0.1em', color: '#C8A848', textDecoration: 'none', opacity: 0.6 }}>
-            ← Back to camp
-          </a>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            {isAdmin && (
-              <a href="/admin" style={{ fontSize: '0.75rem', letterSpacing: '0.12em', color: '#D239F8', textDecoration: 'none', opacity: 0.7 }}>
-                Admin
-              </a>
-            )}
-            {isAdmin ? <NotificationBell /> : <UserNotificationBell />}
-            {application && (application.status === 'approved' || application.status === 'pending') && (
-              <ProfileSettings application={application} />
-            )}
-            {volunteer && volunteer.status === 'active' && !application && (
-              <VolunteerSettings volunteer={volunteer} />
-            )}
-            <SignOutBtn />
-          </div>
-        </div>
+      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '6rem 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
 
         {/* Name header — shown for application and volunteer tracks */}
         {(application || volunteer) && (
@@ -161,9 +138,17 @@ export default async function ProfilePage() {
                   {kicker}
                 </p>
               )}
-              <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 6vw, 3rem)', color: '#C8A848', marginBottom: '0.15rem', textShadow: '0 0 40px rgba(210,57,248,0.4)' }}>
-                {displayName}
-              </h1>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.15rem' }}>
+                <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 6vw, 3rem)', color: '#C8A848', margin: 0, textShadow: '0 0 40px rgba(210,57,248,0.4)' }}>
+                  {displayName}
+                </h1>
+                {application && (application.status === 'approved' || application.status === 'pending') && (
+                  <ProfileSettings application={application} />
+                )}
+                {volunteer && volunteer.status === 'active' && !application && (
+                  <VolunteerSettings volunteer={volunteer} />
+                )}
+              </div>
               {application?.pronouns && (
                 <p style={{ fontSize: '0.85rem', opacity: 0.5, marginBottom: '0.1rem' }}>{application.pronouns}</p>
               )}
@@ -267,7 +252,7 @@ export default async function ProfilePage() {
                 Application under review.
               </p>
               <p style={{ fontSize: '0.82rem', lineHeight: 1.7, opacity: 0.45 }}>
-                Need to update your details? Use the gear icon above.
+                Need to update your details? Use the gear icon next to your name.
               </p>
             </div>
             <TaskStatus track="pending" />
@@ -306,6 +291,7 @@ export default async function ProfilePage() {
                 dept={roleInfo?.departments ? { name: roleInfo.departments.name ?? '', icon: roleInfo.departments.icon ?? null } : null}
                 shift={shiftInfo ? { title: shiftInfo.title ?? '', day: shiftInfo.day ?? '', time: shiftInfo.time ?? '', icon_type: shiftInfo.icon_type ?? 'star' } : null}
                 roleApprovalStatus={campSignup?.role_approval_status ?? null}
+                showManageLink
               />
               <div>
                 <AttunementStatus tasks={[

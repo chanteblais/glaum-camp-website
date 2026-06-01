@@ -6,6 +6,7 @@ type Props = {
   dept: { name: string; icon: string | null } | null
   shift: { title: string; day: string; time: string; icon_type: string } | null
   roleApprovalStatus: string | null
+  showManageLink?: boolean
 }
 
 const CONTRIBUTION_META: Record<string, { icon: string; desc: string }> = {
@@ -78,7 +79,7 @@ function Row({ circleContent, title, description, tag }: {
   )
 }
 
-export function CommitmentsSection({ contributions, role, dept, shift, roleApprovalStatus }: Props) {
+export function CommitmentsSection({ contributions, role, dept, shift, roleApprovalStatus, showManageLink = false }: Props) {
   const hasAnything = contributions.length > 0 || role || shift
   if (!hasAnything) return null
 
@@ -159,11 +160,13 @@ export function CommitmentsSection({ contributions, role, dept, shift, roleAppro
       </div>
 
       {/* Footer */}
-      <div style={{ padding: '1rem 2rem' }}>
-        <a href="/apply" style={{ fontSize: '0.78rem', color: '#C8A848', opacity: 0.85, textDecoration: 'none', letterSpacing: '0.04em' }}>
-          Manage commitments →
-        </a>
-      </div>
+      {showManageLink && (
+        <div style={{ padding: '1rem 2rem' }}>
+          <a href="/apply" style={{ fontSize: '0.78rem', color: '#C8A848', opacity: 0.85, textDecoration: 'none', letterSpacing: '0.04em' }}>
+            Manage commitments →
+          </a>
+        </div>
+      )}
     </div>
   )
 }

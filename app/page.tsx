@@ -340,15 +340,15 @@ export default async function Home() {
                     <div style={{ padding: '0.75rem 1.5rem', borderTop: '1px solid rgba(200,168,72,0.1)' }}>
                       <a href={href} style={{ fontSize: '0.75rem', color: '#C8A848', opacity: 0.7, textDecoration: 'none' }}>
                         View full schedule →
-                      </a>
+</a>
                     </div>
                   </div>
                 )
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                    {preCamp.length > 0 && <EventList events={preCamp} label="Pre-Camp Gatherings" href="#schedule" />}
-                    {atCamp.length > 0 && <EventList events={atCamp} label="Upcoming Gatherings" href="#schedule" />}
-                    {upcomingEvents.length === 0 && <EventList events={[]} label="Upcoming Gatherings" href="#schedule" />}
+                    {preCamp.length > 0 && <EventList events={preCamp} label="Pre-Camp Gatherings" href="/schedule" />}
+                    {atCamp.length > 0 && <EventList events={atCamp} label="Upcoming Gatherings" href="/schedule" />}
+                    {upcomingEvents.length === 0 && <EventList events={[]} label="Upcoming Gatherings" href="/schedule" />}
                   </div>
                 )
               })()}
