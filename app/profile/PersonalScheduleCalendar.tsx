@@ -44,7 +44,11 @@ function parseMinutes(str: string): number | null {
 function parseEventTimes(timeStr: string | null) {
   if (!timeStr) return { start: null, end: null }
   const parts = timeStr.split(/\s*[–—-]\s*/)
-  return { start: parseMinutes(parts[0]), end: parts[1] ? parseMinutes(parts[1]) : null }
+  const start = parseMinutes(parts[0])
+  let end = parts[1] ? parseMinutes(parts[1]) : null
+  // If end is before start (e.g. "9:00 PM – 12:00 AM"), treat it as next-day midnight
+  if (start !== null && end !== null && end < start) end += 24 * 60
+  return { start, end }
 }
 
 type EventColors = { border: string; bg: string; time: string; title: string; subtitle: string; label?: string }

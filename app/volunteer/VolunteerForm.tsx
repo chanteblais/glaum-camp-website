@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, FormEvent } from 'react'
+import { useRouter } from 'next/navigation'
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
@@ -89,6 +90,7 @@ export function VolunteerForm({ userEmail, userFirstName, userLastName }: {
   userFirstName: string
   userLastName: string
 }) {
+  const router = useRouter()
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -148,8 +150,7 @@ export function VolunteerForm({ userEmail, userFirstName, userLastName }: {
         const json = await res.json()
         throw new Error(json.error || 'Submission failed')
       }
-      setSubmitted(true)
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      router.push('/profile')
     } catch (err: any) {
       setError(err.message || 'Something went wrong. Please try again.')
       setSubmitting(false)
