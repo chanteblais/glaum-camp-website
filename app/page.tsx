@@ -151,10 +151,10 @@ export default async function Home() {
 
   const attunementTasks = [
     { id: 'approved',     label: 'Application Approved',  done: true },
-    { id: 'photo',        label: 'Photo Uploaded',         done: !!(application?.avatar_url),  section: 'photo' as const },
-    { id: 'contribution', label: 'Contribution Selected',  done: contributions.length > 0 },
-    { id: 'role',         label: 'Role Selected',          done: !!campSignup?.role_id && campSignup?.role_approval_status !== 'pending', href: '/profile' },
-    { id: 'shift',        label: 'Shift Assigned',         done: !!campSignup?.schedule_event_id, href: '/profile' },
+    { id: 'photo',        label: 'Photo Uploaded',         done: !!(application?.avatar_url),  href: '/profile' },
+    { id: 'contribution', label: 'Contribution Selected',  done: contributions.length > 0,      href: '/profile' },
+    { id: 'role',         label: 'Role Selected',          done: !!campSignup?.role_id && campSignup?.role_approval_status !== 'pending', href: '/signup' },
+    { id: 'shift',        label: 'Shift Assigned',         done: !!campSignup?.schedule_event_id, href: '/signup' },
   ]
   const allAttuned = attunementTasks.every(t => t.done)
 
@@ -239,19 +239,6 @@ export default async function Home() {
                   )}
                 </div>
 
-                {/* Right: quote card — hidden on small screens */}
-                <div className="dash-quote-card" style={{
-                  flexShrink: 0, maxWidth: '240px',
-                  padding: '1.25rem 1.4rem',
-                  border: '1px solid rgba(200,168,72,0.2)',
-                  borderRadius: '1rem',
-                  background: 'rgba(26,10,36,0.72)',
-                  backdropFilter: 'blur(12px)',
-                }}>
-                  <p style={{ fontSize: '0.82rem', lineHeight: 1.75, fontStyle: 'italic', color: '#EDE0C8', opacity: 0.8, margin: 0 }}>
-                    "{c('home_quote', 'We are but many hands, and together, we hold the light.')}"
-                  </p>
-                </div>
               </div>
             </div>
 
@@ -502,13 +489,22 @@ export default async function Home() {
             )}
 
             {/* ── MANY HANDS LINK ── */}
-            <a href="/members" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem 1.5rem', border: '1px solid rgba(200,168,72,0.18)', borderRadius: '1rem', background: 'rgba(200,168,72,0.03)', textDecoration: 'none' }}>
-              <div>
-                <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.1rem', color: '#C8A848', margin: '0 0 0.2rem' }}>Many Hands</p>
-                <p style={{ fontSize: '0.8rem', opacity: 0.45, margin: 0 }}>View your fellow camp members</p>
-              </div>
-              <span style={{ fontSize: '1rem', color: '#C8A848', opacity: 0.4 }}>→</span>
-            </a>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <a href="/signup" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem 1.5rem', border: '1px solid rgba(200,168,72,0.18)', borderRadius: '1rem', background: 'rgba(200,168,72,0.03)', textDecoration: 'none' }}>
+                <div>
+                  <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.1rem', color: '#C8A848', margin: '0 0 0.2rem' }}>Role & Shift</p>
+                  <p style={{ fontSize: '0.8rem', opacity: 0.45, margin: 0 }}>Choose your role and shift</p>
+                </div>
+                <span style={{ fontSize: '1rem', color: '#C8A848', opacity: 0.4 }}>→</span>
+              </a>
+              <a href="/members" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem 1.5rem', border: '1px solid rgba(200,168,72,0.18)', borderRadius: '1rem', background: 'rgba(200,168,72,0.03)', textDecoration: 'none' }}>
+                <div>
+                  <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.1rem', color: '#C8A848', margin: '0 0 0.2rem' }}>Many Hands</p>
+                  <p style={{ fontSize: '0.8rem', opacity: 0.45, margin: 0 }}>View your fellow camp members</p>
+                </div>
+                <span style={{ fontSize: '1rem', color: '#C8A848', opacity: 0.4 }}>→</span>
+              </a>
+            </div>
 
           </div>
         </main>
