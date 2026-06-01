@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { sendUserEmail } from '@/lib/send-email'
 
 async function requireAdmin() {
   const { userId } = await auth()
@@ -8,6 +9,16 @@ async function requireAdmin() {
   const client = await clerkClient()
   const user = await client.users.getUser(userId)
   return user.publicMetadata?.role === 'admin' ? userId : null
+}
+
+async function getUserEmail(clerkUserId: string): Promise<string | null> {
+  try {
+    const client = await clerkClient()
+    const user = await client.users.getUser(clerkUserId)
+    return user.emailAddresses[0]?.emailAddress ?? null
+  } catch {
+    return null
+  }
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -71,6 +82,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         message: 'Your role suggestion was approved',
         details: `"${suggestion.role_name}" has been added to the ${suggestion.dept_name} department and is now available to select.`,
       })
+      const approvedEmail = await getUserEmail(suggestion.clerk_user_id)
+      if (approvedEmail) {
+        await sendUserEmail(
+          approvedEmail,
+          'Your Glåüm role suggestion was approved!',
+          `<p>Great news! Your suggested role "${suggestion.role_name}" has been added to the ${suggestion.dept_name} department and is now available to select on your <a href="https://glaum.camp/profile">profile</a>.</p>`,
+        )
+      }
     } else {
       // Notify the member of rejection
       await supabaseAdmin.from('user_notifications').insert({
@@ -78,6 +97,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         message: 'Your role suggestion was reviewed',
         details: `Your suggestion for "${suggestion.role_name}" was not added at this time. Reach out to an organiser if you have questions.`,
       })
+      const rejectedEmail = await getUserEmail(suggestion.clerk_user_id)
+      if (rejectedEmail) {
+        await sendUserEmail(
+          rejectedEmail,
+          'An update on your Glåüm role suggestion',
+          `<p>Thanks for the suggestion! Unfortunately "${suggestion.role_name}" wasn't added at this time. Reach out to an organiser if you have questions.</p>`,
+        )
+      }
     }
 
     // Update suggestion status

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { notifyAdmin } from '@/lib/notify-admin'
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth()
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest) {
 
     const data = await req.json()
 
-    const { error } = await supabaseAdmin
+    const { data: inserted, error } = await supabaseAdmin
       .from('applications')
       .insert([{
         clerk_user_id: userId,
@@ -62,7 +63,11 @@ export async function POST(req: NextRequest) {
         structures: data.structures || null,
         rideshare: data.rideshare || null,
 
+        // Section 2 (wizard) — new fields
+        find_at_camp: data.find_at_camp || null,
+
         // Section 4 — Participation
+        department_interests: data.department_interests || [],
         leadership_interest: data.leadership_interest || null,
         setup_available: data.setup_available || null,
         setup_preference: data.setup_preference || [],
@@ -85,11 +90,21 @@ export async function POST(req: NextRequest) {
 
         status: 'pending',
       }])
+      .select('id')
+      .single()
 
     if (error) {
       console.error('Supabase error:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
+
+    const displayName = [data.preferred_name || data.first_name, data.last_name].filter(Boolean).join(' ')
+    await notifyAdmin({
+      eventType: 'new_application',
+      applicationId: inserted?.id ?? null,
+      message: `New application from ${displayName}`,
+      details: { email: data.email },
+    })
 
     return NextResponse.json({ success: true })
   } catch (err) {

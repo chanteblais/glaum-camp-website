@@ -63,36 +63,59 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   })
 
-  const statusColor =
-    app.status === 'approved' ? '#C8A848' :
-    app.status === 'cancelled' ? '#ffb4b4' :
-    app.status === 'rejected' ? 'rgba(243,237,230,0.3)' :
-    '#D239F8'
-
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1 }}>
-      <div style={{ maxWidth: '760px', margin: '0 auto', padding: '3rem 1.5rem 6rem' }}>
+      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '3rem 1.5rem 6rem' }}>
 
         {/* Nav */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
+        <div style={{ marginBottom: '3rem' }}>
           <a href="/admin" style={{ fontSize: '0.8rem', letterSpacing: '0.1em', color: '#C8A848', textDecoration: 'none', opacity: 0.6 }}>
             ← Back to registry
           </a>
-          <span style={{ fontSize: '0.7rem', letterSpacing: '0.15em', color: statusColor, opacity: 0.8, textTransform: 'uppercase' }}>
-            {app.status}
-          </span>
         </div>
 
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-          <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(1.8rem, 5vw, 2.8rem)', color: '#C8A848', marginBottom: '0.25rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: '2.5rem' }}>
+          {/* Avatar */}
+          {app.avatar_url ? (
+            <img
+              src={app.avatar_url}
+              alt={`${app.preferred_name || app.first_name} ${app.last_name}`}
+              style={{ width: '260px', height: '260px', borderRadius: '50%', objectFit: 'cover', border: '3px solid #6F491F', boxShadow: '0 0 0 1px rgba(200,168,72,0.2), 0 4px 24px rgba(0,0,0,0.5)', marginBottom: '1.5rem' }}
+            />
+          ) : (
+            <div style={{ width: '260px', height: '260px', borderRadius: '50%', border: '2px solid rgba(200,168,72,0.15)', background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', color: 'rgba(200,168,72,0.2)', fontSize: '4rem' }}>
+              ✦
+            </div>
+          )}
+
+          {/* Kicker */}
+          <p style={{ fontSize: '0.65rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: '#D239F8', marginBottom: '0.3rem', opacity: 0.85 }}>
+            Application
+          </p>
+
+          {/* Name */}
+          <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 6vw, 3rem)', color: '#C8A848', marginBottom: '0.15rem', textShadow: '0 0 40px rgba(210,57,248,0.4)' }}>
             {app.preferred_name || app.first_name} {app.last_name}
           </h1>
+
           {app.pronouns && (
-            <p style={{ fontSize: '0.85rem', opacity: 0.45, marginBottom: '0.2rem' }}>{app.pronouns}</p>
+            <p style={{ fontSize: '0.85rem', opacity: 0.5, marginBottom: '0.1rem' }}>{app.pronouns}</p>
           )}
-          <p style={{ fontSize: '0.8rem', opacity: 0.4 }}>{app.email}</p>
-          <p style={{ fontSize: '0.75rem', opacity: 0.3, marginTop: '0.25rem', fontStyle: 'italic' }}>Submitted {submitted}</p>
+          <p style={{ fontSize: '0.8rem', opacity: 0.4, marginBottom: '0.5rem' }}>{app.email}</p>
+
+          {/* Status pill */}
+          <span style={{
+            display: 'inline-block', padding: '0.3rem 1.1rem', borderRadius: '9999px',
+            fontSize: '0.7rem', letterSpacing: '0.12em', textTransform: 'uppercase',
+            backgroundColor: app.status === 'approved' ? 'rgba(210,57,248,0.15)' : app.status === 'rejected' ? 'rgba(255,255,255,0.06)' : app.status === 'cancelled' ? 'rgba(255,100,100,0.1)' : 'rgba(200,168,72,0.1)',
+            border: `1px solid ${app.status === 'approved' ? 'rgba(210,57,248,0.3)' : app.status === 'rejected' ? 'rgba(255,255,255,0.15)' : app.status === 'cancelled' ? 'rgba(255,100,100,0.25)' : 'rgba(200,168,72,0.3)'}`,
+            color: app.status === 'approved' ? '#D239F8' : app.status === 'rejected' ? 'rgba(243,237,230,0.45)' : app.status === 'cancelled' ? '#ffb4b4' : '#C8A848',
+          }}>
+            {app.status === 'pending' ? '○ Pending Review' : app.status === 'approved' ? '✦ Approved' : app.status === 'rejected' ? 'Rejected' : 'Cancelled'}
+          </span>
+
+          <p style={{ fontSize: '0.72rem', opacity: 0.3, marginTop: '0.75rem', fontStyle: 'italic' }}>Submitted {submitted}</p>
         </div>
 
         {/* Actions for pending */}

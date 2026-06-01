@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, FormEvent } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useRef, FormEvent } from 'react'
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
@@ -14,25 +13,24 @@ const inputStyle: React.CSSProperties = {
   fontFamily: 'var(--font-libre-baskerville), Georgia, serif',
   outline: 'none',
   transition: 'border-color 0.2s',
+  boxSizing: 'border-box',
 }
 
 const labelStyle: React.CSSProperties = {
   display: 'block',
-  fontSize: '0.8rem',
-  letterSpacing: '0.1em',
+  fontSize: '0.75rem',
+  letterSpacing: '0.12em',
   color: '#C8A848',
   marginBottom: '0.5rem',
   textTransform: 'uppercase',
 }
 
-const fieldStyle: React.CSSProperties = {
-  marginBottom: '2.75rem',
-}
+const fieldStyle: React.CSSProperties = { marginBottom: '1.75rem' }
 
 const dividerStyle: React.CSSProperties = {
   height: '1px',
   background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.3), transparent)',
-  margin: '3rem 0',
+  margin: '2.5rem 0',
 }
 
 function Field({ label, children, optional }: { label: string; children: React.ReactNode; optional?: boolean }) {
@@ -40,15 +38,15 @@ function Field({ label, children, optional }: { label: string; children: React.R
     <div style={fieldStyle}>
       <label style={labelStyle}>
         {label}
-        {optional && <span style={{ opacity: 0.45, marginLeft: '0.4rem', textTransform: 'none', letterSpacing: 0, fontSize: '0.75rem' }}>(optional)</span>}
+        {optional && <span style={{ opacity: 0.45, marginLeft: '0.4rem', textTransform: 'none', letterSpacing: 0, fontSize: '0.72rem' }}>(optional)</span>}
       </label>
       {children}
     </div>
   )
 }
 
-function TextInput({ name, placeholder, type = 'text', required, defaultValue, maxLength }: {
-  name: string; placeholder?: string; type?: string; required?: boolean; defaultValue?: string; maxLength?: number
+function TextInput({ name, placeholder, type = 'text', required, defaultValue, readOnly }: {
+  name: string; placeholder?: string; type?: string; required?: boolean; defaultValue?: string; readOnly?: boolean
 }) {
   return (
     <input
@@ -57,15 +55,15 @@ function TextInput({ name, placeholder, type = 'text', required, defaultValue, m
       placeholder={placeholder}
       required={required}
       defaultValue={defaultValue}
-      maxLength={maxLength}
-      style={inputStyle}
-      onFocus={e => { e.currentTarget.style.borderColor = 'rgba(210,57,248,0.6)' }}
+      readOnly={readOnly}
+      style={{ ...inputStyle, ...(readOnly ? { opacity: 0.55, cursor: 'default' } : {}) }}
+      onFocus={e => { if (!readOnly) e.currentTarget.style.borderColor = 'rgba(210,57,248,0.6)' }}
       onBlur={e => { e.currentTarget.style.borderColor = 'rgba(200,168,72,0.25)' }}
     />
   )
 }
 
-function TextArea({ name, placeholder, rows = 4 }: { name: string; placeholder?: string; rows?: number }) {
+function TextArea({ name, placeholder, rows = 3 }: { name: string; placeholder?: string; rows?: number }) {
   return (
     <textarea
       name={name}
@@ -78,53 +76,13 @@ function TextArea({ name, placeholder, rows = 4 }: { name: string; placeholder?:
   )
 }
 
-function CheckboxGroup({ options, name }: { options: string[]; name: string }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-      {options.map(option => (
-        <label key={option} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer', fontSize: '0.9rem', lineHeight: 1.5, color: '#F3EDE6', opacity: 0.85 }}>
-          <input
-            type="checkbox"
-            name={name}
-            value={option}
-            style={{ marginTop: '0.2rem', width: '1rem', height: '1rem', flexShrink: 0, accentColor: '#D239F8', cursor: 'pointer' }}
-          />
-          {option}
-        </label>
-      ))}
-    </div>
-  )
-}
-
 const SIGNUP_INTENT_OPTIONS = [
-  { value: 'shift', label: 'Sign up for a shift', description: 'I want to help out during a specific time slot.' },
-  { value: 'role', label: 'Take on a camp role', description: 'I want to take on a defined responsibility for the event.' },
-  { value: 'other', label: 'Something else', description: "I'm interested in contributing but not sure how yet, or I have something else in mind." },
+  { value: 'shift',  label: 'Sign up for a shift',   desc: 'Help out during a specific time slot.' },
+  { value: 'role',   label: 'Take on a camp role',    desc: 'Take on a defined responsibility for the event.' },
+  { value: 'other',  label: 'Something else',          desc: "I'm not sure yet, or I have something else in mind." },
 ]
 
-function SignupIntentCheckboxes() {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-      {SIGNUP_INTENT_OPTIONS.map(opt => (
-        <label key={opt.value} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.85rem', cursor: 'pointer', padding: '0.85rem 1rem', borderRadius: '0.6rem', border: '1px solid rgba(200,168,72,0.15)', background: 'rgba(255,255,255,0.02)' }}>
-          <input
-            type="checkbox"
-            name="signup_intent"
-            value={opt.value}
-            style={{ marginTop: '0.25rem', flexShrink: 0, accentColor: '#D239F8', cursor: 'pointer' }}
-          />
-          <div>
-            <p style={{ fontSize: '0.9rem', color: '#F3EDE6', marginBottom: '0.2rem' }}>{opt.label}</p>
-            <p style={{ fontSize: '0.78rem', opacity: 0.5, lineHeight: 1.5 }}>{opt.description}</p>
-          </div>
-        </label>
-      ))}
-    </div>
-  )
-}
-
 const DAYS = ['Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Monday', 'Flexible']
-
 
 export function VolunteerForm({ userEmail, userFirstName, userLastName }: {
   userEmail: string
@@ -134,29 +92,50 @@ export function VolunteerForm({ userEmail, userFirstName, userLastName }: {
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const router = useRouter()
+  const [otherChecked, setOtherChecked] = useState(false)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setAvatarPreview(URL.createObjectURL(file))
+    setAvatarUploading(true)
+    const fd = new FormData()
+    fd.append('avatar', file)
+    const res = await fetch('/api/profile/avatar', { method: 'POST', body: fd })
+    const json = await res.json()
+    if (res.ok) setAvatarUrl(json.avatarUrl)
+    setAvatarUploading(false)
+    if (avatarInputRef.current) avatarInputRef.current.value = ''
+  }
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setSubmitting(true)
     setError(null)
 
-    const formData = new FormData(e.currentTarget)
+    if (!avatarUrl) {
+      setError('Please upload a photo before submitting.')
+      setSubmitting(false)
+      return
+    }
+
+    const form = new FormData(e.currentTarget)
 
     const data = {
-      first_name: formData.get('first_name'),
-      last_name: formData.get('last_name'),
-      preferred_name: formData.get('preferred_name') || null,
-      pronouns: formData.get('pronouns') || null,
-      email: formData.get('email'),
-      phone: formData.get('phone'),
-      brings_to_glaum: formData.get('brings_to_glaum') || null,
-      signup_intent: formData.getAll('signup_intent'),
-      days_available: formData.getAll('days_available'),
-      specific_interests: formData.get('specific_interests') || null,
-      special_skills: formData.get('special_skills') || null,
-      familiar_with_glaum: formData.get('familiar_with_glaum') === 'yes',
-      why_contribute: formData.get('why_contribute') || null,
+      first_name:      form.get('first_name'),
+      last_name:       form.get('last_name'),
+      preferred_name:  form.get('preferred_name') || null,
+      pronouns:        form.get('pronouns') || null,
+      email:           form.get('email'),
+      phone:           form.get('phone') || null,
+      signup_intent:   form.getAll('signup_intent'),
+      days_available:  form.getAll('days_available'),
+      other_notes:     form.get('other_notes') || null,
+      avatar_url:      avatarUrl || null,
     }
 
     try {
@@ -165,12 +144,10 @@ export function VolunteerForm({ userEmail, userFirstName, userLastName }: {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       })
-
       if (!res.ok) {
-        const { error } = await res.json()
-        throw new Error(error || 'Submission failed')
+        const json = await res.json()
+        throw new Error(json.error || 'Submission failed')
       }
-
       setSubmitted(true)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err: any) {
@@ -179,15 +156,40 @@ export function VolunteerForm({ userEmail, userFirstName, userLastName }: {
     }
   }
 
-  return (
-    <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1 }}>
-      <div style={{ padding: '1.5rem', maxWidth: '640px', margin: '0 auto' }}>
-        <a href="/" style={{ fontSize: '0.8rem', letterSpacing: '0.1em', color: '#C8A848', textDecoration: 'none', opacity: 0.6 }}>
-          ← Back to camp
-        </a>
+  if (submitted) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '3rem 1.5rem' }}>
+        <div style={{ textAlign: 'center', maxWidth: '480px' }}>
+          <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '2.5rem', color: '#C8A848', marginBottom: '1.25rem', textShadow: '0 0 40px rgba(210,57,248,0.4)' }}>
+            Thank you.
+          </p>
+          <p style={{ fontSize: '0.95rem', lineHeight: 1.8, opacity: 0.7, marginBottom: '0.75rem' }}>
+            Your volunteer signup has been received.
+          </p>
+          <p style={{ fontSize: '0.85rem', lineHeight: 1.8, opacity: 0.45 }}>
+            We'll be in touch as the event gets closer with next steps.
+          </p>
+          <a href="/" style={{ display: 'inline-block', marginTop: '2rem', fontSize: '0.8rem', color: '#C8A848', opacity: 0.6, textDecoration: 'none', letterSpacing: '0.08em' }}>
+            ← Back to camp
+          </a>
+        </div>
       </div>
+    )
+  }
 
-      <div style={{ maxWidth: '640px', margin: '0 auto', padding: '0 1.5rem 6rem' }}>
+  return (
+    <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
+      <img src="/hands-left.svg"  alt="" aria-hidden style={{ position: 'fixed', left: 0,  top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
+      <img src="/hands-right.svg" alt="" aria-hidden style={{ position: 'fixed', right: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
+
+      <div style={{ maxWidth: '640px', margin: '0 auto', padding: '3rem 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
+
+        {/* Back link */}
+        <div style={{ marginBottom: '3rem' }}>
+          <a href="/apply" style={{ fontSize: '0.8rem', letterSpacing: '0.1em', color: '#C8A848', textDecoration: 'none', opacity: 0.6 }}>
+            ← Back
+          </a>
+        </div>
 
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
@@ -197,138 +199,160 @@ export function VolunteerForm({ userEmail, userFirstName, userLastName }: {
           <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 6vw, 3rem)', color: '#C8A848', lineHeight: 1.1, marginBottom: '1rem', textShadow: '0 0 40px rgba(210,57,248,0.4)' }}>
             Volunteer Signup
           </h1>
-          <p style={{ fontSize: '0.95rem', lineHeight: 1.8, opacity: 0.6, maxWidth: '480px', margin: '0 auto' }}>
-            Not camping with Glåüm, but want to be part of it? Sign up to volunteer and we'll be in touch as the event gets closer.
+          <p style={{ fontSize: '0.9rem', lineHeight: 1.8, opacity: 0.55, maxWidth: '440px', margin: '0 auto' }}>
+            Want to be part of Glåüm without a full membership? Fill out the form below and we'll be in touch.
           </p>
         </div>
 
         <div style={dividerStyle} />
 
-        {/* Success state */}
-        {submitted ? (
-          <div style={{ textAlign: 'center', padding: '4rem 2rem', border: '1px solid rgba(200,168,72,0.3)', borderRadius: '1rem', background: 'rgba(210,57,248,0.05)' }}>
-            <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '2rem', color: '#C8A848', marginBottom: '1.25rem' }}>
-              Thank you.
-            </p>
-            <p style={{ fontSize: '0.95rem', lineHeight: 1.8, opacity: 0.75, marginBottom: '0.75rem' }}>
-              Thank you for your interest in contributing to Glåüm.
-            </p>
-            <p style={{ fontSize: '0.9rem', lineHeight: 1.8, opacity: 0.6, marginBottom: '0.75rem' }}>
-              Approved volunteers will be invited to join the Many Hands Registry, where they may sign up for available roles and shifts.
-            </p>
-            <p style={{ fontSize: '0.85rem', lineHeight: 1.8, opacity: 0.4, fontStyle: 'italic' }}>
-              Attunement may begin immediately. Results may vary.
-            </p>
+        <form onSubmit={handleSubmit}>
+
+          {/* Basic info */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+            <Field label="First Name">
+              <TextInput name="first_name" placeholder="First name" required defaultValue={userFirstName} />
+            </Field>
+            <Field label="Last Name">
+              <TextInput name="last_name" placeholder="Last name" required defaultValue={userLastName} />
+            </Field>
           </div>
-        ) : (
-          <form onSubmit={handleSubmit}>
 
-            {/* Basic info */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
-              <Field label="First Name">
-                <TextInput name="first_name" placeholder="First name" required defaultValue={userFirstName} maxLength={50} />
-              </Field>
-              <Field label="Last Name">
-                <TextInput name="last_name" placeholder="Last name" required defaultValue={userLastName} maxLength={50} />
-              </Field>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+            <Field label="Preferred Name" optional>
+              <TextInput name="preferred_name" placeholder="If different from first name" />
+            </Field>
+            <Field label="Pronouns" optional>
+              <TextInput name="pronouns" placeholder="e.g. she/her, they/them" />
+            </Field>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+            <Field label="Email">
+              <TextInput name="email" type="email" defaultValue={userEmail} readOnly required />
+            </Field>
+            <Field label="Phone">
+              <TextInput name="phone" type="tel" placeholder="For shift coordination" required />
+            </Field>
+          </div>
+
+          {/* Photo upload */}
+          <Field label="Photo">
+            <p style={{ fontSize: '0.8rem', lineHeight: 1.7, opacity: 0.45, fontStyle: 'italic', marginBottom: '1rem' }}>
+              A photo helps the organising team put a face to the name.
+            </p>
+            <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
+            <div
+              onClick={() => !avatarUploading && avatarInputRef.current?.click()}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                gap: '0.75rem', minHeight: '120px', padding: '1.5rem',
+                border: `1px dashed ${avatarPreview ? 'rgba(210,57,248,0.4)' : 'rgba(200,168,72,0.25)'}`,
+                borderRadius: '0.75rem', cursor: avatarUploading ? 'wait' : 'pointer',
+                background: avatarPreview ? 'rgba(210,57,248,0.04)' : 'rgba(255,255,255,0.02)',
+                transition: 'border-color 0.2s, background 0.2s',
+              }}
+              onMouseEnter={e => { if (!avatarUploading) (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(210,57,248,0.5)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = avatarPreview ? 'rgba(210,57,248,0.4)' : 'rgba(200,168,72,0.25)' }}
+            >
+              {avatarPreview ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', width: '100%' }}>
+                  <img src={avatarPreview} alt="Preview" style={{ width: '72px', height: '72px', borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(210,57,248,0.3)', flexShrink: 0 }} />
+                  <div>
+                    {avatarUploading
+                      ? <p style={{ fontSize: '0.85rem', color: '#D239F8', opacity: 0.8 }}>Uploading…</p>
+                      : <><p style={{ fontSize: '0.85rem', color: '#7dcf8e', marginBottom: '0.25rem' }}>✓ Photo uploaded</p><p style={{ fontSize: '0.75rem', opacity: 0.45, fontStyle: 'italic' }}>Click to change</p></>
+                    }
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="rgba(200,168,72,0.5)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                    <circle cx="12" cy="13" r="4" />
+                  </svg>
+                  <p style={{ fontSize: '0.85rem', opacity: 0.5, margin: 0 }}>Click to upload a photo</p>
+                  <p style={{ fontSize: '0.72rem', opacity: 0.3, margin: 0 }}>JPEG, PNG, WebP · max 5 MB</p>
+                </>
+              )}
             </div>
+          </Field>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
-              <Field label="Preferred Name" optional>
-                <TextInput name="preferred_name" placeholder="If different from first name" maxLength={50} />
-              </Field>
-              <Field label="Pronouns" optional>
-                <TextInput name="pronouns" placeholder="e.g. she/her, they/them" />
-              </Field>
+          <div style={dividerStyle} />
+
+          {/* Signup intent */}
+          <Field label="How would you like to help?">
+            <p style={{ fontSize: '0.8rem', opacity: 0.45, fontStyle: 'italic', marginBottom: '0.85rem', lineHeight: 1.5 }}>Select all that apply</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              {SIGNUP_INTENT_OPTIONS.map(opt => (
+                <label key={opt.value} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.85rem', cursor: 'pointer', padding: '0.85rem 1rem', borderRadius: '0.6rem', border: '1px solid rgba(200,168,72,0.15)', background: 'rgba(255,255,255,0.02)' }}>
+                  <input
+                    type="checkbox"
+                    name="signup_intent"
+                    value={opt.value}
+                    onChange={opt.value === 'other' ? e => setOtherChecked(e.target.checked) : undefined}
+                    style={{ marginTop: '0.25rem', flexShrink: 0, accentColor: '#D239F8', cursor: 'pointer' }}
+                  />
+                  <div>
+                    <p style={{ fontSize: '0.9rem', color: '#F3EDE6', margin: '0 0 0.2rem' }}>{opt.label}</p>
+                    <p style={{ fontSize: '0.78rem', opacity: 0.45, lineHeight: 1.5, margin: 0 }}>{opt.desc}</p>
+                  </div>
+                </label>
+              ))}
             </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
-              <Field label="Email">
-                <input
-                  name="email"
-                  type="email"
-                  defaultValue={userEmail}
-                  readOnly
-                  required
-                  style={{ ...inputStyle, opacity: 0.6, cursor: 'default' }}
-                />
-              </Field>
-              <Field label="Phone">
-                <TextInput name="phone" type="tel" placeholder="For shift coordination" required />
-              </Field>
-            </div>
-
-            <div style={dividerStyle} />
-
-            <Field label="How would you like to contribute?">
-              <p style={{ fontSize: '0.8rem', opacity: 0.45, fontStyle: 'italic', marginBottom: '0.75rem' }}>Select all that apply</p>
-              <SignupIntentCheckboxes />
-            </Field>
-
-            <Field label="What brings you to Glåüm?">
-              <TextArea name="brings_to_glaum" placeholder="Tell us a little about how you found us and what draws you here." rows={4} />
-            </Field>
-
-            <Field label="What days are you likely available?">
-              <CheckboxGroup name="days_available" options={DAYS} />
-            </Field>
-
-            <Field label="Are there any roles or activities that particularly interest you?" optional>
-              <TextArea name="specific_interests" placeholder="Anything specific you have in mind..." rows={3} />
-            </Field>
-
-            <Field label="Is there anything you're particularly good at that Glåüm should know about?" optional>
-              <TextArea name="special_skills" placeholder="Skills, talents, specialties — mundane or otherwise." rows={3} />
-            </Field>
-
-            <div style={dividerStyle} />
-
-            <Field label="Have you familiarized yourself with Glåüm?">
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer', fontSize: '0.9rem', lineHeight: 1.6, color: '#F3EDE6', opacity: 0.85 }}>
-                <input
-                  type="checkbox"
-                  name="familiar_with_glaum"
-                  value="yes"
-                  style={{ marginTop: '0.2rem', width: '1rem', height: '1rem', flexShrink: 0, accentColor: '#D239F8', cursor: 'pointer' }}
-                />
-                I've explored the website, spoken with members, attended events, or otherwise have a general understanding of what Glåüm is about.
-              </label>
-            </Field>
-
-            <Field label="Why do you want to contribute to Glåüm?">
-              <TextArea name="why_contribute" placeholder="Take your time with this one." rows={5} />
-            </Field>
-
-            {error && (
-              <p style={{ color: '#ff6b6b', fontSize: '0.9rem', marginBottom: '1.25rem', textAlign: 'center' }}>{error}</p>
+            {otherChecked && (
+              <div style={{ marginTop: '0.75rem' }}>
+                <TextArea name="specific_interests" placeholder="Tell us more about what you have in mind…" rows={3} />
+              </div>
             )}
+          </Field>
 
-            <div style={{ textAlign: 'center' }}>
-              <button
-                type="submit"
-                disabled={submitting}
-                style={{
-                  padding: '0.9rem 2.75rem',
-                  borderRadius: '9999px',
-                  border: '1px solid rgba(200,168,72,0.5)',
-                  backgroundColor: 'transparent',
-                  color: '#FFFACD',
-                  fontFamily: 'TokyoDreams, serif',
-                  fontSize: '0.9rem',
-                  letterSpacing: '0.15em',
-                  cursor: submitting ? 'not-allowed' : 'pointer',
-                  opacity: submitting ? 0.5 : 1,
-                  transition: 'all 0.25s',
-                }}
-                onMouseEnter={e => { if (!submitting) e.currentTarget.style.backgroundColor = 'rgba(200,168,72,0.08)' }}
-                onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }}
-              >
-                {submitting ? 'Submitting...' : 'Submit'}
-              </button>
+          {/* Days available */}
+          <Field label="What days are you likely available?" optional>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {DAYS.map(day => (
+                <label key={day} style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', cursor: 'pointer', fontSize: '0.9rem', color: '#F3EDE6', opacity: 0.85 }}>
+                  <input type="checkbox" name="days_available" value={day} style={{ width: '1rem', height: '1rem', flexShrink: 0, accentColor: '#D239F8', cursor: 'pointer' }} />
+                  {day}
+                </label>
+              ))}
             </div>
+          </Field>
 
-          </form>
-        )}
+          {/* Anything else */}
+          <Field label="Anything else we should know?" optional>
+            <TextArea name="other_notes" placeholder="Skills, availability notes, questions — whatever feels relevant." rows={3} />
+          </Field>
+
+          {error && (
+            <p style={{ color: '#ff6b6b', fontSize: '0.9rem', marginBottom: '1.25rem', textAlign: 'center' }}>{error}</p>
+          )}
+
+          <div style={{ textAlign: 'center', paddingTop: '0.5rem' }}>
+            <button
+              type="submit"
+              disabled={submitting}
+              style={{
+                padding: '0.9rem 2.75rem',
+                borderRadius: '9999px',
+                border: '1px solid rgba(200,168,72,0.5)',
+                backgroundColor: 'transparent',
+                color: '#FFFACD',
+                fontFamily: 'TokyoDreams, serif',
+                fontSize: '0.9rem',
+                letterSpacing: '0.15em',
+                cursor: submitting ? 'not-allowed' : 'pointer',
+                opacity: submitting ? 0.5 : 1,
+                transition: 'all 0.25s',
+              }}
+              onMouseEnter={e => { if (!submitting) e.currentTarget.style.backgroundColor = 'rgba(200,168,72,0.08)' }}
+              onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }}
+            >
+              {submitting ? 'Submitting…' : 'Submit'}
+            </button>
+          </div>
+
+        </form>
       </div>
     </div>
   )

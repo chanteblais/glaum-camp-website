@@ -211,7 +211,7 @@ function RoleModal({
 
         <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.85rem', cursor: 'pointer', marginBottom: '1rem' }}>
           <span
-            onClick={() => set('requires_approval', !form.requires_approval)}
+            onClick={() => setForm(f => ({ ...f, requires_approval: !f.requires_approval }))}
             style={{
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               width: '36px', height: '20px', borderRadius: '9999px', flexShrink: 0, marginTop: '2px',

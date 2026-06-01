@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { sendUserEmail } from '@/lib/send-email'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const { userId } = await auth()
@@ -38,11 +39,22 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   // Notify the applicant
   if (application?.clerk_user_id) {
     const displayName = application.preferred_name || application.first_name || 'Camper'
+    const message = `Welcome to Glåüm, ${displayName}! Your application has been approved. 🎉`
     await supabaseAdmin.from('user_notifications').insert([{
       clerk_user_id: application.clerk_user_id,
       event_type: 'application_approved',
-      message: `Welcome to Glåüm, ${displayName}! Your application has been approved. 🎉`,
+      message,
     }])
+
+    const clerkUser = await client.users.getUser(application.clerk_user_id)
+    const email = clerkUser.emailAddresses[0]?.emailAddress
+    if (email) {
+      await sendUserEmail(
+        email,
+        'Your Glåüm application has been approved!',
+        `<p>Hi ${displayName},</p><p>Great news — your application to Glåüm has been approved! Head to your <a href="https://glaum.camp/profile">profile</a> to choose your role and shift.</p><p>See you at camp ✦</p>`,
+      )
+    }
   }
 
   return NextResponse.json({ success: true })

@@ -75,23 +75,22 @@ function EventCard({ event, top, height }: { event: PersonalEvent; top: number; 
       borderRadius: '8px',
       border: `1.5px solid ${c.border}`,
       background: c.bg,
-      padding: tall ? '18px 12px' : '10px 10px',
+      padding: tall ? '10px 12px' : '6px 10px',
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start',
-      overflow: 'hidden',
       boxShadow: isPersonalShift
         ? `0 0 20px rgba(182,80,200,0.28), inset 0 0 24px rgba(20,0,30,0.35)`
         : `inset 0 0 20px rgba(0,0,0,0.22), 0 0 10px rgba(0,0,0,0.12)`,
     }}>
       {event.time && (
-        <p style={{ fontSize: '0.58rem', color: c.time, margin: `0 0 ${tall ? 9 : 4}px`, letterSpacing: '0.02em', lineHeight: 1.1, fontWeight: 600, textAlign: 'center', textShadow: '0 1px 0 rgba(0,0,0,0.45)' }}>
+        <p style={{ fontSize: '0.52rem', color: c.time, margin: `0 0 ${tall ? 9 : 4}px`, letterSpacing: '0.02em', lineHeight: 1.1, fontWeight: 600, textAlign: 'center', textShadow: '0 1px 0 rgba(0,0,0,0.45)' }}>
           {event.time}
         </p>
       )}
-      <p style={{ fontSize: tall ? '0.82rem' : '0.68rem', fontWeight: 700, color: c.title, margin: 0, lineHeight: 1.2, wordBreak: 'break-word', textAlign: 'center', textShadow: '0 1px 0 rgba(0,0,0,0.75)' }}>
+      <p style={{ fontSize: tall ? '0.65rem' : '0.56rem', fontWeight: 700, color: c.title, margin: 0, lineHeight: 1.2, wordBreak: 'break-word', textAlign: 'center', textShadow: '0 1px 0 rgba(0,0,0,0.75)' }}>
         {event.title}
       </p>
       {event.subtitle && tall && (
-        <p style={{ fontSize: '0.6rem', color: c.subtitle, margin: '11px 0 0', lineHeight: 1.3, fontWeight: 500, textAlign: 'center', textShadow: '0 1px 0 rgba(0,0,0,0.5)' }}>
+        <p style={{ fontSize: '0.54rem', color: c.subtitle, margin: '11px 0 0', lineHeight: 1.3, fontWeight: 500, textAlign: 'center', textShadow: '0 1px 0 rgba(0,0,0,0.5)' }}>
           {event.subtitle}
         </p>
       )}

@@ -163,7 +163,7 @@ export async function POST(req: NextRequest) {
 
     if (isRoleChange) {
       const [oldRole, newRole] = await Promise.all([
-        supabaseAdmin.from('roles').select('name').eq('id', existing.role_id!).single(),
+        supabaseAdmin.from('roles').select('name').eq('id', existing?.role_id ?? '').single(),
         supabaseAdmin.from('roles').select('name').eq('id', role_id).single(),
       ])
       await supabaseAdmin.from('admin_notifications').insert({
@@ -171,7 +171,7 @@ export async function POST(req: NextRequest) {
         event_type: 'role_change',
         message: `${name} changed their role`,
         details: {
-          from_role: oldRole.data?.name ?? existing.role_id,
+          from_role: oldRole.data?.name ?? existing?.role_id,
           to_role: newRole.data?.name ?? role_id,
         },
       })
@@ -179,7 +179,7 @@ export async function POST(req: NextRequest) {
 
     if (isEventChange) {
       const [oldEv, newEv] = await Promise.all([
-        supabaseAdmin.from('schedule_events').select('title').eq('id', existing.schedule_event_id!).single(),
+        supabaseAdmin.from('schedule_events').select('title').eq('id', existing?.schedule_event_id ?? '').single(),
         supabaseAdmin.from('schedule_events').select('title').eq('id', schedule_event_id).single(),
       ])
       await supabaseAdmin.from('admin_notifications').insert({
@@ -187,7 +187,7 @@ export async function POST(req: NextRequest) {
         event_type: 'shift_change',
         message: `${name} changed their shift`,
         details: {
-          from_shift: oldEv.data?.title ?? existing.schedule_event_id,
+          from_shift: oldEv.data?.title ?? existing?.schedule_event_id,
           to_shift: newEv.data?.title ?? schedule_event_id,
         },
       })

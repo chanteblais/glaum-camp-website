@@ -18,6 +18,8 @@
     "next": "^14.2.35",
     "react": "^18",
     "react-dom": "^18",
+    "react-easy-crop": "^5.5.7",
+    "resend": "^6.12.4",
     "tailwind-merge": "^2.2.0"
   },
   "devDependencies": {

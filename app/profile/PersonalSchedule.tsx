@@ -49,7 +49,7 @@ export async function PersonalSchedule({ userId, contributions }: Props) {
 
   // User's explicitly signed shift events
   for (const signup of userSignups ?? []) {
-    const ev = signup.schedule_events as Omit<PersonalEvent, 'isPersonal'> | null
+    const ev = signup.schedule_events as unknown as Omit<PersonalEvent, 'isPersonal'> | null
     if (!ev) continue
     if (seenIds.has(ev.id)) {
       const existing = events.find(e => e.id === ev.id)

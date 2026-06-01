@@ -162,6 +162,15 @@ export function NotificationBell({
                 const when = new Date(n.created_at).toLocaleString('en-CA', {
                   month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
                 })
+
+                const link: { href: string; label: string } | null = (() => {
+                  if (n.application_id) return { href: `/admin/${n.application_id}`, label: 'View application →' }
+                  if (n.event_type === 'volunteer_signup' && n.details?.volunteer_id) return { href: `/admin#volunteer-${n.details.volunteer_id}`, label: 'View volunteer →' }
+                  if (n.event_type === 'volunteer_signup') return { href: '/admin', label: 'View volunteers →' }
+                  if (n.event_type === 'role_suggestion') return { href: '/admin', label: 'Review suggestion →' }
+                  return null
+                })()
+
                 return (
                   <div
                     key={n.id}
@@ -185,13 +194,13 @@ export function NotificationBell({
                         "{n.details.reason}"
                       </p>
                     )}
-                    {n.application_id && (
+                    {link && (
                       <a
-                        href={`/admin/${n.application_id}`}
+                        href={link.href}
                         onClick={() => setOpen(false)}
                         style={{ display: 'inline-block', marginTop: '0.4rem', fontSize: '0.72rem', color: '#C8A848', opacity: 0.7, textDecoration: 'none', letterSpacing: '0.04em' }}
                       >
-                        View application →
+                        {link.label}
                       </a>
                     )}
                   </div>

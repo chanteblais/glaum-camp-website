@@ -8,9 +8,11 @@ import { NotificationsSection } from './NotificationsSection'
 import { NotificationBell } from './NotificationBell'
 import { AdminTabBar } from './AdminTabBar'
 import { ScheduleManager } from './ScheduleManager'
+import { AnnouncementsManager } from './AnnouncementsManager'
 import { DepartmentsManager } from './DepartmentsManager'
 import { RoleRequestsSection } from './RoleRequestsSection'
 import { RoleSuggestionsSection } from './RoleSuggestionsSection'
+import { DebugSection } from './DebugSection'
 
 export default async function AdminPage() {
   const { userId } = await auth()
@@ -31,8 +33,15 @@ export default async function AdminPage() {
 
   const { data: applications, error: dbError } = await supabaseAdmin
     .from('applications')
-    .select('id, first_name, last_name, preferred_name, email, status, submitted_at, attendance, camp_relationship, camped_before, setup_preference')
+    .select('id, clerk_user_id, first_name, last_name, preferred_name, email, status, submitted_at, attendance, camp_relationship, camped_before, setup_preference')
     .order('submitted_at', { ascending: false })
+
+  const { data: signupsRaw } = await supabaseAdmin
+    .from('camp_signups')
+    .select('clerk_user_id, schedule_event_id')
+  const signupEventMap = Object.fromEntries(
+    (signupsRaw ?? []).map(s => [s.clerk_user_id, s.schedule_event_id ?? null])
+  )
 
   const { data: notifications, error: notificationsError } = await supabaseAdmin
     .from('admin_notifications')
@@ -47,7 +56,9 @@ export default async function AdminPage() {
   const pending = all.filter(a => a.status === 'pending')
   const approved = all.filter(a => a.status === 'approved')
   const rejected = all.filter(a => a.status === 'rejected')
-  const cancelled = all.filter(a => a.status === 'cancelled')
+  // Exclude cancelled applications where the person has since rejoined as an active volunteer
+  const activeVolunteerEmails = new Set(volunteers.filter(v => v.status === 'active').map(v => v.email.toLowerCase()))
+  const cancelled = all.filter(a => a.status === 'cancelled' && !activeVolunteerEmails.has(a.email.toLowerCase()))
 
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
@@ -132,6 +143,7 @@ export default async function AdminPage() {
               email: a.email,
               contributions: a.setup_preference ?? null,
               attendance: a.attendance ?? null,
+              schedule_event_id: signupEventMap[a.clerk_user_id] ?? null,
             }))}
           />
         </CollapsibleSection>
@@ -161,6 +173,14 @@ export default async function AdminPage() {
           <DepartmentsManager />
         </CollapsibleSection>
 
+        {/* ── ANNOUNCEMENTS ── */}
+        <CollapsibleSection
+          title="Announcements"
+          summary="Post updates visible to all members"
+        >
+          <AnnouncementsManager />
+        </CollapsibleSection>
+
         {/* ── SCHEDULE ── */}
         <CollapsibleSection
           title="Schedule"
@@ -169,13 +189,18 @@ export default async function AdminPage() {
           <ScheduleManager />
         </CollapsibleSection>
 
+        {/* ── DEBUG ── */}
+        <CollapsibleSection title="Debug Tools" summary="Testing utilities">
+          <DebugSection />
+        </CollapsibleSection>
+
         {/* ── REGISTRY ── */}
         <CollapsibleSection
-          title="Registry"
-          summary={`${pending.length} pending · ${approved.length} approved`}
+          title="Applications"
+          summary={`${pending.length} pending${rejected.length > 0 ? ` · ${rejected.length} not approved` : ''}${cancelled.length > 0 ? ` · ${cancelled.length} cancelled` : ''}`}
         >
-          {all.length === 0 ? (
-            <p style={{ textAlign: 'center', opacity: 0.4, fontStyle: 'italic' }}>No applications yet.</p>
+          {pending.length === 0 && rejected.length === 0 && cancelled.length === 0 ? (
+            <p style={{ textAlign: 'center', opacity: 0.4, fontStyle: 'italic' }}>No applications to review.</p>
           ) : (
             <>
               {pending.length > 0 && (
@@ -189,21 +214,9 @@ export default async function AdminPage() {
                 </div>
               )}
 
-              {approved.length > 0 && (
-                <div style={{ marginBottom: '2rem' }}>
-                  {pending.length > 0 && <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.2), transparent)', marginBottom: '2rem' }} />}
-                  <p style={{ fontSize: '0.7rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', marginBottom: '1rem', opacity: 0.7 }}>
-                    Approved
-                  </p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    {approved.map(app => <ApplicationRow key={app.id} app={app} showActions={false} />)}
-                  </div>
-                </div>
-              )}
-
               {rejected.length > 0 && (
                 <div>
-                  <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.2), transparent)', marginBottom: '2rem' }} />
+                  {pending.length > 0 && <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.2), transparent)', marginBottom: '2rem' }} />}
                   <p style={{ fontSize: '0.7rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#F3EDE6', marginBottom: '1rem', opacity: 0.3 }}>
                     Not Approved
                   </p>

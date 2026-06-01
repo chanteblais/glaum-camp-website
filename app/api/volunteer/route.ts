@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
     pronouns: data.pronouns || null,
     email: data.email,
     phone: data.phone || null,
+    avatar_url: data.avatar_url || null,
     brings_to_glaum: data.brings_to_glaum || null,
     signup_intent: Array.isArray(data.signup_intent) && data.signup_intent.length > 0 ? data.signup_intent : null,
     role_interests: data.role_interests ?? [],
@@ -36,13 +37,14 @@ export async function POST(req: NextRequest) {
     special_skills: data.special_skills || null,
     familiar_with_glaum: data.familiar_with_glaum ?? false,
     why_contribute: data.why_contribute || null,
+    other_notes: data.other_notes || null,
     status: 'pending',
   }
 
   // Re-signup: update existing cancelled record instead of inserting
-  const { error } = existing
-    ? await supabaseAdmin.from('volunteers').update(payload).eq('id', existing.id)
-    : await supabaseAdmin.from('volunteers').insert([{ clerk_user_id: userId, ...payload }])
+  const { data: upserted, error } = existing
+    ? await supabaseAdmin.from('volunteers').update(payload).eq('id', existing.id).select('id').single()
+    : await supabaseAdmin.from('volunteers').insert([{ clerk_user_id: userId, ...payload }]).select('id').single()
 
   if (error) {
     console.error('Volunteer signup error:', error)
@@ -57,7 +59,7 @@ export async function POST(req: NextRequest) {
   await notifyAdmin({
     eventType: 'volunteer_signup',
     message: `${displayName} signed up to volunteer`,
-    details: { email: data.email },
+    details: { email: data.email, volunteer_id: upserted?.id ?? existing?.id ?? null },
   })
 
   return NextResponse.json({ success: true })

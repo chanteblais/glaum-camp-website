@@ -5,6 +5,7 @@ type AttunementTask = {
   label: string
   done: boolean
   section?: 'photo' | 'contribution'
+  href?: string
 }
 
 type Props = {
@@ -116,16 +117,32 @@ export function AttunementStatus({ tasks }: Props) {
 
         {/* Task list */}
         <div style={{ padding: '0.6rem 1.75rem 0.7rem', position: 'relative', zIndex: 1 }}>
-          {tasks.map(task => (
+          {tasks.map(task => {
+            const isActionable = !task.done && (task.section || task.href)
+            return (
             <div
             key={task.id}
             onClick={() => {
               if (!task.done && task.section) {
                 window.dispatchEvent(new CustomEvent('glaum:open-settings', { detail: { section: task.section } }))
+              } else if (!task.done && task.href) {
+                // Try immediate scroll first, then retry after a tick in case element isn't painted yet
+                const id = task.href.replace('#', '')
+                const attempt = () => {
+                  const target = document.getElementById(id)
+                  if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                    return true
+                  }
+                  return false
+                }
+                if (!attempt()) {
+                  setTimeout(attempt, 100)
+                }
               }
             }}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.72rem', padding: '0.65rem 0.5rem', cursor: !task.done && task.section ? 'pointer' : 'default', borderRadius: '0.4rem', transition: 'background 0.15s', background: 'transparent' }}
-            onMouseEnter={e => { if (!task.done && task.section) e.currentTarget.style.background = 'rgba(122,85,32,0.1)' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.72rem', padding: '0.65rem 0.5rem', cursor: isActionable ? 'pointer' : 'default', borderRadius: '0.4rem', transition: 'background 0.15s', background: 'transparent' }}
+            onMouseEnter={e => { if (isActionable) e.currentTarget.style.background = 'rgba(122,85,32,0.1)' }}
             onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
           >
               <div style={{
@@ -153,12 +170,13 @@ export function AttunementStatus({ tasks }: Props) {
                 flex: 1,
               }}>
                 {task.label}
-                {!task.done && task.section && (
+                {isActionable && (
                   <span style={{ fontSize: '0.78rem', color: '#9B6A2A', marginLeft: '0.5rem', fontStyle: 'italic' }}>tap to fix →</span>
                 )}
               </span>
             </div>
-          ))}
+            )
+          })}
         </div>
 
         <div style={{ padding: '0 1.35rem', position: 'relative', zIndex: 1 }}>
