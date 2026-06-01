@@ -60,6 +60,8 @@ export default async function OverviewPage() {
     { data: signups },
     { data: volunteers },
     { data: notifications },
+    { data: polls },
+    { data: pollVotes },
   ] = await Promise.all([
     supabaseAdmin
       .from('applications')
@@ -78,12 +80,44 @@ export default async function OverviewPage() {
       .select('id, application_id, event_type, message, details, created_at, read_at')
       .order('created_at', { ascending: false })
       .limit(20),
+    supabaseAdmin
+      .from('polls')
+      .select('id, question, options, visible, allow_multiple, expires_at, created_at')
+      .order('created_at', { ascending: false }),
+    supabaseAdmin
+      .from('poll_votes')
+      .select('poll_id, option_index, clerk_user_id'),
   ])
 
   const all = applications ?? []
   const approved = all.filter(a => a.status === 'approved')
   const pending = all.filter(a => a.status === 'pending')
   const activeVolunteers = volunteers ?? []
+
+  // Build poll results
+  type PollResult = {
+    id: string
+    question: string
+    options: string[]
+    visible: boolean
+    allow_multiple: boolean
+    expires_at: string | null
+    created_at: string
+    counts: number[]
+    totalVoters: number
+  }
+  const pollResults: PollResult[] = (polls ?? []).map(p => {
+    const options = p.options as string[]
+    const counts = Array(options.length).fill(0)
+    const voters = new Set<string>()
+    for (const v of pollVotes ?? []) {
+      if (v.poll_id === p.id && v.option_index < counts.length) {
+        counts[v.option_index]++
+        voters.add(v.clerk_user_id)
+      }
+    }
+    return { ...p, options, counts, totalVoters: voters.size }
+  })
 
   // Build signup lookup
   const signupMap = new Map((signups ?? []).map(s => [s.clerk_user_id, s]))
@@ -290,6 +324,83 @@ export default async function OverviewPage() {
             </div>
           )}
         </section>
+
+        {/* ── POLL RESULTS ── */}
+        {pollResults.length > 0 && (
+          <>
+            <div style={divider} />
+            <section>
+              <p style={{ fontSize: '0.65rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, marginBottom: '1.25rem' }}>
+                Poll Results
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                {pollResults.map(poll => {
+                  const total = poll.counts.reduce((a, b) => a + b, 0)
+                  const expired = poll.expires_at ? new Date(poll.expires_at) < new Date() : false
+                  return (
+                    <div key={poll.id} style={{ ...card(), padding: '1.25rem 1.5rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', marginBottom: '1rem' }}>
+                        <p style={{ margin: 0, fontSize: '0.9rem', color: '#EDE0C8', lineHeight: 1.45, flex: 1 }}>
+                          {poll.question}
+                        </p>
+                        <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                          {!poll.visible && (
+                            <span style={{ fontSize: '0.62rem', letterSpacing: '0.08em', color: '#888', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '9999px', padding: '0.1rem 0.5rem' }}>
+                              Hidden
+                            </span>
+                          )}
+                          {expired && (
+                            <span style={{ fontSize: '0.62rem', letterSpacing: '0.08em', color: '#ffb432', border: '1px solid rgba(255,180,50,0.25)', borderRadius: '9999px', padding: '0.1rem 0.5rem' }}>
+                              Closed
+                            </span>
+                          )}
+                          <span style={{ fontSize: '0.68rem', color: '#C8A848', opacity: 0.5, alignSelf: 'center' }}>
+                            {poll.totalVoters} {poll.totalVoters === 1 ? 'voter' : 'voters'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+                        {poll.options.map((opt, i) => {
+                          const count = poll.counts[i]
+                          const pct = total > 0 ? Math.round((count / total) * 100) : 0
+                          const isTop = count > 0 && count === Math.max(...poll.counts)
+                          return (
+                            <div key={i}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
+                                <span style={{ fontSize: '0.8rem', color: isTop ? '#C8A848' : '#F3EDE6', opacity: isTop ? 1 : 0.7 }}>
+                                  {isTop && '✦ '}{opt}
+                                </span>
+                                <span style={{ fontSize: '0.75rem', color: '#C8A848', opacity: 0.6, flexShrink: 0, marginLeft: '1rem' }}>
+                                  {count} · {pct}%
+                                </span>
+                              </div>
+                              <div style={{ height: '6px', borderRadius: '9999px', background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                                <div style={{
+                                  height: '100%',
+                                  width: `${pct}%`,
+                                  borderRadius: '9999px',
+                                  background: isTop
+                                    ? 'linear-gradient(90deg, #C8A848, #e8c868)'
+                                    : 'rgba(200,168,72,0.35)',
+                                  transition: 'width 0.4s ease',
+                                }} />
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+
+                      {poll.allow_multiple && (
+                        <p style={{ fontSize: '0.65rem', opacity: 0.3, margin: '0.75rem 0 0' }}>Multiple choice — total votes may exceed voters</p>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+          </>
+        )}
 
       </div>
     </div>

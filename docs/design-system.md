@@ -126,6 +126,11 @@ Most content cards use a parchment aesthetic:
 
 - Two variants: `NotificationBell` (admin) and `UserNotificationBell` (members)
 - Shows unread count badge when > 0
+- `UserNotificationBell` handles `new_message` event type — links directly to the sender's thread
+
+### Messages Nav Link
+
+`MessagesNavLink` (`components/MessagesNavLink.tsx`) — a special nav link component used in the member nav for Messages. Polls `/api/messages/unread` every 30s and renders an inline unread count badge next to the label when > 0. Used in `HeaderClient` instead of a plain `<a>` tag for that nav item.
 
 ### Schedule Calendar
 

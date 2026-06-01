@@ -39,21 +39,22 @@ Design docs live in `docs/` — read them when you need detail:
 
 | Table | Purpose |
 |---|---|
-| `applications` | Camp member applications. `status`: `pending/approved/rejected/cancelled`. Has `setup_preference TEXT[]` ('Setup','Teardown','Decor','Other'), `avatar_url`, `pronouns`, arrival/departure, etc. `contributions TEXT[]` is **legacy** — use `setup_preference`. |
+| `applications` | Camp member applications. `status`: `pending/approved/rejected/cancelled`. Has `setup_preference TEXT[]`, `avatar_url`, `pronouns`, arrival/departure, etc. `custom_answers JSONB` stores answers to admin-added form fields (migration 023). |
 | `volunteers` | Outside volunteers. `status`: `pending/active/cancelled/removed`. Has `signup_intent TEXT[]`. |
 | `departments` | Role groups. `icon` = emoji or image path (starts with `/` → rendered as `<img>`). Name max 40 chars. |
 | `roles` | Roles within departments. Name max 28 chars. `capacity` INT. |
-| `schedule_events` | Public schedule. `event_type`: `null`/`'all_hands'`/`'camp_tending'`/`'service'`. `contribution_type TEXT`: 'Setup'/'Teardown'/'Decor' — shows on personal schedule for matching members. `event_date DATE`: filters Upcoming Gatherings to next 14 days (NULL = always show). `event_category TEXT`: `'at_camp'` (default) / `'pre_camp'` — splits dashboard widget into two sections. |
+| `schedule_events` | Public schedule. `event_type`: `null`/`'all_hands'`/`'camp_tending'`/`'service'`. `contribution_type TEXT`: 'Setup'/'Teardown'/'Decor'. `event_date DATE`. `event_category TEXT`: `'at_camp'` / `'pre_camp'`. |
 | `camp_signups` | One row per approved member's role+shift. `role_approval_status`. No FK to `applications`. |
 | `announcements` | Admin-posted updates shown to all approved members. `pinned BOOL`, `visible BOOL`, `expires_at TIMESTAMPTZ`. |
-| `page_content` | Admin-editable homepage copy. Key/value rows. Keys: `home_tagline`, `home_quote`, `home_about_heading`, `home_about_body`, `home_participate_heading`, `home_participate_body`. |
+| `page_content` | Key/value store. Homepage copy (`home_*`), form configs (`config_member_form`, `config_volunteer_form` as JSON blobs). |
 | `role_suggestions` | Member-submitted dept/role ideas. `status`: `pending/approved/rejected`. |
 | `admin_notifications` | Admin bell notifications. `read_at` NULL = unread. |
 | `user_notifications` | Member bell notifications. Same pattern. |
+| `messages` | Direct messages between approved members. `sender_clerk_id`, `recipient_clerk_id`, `body` (max 2000 chars), `read_at`. Migration 022. |
 
 **Storage buckets:** `avatars` (profile photos), `schedule-icons` (custom event icons) — both must be public.
 
-**Migrations:** 001–016 confirmed applied. 017–021 may be pending depending on environment.
+**Migrations:** 001–023 applied.
 
 ---
 
@@ -76,41 +77,43 @@ Widget order (top to bottom):
 ```
 app/
   page.tsx                        Homepage (public marketing + member dashboard)
-  HomePageEditor.tsx              Admin slide-in panel to edit page_content keys
-  apply/page.tsx                  Apply (4 states: no app / pending+rejected / approved / volunteer)
-  apply/ApplyForm.tsx             Full application form
-  volunteer/VolunteerForm.tsx     Volunteer signup form
+  apply/page.tsx                  Apply — TrackPicker or ApplyWizard; reads config_member_form
+  apply/ApplyWizard.tsx           6-step multi-step form driven by MemberFormConfig
+  apply/TrackPicker.tsx           Choose member or volunteer track
+  volunteer/page.tsx              Volunteer page — reads config_volunteer_form
+  volunteer/VolunteerForm.tsx     Volunteer signup form driven by VolunteerFormConfig
+  admin/page.tsx                  Admin dashboard; "Configure Applications →" link
+  admin/configure/page.tsx        Application Builder (server component — fetches configs)
+  admin/configure/ApplicationBuilder.tsx  Full builder UI (client component)
+  admin/AnnouncementsManager.tsx  Create/edit/delete announcements
+  admin/DepartmentsManager.tsx    Dept/role CRUD
+  admin/ScheduleManager.tsx       Schedule event CRUD
+  admin/RoleSuggestionsSection.tsx  Review suggestions
+  admin/NotificationsSection.tsx  Bell notifications
   profile/page.tsx                Member profile hub (max-width 1100px)
   profile/AttunementStatus.tsx    Checklist card; dispatches glaum:open-settings event
   profile/SignupSection.tsx       Role/shift picker + "Suggest a role" button
-  profile/SuggestRoleModal.tsx    Role suggestion form → POST /api/role-suggestions
-  profile/ProfileSettings.tsx     Gear-icon edit modal; listens for glaum:open-settings
   profile/CommitmentsSection.tsx  Role + shift display
-  profile/DashboardCommitments.tsx  Commitments widget on homepage dashboard
-  profile/PersonalScheduleCalendar.tsx  Personal schedule (day tabs mobile, grid desktop). PX_PER_HOUR = 40
+  profile/PersonalScheduleCalendar.tsx  Personal schedule. PX_PER_HOUR = 40
   members/page.tsx                Member directory (approved only)
   members/[id]/page.tsx           Individual member view
-  admin/page.tsx                  Admin dashboard
-  admin/AnnouncementsManager.tsx  Create/edit/delete announcements
-  admin/DepartmentsManager.tsx    Dept/role CRUD
-  admin/ScheduleManager.tsx       Schedule event CRUD (includes event_date + event_category fields)
-  admin/RoleSuggestionsSection.tsx  Review suggestions
-  admin/NotificationsSection.tsx  Bell notifications
+  messages/page.tsx               Messaging inbox
+  messages/[userId]/page.tsx      Thread page
+  api/apply/route.ts              POST — submit application (includes custom_answers)
   api/badge/route.tsx             Badge PNG via next/og (Node runtime)
-  api/admin/announcements/        GET+POST / PATCH+DELETE / all (admin list)
-  api/admin/page-content/         GET+PATCH homepage editable copy
+  api/admin/page-content/route.ts GET+PATCH — homepage copy + form configs (config_member_form, config_volunteer_form)
   api/admin/schedule/             GET+POST / [id] PATCH+DELETE / icon upload
 
 components/
   HeaderClient.tsx                Nav; clears localStorage on sign-out
-  AvatarUpload.tsx                260px circular avatar, gold border #6F491F, id="avatar-upload"
+  AvatarUpload.tsx                260px circular avatar, gold border #6F491F
   ScheduleCalendarClient.tsx      Public schedule
   UserNotificationBell.tsx        Member bell
 
 lib/
   supabase.ts                     Lazy Proxy supabaseAdmin
+  form-config.ts                  MemberFormConfig + VolunteerFormConfig types, defaults, merge helpers
   profile-auth.ts                 Shared auth helper
-  application-options.ts          Form option constants
   notify-admin.ts                 Helper to create admin_notifications rows
 ```
 

@@ -47,17 +47,21 @@ Sign-out flow:
 ## Routing
 
 ```
-/                        Public homepage (schedule, about)
+/                        Public homepage (schedule, about) / Member dashboard (if approved)
 /apply                   Application form (4 states, see Features doc)
 /volunteer               Outside volunteer signup
 /profile                 Logged-in member profile + role/shift picker
 /members                 Member directory (approved members only)
 /members/[id]            Individual member view
+/messages                Member messaging inbox
+/messages/[userId]       Conversation thread with a specific member
+/schedule                Full public camp schedule (accessible to approved members)
 /sign-in                 Clerk sign-in (catch-all route)
 /sign-out                Sign-out redirect page
 /admin                   Admin dashboard (role-gated)
 /admin/[id]              Admin view of a specific application
 /admin/overview          Admin overview / stats
+/admin/configure         Application Builder — configure member + volunteer forms
 ```
 
 ---
@@ -76,7 +80,10 @@ Sign-out flow:
 | `/api/profile/cancel` | POST | Cancel own application |
 | `/api/role-suggestions` | POST | Submit a dept/role suggestion |
 | `/api/notifications` | GET/PATCH | Fetch + mark-read user notifications |
-| `/api/nav-auth` | GET | Lightweight auth check for nav |
+| `/api/messages` | GET/POST | Fetch inbox conversations / send a message |
+| `/api/messages/[userId]` | GET | Fetch thread with a specific member (marks messages read) |
+| `/api/messages/unread` | GET | Unread message count for nav badge |
+| `/api/nav-auth` | GET | Lightweight auth check for nav (returns `isSignedIn`, `isApproved`, name, email, avatarUrl) |
 | `/api/sign-out` | POST | Sign out |
 | `/api/badge` | GET | Generate role badge PNG (OG image) |
 
@@ -107,7 +114,7 @@ Sign-out flow:
 | `/api/admin/announcements` | GET/POST | List visible announcements / create new |
 | `/api/admin/announcements/all` | GET | List all announcements including hidden (admin only) |
 | `/api/admin/announcements/[id]` | PATCH/DELETE | Update / delete announcement |
-| `/api/admin/page-content` | GET/PATCH | Read / upsert homepage editable copy |
+| `/api/admin/page-content` | GET/PATCH | Read / upsert any `page_content` row — used for homepage copy (`home_*`) and form configs (`config_member_form`, `config_volunteer_form`) |
 
 ---
 
@@ -136,8 +143,9 @@ Sign-out flow:
 
 ## Key Conventions
 
-- **No shared layout header** — each page manages its own header row
+- **Shared `<Header />`** — all member-facing pages use the shared `Header` component (`components/Header.tsx` → `components/HeaderClient.tsx`). Pages no longer manage their own header rows.
 - **Mobile nav breakpoint** — detected in JS via `window.innerWidth < 768`
 - **`overflow-x: hidden`** on `html`/`body` to prevent mobile horizontal scroll
 - **Camp signups join** — always fetch `applications` and `camp_signups` separately and join in JS; Supabase can't resolve the FK via nested select
 - **Lazy Supabase client** — `lib/supabase.ts` uses Proxy to avoid build-time env var errors
+- **Form config system** — `lib/form-config.ts` defines `MemberFormConfig` and `VolunteerFormConfig` types, default step/field definitions, and `mergeMemberConfig`/`mergeVolunteerConfig` helpers. Configs are fetched from `page_content` as JSON and merged with defaults on every request. Custom steps and admin-added fields survive the merge; built-in fields are updated with saved overrides only (label, description, visible, required). The Application Builder (`/admin/configure`) writes to `page_content` via `PATCH /api/admin/page-content`.

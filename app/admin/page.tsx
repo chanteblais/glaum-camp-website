@@ -13,6 +13,7 @@ import { DepartmentsManager } from './DepartmentsManager'
 import { RoleRequestsSection } from './RoleRequestsSection'
 import { RoleSuggestionsSection } from './RoleSuggestionsSection'
 import { DebugSection } from './DebugSection'
+import { PollsManager } from './PollsManager'
 
 export default async function AdminPage() {
   const { userId } = await auth()
@@ -181,6 +182,14 @@ export default async function AdminPage() {
           <AnnouncementsManager />
         </CollapsibleSection>
 
+        {/* ── POLLS ── */}
+        <CollapsibleSection
+          title="Polls"
+          summary="Create polls for members to vote on"
+        >
+          <PollsManager />
+        </CollapsibleSection>
+
         {/* ── SCHEDULE ── */}
         <CollapsibleSection
           title="Schedule"
@@ -188,6 +197,28 @@ export default async function AdminPage() {
         >
           <ScheduleManager />
         </CollapsibleSection>
+
+        {/* ── CONFIGURATION ── */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <a
+            href="/admin/configure"
+            style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              width: '100%', boxSizing: 'border-box',
+              padding: '1rem 1.5rem',
+              borderRadius: '0.75rem',
+              border: '1px solid rgba(200,168,72,0.2)',
+              background: 'rgba(200,168,72,0.03)',
+              color: '#C8A848',
+              textDecoration: 'none',
+              fontSize: '0.88rem',
+              letterSpacing: '0.06em',
+            }}
+          >
+            <span>Configure Applications</span>
+            <span style={{ opacity: 0.5 }}>→</span>
+          </a>
+        </div>
 
         {/* ── DEBUG ── */}
         <CollapsibleSection title="Debug Tools" summary="Testing utilities">

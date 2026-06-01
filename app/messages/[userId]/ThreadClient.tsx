@@ -96,12 +96,11 @@ export function ThreadClient({ currentUserId, recipientId, displayName, avatarUr
   const isOver = charsLeft < 0
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', maxWidth: '720px', width: '100%', margin: '0 auto', padding: '0 1.5rem', position: 'relative', zIndex: 1 }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', maxWidth: '720px', width: '100%', margin: '0 auto', position: 'relative', zIndex: 1 }}>
 
       {/* Thread header */}
       <div style={{
-        paddingTop: '5.5rem',
-        paddingBottom: '1.25rem',
+        padding: '5.5rem 1.5rem 1.25rem',
         borderBottom: '1px solid rgba(200,168,72,0.15)',
         display: 'flex',
         alignItems: 'center',
@@ -141,7 +140,7 @@ export function ThreadClient({ currentUserId, recipientId, displayName, avatarUr
       </div>
 
       {/* Messages */}
-      <div style={{ flex: 1, paddingTop: '1.5rem', paddingBottom: '1rem', overflowY: 'auto' }}>
+      <div style={{ flex: 1, padding: '1.5rem 1.5rem 1rem', overflowY: 'auto' }}>
         {loading && (
           <p style={{ textAlign: 'center', opacity: 0.4, fontStyle: 'italic', fontSize: '0.9rem' }}>Loading…</p>
         )}
@@ -196,8 +195,7 @@ export function ThreadClient({ currentUserId, recipientId, displayName, avatarUr
 
       {/* Compose */}
       <div style={{
-        paddingTop: '0.85rem',
-        paddingBottom: '2rem',
+        padding: '0.85rem 1.5rem 2rem',
         borderTop: '1px solid rgba(200,168,72,0.12)',
         position: 'sticky',
         bottom: 0,
