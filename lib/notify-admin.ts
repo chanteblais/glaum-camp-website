@@ -1,8 +1,10 @@
+import { clerkClient } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { sendAdminEmail } from '@/lib/send-email'
 
 type NotifyAdminInput = {
   applicationId?: string | null
-  eventType: 'profile_updated' | 'attendance_cancelled' | 'volunteer_cancelled' | 'volunteer_signup'
+  eventType: 'new_application' | 'profile_updated' | 'attendance_cancelled' | 'volunteer_cancelled' | 'volunteer_signup'
   message: string
   details?: Record<string, unknown>
 }
@@ -19,6 +21,24 @@ export async function notifyAdmin(input: NotifyAdminInput): Promise<void> {
 
   if (error) {
     console.error('[notifyAdmin] Failed to insert notification:', error.message)
+  }
+
+  const detailLines = input.details
+    ? Object.entries(input.details).map(([k, v]) => `<p style="margin:4px 0"><b>${k}:</b> ${v}</p>`).join('')
+    : ''
+
+  try {
+    const client = await clerkClient()
+    const { data: users } = await client.users.getUserList({ limit: 100 })
+    const adminEmails = users
+      .filter(u => u.publicMetadata?.role === 'admin')
+      .flatMap(u => u.emailAddresses.map(e => e.emailAddress))
+
+    for (const email of adminEmails) {
+      await sendAdminEmail(email, `Glåüm: ${input.message}`, `<p>${input.message}</p>${detailLines}`)
+    }
+  } catch (err) {
+    console.error('[notifyAdmin] Failed to send email:', err)
   }
 }
 

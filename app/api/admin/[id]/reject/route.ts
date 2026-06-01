@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { sendUserEmail } from '@/lib/send-email'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const { userId } = await auth()
@@ -32,11 +33,22 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   // Notify the applicant
   if (application?.clerk_user_id) {
+    const message = 'The Many Hands have reviewed your application. Unfortunately it wasn\'t a fit for this gathering.'
     await supabaseAdmin.from('user_notifications').insert([{
       clerk_user_id: application.clerk_user_id,
       event_type: 'application_rejected',
-      message: 'The Many Hands have reviewed your application. Unfortunately it wasn\'t a fit for this gathering.',
+      message,
     }])
+
+    const clerkUser = await client.users.getUser(application.clerk_user_id)
+    const email = clerkUser.emailAddresses[0]?.emailAddress
+    if (email) {
+      await sendUserEmail(
+        email,
+        'An update on your Glåüm application',
+        `<p>Hi ${application.preferred_name || application.first_name || 'there'},</p><p>${message}</p><p>Thank you for your interest in Glåüm.</p>`,
+      )
+    }
   }
 
   return NextResponse.json({ success: true })

@@ -58,6 +58,8 @@ export async function POST(req: NextRequest) {
       capacity: body.capacity ?? null,
       event_type: body.event_type ?? null,
       contribution_type: body.contribution_type ?? null,
+      event_date: body.event_date ?? null,
+      event_category: body.event_category ?? 'at_camp',
     }])
     .select()
     .single()

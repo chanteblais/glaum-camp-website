@@ -27,7 +27,7 @@ type CampMember = {
   email: string
   contributions: string[] | null
   attendance: string | null
-  // shifts_satisfied will be computed here — always true for now
+  schedule_event_id: string | null
 }
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
@@ -77,8 +77,7 @@ function SubHeading({ children }: { children: React.ReactNode }) {
 function CampMemberRow({ member }: { member: CampMember }) {
   const [expanded, setExpanded] = useState(false)
 
-  // TODO: replace with real shift sign-up check when shifts are built
-  const shiftsSatisfied = true
+  const shiftsSatisfied = member.schedule_event_id != null
 
   const displayName = member.preferred_name || member.first_name
 
@@ -122,13 +121,13 @@ function CampMemberRow({ member }: { member: CampMember }) {
 
       {expanded && (
         <div style={{ padding: '0 1.25rem 1.25rem', borderTop: '1px solid rgba(200,168,72,0.08)' }}>
-          {member.contributions?.length > 0 && (
+          {(member.contributions ?? []).length > 0 && (
             <div style={{ marginTop: '1rem' }}>
               <p style={{ fontSize: '0.65rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.5, marginBottom: '0.5rem' }}>
                 Contributions
               </p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
-                {member.contributions.map(c => (
+                {(member.contributions ?? []).map(c => (
                   <span key={c} style={{
                     padding: '0.2rem 0.65rem',
                     borderRadius: '9999px',

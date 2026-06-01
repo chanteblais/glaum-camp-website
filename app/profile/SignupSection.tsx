@@ -953,7 +953,7 @@ export function SignupSection({ showPickers = true }: { showPickers?: boolean })
   }
 
   if (loading) return (
-    <div style={{ padding: '1.5rem', border: '1px solid rgba(200,168,72,0.1)', borderRadius: '1rem', background: 'rgba(255,255,255,0.01)', marginBottom: '2.5rem' }}>
+    <div id="role-signup" style={{ padding: '1.5rem', border: '1px solid rgba(200,168,72,0.1)', borderRadius: '1rem', background: 'rgba(255,255,255,0.01)', marginBottom: '2.5rem' }}>
       <p style={{ opacity: 0.35, fontSize: '0.85rem', textAlign: 'center', margin: 0 }}>Loading…</p>
     </div>
   )
@@ -961,12 +961,12 @@ export function SignupSection({ showPickers = true }: { showPickers?: boolean })
   if (!hasRoles && !hasCalendarEvents) return null
 
   return (
-    <div style={{ marginBottom: '2.5rem' }}>
+    <div id="role-signup" style={{ marginBottom: '2.5rem' }}>
       {showSuggest && <SuggestRoleModal onClose={() => setShowSuggest(false)} />}
       <CurrentSignupCards signup={signup} departments={departments} scheduleEvents={scheduleEvents} onOptOut={handleOptOut} onCancelShift={handleCancelShift} />
 
       {showPickers && (
-        <div id="role-signup" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
 
           {/* Role picker — confirm button lives inside the selected role card */}
           {hasRoles && (

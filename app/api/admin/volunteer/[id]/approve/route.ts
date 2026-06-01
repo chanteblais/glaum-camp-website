@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { sendUserEmail } from '@/lib/send-email'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const { userId } = await auth()
@@ -31,11 +32,22 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   // Notify the volunteer if they have a Clerk account linked
   if (volunteer.clerk_user_id) {
+    const displayName = volunteer.preferred_name || volunteer.first_name || 'there'
     await supabaseAdmin.from('user_notifications').insert([{
       clerk_user_id: volunteer.clerk_user_id,
       message: 'Your volunteer signup has been approved!',
       details: {},
     }])
+
+    const clerkUser = await client.users.getUser(volunteer.clerk_user_id)
+    const email = clerkUser.emailAddresses[0]?.emailAddress
+    if (email) {
+      await sendUserEmail(
+        email,
+        'Your Glåüm volunteer signup has been approved!',
+        `<p>Hi ${displayName},</p><p>You're in! Your volunteer signup for Glåüm has been approved. Head to your <a href="https://glaum.camp/profile">profile</a> to see next steps.</p><p>See you at camp ✦</p>`,
+      )
+    }
   }
 
   return NextResponse.json({ success: true })

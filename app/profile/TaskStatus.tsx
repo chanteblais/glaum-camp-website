@@ -53,7 +53,7 @@ export function TaskStatus({ track, volunteerStatus, contributions, campSignup, 
       label: rolePending ? 'Role request pending approval' : 'Choose a camp role',
       done: hasRole && !rolePending,
       pending: rolePending,
-      href: rolePending ? undefined : '/apply',
+      href: rolePending ? undefined : '#role-signup',
       cta: 'Select a role →',
       note: rolePending ? "You'll be notified once your role request is reviewed." : undefined,
     })
@@ -61,7 +61,7 @@ export function TaskStatus({ track, volunteerStatus, contributions, campSignup, 
       id: 'shift',
       label: 'Sign up for a shift',
       done: hasShift,
-      href: '/apply',
+      href: '#role-signup',
       cta: 'Pick a shift →',
     })
   }
@@ -93,7 +93,7 @@ export function TaskStatus({ track, volunteerStatus, contributions, campSignup, 
           id: 'role',
           label: 'Choose a volunteer role',
           done: hasRole,
-          href: '/apply',
+          href: '#role-signup',
           cta: 'Select a role →',
         })
       }
@@ -102,7 +102,7 @@ export function TaskStatus({ track, volunteerStatus, contributions, campSignup, 
           id: 'shift',
           label: 'Sign up for a shift',
           done: hasShift,
-          href: '/apply',
+          href: '#role-signup',
           cta: 'Pick a shift →',
         })
       }

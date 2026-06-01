@@ -23,7 +23,7 @@ export async function GET() {
   if (!signups?.length) return NextResponse.json({ requests: [] })
 
   // Fetch roles + departments
-  const roleIds = [...new Set(signups.map(s => s.role_id).filter(Boolean))]
+  const roleIds = Array.from(new Set(signups.map(s => s.role_id).filter(Boolean)))
   const { data: roles } = await supabaseAdmin
     .from('roles')
     .select('id, name, department_id, departments(name, icon)')

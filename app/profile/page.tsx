@@ -312,8 +312,8 @@ export default async function ProfilePage() {
                   { id: 'approved',      label: 'Application Approved',  done: true },
                   { id: 'photo',         label: 'Photo Uploaded',         done: !!(application?.avatar_url),  section: 'photo' as const },
                   { id: 'contribution',  label: 'Contribution Selected',  done: contributions.length > 0,     section: 'contribution' as const },
-                  { id: 'role',          label: 'Role Selected',          done: !!campSignup?.role_id && campSignup?.role_approval_status !== 'pending' },
-                  { id: 'shift',         label: 'Shift Assigned',         done: !!campSignup?.schedule_event_id },
+                  { id: 'role',          label: 'Role Selected',          done: !!campSignup?.role_id && campSignup?.role_approval_status !== 'pending', href: '#role-signup' },
+                  { id: 'shift',         label: 'Shift Assigned',         done: !!campSignup?.schedule_event_id, href: '#role-signup' },
                 ]} />
               </div>
             </div>

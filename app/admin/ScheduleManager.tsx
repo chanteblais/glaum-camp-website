@@ -18,6 +18,8 @@ type ScheduleEvent = {
   capacity: number | null
   event_type: string | null
   contribution_type: string | null
+  event_date: string | null
+  event_category: string
 }
 
 const DAYS = ['Thursday', 'Friday', 'Saturday', 'Sunday', 'Wednesday', 'Tuesday', 'Monday']
@@ -82,7 +84,7 @@ function formatTime(raw: string): string {
 
 const blank = (): Omit<ScheduleEvent, 'id' | 'sort_order'> => ({
   day: 'Thursday', time: '', title: '', subtitle: '', detail_desc: '',
-  icon_type: 'star', visible: true, highlight: false, is_recurring: false, capacity: null, event_type: null, contribution_type: null,
+  icon_type: 'star', visible: true, highlight: false, is_recurring: false, capacity: null, event_type: null, contribution_type: null, event_date: null, event_category: 'at_camp',
 })
 
 const inputStyle: React.CSSProperties = {
@@ -198,6 +200,17 @@ function EventModal({
             <input style={inputStyle} value={form.time} placeholder="e.g. 7:00 PM – 10:00 PM" onChange={(e) => set('time', e.target.value)} />
           </Field>
         </div>
+
+        {!form.is_recurring && (
+          <Field label="Date (used to filter Upcoming Gatherings on the dashboard)">
+            <input
+              style={{ ...inputStyle, width: '180px' }}
+              type="date"
+              value={form.event_date ?? ''}
+              onChange={e => set('event_date', e.target.value || null)}
+            />
+          </Field>
+        )}
 
         {!form.is_recurring && (
           <Field label="Subtitle — shown in the At a Glance table">
@@ -334,6 +347,16 @@ function EventModal({
               <option value="all_hands">All Hands</option>
               <option value="camp_tending">Camp Tending</option>
               <option value="service">Service</option>
+            </select>
+          </Field>
+          <Field label="Category">
+            <select
+              style={{ ...inputStyle, fontSize: '0.82rem', cursor: 'pointer' }}
+              value={form.event_category}
+              onChange={e => set('event_category', e.target.value)}
+            >
+              <option value="at_camp">At Camp</option>
+              <option value="pre_camp">Pre-Camp</option>
             </select>
           </Field>
           <Field label="Contribution">

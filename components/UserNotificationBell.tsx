@@ -150,6 +150,20 @@ export function UserNotificationBell() {
                 const when = new Date(n.created_at).toLocaleString('en-CA', {
                   month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
                 })
+
+                const link: { href: string; label: string } | null = (() => {
+                  switch (n.event_type) {
+                    case 'application_approved': return { href: '/profile', label: 'Go to profile →' }
+                    case 'application_rejected':  return { href: '/apply', label: 'Back to apply →' }
+                    case 'role_suggestion_approved': return { href: '/profile#role-signup', label: 'Select your role →' }
+                    case 'role_suggestion_rejected': return { href: '/profile', label: 'Go to profile →' }
+                    case 'role_request_approved':   return { href: '/profile', label: 'Go to profile →' }
+                    case 'role_request_rejected':   return { href: '/profile#role-signup', label: 'Choose another role →' }
+                    case 'volunteer_approved':       return { href: '/profile', label: 'Go to profile →' }
+                    default: return null
+                  }
+                })()
+
                 return (
                   <div
                     key={n.id}
@@ -176,6 +190,15 @@ export function UserNotificationBell() {
                       </p>
                       <span style={{ fontSize: '0.68rem', opacity: 0.35, flexShrink: 0, whiteSpace: 'nowrap' }}>{when}</span>
                     </div>
+                    {link && (
+                      <a
+                        href={link.href}
+                        onClick={() => setOpen(false)}
+                        style={{ display: 'inline-block', marginTop: '0.4rem', fontSize: '0.72rem', color: '#C8A848', opacity: 0.7, textDecoration: 'none', letterSpacing: '0.04em' }}
+                      >
+                        {link.label}
+                      </a>
+                    )}
                   </div>
                 )
               })}
