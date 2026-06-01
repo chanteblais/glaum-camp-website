@@ -1,6 +1,6 @@
 # Database Schema
 
-All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations `001`–`017` in `supabase-migrations/` document incremental changes. Migrations `001`–`016` are confirmed applied; `017_role_suggestions.sql` may be pending.
+All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations `001`–`021` in `supabase-migrations/` document incremental changes. Migrations `001`–`016` are confirmed applied; `017`–`021` may be pending depending on environment.
 
 ---
 
@@ -127,6 +127,8 @@ Public camp schedule entries.
 | `event_type` | TEXT | `null` (general) / `'all_hands'` / `'camp_tending'` / `'service'` |
 | `sort_order` | INT | |
 | `contribution_type` | TEXT | `'Setup'` / `'Teardown'` / `'Decor'` — shows event on personal schedule for matching members |
+| `event_date` | DATE | Actual calendar date. Used to filter Upcoming Gatherings to next 14 days. NULL = always show |
+| `event_category` | TEXT | `'at_camp'` (default) / `'pre_camp'` — splits dashboard into separate sections |
 
 **Color coding by `event_type`:**
 - `null` → purple
@@ -184,6 +186,40 @@ Bell notifications shown to individual members.
 
 ---
 
+### `announcements`
+
+Admin-posted updates shown to all approved members on the dashboard.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `title` | TEXT NOT NULL | |
+| `body` | TEXT | Optional detail text |
+| `pinned` | BOOL | Pinned items sort first. Default `false` |
+| `visible` | BOOL | Whether shown to members. Default `true` |
+| `expires_at` | TIMESTAMPTZ | Auto-hides after this date. NULL = show indefinitely |
+| `created_at` | TIMESTAMPTZ | |
+
+---
+
+### `page_content`
+
+Admin-editable copy for the homepage. One row per key.
+
+| Column | Type | Notes |
+|---|---|---|
+| `key` | TEXT PK | e.g. `home_tagline`, `home_quote`, `home_about_heading` |
+| `value` | TEXT | The content |
+| `updated_at` | TIMESTAMPTZ | |
+
+**Known keys:**
+- `home_tagline` — hero tagline (shown on public page + logged-in dashboard)
+- `home_quote` — quote card text in logged-in hero banner
+- `home_about_heading` / `home_about_body` — About section
+- `home_participate_heading` / `home_participate_body` — Participate section
+
+---
+
 ### `role_suggestions`
 
 Member-submitted suggestions for new departments or roles. Added in migration `017`.
@@ -235,3 +271,7 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `015_volunteer_signup_intent_array.sql` | Converts to `TEXT[]` |
 | `016_schedule_contribution_type.sql` | `contribution_type` on schedule events |
 | `017_role_suggestions.sql` | `role_suggestions` table, `user_notifications` table |
+| `018_page_content.sql` | `page_content` table |
+| `019_schedule_event_date.sql` | `event_date DATE` on `schedule_events` |
+| `020_announcements.sql` | `announcements` table |
+| `021_event_category.sql` | `event_category TEXT` on `schedule_events` (default `'at_camp'`) |

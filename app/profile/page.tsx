@@ -312,11 +312,17 @@ export default async function ProfilePage() {
                   { id: 'approved',      label: 'Application Approved',  done: true },
                   { id: 'photo',         label: 'Photo Uploaded',         done: !!(application?.avatar_url),  section: 'photo' as const },
                   { id: 'contribution',  label: 'Contribution Selected',  done: contributions.length > 0,     section: 'contribution' as const },
-                  { id: 'role',          label: 'Role Selected',          done: !!campSignup?.role_id && campSignup?.role_approval_status !== 'pending', href: '#role-signup' },
-                  { id: 'shift',         label: 'Shift Assigned',         done: !!campSignup?.schedule_event_id, href: '#role-signup' },
+                  { id: 'role',          label: 'Role Selected',          done: !!campSignup?.role_id && campSignup?.role_approval_status !== 'pending', href: '/signup' },
+                  { id: 'shift',         label: 'Shift Assigned',         done: !!campSignup?.schedule_event_id, href: '/signup' },
                 ]} />
               </div>
             </div>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <a href="/signup" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 1.25rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.35)', background: 'rgba(200,168,72,0.06)', color: '#C8A848', textDecoration: 'none', fontSize: '0.82rem', letterSpacing: '0.06em' }}>
+                ✦ Choose / change your role & shift
+              </a>
+            </div>
+
             <PersonalSchedule userId={userId} contributions={contributions} />
 
             <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.3), transparent)', marginBottom: '2.5rem' }} />

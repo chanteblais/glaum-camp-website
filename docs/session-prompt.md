@@ -43,15 +43,31 @@ Design docs live in `docs/` — read them when you need detail:
 | `volunteers` | Outside volunteers. `status`: `pending/active/cancelled/removed`. Has `signup_intent TEXT[]`. |
 | `departments` | Role groups. `icon` = emoji or image path (starts with `/` → rendered as `<img>`). Name max 40 chars. |
 | `roles` | Roles within departments. Name max 28 chars. `capacity` INT. |
-| `schedule_events` | Public schedule. `event_type`: `null`/`'all_hands'`/`'camp_tending'`/`'service'`. `contribution_type TEXT`: 'Setup'/'Teardown'/'Decor' — shows on personal schedule for matching members. |
+| `schedule_events` | Public schedule. `event_type`: `null`/`'all_hands'`/`'camp_tending'`/`'service'`. `contribution_type TEXT`: 'Setup'/'Teardown'/'Decor' — shows on personal schedule for matching members. `event_date DATE`: filters Upcoming Gatherings to next 14 days (NULL = always show). `event_category TEXT`: `'at_camp'` (default) / `'pre_camp'` — splits dashboard widget into two sections. |
 | `camp_signups` | One row per approved member's role+shift. `role_approval_status`. No FK to `applications`. |
-| `role_suggestions` | Member-submitted dept/role ideas. `status`: `pending/approved/rejected`. (Migration 017 — may need to be applied.) |
+| `announcements` | Admin-posted updates shown to all approved members. `pinned BOOL`, `visible BOOL`, `expires_at TIMESTAMPTZ`. |
+| `page_content` | Admin-editable homepage copy. Key/value rows. Keys: `home_tagline`, `home_quote`, `home_about_heading`, `home_about_body`, `home_participate_heading`, `home_participate_body`. |
+| `role_suggestions` | Member-submitted dept/role ideas. `status`: `pending/approved/rejected`. |
 | `admin_notifications` | Admin bell notifications. `read_at` NULL = unread. |
 | `user_notifications` | Member bell notifications. Same pattern. |
 
 **Storage buckets:** `avatars` (profile photos), `schedule-icons` (custom event icons) — both must be public.
 
-**Migrations:** 001–016 confirmed applied. `017_role_suggestions.sql` may be pending.
+**Migrations:** 001–016 confirmed applied. 017–021 may be pending depending on environment.
+
+---
+
+## Member dashboard layout (homepage when signed in + approved)
+
+Widget order (top to bottom):
+1. **Hero banner** — greeting, countdown, quote card (`home_quote`), tagline (`home_tagline`)
+2. **Attunement + Commitments** — side-by-side (`dash-grid` 1fr 1fr)
+3. **Announcements** — visible non-expired admin posts; pinned first. Hidden if none
+4. **Pre-Camp Gatherings** — `event_category = 'pre_camp'` events in next 14 days. Hidden if none
+5. **Upcoming Gatherings** — `event_category = 'at_camp'` events in next 14 days. Hidden if none
+6. **Meet a Member + Your Schedule** — side-by-side (`5fr 7fr`). Member rotates every minute
+7. **Recent Activity** — member joins + profile updates, up to 6 items
+8. **Many Hands link** — shortcut to `/members`
 
 ---
 
@@ -59,7 +75,8 @@ Design docs live in `docs/` — read them when you need detail:
 
 ```
 app/
-  page.tsx                        Homepage
+  page.tsx                        Homepage (public marketing + member dashboard)
+  HomePageEditor.tsx              Admin slide-in panel to edit page_content keys
   apply/page.tsx                  Apply (4 states: no app / pending+rejected / approved / volunteer)
   apply/ApplyForm.tsx             Full application form
   volunteer/VolunteerForm.tsx     Volunteer signup form
@@ -69,14 +86,20 @@ app/
   profile/SuggestRoleModal.tsx    Role suggestion form → POST /api/role-suggestions
   profile/ProfileSettings.tsx     Gear-icon edit modal; listens for glaum:open-settings
   profile/CommitmentsSection.tsx  Role + shift display
-  profile/PersonalScheduleCalendar.tsx  Personal schedule (day tabs mobile, grid desktop)
+  profile/DashboardCommitments.tsx  Commitments widget on homepage dashboard
+  profile/PersonalScheduleCalendar.tsx  Personal schedule (day tabs mobile, grid desktop). PX_PER_HOUR = 40
   members/page.tsx                Member directory (approved only)
   members/[id]/page.tsx           Individual member view
   admin/page.tsx                  Admin dashboard
+  admin/AnnouncementsManager.tsx  Create/edit/delete announcements
   admin/DepartmentsManager.tsx    Dept/role CRUD
+  admin/ScheduleManager.tsx       Schedule event CRUD (includes event_date + event_category fields)
   admin/RoleSuggestionsSection.tsx  Review suggestions
   admin/NotificationsSection.tsx  Bell notifications
   api/badge/route.tsx             Badge PNG via next/og (Node runtime)
+  api/admin/announcements/        GET+POST / PATCH+DELETE / all (admin list)
+  api/admin/page-content/         GET+PATCH homepage editable copy
+  api/admin/schedule/             GET+POST / [id] PATCH+DELETE / icon upload
 
 components/
   HeaderClient.tsx                Nav; clears localStorage on sign-out
@@ -137,3 +160,22 @@ Member → `SuggestRoleModal` → `POST /api/role-suggestions` → `admin_notifi
 Admin → `PATCH /api/admin/role-suggestions/[id]`
 - Approve: finds/creates dept (case-insensitive), creates role, sends `user_notifications`
 - Reject: sends `user_notifications`
+
+---
+
+## Announcements flow
+
+Admin → Admin Dashboard → Announcements → New announcement  
+Stored in `announcements` table. Visible to all approved members on dashboard (widget 3).  
+Supports: title, body, pinned, visible toggle, optional expiry date.  
+API: `POST /api/admin/announcements`, `PATCH/DELETE /api/admin/announcements/[id]`
+
+---
+
+## Homepage editable copy
+
+Admin → floating "Edit Page" button (bottom-right, visible when signed in as admin)  
+Opens `HomePageEditor` slide-in panel. Saves to `page_content` via `PATCH /api/admin/page-content`.  
+Fields: Hero Tagline, Hero Quote Card, About heading/body, Participate heading/body.  
+`home_tagline` renders on both the public page and the logged-in hero banner.  
+`home_quote` renders in the quote card on the logged-in hero banner.

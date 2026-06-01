@@ -104,6 +104,10 @@ Sign-out flow:
 | `/api/admin/volunteer/[id]/approve` | POST | Approve volunteer |
 | `/api/admin/notifications` | GET/PATCH/DELETE | Admin notification management |
 | `/api/admin/notifications/[id]` | PATCH/DELETE | Per-notification actions |
+| `/api/admin/announcements` | GET/POST | List visible announcements / create new |
+| `/api/admin/announcements/all` | GET | List all announcements including hidden (admin only) |
+| `/api/admin/announcements/[id]` | PATCH/DELETE | Update / delete announcement |
+| `/api/admin/page-content` | GET/PATCH | Read / upsert homepage editable copy |
 
 ---
 

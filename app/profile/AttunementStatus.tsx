@@ -126,18 +126,16 @@ export function AttunementStatus({ tasks }: Props) {
               if (!task.done && task.section) {
                 window.dispatchEvent(new CustomEvent('glaum:open-settings', { detail: { section: task.section } }))
               } else if (!task.done && task.href) {
-                // Try immediate scroll first, then retry after a tick in case element isn't painted yet
-                const id = task.href.replace('#', '')
-                const attempt = () => {
-                  const target = document.getElementById(id)
-                  if (target) {
-                    target.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                    return true
+                if (task.href.startsWith('#')) {
+                  const id = task.href.slice(1)
+                  const attempt = () => {
+                    const target = document.getElementById(id)
+                    if (target) { target.scrollIntoView({ behavior: 'smooth', block: 'start' }); return true }
+                    return false
                   }
-                  return false
-                }
-                if (!attempt()) {
-                  setTimeout(attempt, 100)
+                  if (!attempt()) setTimeout(attempt, 100)
+                } else {
+                  window.location.href = task.href
                 }
               }
             }}

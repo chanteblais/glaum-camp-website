@@ -6,14 +6,31 @@
 
 ### Homepage (`/`)
 
-**Who:** Anyone  
-**What:** Marketing/landing page for Glåüm camp.
+**Who:** Anyone (public view) / Approved members (dashboard view)  
+**What:** Two distinct experiences depending on auth state.
 
+**Public (not signed in):**
 - TokyoDreams display heading + camp logo
+- Hero tagline (`home_tagline` from `page_content`)
 - Embedded public schedule (`ScheduleSection` + `ScheduleCalendarClient`)
   - Mobile: day-tab switcher (< 640px)
   - Desktop: 6-column grid
+- About + Participate sections (editable via Admin → Edit Page)
 - Footer with hands SVG decorations
+
+**Member dashboard (approved + signed in):**
+
+Widget order (top to bottom):
+1. **Hero banner** — welcome greeting, countdown to event, quote card (`home_quote`), hero tagline (`home_tagline`)
+2. **Attunement + Commitments** — side-by-side (`dash-grid`)
+3. **Announcements** — visible, non-expired admin announcements; pinned first. Hidden if none
+4. **Pre-Camp Gatherings** — `schedule_events` with `event_category = 'pre_camp'` in next 14 days. Hidden if none
+5. **Upcoming Gatherings** — `schedule_events` with `event_category = 'at_camp'` in next 14 days. Hidden if none
+6. **Meet a Member + Your Schedule** — side-by-side (`5fr 7fr` grid). Meet a Member rotates every minute from approved member pool
+7. **Recent Activity** — mixed feed of member joins + profile updates, up to 6 items
+8. **Many Hands link** — shortcut to member directory
+
+Admin-only: floating **Edit Page** button (bottom-right) opens a slide-in panel to edit `home_tagline`, `home_quote`, About, and Participate copy.
 
 ---
 
@@ -116,8 +133,9 @@ Sections (collapsible via `CollapsibleSection`):
 | Volunteers | `VolunteersSection` | Review + manage volunteer signups |
 | Role Requests | `RoleRequestsSection` | Approve/reject member role claims |
 | Role Suggestions | `RoleSuggestionsSection` | Review member-submitted dept/role suggestions |
+| Announcements | `AnnouncementsManager` | Create/edit/delete member-facing announcements |
 | Departments | `DepartmentsManager` | CRUD for departments + roles |
-| Schedule | `ScheduleManager` + `ShiftsManager` | CRUD for schedule events + shifts |
+| Schedule | `ScheduleManager` + `ShiftsManager` | CRUD for schedule events + shifts. Each event has `event_date`, `event_category` (`at_camp`/`pre_camp`) |
 | Registry | Member signup grid | View all member role+shift assignments |
 
 **Notifications** (`NotificationBell` + `NotificationsSection`): bell icon in admin header shows unread count. Supports mark-as-read per item, mark-all-read, and delete all.
