@@ -2,7 +2,7 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect, notFound } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { CommitmentsSection } from '@/app/profile/CommitmentsSection'
-
+import { Header } from '@/components/Header'
 import { supabaseResizedUrl } from '@/lib/supabase-image'
 
 export default async function MemberPage({ params }: { params: { id: string } }) {
@@ -60,6 +60,7 @@ export default async function MemberPage({ params }: { params: { id: string } })
 
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
+      <Header />
       <style>{`
         .member-badge-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 1.5rem; margin-bottom: 1rem; }
         .member-badge-left { display: flex; justify-content: flex-end; }
@@ -73,14 +74,7 @@ export default async function MemberPage({ params }: { params: { id: string } })
       <img src="/hands-left.svg"  alt="" aria-hidden style={{ position: 'fixed', left: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
       <img src="/hands-right.svg" alt="" aria-hidden style={{ position: 'fixed', right: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
 
-      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '3rem 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
-
-        {/* Back nav */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
-          <a href="/members" style={{ fontSize: '0.8rem', letterSpacing: '0.1em', color: '#C8A848', textDecoration: 'none', opacity: 0.6 }}>
-            ← Many Hands
-          </a>
-        </div>
+      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '6rem 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
 
         {/* Badge + avatar row */}
         <div style={{ marginBottom: '3rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>

@@ -50,18 +50,20 @@ export async function GET(req: Request) {
 
   const email = user.emailAddresses[0]?.emailAddress ?? null
 
-  // Fetch avatar from whichever table has a record for this user
+  // Fetch application status + avatar
   let avatarUrl: string | null = null
+  let isApproved = false
+
   const { data: appRow } = await supabaseAdmin
     .from('applications')
-    .select('avatar_url')
+    .select('avatar_url, status')
     .or(`clerk_user_id.eq.${userId}${email ? `,email.eq.${email}` : ''}`)
-    .not('avatar_url', 'is', null)
     .limit(1)
     .maybeSingle()
 
-  if (appRow?.avatar_url) {
-    avatarUrl = appRow.avatar_url
+  if (appRow) {
+    avatarUrl = appRow.avatar_url ?? null
+    isApproved = appRow.status === 'approved'
   } else {
     const { data: volRow } = await supabaseAdmin
       .from('volunteers')
@@ -76,6 +78,7 @@ export async function GET(req: Request) {
   return NextResponse.json(
     {
       isSignedIn: true,
+      isApproved,
       firstName: user.firstName ?? null,
       email,
       avatarUrl,
