@@ -42,17 +42,40 @@ Nav links for non-approved signed-in users (pending/rejected) show the public se
 
 **Member dashboard (approved + signed in):**
 
-Widget order (top to bottom):
-1. **Hero banner** — welcome greeting, countdown to event, quote card (`home_quote`), hero tagline (`home_tagline`)
+Fixed top sections (always present, not reorderable):
+1. **Hero banner** — welcome greeting, countdown to event, hero tagline (`home_tagline`, editable inline)
 2. **Attunement + Commitments** — side-by-side (`dash-grid`)
-3. **Announcements** — visible, non-expired admin announcements; pinned first. Hidden if none
-4. **Pre-Camp Gatherings** — `schedule_events` with `event_category = 'pre_camp'` in next 14 days. Hidden if none
-5. **Upcoming Gatherings** — `schedule_events` with `event_category = 'at_camp'` in next 14 days. Hidden if none. "View full schedule →" links to `/schedule`
-6. **Meet a Member + Your Schedule** — side-by-side (`5fr 7fr` grid). Meet a Member rotates every minute from approved member pool. "View full calendar →" links to `/schedule`
-7. **Recent Activity** — mixed feed of member joins + profile updates, up to 6 items
-8. **Many Hands link** — shortcut to member directory
 
-Admin-only: floating **Edit Page** button (bottom-right) opens a slide-in panel to edit `home_tagline`, `home_quote`, About, and Participate copy.
+Configurable widgets (order, visibility, and width controlled by admin via the page editor):
+
+| Widget ID | Default label | Content |
+|---|---|---|
+| `announcements` | Announcements | Visible, non-expired admin announcements; pinned first. Hidden if empty |
+| `polls` | Polls | Active, non-expired admin polls. Members vote inline; results shown after voting |
+| `events` | Upcoming Gatherings | Pre-camp + at-camp `schedule_events` in the next 14 days. "View full schedule →" links to `/schedule` |
+| `spotlight` | Meet a Member | Left: rotating member spotlight (cycles every minute). Right: Upcoming Gatherings list |
+| `activity` | Recent Activity | Mixed feed of member joins + profile updates, up to 6 items |
+
+Fixed bottom section (always present):
+- **Role & Shift + Many Hands** — quick-link grid to `/signup` and `/members`
+
+**Widget layout:** widgets render in a `display: flex; flex-wrap: wrap; gap: 1.25rem` container. Each widget is `flex: 0 0 100%` (full width) by default, or `flex: 0 0 calc(50% - 0.625rem)` (half width) when configured. Two consecutive half-width widgets sit side by side. On mobile (≤ 680px) all widgets revert to full width.
+
+**Dashboard layout** is stored as `dashboard_layout` JSON in `page_content`:
+```json
+{ "order": ["announcements","polls","events","spotlight","activity"], "hidden": [], "widths": {} }
+```
+
+Admin-only: **"✎ Edit Page"** floating button (bottom-right). Clicking enters inline edit mode:
+- A top bar appears: `Editing · [+ Poll] [Edit Text] [Save] [✕]`
+- All widgets get a gold dashed outline
+- Hovering a widget reveals a `⠿ Label [½]` handle in its top-right corner
+- **Drag the handle** to reorder widgets — the card physically follows the cursor (`position: fixed`) while a dashed placeholder holds the drop slot
+- **Click `½`** on the handle to toggle that widget between full and half width (updates live on the page before saving)
+- **Click a gold-underlined text element** (e.g. the hero tagline) to edit it inline (`contenteditable`)
+- **`+ Poll`** — opens a slide-in panel to create a new poll
+- **`Edit Text`** — opens a slide-in panel for copy fields not visible on the dashboard (quote card, About, Participate)
+- **`Save`** — writes new order + widths + any text edits to `page_content` and reloads
 
 ---
 
@@ -199,6 +222,7 @@ Sections (collapsible via `CollapsibleSection`):
 | Role Suggestions | `RoleSuggestionsSection` | Review member-submitted dept/role suggestions |
 | Departments | `DepartmentsManager` | CRUD for departments + roles |
 | Announcements | `AnnouncementsManager` | Create/edit/delete member-facing announcements |
+| Polls | `PollsManager` | Create/edit/delete/toggle polls. Each poll has: question, 2–10 options, visible toggle, multiple-choice toggle, optional expiry |
 | Schedule | `ScheduleManager` | CRUD for schedule events |
 | Configure Applications | link → `/admin/configure` | Opens the Application Builder |
 | Debug Tools | `DebugSection` | Reset test user data |
@@ -252,9 +276,44 @@ Reached via the "Configure Applications →" link on the admin dashboard.
 **Who:** Admin  
 **What:** Summary stats + `MembersDropdown` for quick navigation.
 
+Sections:
+- **Participation** — approved member count, signup completion, active volunteer count, members list (expandable)
+- **Shift Hours** — total committed, confirmed, pending, volunteer hours
+- **Setup & Teardown** — Setup / Teardown / Decor team member pills; limitations count; unassigned count
+- **Rideshare** — breakdown by rideshare intent
+- **Poll Results** — all polls with bar chart per option (vote count + percentage). Leading option highlighted in gold. Shows Hidden/Closed badges. Hidden if no polls exist.
+
 ---
 
 ## Supporting Features
+
+### Polls
+
+Admin creates polls in the Admin Dashboard → Polls section (or via `+ Poll` in the page editor).
+
+**Member experience:**
+- Active (visible + non-expired) polls appear in the `polls` dashboard widget
+- Before voting: plain option buttons
+- After voting: animated progress bars, percentages, and vote counts appear
+- Members can change their vote at any time (previous votes are replaced)
+- Single-choice and multiple-choice modes supported
+
+**Admin experience:**
+- Create/edit via `PollsManager` (Admin Dashboard) or the `+ Poll` button in page edit mode
+- Visibility toggle per poll (hidden polls still store votes, just aren't shown to members)
+- Optional expiry date — expired polls show a "closed" badge and accept no new votes
+- Results visible in Admin Overview → Poll Results section with bar charts
+
+**API routes:**
+- `GET /api/admin/polls` — list all polls (admin only)
+- `POST /api/admin/polls` — create poll (admin only)
+- `PATCH /api/admin/polls/[id]` — edit poll (admin only)
+- `DELETE /api/admin/polls/[id]` — delete poll + all votes (admin only)
+- `POST /api/polls/[id]/vote` — submit or update a member's vote (authenticated members)
+
+**Key files:** `app/PollWidget.tsx`, `app/admin/PollsManager.tsx`, `app/api/admin/polls/`, `app/api/polls/`
+
+---
 
 ### Role Badge
 

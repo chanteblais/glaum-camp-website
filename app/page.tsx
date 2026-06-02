@@ -164,7 +164,7 @@ let isAdmin = false
 
   // ── Dashboard layout (admin-configurable widget order) ────────
   const DEFAULT_WIDGET_ORDER = ['announcements', 'polls', 'events', 'spotlight', 'activity']
-  let dashLayout: { order: string[]; hidden: string[] } = { order: DEFAULT_WIDGET_ORDER, hidden: [] }
+  let dashLayout: { order: string[]; hidden: string[]; widths?: Record<string, string> } = { order: DEFAULT_WIDGET_ORDER, hidden: [] }
   try {
     if (pageContent['dashboard_layout']) dashLayout = JSON.parse(pageContent['dashboard_layout'])
   } catch {}
@@ -209,14 +209,21 @@ let isAdmin = false
       <>
         <Header />
         <main style={{ paddingTop: '64px' }}>
-          <style>{`
+          <style dangerouslySetInnerHTML={{ __html: `
             .dash-grid       { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; align-items: start; margin-bottom: 1.25rem; }
             .dash-quote-card { display: block; }
+            .dash-hero-inner { display: flex; width: 100%; padding: 2.25rem 2.5rem; align-items: center; justify-content: space-between; gap: 2rem; }
+            .dash-spotlight  { display: grid; grid-template-columns: 5fr 7fr; gap: 1.25rem; align-items: start; }
+            .dash-quicklinks { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
             @media (max-width: 680px) {
               .dash-grid       { grid-template-columns: 1fr; }
               .dash-quote-card { display: none !important; }
+              [data-width="half"] { flex: 0 0 100% !important; }
+              .dash-hero-inner { flex-direction: column; align-items: flex-start; padding: 1.5rem 1.25rem; gap: 1rem; }
+              .dash-spotlight  { grid-template-columns: 1fr; }
+              .dash-quicklinks { grid-template-columns: 1fr; }
             }
-          `}</style>
+          ` }} />
 
           <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '2.5rem 1.5rem 6rem' }}>
 
@@ -242,14 +249,7 @@ let isAdmin = false
                 position: 'absolute', inset: 0,
                 background: 'linear-gradient(90deg, rgba(26,10,36,0.95) 0%, rgba(26,10,36,0.65) 55%, rgba(26,10,36,0.15) 100%)',
               }} />
-              <div style={{
-                position: 'relative', zIndex: 1,
-                display: 'flex', width: '100%',
-                padding: '2.25rem 2.5rem',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '2rem',
-              }}>
+              <div className="dash-hero-inner" style={{ position: 'relative', zIndex: 1 }}>
                 {/* Left: greeting + countdown */}
                 <div style={{ flex: 1 }}>
                   <p style={{ fontSize: '0.68rem', letterSpacing: '0.28em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.65, marginBottom: '0.5rem' }}>
@@ -383,7 +383,7 @@ let isAdmin = false
                 ),
 
                 spotlight: spotlightMember ? (
-                  <div style={{ display: 'grid', gridTemplateColumns: '5fr 7fr', gap: '1.25rem', alignItems: 'start' }}>
+                  <div className="dash-spotlight">
                     <div style={{ position: 'relative', padding: '1.5rem', border: '1px solid rgba(200,168,72,0.2)', borderRadius: '1rem', background: 'rgba(10,0,20,0.6)', overflow: 'hidden' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
                         <p style={{ fontSize: '0.62rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, margin: 0 }}>Meet a Member</p>
@@ -457,15 +457,30 @@ let isAdmin = false
                 ) : null,
               }
 
-              return visibleWidgets.map(id => {
-                const widget = widgetMap[id]
-                if (!widget) return null
-                return <div key={id} data-widget-id={id} style={{ marginBottom: '1.25rem' }}>{widget}</div>
-              })
+              const widths = dashLayout.widths ?? {}
+              return (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.25rem', alignItems: 'flex-start' }}>
+                  {visibleWidgets.map(id => {
+                    const widget = widgetMap[id]
+                    if (!widget) return null
+                    const isHalf = widths[id] === 'half'
+                    return (
+                      <div
+                        key={id}
+                        data-widget-id={id}
+                        data-width={isHalf ? 'half' : 'full'}
+                        style={{ flex: isHalf ? '0 0 calc(50% - 0.625rem)' : '0 0 100%', minWidth: 0 }}
+                      >
+                        {widget}
+                      </div>
+                    )
+                  })}
+                </div>
+              )
             })()}
 
             {/* ── MANY HANDS LINK ── */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div className="dash-quicklinks">
               <a href="/signup" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem 1.5rem', border: '1px solid rgba(200,168,72,0.18)', borderRadius: '1rem', background: 'rgba(200,168,72,0.03)', textDecoration: 'none' }}>
                 <div>
                   <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.1rem', color: '#C8A848', margin: '0 0 0.2rem' }}>Role & Shift</p>

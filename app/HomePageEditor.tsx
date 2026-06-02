@@ -32,6 +32,14 @@ function getCurrentOrder(): string[] {
   return getWidgetEls().map(el => el.dataset.widgetId!)
 }
 
+function getCurrentWidths(): Record<string, string> {
+  const widths: Record<string, string> = {}
+  getWidgetEls().forEach(el => {
+    if (el.dataset.width === 'half') widths[el.dataset.widgetId!] = 'half'
+  })
+  return widths
+}
+
 function getSavedHidden(initialContent: Content): string[] {
   try {
     const raw = initialContent['dashboard_layout']
@@ -229,7 +237,39 @@ export function HomePageEditor({ initialContent }: { initialContent: Content }) 
         pointer-events: auto;
         font-family: var(--font-libre-baskerville), Georgia, serif;
       `
+      const widthBtn = document.createElement('span')
+      widthBtn.style.cssText = `
+        margin-left: 6px;
+        padding: 1px 5px;
+        border: 1px solid rgba(200,168,72,0.3);
+        border-radius: 4px;
+        font-size: 10px;
+        cursor: pointer;
+        opacity: 0.7;
+        transition: opacity 0.15s, background 0.15s;
+        user-select: none;
+      `
+      widthBtn.textContent = widget.dataset.width === 'half' ? '½' : '⊞'
+      widthBtn.title = 'Toggle half / full width'
+
       handle.innerHTML = `<span style="font-size:15px;opacity:.65;line-height:1">⠿</span><span style="opacity:.55;font-size:10.5px;text-transform:uppercase;letter-spacing:.1em">${WIDGET_LABELS[id] ?? id}</span>`
+      handle.appendChild(widthBtn)
+
+      widthBtn.addEventListener('click', (e: MouseEvent) => {
+        e.stopPropagation()
+        const isHalf = widget.dataset.width === 'half'
+        const next = isHalf ? 'full' : 'half'
+        widget.dataset.width = next
+        widget.style.flex = next === 'half' ? '0 0 calc(50% - 0.625rem)' : '0 0 100%'
+        widthBtn.textContent = next === 'half' ? '½' : '⊞'
+        widthBtn.style.background = next === 'half' ? 'rgba(200,168,72,0.15)' : ''
+        markChanged()
+      })
+
+      // Reflect initial state
+      if (widget.dataset.width === 'half') {
+        widthBtn.style.background = 'rgba(200,168,72,0.15)'
+      }
 
       widget.appendChild(handle)
       cleanups.push(() => handle.remove())
@@ -246,73 +286,106 @@ export function HomePageEditor({ initialContent }: { initialContent: Content }) 
 
       // ── Pointer-capture drag ────────────────────────────────
       let isDragging = false
-      let startY = 0
-      let offsetY = 0
+      let placeholder: HTMLElement | null = null
 
       handle.addEventListener('pointerdown', (e: PointerEvent) => {
         e.preventDefault()
         handle.setPointerCapture(e.pointerId)
         isDragging = true
         handle.style.cursor = 'grabbing'
+        handle.style.opacity = '1'
 
         const rect = widget.getBoundingClientRect()
-        startY = e.clientY
-        offsetY = e.clientY - rect.top
+        const offsetY = e.clientY - rect.top
 
-        // Lift the widget visually
-        widget.style.zIndex = '10'
-        widget.style.boxShadow = '0 12px 40px rgba(0,0,0,0.55)'
-        widget.style.opacity = '0.75'
-        widget.style.outline = '1px solid rgba(200,168,72,0.5) !important'
-        handle.style.opacity = '1'
-      })
+        // Create a same-height placeholder to hold the slot
+        const isHalf = widget.dataset.width === 'half'
+        placeholder = document.createElement('div')
+        placeholder.style.cssText = `
+          height: ${rect.height}px;
+          flex: ${isHalf ? '0 0 calc(50% - 0.625rem)' : '0 0 100%'};
+          border: 1px dashed rgba(200,168,72,0.3);
+          border-radius: 1rem;
+          background: rgba(200,168,72,0.03);
+          box-sizing: border-box;
+          min-width: 0;
+        `
+        widget.parentNode?.insertBefore(placeholder, widget)
 
-      handle.addEventListener('pointermove', (e: PointerEvent) => {
-        if (!isDragging) return
-        const cursorY = e.clientY
+        // Lift the widget out of flow so it follows the cursor
+        widget.style.position = 'fixed'
+        widget.style.top = rect.top + 'px'
+        widget.style.left = rect.left + 'px'
+        widget.style.width = rect.width + 'px'
+        widget.style.zIndex = '500'
+        widget.style.boxShadow = '0 20px 60px rgba(0,0,0,0.65), 0 0 0 1px rgba(200,168,72,0.3)'
+        widget.style.outline = 'none'
+        widget.style.transition = 'box-shadow 0.15s'
+        widget.style.margin = '0'
+        widget.style.borderRadius = '1rem'
 
-        // Only reorder if moved meaningfully
-        if (Math.abs(cursorY - startY) < 4) return
+        function onMove(e: PointerEvent) {
+          if (!isDragging || !placeholder) return
 
-        const others = getWidgetEls().filter(w => w !== widget)
-        let inserted = false
+          // Card follows cursor
+          widget.style.top = (e.clientY - offsetY) + 'px'
 
-        for (const other of others) {
-          const rect = other.getBoundingClientRect()
-          if (cursorY < rect.top + rect.height / 2) {
-            if (widget.nextSibling !== other) {
-              other.parentNode?.insertBefore(widget, other)
+          // Move placeholder to show drop position
+          const cursorY = e.clientY
+          const others = getWidgetEls().filter(w => w !== widget)
+          let moved = false
+
+          for (const other of others) {
+            const r = other.getBoundingClientRect()
+            if (cursorY < r.top + r.height / 2) {
+              if (placeholder!.nextSibling !== other) {
+                other.parentNode?.insertBefore(placeholder!, other)
+              }
+              moved = true
+              break
             }
-            inserted = true
-            break
+          }
+          if (!moved && others.length > 0) {
+            const last = others[others.length - 1]
+            if (last.nextSibling !== placeholder) last.after(placeholder!)
           }
         }
 
-        if (!inserted) {
-          const last = others[others.length - 1]
-          if (last && last.nextSibling !== widget) {
-            last.after(widget)
+        function onUp() {
+          if (!isDragging) return
+          isDragging = false
+          handle.removeEventListener('pointermove', onMove)
+          handle.removeEventListener('pointerup', onUp)
+          handle.removeEventListener('pointercancel', onUp)
+
+          // Drop: put widget back into flow at placeholder position
+          if (placeholder && placeholder.parentNode) {
+            placeholder.parentNode.insertBefore(widget, placeholder)
+            placeholder.remove()
+            placeholder = null
           }
+
+          // Restore widget styles
+          widget.style.position = ''
+          widget.style.top = ''
+          widget.style.left = ''
+          widget.style.width = ''
+          widget.style.zIndex = ''
+          widget.style.boxShadow = ''
+          widget.style.outline = ''
+          widget.style.transition = ''
+          widget.style.margin = ''
+          widget.style.borderRadius = ''
+          handle.style.cursor = 'grab'
+          handle.style.opacity = '0'
+
+          markChanged()
         }
+
+        handle.addEventListener('pointermove', onMove)
+        handle.addEventListener('pointerup', onUp)
+        handle.addEventListener('pointercancel', onUp)
       })
-
-      const onDragEnd = () => {
-        if (!isDragging) return
-        isDragging = false
-        handle.style.cursor = 'grab'
-        handle.style.opacity = '0'
-
-        // Reset lift
-        widget.style.zIndex = ''
-        widget.style.boxShadow = ''
-        widget.style.opacity = ''
-        widget.style.outline = ''
-
-        markChanged()
-      }
-
-      handle.addEventListener('pointerup', onDragEnd)
-      handle.addEventListener('pointercancel', onDragEnd)
     })
 
     // ── Editable text ──────────────────────────────────────────
@@ -335,6 +408,7 @@ export function HomePageEditor({ initialContent }: { initialContent: Content }) 
 
     const order = getCurrentOrder()
     const hidden = getSavedHidden(initialContent)
+    const widths = getCurrentWidths()
 
     const textUpdates: Record<string, string> = {}
     document.querySelectorAll<HTMLElement>('[data-editable-key]').forEach(el => {
@@ -346,7 +420,7 @@ export function HomePageEditor({ initialContent }: { initialContent: Content }) 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...textUpdates,
-        dashboard_layout: JSON.stringify({ order, hidden }),
+        dashboard_layout: JSON.stringify({ order, hidden, widths }),
       }),
     })
 

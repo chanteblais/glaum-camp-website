@@ -364,17 +364,18 @@ function PhotoUpload({ value, onChange }: { value: string | null; onChange: (url
 
 // ── Sections ──────────────────────────────────────────────────────────────────
 
-function SectionI({ form, set, fl }: { form: FormData; set: (k: keyof FormData, v: unknown) => void; fl: FlHelper }) {
+function SectionI({ form, set, fl, isMobile }: { form: FormData; set: (k: keyof FormData, v: unknown) => void; fl: FlHelper; isMobile?: boolean }) {
+  const cols2 = isMobile ? '1fr' : '1fr 1fr'
   return (
     <>
       <p style={{ fontSize: '0.72rem', opacity: 0.4, textAlign: 'right', marginBottom: '1rem', marginTop: '-0.5rem' }}>
         <span style={{ color: '#ff8a8a' }}>*</span> required
       </p>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: cols2, gap: '1rem' }}>
         <Field label={fl.label('first_name')} required={fl.required('first_name')}><Input value={form.first_name} onChange={v => set('first_name', v)} placeholder="First name" maxLength={50} /></Field>
         <Field label={fl.label('last_name')} required={fl.required('last_name')}><Input value={form.last_name} onChange={v => set('last_name', v)} placeholder="Last name" maxLength={50} /></Field>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: cols2, gap: '1rem' }}>
         {fl.visible('preferred_name') && (
           <Field label={fl.label('preferred_name')} optional={!fl.required('preferred_name')} required={fl.required('preferred_name')}><Input value={form.preferred_name} onChange={v => set('preferred_name', v)} placeholder="If different" maxLength={50} /></Field>
         )}
@@ -382,13 +383,13 @@ function SectionI({ form, set, fl }: { form: FormData; set: (k: keyof FormData, 
           <Field label={fl.label('pronouns')} optional={!fl.required('pronouns')} required={fl.required('pronouns')}><Input value={form.pronouns} onChange={v => set('pronouns', v)} placeholder="e.g. she/her" /></Field>
         )}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: cols2, gap: '1rem' }}>
         <Field label={fl.label('email')} required={fl.required('email')}><Input value={form.email} onChange={v => set('email', v)} type="email" placeholder="your@email.com" readOnly={!!form.email} /></Field>
         <Field label={fl.label('phone')} required={fl.required('phone')} optional={!fl.required('phone')}><Input value={form.phone} onChange={v => set('phone', v)} type="tel" placeholder="For camp logistics" /></Field>
       </div>
       {(fl.visible('instagram') || fl.visible('location')) && (
         fl.visible('instagram') && fl.visible('location') ? (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: cols2, gap: '1rem' }}>
             <Field label={fl.label('instagram')} optional={!fl.required('instagram')}><Input value={form.instagram} onChange={v => set('instagram', v)} placeholder={fl.desc('instagram') ?? '@handle'} /></Field>
             <Field label={fl.label('location')} optional={!fl.required('location')}><Input value={form.location} onChange={v => set('location', v)} placeholder="City, region, or 'the void'" /></Field>
           </div>
@@ -401,7 +402,7 @@ function SectionI({ form, set, fl }: { form: FormData; set: (k: keyof FormData, 
       <Field label={fl.label('emergency_contact')} required={fl.required('emergency_contact')} optional={!fl.required('emergency_contact')}>
         <Input value={form.emergency_contact} onChange={v => set('emergency_contact', v)} placeholder={fl.desc('emergency_contact') ?? 'Name and phone number'} />
       </Field>
-      <div style={{ display: 'grid', gridTemplateColumns: fl.visible('referral') ? '1fr 1fr' : '1fr', gap: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: fl.visible('referral') ? cols2 : '1fr', gap: '1rem' }}>
         {fl.visible('referral') && (
           <Field label={fl.label('referral')} optional={!fl.required('referral')}><Input value={form.referral} onChange={v => set('referral', v)} placeholder="Name or how you found us" /></Field>
         )}
@@ -424,7 +425,8 @@ function SectionI({ form, set, fl }: { form: FormData; set: (k: keyof FormData, 
   )
 }
 
-function SectionII({ form, set, fl }: { form: FormData; set: (k: keyof FormData, v: unknown) => void; fl: FlHelper }) {
+function SectionII({ form, set, fl, isMobile }: { form: FormData; set: (k: keyof FormData, v: unknown) => void; fl: FlHelper; isMobile?: boolean }) {
+  const cols2 = isMobile ? '1fr' : '1fr 1fr'
   const showAny = fl.visible('about_you') || fl.visible('special_skills') || fl.visible('find_at_camp')
   return (
     <>
@@ -451,7 +453,7 @@ function SectionII({ form, set, fl }: { form: FormData; set: (k: keyof FormData,
         </Field>
       )}
       {showAny && <Divider />}
-      <div style={{ display: 'grid', gridTemplateColumns: fl.visible('attunement_status') ? '1fr 1fr' : '1fr', gap: '2rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: fl.visible('attunement_status') && !isMobile ? '1fr 1fr' : '1fr', gap: '2rem' }}>
         <Field label={fl.label('glaum_acceptance')} required={fl.required('glaum_acceptance')}>
           <RadioGroup options={['Yes', 'Not Yet', "It's Complicated"]} value={form.glaum_acceptance} onChange={v => set('glaum_acceptance', v)} />
         </Field>
@@ -474,7 +476,8 @@ function SectionII({ form, set, fl }: { form: FormData; set: (k: keyof FormData,
   )
 }
 
-function SectionIII({ form, set, fl }: { form: FormData; set: (k: keyof FormData, v: unknown) => void; fl: FlHelper }) {
+function SectionIII({ form, set, fl, isMobile }: { form: FormData; set: (k: keyof FormData, v: unknown) => void; fl: FlHelper; isMobile?: boolean }) {
+  const cols2 = isMobile ? '1fr' : '1fr 1fr'
   const showDates = fl.visible('arrival_date') || fl.visible('departure_date')
   const showVehicle = fl.visible('vehicle') || fl.visible('structures')
   return (
@@ -489,7 +492,7 @@ function SectionIII({ form, set, fl }: { form: FormData; set: (k: keyof FormData
       {showDates && (
         <>
           <Divider />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: cols2, gap: '1rem' }}>
             {fl.visible('arrival_date') && <Field label={fl.label('arrival_date')} optional={!fl.required('arrival_date')}><Input value={form.arrival_date} onChange={v => set('arrival_date', v)} type="date" /></Field>}
             {fl.visible('departure_date') && <Field label={fl.label('departure_date')} optional={!fl.required('departure_date')}><Input value={form.departure_date} onChange={v => set('departure_date', v)} type="date" /></Field>}
           </div>
@@ -908,9 +911,9 @@ export function ApplyWizard({ userEmail, formConfig }: { userEmail: string; form
 
       {/* Form content */}
       <div style={{ marginBottom: '3rem' }}>
-        {steps[step]?.key === 'basic'     && <SectionI   form={form} set={set} fl={makeFlHelper(formConfig, 'basic')} />}
-        {steps[step]?.key === 'registry'  && <SectionII  form={form} set={set} fl={makeFlHelper(formConfig, 'registry')} />}
-        {steps[step]?.key === 'plans'     && <SectionIII form={form} set={set} fl={makeFlHelper(formConfig, 'plans')} />}
+        {steps[step]?.key === 'basic'     && <SectionI   form={form} set={set} fl={makeFlHelper(formConfig, 'basic')}     isMobile={isMobile} />}
+        {steps[step]?.key === 'registry'  && <SectionII  form={form} set={set} fl={makeFlHelper(formConfig, 'registry')} isMobile={isMobile} />}
+        {steps[step]?.key === 'plans'     && <SectionIII form={form} set={set} fl={makeFlHelper(formConfig, 'plans')}     isMobile={isMobile} />}
         {steps[step]?.key === 'roles'     && <SectionIV  form={form} set={set} fl={makeFlHelper(formConfig, 'roles')} />}
         {steps[step]?.key === 'agreement' && <SectionV   form={form} set={set} />}
         {steps[step]?.key === 'shrimp'    && <SectionVI  form={form} set={set} fl={makeFlHelper(formConfig, 'shrimp')} />}
