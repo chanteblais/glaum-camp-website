@@ -1,6 +1,6 @@
 'use client'
 
-export function TrackPicker() {
+export function TrackPicker({ hideMember = false, hideVolunteer = false }: { hideMember?: boolean; hideVolunteer?: boolean }) {
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
       <img src="/hands-left.svg" alt="" aria-hidden style={{ position: 'fixed', left: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
@@ -25,9 +25,9 @@ export function TrackPicker() {
           </p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: hideMember || hideVolunteer ? '1fr' : '1fr 1fr', gap: '1.25rem', maxWidth: hideMember || hideVolunteer ? '400px' : undefined, margin: hideMember || hideVolunteer ? '0 auto' : undefined }}>
           {/* Member */}
-          <a href="/apply?track=member" style={{ textDecoration: 'none' }}>
+          {!hideMember && <a href="/apply?track=member" style={{ textDecoration: 'none' }}>
             <div style={{
               padding: '2rem 1.75rem',
               border: '1px solid rgba(200,168,72,0.3)',
@@ -57,10 +57,10 @@ export function TrackPicker() {
                 Apply for full membership — fill out an application and join the community as a Glåüm member.
               </p>
             </div>
-          </a>
+          </a>}
 
           {/* Volunteer */}
-          <a href="/volunteer" style={{ textDecoration: 'none' }}>
+          {!hideVolunteer && <a href="/volunteer" style={{ textDecoration: 'none' }}>
             <div style={{
               padding: '2rem 1.75rem',
               border: '1px solid rgba(210,57,248,0.25)',
@@ -90,7 +90,7 @@ export function TrackPicker() {
                 Sign up as a volunteer — help with setup, teardown, or other roles without a full membership application.
               </p>
             </div>
-          </a>
+          </a>}
         </div>
 
         <p style={{ textAlign: 'center', fontSize: '0.75rem', opacity: 0.3, marginTop: '2.5rem', letterSpacing: '0.05em' }}>

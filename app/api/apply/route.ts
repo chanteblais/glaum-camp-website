@@ -88,6 +88,11 @@ export async function POST(req: NextRequest) {
         // Section 7 — Final Glåüm Questions
         shrimp_relationship: data.shrimp_relationship || null,
 
+        // Custom sections (admin-added)
+        ...(data.custom_answers && Object.keys(data.custom_answers).length > 0
+          ? { custom_answers: data.custom_answers }
+          : {}),
+
         status: 'pending',
       }])
       .select('id')

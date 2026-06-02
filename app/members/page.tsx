@@ -96,6 +96,8 @@ export default async function MembersPage() {
                 background: 'rgba(255,255,255,0.02)',
                 cursor: 'pointer',
                 transition: 'border-color 0.2s, background 0.2s',
+                minHeight: '165px',
+                justifyContent: 'center',
               }}
               onMouseEnter={undefined}
               >
@@ -113,8 +115,8 @@ export default async function MembersPage() {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={supabaseResizedUrl(member.avatarUrl, 160) ?? ''} alt={member.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
-                    <span style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.4rem', color: '#C8A848', opacity: 0.6 }}>
-                      {member.name.charAt(0).toUpperCase()}
+                    <span style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.5rem', color: '#C8A848', opacity: 0.85 }}>
+                      ✦
                     </span>
                   )}
                 </div>

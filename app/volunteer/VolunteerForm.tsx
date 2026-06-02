@@ -2,6 +2,7 @@
 
 import { useState, useRef, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
+import type { VolunteerFormConfig } from '@/lib/form-config'
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
@@ -85,12 +86,24 @@ const SIGNUP_INTENT_OPTIONS = [
 
 const DAYS = ['Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Monday', 'Flexible']
 
-export function VolunteerForm({ userEmail, userFirstName, userLastName }: {
+// Field lookup helper
+function makeFlHelper(formConfig: VolunteerFormConfig) {
+  return {
+    visible:  (key: string) => formConfig.fields.find(f => f.key === key)?.visible ?? true,
+    required: (key: string) => formConfig.fields.find(f => f.key === key)?.required ?? false,
+    label:    (key: string) => formConfig.fields.find(f => f.key === key)?.label ?? key,
+    desc:     (key: string) => formConfig.fields.find(f => f.key === key)?.description,
+  }
+}
+
+export function VolunteerForm({ userEmail, userFirstName, userLastName, formConfig }: {
   userEmail: string
   userFirstName: string
   userLastName: string
+  formConfig: VolunteerFormConfig
 }) {
   const router = useRouter()
+  const fl = makeFlHelper(formConfig)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -119,7 +132,7 @@ export function VolunteerForm({ userEmail, userFirstName, userLastName }: {
     setSubmitting(true)
     setError(null)
 
-    if (!avatarUrl) {
+    if (fl.visible('avatar_url') && fl.required('avatar_url') && !avatarUrl) {
       setError('Please upload a photo before submitting.')
       setSubmitting(false)
       return
@@ -151,8 +164,8 @@ export function VolunteerForm({ userEmail, userFirstName, userLastName }: {
         throw new Error(json.error || 'Submission failed')
       }
       router.push('/profile')
-    } catch (err: any) {
-      setError(err.message || 'Something went wrong. Please try again.')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
       setSubmitting(false)
     }
   }
@@ -185,14 +198,12 @@ export function VolunteerForm({ userEmail, userFirstName, userLastName }: {
 
       <div style={{ maxWidth: '640px', margin: '0 auto', padding: '3rem 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
 
-        {/* Back link */}
         <div style={{ marginBottom: '3rem' }}>
           <a href="/apply" style={{ fontSize: '0.8rem', letterSpacing: '0.1em', color: '#C8A848', textDecoration: 'none', opacity: 0.6 }}>
             ← Back
           </a>
         </div>
 
-        {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
           <p style={{ fontSize: '0.65rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: '#D239F8', marginBottom: '1rem', opacity: 0.85 }}>
             What If 2026
@@ -209,121 +220,134 @@ export function VolunteerForm({ userEmail, userFirstName, userLastName }: {
 
         <form onSubmit={handleSubmit}>
 
-          {/* Basic info */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
-            <Field label="First Name">
-              <TextInput name="first_name" placeholder="First name" required defaultValue={userFirstName} />
+            <Field label={fl.label('first_name')}>
+              <TextInput name="first_name" placeholder="First name" required={fl.required('first_name')} defaultValue={userFirstName} />
             </Field>
-            <Field label="Last Name">
-              <TextInput name="last_name" placeholder="Last name" required defaultValue={userLastName} />
+            <Field label={fl.label('last_name')}>
+              <TextInput name="last_name" placeholder="Last name" required={fl.required('last_name')} defaultValue={userLastName} />
             </Field>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
-            <Field label="Preferred Name" optional>
-              <TextInput name="preferred_name" placeholder="If different from first name" />
-            </Field>
-            <Field label="Pronouns" optional>
-              <TextInput name="pronouns" placeholder="e.g. she/her, they/them" />
-            </Field>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
-            <Field label="Email">
-              <TextInput name="email" type="email" defaultValue={userEmail} readOnly required />
-            </Field>
-            <Field label="Phone">
-              <TextInput name="phone" type="tel" placeholder="For shift coordination" required />
-            </Field>
-          </div>
-
-          {/* Photo upload */}
-          <Field label="Photo">
-            <p style={{ fontSize: '0.8rem', lineHeight: 1.7, opacity: 0.45, fontStyle: 'italic', marginBottom: '1rem' }}>
-              A photo helps the organising team put a face to the name.
-            </p>
-            <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
-            <div
-              onClick={() => !avatarUploading && avatarInputRef.current?.click()}
-              style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                gap: '0.75rem', minHeight: '120px', padding: '1.5rem',
-                border: `1px dashed ${avatarPreview ? 'rgba(210,57,248,0.4)' : 'rgba(200,168,72,0.25)'}`,
-                borderRadius: '0.75rem', cursor: avatarUploading ? 'wait' : 'pointer',
-                background: avatarPreview ? 'rgba(210,57,248,0.04)' : 'rgba(255,255,255,0.02)',
-                transition: 'border-color 0.2s, background 0.2s',
-              }}
-              onMouseEnter={e => { if (!avatarUploading) (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(210,57,248,0.5)' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = avatarPreview ? 'rgba(210,57,248,0.4)' : 'rgba(200,168,72,0.25)' }}
-            >
-              {avatarPreview ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', width: '100%' }}>
-                  <img src={avatarPreview} alt="Preview" style={{ width: '72px', height: '72px', borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(210,57,248,0.3)', flexShrink: 0 }} />
-                  <div>
-                    {avatarUploading
-                      ? <p style={{ fontSize: '0.85rem', color: '#D239F8', opacity: 0.8 }}>Uploading…</p>
-                      : <><p style={{ fontSize: '0.85rem', color: '#7dcf8e', marginBottom: '0.25rem' }}>✓ Photo uploaded</p><p style={{ fontSize: '0.75rem', opacity: 0.45, fontStyle: 'italic' }}>Click to change</p></>
-                    }
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="rgba(200,168,72,0.5)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                    <circle cx="12" cy="13" r="4" />
-                  </svg>
-                  <p style={{ fontSize: '0.85rem', opacity: 0.5, margin: 0 }}>Click to upload a photo</p>
-                  <p style={{ fontSize: '0.72rem', opacity: 0.3, margin: 0 }}>JPEG, PNG, WebP · max 5 MB</p>
-                </>
+          {(fl.visible('preferred_name') || fl.visible('pronouns')) && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+              {fl.visible('preferred_name') && (
+                <Field label={fl.label('preferred_name')} optional={!fl.required('preferred_name')}>
+                  <TextInput name="preferred_name" placeholder="If different from first name" required={fl.required('preferred_name')} />
+                </Field>
+              )}
+              {fl.visible('pronouns') && (
+                <Field label={fl.label('pronouns')} optional={!fl.required('pronouns')}>
+                  <TextInput name="pronouns" placeholder="e.g. she/her, they/them" required={fl.required('pronouns')} />
+                </Field>
               )}
             </div>
-          </Field>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+            <Field label={fl.label('email')}>
+              <TextInput name="email" type="email" defaultValue={userEmail} readOnly required={fl.required('email')} />
+            </Field>
+            {fl.visible('phone') && (
+              <Field label={fl.label('phone')} optional={!fl.required('phone')}>
+                <TextInput name="phone" type="tel" placeholder="For shift coordination" required={fl.required('phone')} />
+              </Field>
+            )}
+          </div>
+
+          {fl.visible('avatar_url') && (
+            <Field label={fl.label('avatar_url')}>
+              {fl.desc('avatar_url') && (
+                <p style={{ fontSize: '0.8rem', lineHeight: 1.7, opacity: 0.45, fontStyle: 'italic', marginBottom: '1rem' }}>
+                  {fl.desc('avatar_url')}
+                </p>
+              )}
+              <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
+              <div
+                onClick={() => !avatarUploading && avatarInputRef.current?.click()}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  gap: '0.75rem', minHeight: '120px', padding: '1.5rem',
+                  border: `1px dashed ${avatarPreview ? 'rgba(210,57,248,0.4)' : 'rgba(200,168,72,0.25)'}`,
+                  borderRadius: '0.75rem', cursor: avatarUploading ? 'wait' : 'pointer',
+                  background: avatarPreview ? 'rgba(210,57,248,0.04)' : 'rgba(255,255,255,0.02)',
+                  transition: 'border-color 0.2s, background 0.2s',
+                }}
+                onMouseEnter={e => { if (!avatarUploading) (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(210,57,248,0.5)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = avatarPreview ? 'rgba(210,57,248,0.4)' : 'rgba(200,168,72,0.25)' }}
+              >
+                {avatarPreview ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', width: '100%' }}>
+                    <img src={avatarPreview} alt="Preview" style={{ width: '72px', height: '72px', borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(210,57,248,0.3)', flexShrink: 0 }} />
+                    <div>
+                      {avatarUploading
+                        ? <p style={{ fontSize: '0.85rem', color: '#D239F8', opacity: 0.8 }}>Uploading…</p>
+                        : <><p style={{ fontSize: '0.85rem', color: '#7dcf8e', marginBottom: '0.25rem' }}>✓ Photo uploaded</p><p style={{ fontSize: '0.75rem', opacity: 0.45, fontStyle: 'italic' }}>Click to change</p></>
+                      }
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="rgba(200,168,72,0.5)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                      <circle cx="12" cy="13" r="4" />
+                    </svg>
+                    <p style={{ fontSize: '0.85rem', opacity: 0.5, margin: 0 }}>Click to upload a photo</p>
+                    <p style={{ fontSize: '0.72rem', opacity: 0.3, margin: 0 }}>JPEG, PNG, WebP · max 5 MB</p>
+                  </>
+                )}
+              </div>
+            </Field>
+          )}
 
           <div style={dividerStyle} />
 
-          {/* Signup intent */}
-          <Field label="How would you like to help?">
-            <p style={{ fontSize: '0.8rem', opacity: 0.45, fontStyle: 'italic', marginBottom: '0.85rem', lineHeight: 1.5 }}>Select all that apply</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-              {SIGNUP_INTENT_OPTIONS.map(opt => (
-                <label key={opt.value} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.85rem', cursor: 'pointer', padding: '0.85rem 1rem', borderRadius: '0.6rem', border: '1px solid rgba(200,168,72,0.15)', background: 'rgba(255,255,255,0.02)' }}>
-                  <input
-                    type="checkbox"
-                    name="signup_intent"
-                    value={opt.value}
-                    onChange={opt.value === 'other' ? e => setOtherChecked(e.target.checked) : undefined}
-                    style={{ marginTop: '0.25rem', flexShrink: 0, accentColor: '#D239F8', cursor: 'pointer' }}
-                  />
-                  <div>
-                    <p style={{ fontSize: '0.9rem', color: '#F3EDE6', margin: '0 0 0.2rem' }}>{opt.label}</p>
-                    <p style={{ fontSize: '0.78rem', opacity: 0.45, lineHeight: 1.5, margin: 0 }}>{opt.desc}</p>
-                  </div>
-                </label>
-              ))}
-            </div>
-            {otherChecked && (
-              <div style={{ marginTop: '0.75rem' }}>
-                <TextArea name="specific_interests" placeholder="Tell us more about what you have in mind…" rows={3} />
+          {fl.visible('signup_intent') && (
+            <Field label={fl.label('signup_intent')}>
+              <p style={{ fontSize: '0.8rem', opacity: 0.45, fontStyle: 'italic', marginBottom: '0.85rem', lineHeight: 1.5 }}>Select all that apply</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                {SIGNUP_INTENT_OPTIONS.map(opt => (
+                  <label key={opt.value} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.85rem', cursor: 'pointer', padding: '0.85rem 1rem', borderRadius: '0.6rem', border: '1px solid rgba(200,168,72,0.15)', background: 'rgba(255,255,255,0.02)' }}>
+                    <input
+                      type="checkbox"
+                      name="signup_intent"
+                      value={opt.value}
+                      onChange={opt.value === 'other' ? e => setOtherChecked(e.target.checked) : undefined}
+                      style={{ marginTop: '0.25rem', flexShrink: 0, accentColor: '#D239F8', cursor: 'pointer' }}
+                    />
+                    <div>
+                      <p style={{ fontSize: '0.9rem', color: '#F3EDE6', margin: '0 0 0.2rem' }}>{opt.label}</p>
+                      <p style={{ fontSize: '0.78rem', opacity: 0.45, lineHeight: 1.5, margin: 0 }}>{opt.desc}</p>
+                    </div>
+                  </label>
+                ))}
               </div>
-            )}
-          </Field>
+              {otherChecked && (
+                <div style={{ marginTop: '0.75rem' }}>
+                  <TextArea name="specific_interests" placeholder="Tell us more about what you have in mind…" rows={3} />
+                </div>
+              )}
+            </Field>
+          )}
 
-          {/* Days available */}
-          <Field label="What days are you likely available?" optional>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {DAYS.map(day => (
-                <label key={day} style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', cursor: 'pointer', fontSize: '0.9rem', color: '#F3EDE6', opacity: 0.85 }}>
-                  <input type="checkbox" name="days_available" value={day} style={{ width: '1rem', height: '1rem', flexShrink: 0, accentColor: '#D239F8', cursor: 'pointer' }} />
-                  {day}
-                </label>
-              ))}
-            </div>
-          </Field>
+          {fl.visible('days_available') && (
+            <Field label={fl.label('days_available')} optional={!fl.required('days_available')}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {DAYS.map(day => (
+                  <label key={day} style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', cursor: 'pointer', fontSize: '0.9rem', color: '#F3EDE6', opacity: 0.85 }}>
+                    <input type="checkbox" name="days_available" value={day} style={{ width: '1rem', height: '1rem', flexShrink: 0, accentColor: '#D239F8', cursor: 'pointer' }} />
+                    {day}
+                  </label>
+                ))}
+              </div>
+            </Field>
+          )}
 
-          {/* Anything else */}
-          <Field label="Anything else we should know?" optional>
-            <TextArea name="other_notes" placeholder="Skills, availability notes, questions — whatever feels relevant." rows={3} />
-          </Field>
+          {fl.visible('other_notes') && (
+            <Field label={fl.label('other_notes')} optional={!fl.required('other_notes')}>
+              <TextArea name="other_notes" placeholder="Skills, availability notes, questions — whatever feels relevant." rows={3} />
+            </Field>
+          )}
 
           {error && (
             <p style={{ color: '#ff6b6b', fontSize: '0.9rem', marginBottom: '1.25rem', textAlign: 'center' }}>{error}</p>

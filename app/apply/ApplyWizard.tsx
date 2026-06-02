@@ -3,19 +3,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Cropper from 'react-easy-crop'
 import type { Area } from 'react-easy-crop'
+import type { MemberFormConfig, StepConfig, FieldConfig } from '@/lib/form-config'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const DRAFT_KEY = 'glaum-apply-draft-v2'
-
-const STEPS = [
-  { num: 'I',   title: 'BASIC INFORMATION',        subtitle: 'Who you are.' },
-  { num: 'II',  title: 'MANY HANDS REGISTRY',      subtitle: 'Tell us about you.' },
-  { num: 'III', title: 'WHAT IF PLANS',            subtitle: 'How you\'ll participate.' },
-  { num: 'IV',  title: 'PARTICIPATION & ROLES',    subtitle: 'How you\'d like to contribute.' },
-  { num: 'V',   title: 'THE MANY HANDS AGREEMENT', subtitle: 'What we ask of each other.' },
-  { num: 'VI',  title: 'SHRIMP',                   subtitle: 'A final question.' },
-]
 
 const MILESTONES = [
   'Application\nReceived',
@@ -25,7 +17,9 @@ const MILESTONES = [
   'Welcome to\nGlåüm',
 ]
 
-const MILESTONE_FOR_STEP = [0, 1, 2, 2, 3, 4]
+const MILESTONE_FOR_KEY: Record<string, number> = {
+  basic: 0, registry: 1, plans: 2, roles: 2, agreement: 3, shrimp: 4,
+}
 
 const AGREEMENT_ITEMS = [
   'I have taken time to familiarise myself with Glåüm and believe it is a community I would genuinely enjoy contributing to.',
@@ -52,8 +46,6 @@ const DEPT_OPTIONS = [
   'Records & Documentation',
 ]
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
 type FormData = {
   // I
   first_name: string; last_name: string; preferred_name: string; pronouns: string
@@ -73,6 +65,8 @@ type FormData = {
   acknowledgements: string[]
   // VI
   shrimp_relationship: string
+  // Custom sections
+  custom_answers: Record<string, string | string[]>
 }
 
 const BLANK: FormData = {
@@ -87,6 +81,7 @@ const BLANK: FormData = {
   setup_preference: [], setup_limitations: [], setup_notes: '',
   acknowledgements: [],
   shrimp_relationship: '',
+  custom_answers: {},
 }
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
@@ -103,6 +98,25 @@ const inputStyle: React.CSSProperties = {
   borderRadius: '0.65rem',
   color: CREAM, fontSize: '0.9rem', outline: 'none',
   transition: 'border-color 0.2s',
+}
+
+// ── Field lookup helper ───────────────────────────────────────────────────────
+
+type FlHelper = {
+  visible: (fieldKey: string) => boolean
+  required: (fieldKey: string) => boolean
+  label:    (fieldKey: string) => string
+  desc:     (fieldKey: string) => string | undefined
+}
+
+function makeFlHelper(formConfig: MemberFormConfig, stepKey: string): FlHelper {
+  const step = formConfig.steps.find(s => s.key === stepKey)
+  return {
+    visible: (fieldKey: string) => step?.fields.find(f => f.key === fieldKey)?.visible ?? true,
+    required: (fieldKey: string) => step?.fields.find(f => f.key === fieldKey)?.required ?? false,
+    label:    (fieldKey: string) => step?.fields.find(f => f.key === fieldKey)?.label ?? fieldKey,
+    desc:     (fieldKey: string) => step?.fields.find(f => f.key === fieldKey)?.description,
+  }
 }
 
 // ── Small components ──────────────────────────────────────────────────────────
@@ -277,14 +291,11 @@ function PhotoUpload({ value, onChange }: { value: string | null; onChange: (url
 
   return (
     <>
-      {/* Crop modal */}
       {rawSrc && (
         <>
           <div onClick={() => !uploading && setRawSrc(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 60 }} />
           <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 61, background: '#130820', border: '1px solid rgba(200,168,72,0.25)', borderRadius: '1rem', padding: '1.5rem', width: '90%', maxWidth: '440px' }}>
             <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1rem', color: GOLD, margin: '0 0 1rem', textAlign: 'center' }}>Adjust Photo</p>
-
-            {/* Crop area */}
             <div style={{ position: 'relative', width: '100%', paddingBottom: '100%', borderRadius: '0.75rem', overflow: 'hidden', background: '#000' }}>
               <div style={{ position: 'absolute', inset: 0 }}>
                 <Cropper
@@ -304,8 +315,6 @@ function PhotoUpload({ value, onChange }: { value: string | null; onChange: (url
                 />
               </div>
             </div>
-
-            {/* Zoom slider */}
             <div style={{ margin: '1rem 0 0.25rem' }}>
               <p style={{ fontSize: '0.68rem', letterSpacing: '0.1em', color: GOLD, opacity: 0.55, margin: '0 0 0.5rem', textTransform: 'uppercase' }}>Zoom</p>
               <input
@@ -314,9 +323,7 @@ function PhotoUpload({ value, onChange }: { value: string | null; onChange: (url
                 style={{ width: '100%', accentColor: GOLD, cursor: 'pointer' }}
               />
             </div>
-
             {error && <p style={{ fontSize: '0.8rem', color: '#ff8a8a', margin: '0.5rem 0' }}>{error}</p>}
-
             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.25rem' }}>
               <button onClick={() => setRawSrc(null)} disabled={uploading} style={{ padding: '0.55rem 1.1rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.2)', background: 'transparent', color: CREAM, cursor: 'pointer', fontSize: '0.82rem', opacity: 0.7 }}>Cancel</button>
               <button onClick={handleSave} disabled={uploading} style={{ padding: '0.55rem 1.4rem', borderRadius: '9999px', border: 'none', background: uploading ? 'rgba(200,168,72,0.2)' : 'linear-gradient(135deg,#C8A848,#A8882A)', color: uploading ? GOLD : '#1A0800', cursor: uploading ? 'not-allowed' : 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
@@ -326,8 +333,6 @@ function PhotoUpload({ value, onChange }: { value: string | null; onChange: (url
           </div>
         </>
       )}
-
-      {/* Preview + trigger */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
         <div
           onClick={() => ref.current?.click()}
@@ -359,140 +364,204 @@ function PhotoUpload({ value, onChange }: { value: string | null; onChange: (url
 
 // ── Sections ──────────────────────────────────────────────────────────────────
 
-function SectionI({ form, set }: { form: FormData; set: (k: keyof FormData, v: unknown) => void }) {
+function SectionI({ form, set, fl, isMobile }: { form: FormData; set: (k: keyof FormData, v: unknown) => void; fl: FlHelper; isMobile?: boolean }) {
+  const cols2 = isMobile ? '1fr' : '1fr 1fr'
   return (
     <>
       <p style={{ fontSize: '0.72rem', opacity: 0.4, textAlign: 'right', marginBottom: '1rem', marginTop: '-0.5rem' }}>
         <span style={{ color: '#ff8a8a' }}>*</span> required
       </p>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-        <Field label="First Name" required><Input value={form.first_name} onChange={v => set('first_name', v)} placeholder="First name" maxLength={50} /></Field>
-        <Field label="Last Name" required><Input value={form.last_name} onChange={v => set('last_name', v)} placeholder="Last name" maxLength={50} /></Field>
+      <div style={{ display: 'grid', gridTemplateColumns: cols2, gap: '1rem' }}>
+        <Field label={fl.label('first_name')} required={fl.required('first_name')}><Input value={form.first_name} onChange={v => set('first_name', v)} placeholder="First name" maxLength={50} /></Field>
+        <Field label={fl.label('last_name')} required={fl.required('last_name')}><Input value={form.last_name} onChange={v => set('last_name', v)} placeholder="Last name" maxLength={50} /></Field>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-        <Field label="Preferred Name" optional><Input value={form.preferred_name} onChange={v => set('preferred_name', v)} placeholder="If different" maxLength={50} /></Field>
-        <Field label="Pronouns" optional><Input value={form.pronouns} onChange={v => set('pronouns', v)} placeholder="e.g. she/her" /></Field>
+      <div style={{ display: 'grid', gridTemplateColumns: cols2, gap: '1rem' }}>
+        {fl.visible('preferred_name') && (
+          <Field label={fl.label('preferred_name')} optional={!fl.required('preferred_name')} required={fl.required('preferred_name')}><Input value={form.preferred_name} onChange={v => set('preferred_name', v)} placeholder="If different" maxLength={50} /></Field>
+        )}
+        {fl.visible('pronouns') && (
+          <Field label={fl.label('pronouns')} optional={!fl.required('pronouns')} required={fl.required('pronouns')}><Input value={form.pronouns} onChange={v => set('pronouns', v)} placeholder="e.g. she/her" /></Field>
+        )}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-        <Field label="Email" required><Input value={form.email} onChange={v => set('email', v)} type="email" placeholder="your@email.com" readOnly={!!form.email} /></Field>
-        <Field label="Phone Number" required><Input value={form.phone} onChange={v => set('phone', v)} type="tel" placeholder="For camp logistics" /></Field>
+      <div style={{ display: 'grid', gridTemplateColumns: cols2, gap: '1rem' }}>
+        <Field label={fl.label('email')} required={fl.required('email')}><Input value={form.email} onChange={v => set('email', v)} type="email" placeholder="your@email.com" readOnly={!!form.email} /></Field>
+        <Field label={fl.label('phone')} required={fl.required('phone')} optional={!fl.required('phone')}><Input value={form.phone} onChange={v => set('phone', v)} type="tel" placeholder="For camp logistics" /></Field>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-        <Field label="Instagram" optional><Input value={form.instagram} onChange={v => set('instagram', v)} placeholder="@handle" /></Field>
-        <Field label="Where are you travelling from?"><Input value={form.location} onChange={v => set('location', v)} placeholder="City, region, or 'the void'" /></Field>
-      </div>
-      <Field label="Emergency Contact" required><Input value={form.emergency_contact} onChange={v => set('emergency_contact', v)} placeholder="Name and phone number" /></Field>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-        <Field label="Who referred you to Glåüm?" optional><Input value={form.referral} onChange={v => set('referral', v)} placeholder="Name or how you found us" /></Field>
-        <Field label="Have you camped with Glåüm before?" required>
+      {(fl.visible('instagram') || fl.visible('location')) && (
+        fl.visible('instagram') && fl.visible('location') ? (
+          <div style={{ display: 'grid', gridTemplateColumns: cols2, gap: '1rem' }}>
+            <Field label={fl.label('instagram')} optional={!fl.required('instagram')}><Input value={form.instagram} onChange={v => set('instagram', v)} placeholder={fl.desc('instagram') ?? '@handle'} /></Field>
+            <Field label={fl.label('location')} optional={!fl.required('location')}><Input value={form.location} onChange={v => set('location', v)} placeholder="City, region, or 'the void'" /></Field>
+          </div>
+        ) : fl.visible('instagram') ? (
+          <Field label={fl.label('instagram')} optional={!fl.required('instagram')}><Input value={form.instagram} onChange={v => set('instagram', v)} placeholder={fl.desc('instagram') ?? '@handle'} /></Field>
+        ) : (
+          <Field label={fl.label('location')} optional={!fl.required('location')}><Input value={form.location} onChange={v => set('location', v)} placeholder="City, region, or 'the void'" /></Field>
+        )
+      )}
+      <Field label={fl.label('emergency_contact')} required={fl.required('emergency_contact')} optional={!fl.required('emergency_contact')}>
+        <Input value={form.emergency_contact} onChange={v => set('emergency_contact', v)} placeholder={fl.desc('emergency_contact') ?? 'Name and phone number'} />
+      </Field>
+      <div style={{ display: 'grid', gridTemplateColumns: fl.visible('referral') ? cols2 : '1fr', gap: '1rem' }}>
+        {fl.visible('referral') && (
+          <Field label={fl.label('referral')} optional={!fl.required('referral')}><Input value={form.referral} onChange={v => set('referral', v)} placeholder="Name or how you found us" /></Field>
+        )}
+        <Field label={fl.label('camped_before')} required={fl.required('camped_before')} optional={!fl.required('camped_before')}>
           <RadioGroup options={['Yes', 'No']} value={form.camped_before} onChange={v => set('camped_before', v)} />
         </Field>
       </div>
-      <Divider label="Photo *" />
-      <p style={{ fontSize: '0.85rem', lineHeight: 1.8, opacity: 0.5, marginBottom: '1.25rem' }}>
-        Please upload a photo for the Many Hands Photo Board. A photo where people can reasonably tell it's you is appreciated. Baby photos, cryptids, and distant figures disappearing into the mist may be beautiful, but they aren't always particularly helpful.
-      </p>
-      <PhotoUpload value={form.avatar_url} onChange={url => set('avatar_url', url)} />
+      {fl.visible('avatar_url') && (
+        <>
+          <Divider label={`${fl.label('avatar_url')}${fl.required('avatar_url') ? ' *' : ''}`} />
+          {fl.desc('avatar_url') && (
+            <p style={{ fontSize: '0.85rem', lineHeight: 1.8, opacity: 0.5, marginBottom: '1.25rem' }}>
+              Please upload a photo for the Many Hands Photo Board. A photo where people can reasonably tell it's you is appreciated.
+            </p>
+          )}
+          <PhotoUpload value={form.avatar_url} onChange={url => set('avatar_url', url)} />
+        </>
+      )}
     </>
   )
 }
 
-function SectionII({ form, set }: { form: FormData; set: (k: keyof FormData, v: unknown) => void }) {
+function SectionII({ form, set, fl, isMobile }: { form: FormData; set: (k: keyof FormData, v: unknown) => void; fl: FlHelper; isMobile?: boolean }) {
+  const cols2 = isMobile ? '1fr' : '1fr 1fr'
+  const showAny = fl.visible('about_you') || fl.visible('special_skills') || fl.visible('find_at_camp')
   return (
     <>
-      <p style={{ fontSize: '0.9rem', lineHeight: 1.8, opacity: 0.5, marginBottom: '2rem', fontStyle: 'italic' }}>
-        These questions help us get to know you and create your official Many Hands Registry entry. Your answers shape how you're introduced to the camp and how we match you with roles and responsibilities that suit you.
-      </p>
-
-      <Field label="What are you currently excited about?">
-        <Textarea value={form.about_you} onChange={v => set('about_you', v)} placeholder="Share the projects, ideas, pursuits, or obsessions lighting you up right now." />
-      </Field>
-      <Field label="What special skills, talents, qualifications, or areas of expertise do you possess?">
-        <p style={{ fontSize: '0.8rem', opacity: 0.4, margin: '0 0 0.5rem', fontStyle: 'italic' }}>What might be useful at camp (or just delightfully surprising).</p>
-        <Textarea value={form.special_skills} onChange={v => set('special_skills', v)} placeholder="Your answer…" />
-      </Field>
-      <Field label="If we encountered you at camp, what would we most likely find you doing?">
-        <p style={{ fontSize: '0.8rem', opacity: 0.4, margin: '0 0 0.5rem', fontStyle: 'italic' }}>Picture a typical (or delightfully atypical) Glåüm moment.</p>
-        <Textarea value={form.find_at_camp} onChange={v => set('find_at_camp', v)} placeholder="Your answer…" />
-      </Field>
-
-      <Divider />
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
-        <Field label="Have you accepted Glåüm into your heart?" required>
-          <RadioGroup options={['Yes', 'Not Yet', 'It\'s Complicated']} value={form.glaum_acceptance} onChange={v => set('glaum_acceptance', v)} />
+      {showAny && (
+        <p style={{ fontSize: '0.9rem', lineHeight: 1.8, opacity: 0.5, marginBottom: '2rem', fontStyle: 'italic' }}>
+          These questions help us get to know you and create your official Many Hands Registry entry.
+        </p>
+      )}
+      {fl.visible('about_you') && (
+        <Field label={fl.label('about_you')} optional={!fl.required('about_you')}>
+          <Textarea value={form.about_you} onChange={v => set('about_you', v)} placeholder="Share the projects, ideas, pursuits, or obsessions lighting you up right now." />
         </Field>
-        <Field label="Current Attunement Status">
-          <RadioGroup
-            options={['Emerging', 'Stable', 'Elevated', 'Classified', 'Other']}
-            value={form.attunement_status}
-            onChange={v => set('attunement_status', v)}
-          />
-          {form.attunement_status === 'Other' && (
-            <div style={{ marginTop: '0.5rem' }}>
-              <Input value={form.attunement_status_other} onChange={v => set('attunement_status_other', v)} placeholder="Tell us more…" />
-            </div>
-          )}
+      )}
+      {fl.visible('special_skills') && (
+        <Field label={fl.label('special_skills')} optional={!fl.required('special_skills')}>
+          {fl.desc('special_skills') && <p style={{ fontSize: '0.8rem', opacity: 0.4, margin: '0 0 0.5rem', fontStyle: 'italic' }}>{fl.desc('special_skills')}</p>}
+          <Textarea value={form.special_skills} onChange={v => set('special_skills', v)} placeholder="Your answer…" />
         </Field>
+      )}
+      {fl.visible('find_at_camp') && (
+        <Field label={fl.label('find_at_camp')} optional={!fl.required('find_at_camp')}>
+          {fl.desc('find_at_camp') && <p style={{ fontSize: '0.8rem', opacity: 0.4, margin: '0 0 0.5rem', fontStyle: 'italic' }}>{fl.desc('find_at_camp')}</p>}
+          <Textarea value={form.find_at_camp} onChange={v => set('find_at_camp', v)} placeholder="Your answer…" />
+        </Field>
+      )}
+      {showAny && <Divider />}
+      <div style={{ display: 'grid', gridTemplateColumns: fl.visible('attunement_status') && !isMobile ? '1fr 1fr' : '1fr', gap: '2rem' }}>
+        <Field label={fl.label('glaum_acceptance')} required={fl.required('glaum_acceptance')}>
+          <RadioGroup options={['Yes', 'Not Yet', "It's Complicated"]} value={form.glaum_acceptance} onChange={v => set('glaum_acceptance', v)} />
+        </Field>
+        {fl.visible('attunement_status') && (
+          <Field label={fl.label('attunement_status')} optional={!fl.required('attunement_status')}>
+            <RadioGroup
+              options={['Emerging', 'Stable', 'Elevated', 'Classified', 'Other']}
+              value={form.attunement_status}
+              onChange={v => set('attunement_status', v)}
+            />
+            {form.attunement_status === 'Other' && (
+              <div style={{ marginTop: '0.5rem' }}>
+                <Input value={form.attunement_status_other} onChange={v => set('attunement_status_other', v)} placeholder="Tell us more…" />
+              </div>
+            )}
+          </Field>
+        )}
       </div>
     </>
   )
 }
 
-function SectionIII({ form, set }: { form: FormData; set: (k: keyof FormData, v: unknown) => void }) {
+function SectionIII({ form, set, fl, isMobile }: { form: FormData; set: (k: keyof FormData, v: unknown) => void; fl: FlHelper; isMobile?: boolean }) {
+  const cols2 = isMobile ? '1fr' : '1fr 1fr'
+  const showDates = fl.visible('arrival_date') || fl.visible('departure_date')
+  const showVehicle = fl.visible('vehicle') || fl.visible('structures')
   return (
     <>
-      <Field label="How do you plan to participate this year?" required>
+      <Field label={fl.label('attendance')} required={fl.required('attendance')}>
         <RadioGroup
           options={['Camping with Glåüm', 'Staying nearby but participating', 'Mostly visiting socially', 'Still figuring it out']}
           value={form.attendance}
           onChange={v => set('attendance', v)}
         />
       </Field>
-      <Divider />
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-        <Field label="Approximate Arrival Date"><Input value={form.arrival_date} onChange={v => set('arrival_date', v)} type="date" /></Field>
-        <Field label="Approximate Departure Date"><Input value={form.departure_date} onChange={v => set('departure_date', v)} type="date" /></Field>
-      </div>
-      <Field label="Vehicle Information" optional><Input value={form.vehicle} onChange={v => set('vehicle', v)} placeholder="Make, model, passengers, cargo capacity" /></Field>
-      <Field label="Bringing Any Structures?" optional><Input value={form.structures} onChange={v => set('structures', v)} placeholder="Tents, shade structures, etc." /></Field>
-      <Divider label="Rideshare" />
-      <Field label="Rideshare Status">
-        <RadioGroup
-          options={['I need a ride', 'I can offer a ride', 'I\'m sorted', 'Not sure yet']}
-          value={form.rideshare}
-          onChange={v => set('rideshare', v)}
-        />
-      </Field>
+      {showDates && (
+        <>
+          <Divider />
+          <div style={{ display: 'grid', gridTemplateColumns: cols2, gap: '1rem' }}>
+            {fl.visible('arrival_date') && <Field label={fl.label('arrival_date')} optional={!fl.required('arrival_date')}><Input value={form.arrival_date} onChange={v => set('arrival_date', v)} type="date" /></Field>}
+            {fl.visible('departure_date') && <Field label={fl.label('departure_date')} optional={!fl.required('departure_date')}><Input value={form.departure_date} onChange={v => set('departure_date', v)} type="date" /></Field>}
+          </div>
+        </>
+      )}
+      {showVehicle && (
+        <>
+          {fl.visible('vehicle') && <Field label={fl.label('vehicle')} optional={!fl.required('vehicle')}><Input value={form.vehicle} onChange={v => set('vehicle', v)} placeholder={fl.desc('vehicle') ?? 'Make, model, passengers, cargo capacity'} /></Field>}
+          {fl.visible('structures') && <Field label={fl.label('structures')} optional={!fl.required('structures')}><Input value={form.structures} onChange={v => set('structures', v)} placeholder={fl.desc('structures') ?? 'Tents, shade structures, etc.'} /></Field>}
+        </>
+      )}
+      {fl.visible('rideshare') && (
+        <>
+          <Divider label="Rideshare" />
+          <Field label={fl.label('rideshare')} optional={!fl.required('rideshare')}>
+            <RadioGroup
+              options={['I need a ride', 'I can offer a ride', "I'm sorted", 'Not sure yet']}
+              value={form.rideshare}
+              onChange={v => set('rideshare', v)}
+            />
+          </Field>
+        </>
+      )}
     </>
   )
 }
 
-function SectionIV({ form, set }: { form: FormData; set: (k: keyof FormData, v: unknown) => void }) {
+function SectionIV({ form, set, fl }: { form: FormData; set: (k: keyof FormData, v: unknown) => void; fl: FlHelper }) {
   return (
     <>
-      <Field label="Which departments interest you?" optional>
-        <CheckboxGroup options={DEPT_OPTIONS} value={form.department_interests} onChange={v => set('department_interests', v)} />
-      </Field>
-      <Divider />
-      <Field label="Are you interested in a leadership role?">
-        <RadioGroup options={['Yes', 'Maybe', 'Not this year']} value={form.leadership_interest} onChange={v => set('leadership_interest', v)} />
-      </Field>
-      <Divider label="Communal Responsibilities" />
-      <Field label="Which communal responsibility would you prefer?">
-        <CheckboxGroup options={['Setup', 'Teardown', 'Decor']} value={form.setup_preference} onChange={v => set('setup_preference', v as string[])} />
-      </Field>
-      <Field label="Are there any limitations we should be aware of?">
-        <CheckboxGroup
-          options={['None', 'Unable to participate in setup', 'Unable to participate in teardown', 'Unable to participate in either', 'Prefer to discuss privately']}
-          value={form.setup_limitations}
-          onChange={v => set('setup_limitations', v as string[])}
-        />
-      </Field>
-      <Divider />
-      <Field label="What brings you to Glåüm this year, and how would you like to participate?" optional>
-        <Textarea value={form.setup_notes} onChange={v => set('setup_notes', v)} placeholder="Your answer…" maxLength={800} />
-      </Field>
+      {fl.visible('dept_interests') && (
+        <>
+          <Field label={fl.label('dept_interests')} optional={!fl.required('dept_interests')}>
+            <CheckboxGroup options={DEPT_OPTIONS} value={form.department_interests} onChange={v => set('department_interests', v)} />
+          </Field>
+          <Divider />
+        </>
+      )}
+      {fl.visible('leadership_interest') && (
+        <>
+          <Field label={fl.label('leadership_interest')} optional={!fl.required('leadership_interest')}>
+            <RadioGroup options={['Yes', 'Maybe', 'Not this year']} value={form.leadership_interest} onChange={v => set('leadership_interest', v)} />
+          </Field>
+          <Divider label="Communal Responsibilities" />
+        </>
+      )}
+      {!fl.visible('leadership_interest') && <Divider label="Communal Responsibilities" />}
+      {fl.visible('setup_preference') && (
+        <Field label={fl.label('setup_preference')} optional={!fl.required('setup_preference')}>
+          <CheckboxGroup options={['Setup', 'Teardown', 'Decor']} value={form.setup_preference} onChange={v => set('setup_preference', v as string[])} />
+        </Field>
+      )}
+      {fl.visible('setup_limitations') && (
+        <Field label={fl.label('setup_limitations')} optional={!fl.required('setup_limitations')}>
+          <CheckboxGroup
+            options={['None', 'Unable to participate in setup', 'Unable to participate in teardown', 'Unable to participate in either', 'Prefer to discuss privately']}
+            value={form.setup_limitations}
+            onChange={v => set('setup_limitations', v as string[])}
+          />
+        </Field>
+      )}
+      {fl.visible('setup_notes') && (
+        <>
+          <Divider />
+          <Field label={fl.label('setup_notes')} optional={!fl.required('setup_notes')}>
+            <Textarea value={form.setup_notes} onChange={v => set('setup_notes', v)} placeholder="Your answer…" maxLength={800} />
+          </Field>
+        </>
+      )}
     </>
   )
 }
@@ -518,22 +587,92 @@ function SectionV({ form, set }: { form: FormData; set: (k: keyof FormData, v: u
   )
 }
 
-function SectionVI({ form, set }: { form: FormData; set: (k: keyof FormData, v: unknown) => void }) {
+function SectionVI({ form, set, fl }: { form: FormData; set: (k: keyof FormData, v: unknown) => void; fl: FlHelper }) {
   return (
     <>
       <p style={{ fontSize: '0.95rem', lineHeight: 1.8, opacity: 0.55, marginBottom: '2rem', fontStyle: 'italic' }}>
         Before we proceed, there is one final matter that requires your attention.
       </p>
-      <Field label="What is your relationship to shrimp?" optional>
+      <Field label={fl.label('shrimp_relationship')} optional={!fl.required('shrimp_relationship')}>
         <Textarea value={form.shrimp_relationship} onChange={v => set('shrimp_relationship', v)} placeholder="Reflect carefully. There are no wrong answers. There are, however, better ones." maxLength={500} />
       </Field>
     </>
   )
 }
 
+// ── Custom section (admin-added steps) ───────────────────────────────────────
+
+function CustomSection({ step, answers, setAnswer }: {
+  step: StepConfig
+  answers: Record<string, string | string[]>
+  setAnswer: (key: string, val: string | string[]) => void
+}) {
+  return (
+    <>
+      {step.fields.filter(f => f.visible).map(field => (
+        <Field key={field.key} label={field.label} optional={!field.required}>
+          {field.description && (
+            <p style={{ fontSize: '0.8rem', opacity: 0.4, margin: '0 0 0.5rem', fontStyle: 'italic' }}>{field.description}</p>
+          )}
+          {(!field.type || field.type === 'text') && (
+            <Input value={(answers[field.key] as string) ?? ''} onChange={v => setAnswer(field.key, v)} placeholder="Your answer…" />
+          )}
+          {field.type === 'textarea' && (
+            <Textarea value={(answers[field.key] as string) ?? ''} onChange={v => setAnswer(field.key, v)} placeholder="Your answer…" />
+          )}
+          {field.type === 'radio' && field.options && (
+            <RadioGroup options={field.options} value={(answers[field.key] as string) ?? ''} onChange={v => setAnswer(field.key, v)} />
+          )}
+          {field.type === 'checkbox' && field.options && (
+            <CheckboxGroup options={field.options} value={(answers[field.key] as string[]) ?? []} onChange={v => setAnswer(field.key, v as string[])} />
+          )}
+        </Field>
+      ))}
+    </>
+  )
+}
+
+// ── Extra custom fields appended to built-in sections ────────────────────────
+
+function CustomFieldsAppendix({ fields, answers, setAnswer }: {
+  fields: FieldConfig[]
+  answers: Record<string, string | string[]>
+  setAnswer: (key: string, val: string | string[]) => void
+}) {
+  if (fields.length === 0) return null
+  return (
+    <>
+      <Divider />
+      {fields.map(field => (
+        <Field key={field.key} label={field.label} optional={!field.required}>
+          {field.description && (
+            <p style={{ fontSize: '0.8rem', opacity: 0.4, margin: '0 0 0.5rem', fontStyle: 'italic' }}>{field.description}</p>
+          )}
+          {(!field.type || field.type === 'text') && (
+            <Input value={(answers[field.key] as string) ?? ''} onChange={v => setAnswer(field.key, v)} placeholder="Your answer…" />
+          )}
+          {field.type === 'textarea' && (
+            <Textarea value={(answers[field.key] as string) ?? ''} onChange={v => setAnswer(field.key, v)} placeholder="Your answer…" />
+          )}
+          {field.type === 'radio' && field.options && (
+            <RadioGroup options={field.options} value={(answers[field.key] as string) ?? ''} onChange={v => setAnswer(field.key, v)} />
+          )}
+          {field.type === 'checkbox' && field.options && (
+            <CheckboxGroup options={field.options} value={(answers[field.key] as string[]) ?? []} onChange={v => setAnswer(field.key, v as string[])} />
+          )}
+        </Field>
+      ))}
+    </>
+  )
+}
+
 // ── Main wizard ───────────────────────────────────────────────────────────────
 
-export function ApplyWizard({ userEmail }: { userEmail: string }) {
+export function ApplyWizard({ userEmail, formConfig }: { userEmail: string; formConfig: MemberFormConfig }) {
+  const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']
+  const steps = formConfig.steps.filter(s => s.visible)
+  const lastStep = steps.length - 1
+
   const [step, setStep] = useState(0)
   const [form, setFormState] = useState<FormData>({ ...BLANK, email: userEmail })
   const [submitting, setSubmitting] = useState(false)
@@ -542,7 +681,6 @@ export function ApplyWizard({ userEmail }: { userEmail: string }) {
   const [draftSaved, setDraftSaved] = useState<Date | null>(null)
   const [isMobile, setIsMobile] = useState(false)
 
-  // Load draft from localStorage
   useEffect(() => {
     try {
       const raw = localStorage.getItem(DRAFT_KEY)
@@ -559,7 +697,6 @@ export function ApplyWizard({ userEmail }: { userEmail: string }) {
     return () => window.removeEventListener('resize', check)
   }, [userEmail])
 
-  // Auto-save draft on change
   function set(k: keyof FormData, v: unknown) {
     setFormState(prev => {
       const next = { ...prev, [k]: v }
@@ -576,10 +713,37 @@ export function ApplyWizard({ userEmail }: { userEmail: string }) {
   }
 
   function canContinue() {
-    if (step === 0) return !!(form.first_name.trim() && form.last_name.trim() && form.email.trim() && form.phone.trim() && form.emergency_contact.trim() && form.camped_before && form.avatar_url)
-    if (step === 1) return !!(form.glaum_acceptance)
-    if (step === 2) return !!(form.attendance)
-    if (step === 4) return form.acknowledgements.length === AGREEMENT_ITEMS.length
+    const currentStepKey = steps[step]?.key
+    const flBasic = makeFlHelper(formConfig, 'basic')
+
+    if (currentStepKey === 'basic') {
+      const needPhone = flBasic.required('phone')
+      const needEmergency = flBasic.required('emergency_contact')
+      const needCamped = flBasic.required('camped_before')
+      const needAvatar = flBasic.required('avatar_url')
+      return !!(
+        form.first_name.trim() &&
+        form.last_name.trim() &&
+        form.email.trim() &&
+        (!needPhone || form.phone.trim()) &&
+        (!needEmergency || form.emergency_contact.trim()) &&
+        (!needCamped || form.camped_before) &&
+        (!needAvatar || form.avatar_url)
+      )
+    }
+    if (currentStepKey === 'registry') return !!(form.glaum_acceptance)
+    if (currentStepKey === 'plans') return !!(form.attendance)
+    if (currentStepKey === 'agreement') return form.acknowledgements.length === AGREEMENT_ITEMS.length
+    // Custom steps: check required fields have answers
+    const currentStep = steps[step]
+    if (currentStep?.isCustom) {
+      return currentStep.fields
+        .filter(f => f.visible && f.required)
+        .every(f => {
+          const val = form.custom_answers[f.key]
+          return Array.isArray(val) ? val.length > 0 : !!(val as string)?.trim()
+        })
+    }
     return true
   }
 
@@ -605,9 +769,7 @@ export function ApplyWizard({ userEmail }: { userEmail: string }) {
     setSubmitting(false)
   }
 
-  const milestone = MILESTONE_FOR_STEP[step]
-
-  // ── Submitted ──
+  const milestone = MILESTONE_FOR_KEY[steps[step]?.key ?? 'basic'] ?? 0
 
   if (submitted) {
     return (
@@ -626,8 +788,6 @@ export function ApplyWizard({ userEmail }: { userEmail: string }) {
     )
   }
 
-  // ── Sidebar ──
-
   const sidebar = (
     <div style={{
       width: isMobile ? '100%' : '200px',
@@ -639,7 +799,6 @@ export function ApplyWizard({ userEmail }: { userEmail: string }) {
       display: 'flex', flexDirection: isMobile ? 'row' : 'column',
       padding: isMobile ? '0.75rem 1rem' : '2.5rem 0 2rem',
       overflowX: isMobile ? 'auto' : 'visible',
-      gap: isMobile ? '0' : '0',
     }}>
       {!isMobile && (
         <div style={{ padding: '0 1.5rem 2rem', textAlign: 'center', borderBottom: '1px solid rgba(200,168,72,0.1)', marginBottom: '1.5rem' }}>
@@ -648,7 +807,7 @@ export function ApplyWizard({ userEmail }: { userEmail: string }) {
         </div>
       )}
 
-      {STEPS.map((s, i) => {
+      {steps.map((s, i) => {
         const active = i === step
         const done = i < step
         return (
@@ -675,7 +834,7 @@ export function ApplyWizard({ userEmail }: { userEmail: string }) {
               fontSize: '0.58rem', color: active ? GOLD : done ? 'rgba(200,168,72,0.6)' : 'rgba(200,168,72,0.35)',
               letterSpacing: '0.02em', fontWeight: active ? 700 : 400,
             }}>
-              {done ? '✓' : s.num}
+              {done ? '✓' : (ROMAN[i] ?? s.num)}
             </div>
             {!isMobile && (
               <div style={{ opacity: active ? 1 : done ? 0.5 : 0.28 }}>
@@ -695,12 +854,9 @@ export function ApplyWizard({ userEmail }: { userEmail: string }) {
     </div>
   )
 
-  // ── Main content ──
-
   const mainContent = (
     <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '1.5rem 1.25rem 6rem' : '3rem 3rem 6rem', maxWidth: '720px', width: '100%', margin: '0 auto' }}>
 
-      {/* Draft saved indicator */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.5rem', minHeight: '1rem' }}>
         {draftSaved && (
           <p style={{ fontSize: '0.68rem', letterSpacing: '0.1em', color: GOLD, opacity: 0.35, margin: 0 }}>
@@ -709,20 +865,19 @@ export function ApplyWizard({ userEmail }: { userEmail: string }) {
         )}
       </div>
 
-      {/* Section heading */}
       <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
         <p style={{ fontSize: '0.62rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: PURPLE, opacity: 0.65, margin: '0 0 0.4rem' }}>
-          SECTION {STEPS[step].num} OF VI
+          SECTION {ROMAN[step] ?? steps[step].num} OF {ROMAN[steps.length - 1] ?? steps[steps.length - 1].num}
         </p>
         <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(1.6rem, 4vw, 2.4rem)', color: GOLD, margin: '0 0 0.5rem', letterSpacing: '0.08em', textShadow: '0 0 30px rgba(200,168,72,0.3)' }}>
-          {STEPS[step].title}
+          {steps[step].title}
         </h1>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', margin: '0.5rem 0' }}>
           <div style={{ height: '1px', width: '40px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.4))' }} />
           <span style={{ color: GOLD, opacity: 0.4, fontSize: '0.65rem' }}>✦</span>
           <div style={{ height: '1px', width: '40px', background: 'linear-gradient(90deg, rgba(200,168,72,0.4), transparent)' }} />
         </div>
-        <p style={{ fontSize: '0.8rem', color: CREAM, opacity: 0.4, margin: 0, letterSpacing: '0.05em' }}>{STEPS[step].subtitle}</p>
+        <p style={{ fontSize: '0.8rem', color: CREAM, opacity: 0.4, margin: 0, letterSpacing: '0.05em' }}>{steps[step].subtitle}</p>
       </div>
 
       {/* Milestone track */}
@@ -732,7 +887,6 @@ export function ApplyWizard({ userEmail }: { userEmail: string }) {
           const active = i === milestone
           return (
             <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
-              {/* Circle + connecting lines on same row */}
               <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
                 {i > 0 && <div style={{ flex: 1, height: '1px', background: done ? 'rgba(200,168,72,0.45)' : 'rgba(200,168,72,0.12)' }} />}
                 <div style={{
@@ -747,7 +901,6 @@ export function ApplyWizard({ userEmail }: { userEmail: string }) {
                 </div>
                 {i < MILESTONES.length - 1 && <div style={{ flex: 1, height: '1px', background: done ? 'rgba(200,168,72,0.35)' : 'rgba(200,168,72,0.12)' }} />}
               </div>
-              {/* Label below */}
               <p style={{ fontSize: '0.55rem', letterSpacing: '0.03em', color: GOLD, opacity: active ? 0.9 : done ? 0.5 : 0.25, textAlign: 'center', lineHeight: 1.4, whiteSpace: 'pre-line', margin: '0.5rem 0 0', maxWidth: '70px' }}>
                 {label}
               </p>
@@ -758,19 +911,33 @@ export function ApplyWizard({ userEmail }: { userEmail: string }) {
 
       {/* Form content */}
       <div style={{ marginBottom: '3rem' }}>
-        {step === 0 && <SectionI form={form} set={set} />}
-        {step === 1 && <SectionII form={form} set={set} />}
-        {step === 2 && <SectionIII form={form} set={set} />}
-        {step === 3 && <SectionIV form={form} set={set} />}
-        {step === 4 && <SectionV form={form} set={set} />}
-        {step === 5 && <SectionVI form={form} set={set} />}
+        {steps[step]?.key === 'basic'     && <SectionI   form={form} set={set} fl={makeFlHelper(formConfig, 'basic')}     isMobile={isMobile} />}
+        {steps[step]?.key === 'registry'  && <SectionII  form={form} set={set} fl={makeFlHelper(formConfig, 'registry')} isMobile={isMobile} />}
+        {steps[step]?.key === 'plans'     && <SectionIII form={form} set={set} fl={makeFlHelper(formConfig, 'plans')}     isMobile={isMobile} />}
+        {steps[step]?.key === 'roles'     && <SectionIV  form={form} set={set} fl={makeFlHelper(formConfig, 'roles')} />}
+        {steps[step]?.key === 'agreement' && <SectionV   form={form} set={set} />}
+        {steps[step]?.key === 'shrimp'    && <SectionVI  form={form} set={set} fl={makeFlHelper(formConfig, 'shrimp')} />}
+        {steps[step]?.isCustom && (
+          <CustomSection
+            step={steps[step]}
+            answers={form.custom_answers}
+            setAnswer={(k, v) => set('custom_answers', { ...form.custom_answers, [k]: v })}
+          />
+        )}
+        {/* Admin-added custom fields appended to built-in sections */}
+        {!steps[step]?.isCustom && (
+          <CustomFieldsAppendix
+            fields={(steps[step]?.fields ?? []).filter((f: FieldConfig) => f.isCustom && f.visible)}
+            answers={form.custom_answers}
+            setAnswer={(k, v) => set('custom_answers', { ...form.custom_answers, [k]: v })}
+          />
+        )}
       </div>
 
       {error && (
         <p style={{ color: '#ff8a8a', fontSize: '0.85rem', marginBottom: '1rem', textAlign: 'center' }}>{error}</p>
       )}
 
-      {/* Navigation */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '1.5rem', borderTop: '1px solid rgba(200,168,72,0.1)' }}>
         <button
           onClick={() => step > 0 ? goTo(step - 1) : undefined}
@@ -784,7 +951,7 @@ export function ApplyWizard({ userEmail }: { userEmail: string }) {
           ← PREVIOUS SECTION
         </button>
 
-        {step < 5 ? (
+        {step < lastStep ? (
           <button
             onClick={() => canContinue() && goTo(step + 1)}
             disabled={!canContinue()}

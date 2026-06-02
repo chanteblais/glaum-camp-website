@@ -7,9 +7,10 @@ import { ScheduleSection } from '@/components/ScheduleSection'
 import { supabaseAdmin } from '@/lib/supabase'
 import { AttunementStatus } from '@/app/profile/AttunementStatus'
 import { DashboardCommitments } from '@/app/profile/DashboardCommitments'
-import { PersonalSchedule } from '@/app/profile/PersonalSchedule'
+
 import { HomePageEditor } from './HomePageEditor'
 import { supabaseResizedUrl } from '@/lib/supabase-image'
+import { PollWidget } from './PollWidget'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,8 +39,9 @@ export default async function Home() {
   let recentActivity: ActivityItem[] = []
   type Announcement = { id: string; title: string; body: string | null; pinned: boolean; created_at: string }
   let announcements: Announcement[] = []
-
-  let isAdmin = false
+  type PollRow = { id: string; question: string; options: string[]; allow_multiple: boolean; expires_at: string | null; initialCounts: number[]; initialUserVotes: number[] }
+  let polls: PollRow[] = []
+let isAdmin = false
 
   if (userId) {
     const user = await currentUser()
@@ -58,7 +60,7 @@ export default async function Home() {
     application = appRaw?.status === 'cancelled' ? null : appRaw ?? null
 
     if (application?.status === 'approved') {
-      const [signupResult, eventsResult, spotlightResult, announcementsResult] = await Promise.all([
+      const [signupResult, eventsResult, spotlightResult, announcementsResult, pollsResult, pollVotesResult] = await Promise.all([
         supabaseAdmin
           .from('camp_signups')
           .select('role_id, schedule_event_id, role_approval_status, roles(name, description, purpose, department_id, departments(name, icon)), schedule_events(title, day, time, icon_type)')
@@ -88,12 +90,37 @@ export default async function Home() {
           .order('pinned', { ascending: false })
           .order('created_at', { ascending: false })
           .limit(5),
+        supabaseAdmin
+          .from('polls')
+          .select('id, question, options, allow_multiple, expires_at')
+          .eq('visible', true)
+          .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+          .order('created_at', { ascending: false }),
+        supabaseAdmin
+          .from('poll_votes')
+          .select('poll_id, option_index')
+          .eq('clerk_user_id', userId),
       ])
 
       campSignup = signupResult.data ?? null
       upcomingEvents = (eventsResult.data ?? []) as typeof upcomingEvents
       spotlightPool = spotlightResult.data ?? []
       announcements = (announcementsResult.data ?? []) as Announcement[]
+
+      const rawPolls = (pollsResult.data ?? []) as { id: string; question: string; options: string[]; allow_multiple: boolean; expires_at: string | null }[]
+      const userVoteRows = (pollVotesResult.data ?? []) as { poll_id: string; option_index: number }[]
+      if (rawPolls.length > 0) {
+        const pollIds = rawPolls.map(p => p.id)
+        const { data: allVotes } = await supabaseAdmin.from('poll_votes').select('poll_id, option_index').in('poll_id', pollIds)
+        polls = rawPolls.map(p => {
+          const counts = Array(p.options.length).fill(0)
+          for (const v of allVotes ?? []) {
+            if (v.poll_id === p.id && v.option_index < counts.length) counts[v.option_index]++
+          }
+          const initialUserVotes = userVoteRows.filter(v => v.poll_id === p.id).map(v => v.option_index)
+          return { ...p, initialCounts: counts, initialUserVotes }
+        })
+      }
 
       // Recent activity feed
       const { data: recentApproved } = await supabaseAdmin
@@ -135,6 +162,18 @@ export default async function Home() {
   const pageContent: Record<string, string> = Object.fromEntries((contentRows ?? []).map(r => [r.key, r.value]))
   const c = (key: string, fallback: string) => pageContent[key] ?? fallback
 
+  // ── Dashboard layout (admin-configurable widget order) ────────
+  const DEFAULT_WIDGET_ORDER = ['announcements', 'polls', 'events', 'spotlight', 'activity']
+  let dashLayout: { order: string[]; hidden: string[]; widths?: Record<string, string> } = { order: DEFAULT_WIDGET_ORDER, hidden: [] }
+  try {
+    if (pageContent['dashboard_layout']) dashLayout = JSON.parse(pageContent['dashboard_layout'])
+  } catch {}
+  // Ensure any new widget IDs are appended if missing from saved order
+  for (const id of DEFAULT_WIDGET_ORDER) {
+    if (!dashLayout.order.includes(id)) dashLayout.order.push(id)
+  }
+  const visibleWidgets = dashLayout.order.filter(id => !dashLayout.hidden.includes(id))
+
   // ── Derived values ────────────────────────────────────────────
   const isApproved = application?.status === 'approved'
 
@@ -170,14 +209,21 @@ export default async function Home() {
       <>
         <Header />
         <main style={{ paddingTop: '64px' }}>
-          <style>{`
+          <style dangerouslySetInnerHTML={{ __html: `
             .dash-grid       { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; align-items: start; margin-bottom: 1.25rem; }
             .dash-quote-card { display: block; }
+            .dash-hero-inner { display: flex; width: 100%; padding: 2.25rem 2.5rem; align-items: center; justify-content: space-between; gap: 2rem; }
+            .dash-spotlight  { display: grid; grid-template-columns: 5fr 7fr; gap: 1.25rem; align-items: start; }
+            .dash-quicklinks { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
             @media (max-width: 680px) {
               .dash-grid       { grid-template-columns: 1fr; }
               .dash-quote-card { display: none !important; }
+              [data-width="half"] { flex: 0 0 100% !important; }
+              .dash-hero-inner { flex-direction: column; align-items: flex-start; padding: 1.5rem 1.25rem; gap: 1rem; }
+              .dash-spotlight  { grid-template-columns: 1fr; }
+              .dash-quicklinks { grid-template-columns: 1fr; }
             }
-          `}</style>
+          ` }} />
 
           <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '2.5rem 1.5rem 6rem' }}>
 
@@ -203,14 +249,7 @@ export default async function Home() {
                 position: 'absolute', inset: 0,
                 background: 'linear-gradient(90deg, rgba(26,10,36,0.95) 0%, rgba(26,10,36,0.65) 55%, rgba(26,10,36,0.15) 100%)',
               }} />
-              <div style={{
-                position: 'relative', zIndex: 1,
-                display: 'flex', width: '100%',
-                padding: '2.25rem 2.5rem',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '2rem',
-              }}>
+              <div className="dash-hero-inner" style={{ position: 'relative', zIndex: 1 }}>
                 {/* Left: greeting + countdown */}
                 <div style={{ flex: 1 }}>
                   <p style={{ fontSize: '0.68rem', letterSpacing: '0.28em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.65, marginBottom: '0.5rem' }}>
@@ -223,7 +262,7 @@ export default async function Home() {
                     {allAttuned ? 'Fully attuned.' : 'Attunement continues.'}
                   </p>
                   {c('home_tagline', '') && (
-                    <p style={{ fontSize: '0.85rem', fontStyle: 'italic', opacity: 0.65, marginBottom: '1.25rem', lineHeight: 1.6 }}>
+                    <p data-editable-key="home_tagline" style={{ fontSize: '0.85rem', fontStyle: 'italic', opacity: 0.65, marginBottom: '1.25rem', lineHeight: 1.6 }}>
                       {c('home_tagline', '')}
                     </p>
                   )}
@@ -256,242 +295,192 @@ export default async function Home() {
               />
             </div>
 
-            {/* ── ANNOUNCEMENTS ── */}
-            {announcements.length > 0 && (
-              <div style={{ border: '1px solid rgba(200,168,72,0.25)', borderRadius: '1rem', background: 'rgba(10,0,20,0.5)', overflow: 'hidden', marginBottom: '1.25rem' }}>
-                <div style={{ padding: '1rem 1.5rem 0.75rem', borderBottom: '1px solid rgba(200,168,72,0.12)' }}>
-                  <p style={{ fontSize: '0.62rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, margin: 0 }}>
-                    Announcements
-                  </p>
-                </div>
-                <div>
-                  {announcements.map((a, i) => (
-                    <div key={a.id} style={{
-                      padding: '1rem 1.5rem',
-                      borderBottom: i < announcements.length - 1 ? '1px solid rgba(200,168,72,0.08)' : 'none',
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: a.body ? '0.35rem' : 0 }}>
-                        {a.pinned && (
-                          <span style={{ fontSize: '0.58rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#D239F8', border: '1px solid rgba(210,57,248,0.3)', borderRadius: '9999px', padding: '0.1rem 0.45rem', flexShrink: 0 }}>
-                            Pinned
-                          </span>
-                        )}
-                        <p style={{ fontSize: '0.9rem', color: '#C8A848', margin: 0, fontFamily: 'TokyoDreams, serif' }}>{a.title}</p>
-                      </div>
-                      {a.body && (
-                        <p style={{ fontSize: '0.83rem', opacity: 0.7, margin: 0, lineHeight: 1.65 }}>{a.body}</p>
-                      )}
-                      <p style={{ fontSize: '0.68rem', opacity: 0.3, margin: '0.4rem 0 0' }}>{timeAgo(a.created_at)}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* ── ROW 2: Upcoming Gatherings ── */}
-            <div>
-              {(() => {
-                const preCamp = upcomingEvents.filter(e => e.event_category === 'pre_camp')
-                const atCamp = upcomingEvents.filter(e => e.event_category !== 'pre_camp')
-                const EventList = ({ events, label, href }: { events: typeof upcomingEvents; label: string; href: string }) => (
-                  <div style={{ border: '1px solid rgba(200,168,72,0.25)', borderRadius: '1rem', background: 'rgba(10,0,20,0.5)', overflow: 'hidden' }}>
-                    <div style={{ padding: '1.25rem 1.5rem 1rem', borderBottom: '1px solid rgba(200,168,72,0.15)' }}>
-                      <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '0.7rem', letterSpacing: '0.18em', color: '#C8A848', margin: 0, textTransform: 'uppercase', opacity: 0.9 }}>
-                        {label}
+            {/* ── WIDGETS (order + visibility controlled by admin) ── */}
+            {(() => {
+              const preCamp = upcomingEvents.filter(e => e.event_category === 'pre_camp')
+              const atCamp = upcomingEvents.filter(e => e.event_category !== 'pre_camp')
+              const EventList = ({ events, label, href }: { events: typeof upcomingEvents; label: string; href: string }) => (
+                <div style={{ border: '1px solid rgba(200,168,72,0.25)', borderRadius: '1rem', background: 'rgba(10,0,20,0.5)', overflow: 'hidden' }}>
+                  <div style={{ padding: '1.25rem 1.5rem 1rem', borderBottom: '1px solid rgba(200,168,72,0.15)' }}>
+                    <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '0.7rem', letterSpacing: '0.18em', color: '#C8A848', margin: 0, textTransform: 'uppercase', opacity: 0.9 }}>
+                      {label}
+                    </p>
+                  </div>
+                  <div style={{ padding: '0.5rem 0' }}>
+                    {events.length === 0 ? (
+                      <p style={{ fontSize: '0.85rem', opacity: 0.4, fontStyle: 'italic', textAlign: 'center', padding: '1.5rem' }}>
+                        Nothing scheduled yet.
                       </p>
-                    </div>
-                    <div style={{ padding: '0.5rem 0' }}>
-                      {events.length === 0 ? (
-                        <p style={{ fontSize: '0.85rem', opacity: 0.4, fontStyle: 'italic', textAlign: 'center', padding: '1.5rem' }}>
-                          Nothing scheduled yet.
-                        </p>
-                      ) : events.map((ev, i) => (
-                        <div key={ev.id} style={{
-                          display: 'flex', alignItems: 'center', gap: '1rem',
-                          padding: '0.9rem 1.5rem',
-                          borderBottom: i < events.length - 1 ? '1px solid rgba(200,168,72,0.08)' : 'none',
+                    ) : events.map((ev, i) => (
+                      <div key={ev.id} style={{
+                        display: 'flex', alignItems: 'center', gap: '1rem',
+                        padding: '0.9rem 1.5rem',
+                        borderBottom: i < events.length - 1 ? '1px solid rgba(200,168,72,0.08)' : 'none',
+                      }}>
+                        <div style={{
+                          flexShrink: 0, width: '64px', textAlign: 'center',
+                          padding: '0.4rem 0.5rem',
+                          border: '1px solid rgba(200,168,72,0.2)',
+                          borderRadius: '0.5rem',
+                          background: 'rgba(200,168,72,0.06)',
                         }}>
-                          <div style={{
-                            flexShrink: 0, width: '64px', textAlign: 'center',
-                            padding: '0.4rem 0.5rem',
-                            border: '1px solid rgba(200,168,72,0.2)',
-                            borderRadius: '0.5rem',
-                            background: 'rgba(200,168,72,0.06)',
-                          }}>
-                            <p style={{ fontSize: '0.58rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.65, margin: '0 0 0.1rem' }}>
-                              {ev.day?.slice(0, 3)?.toUpperCase()}
-                            </p>
-                            <p style={{ fontSize: '0.65rem', color: '#C8A848', margin: 0, letterSpacing: '0.04em' }}>
-                              {ev.time?.split(':').slice(0, 2).join(':') ?? ''}
-                            </p>
+                          <p style={{ fontSize: '0.58rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.65, margin: '0 0 0.1rem' }}>
+                            {ev.day?.slice(0, 3)?.toUpperCase()}
+                          </p>
+                          <p style={{ fontSize: '0.65rem', color: '#C8A848', margin: 0, letterSpacing: '0.04em' }}>
+                            {ev.time?.split(':').slice(0, 2).join(':') ?? ''}
+                          </p>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: '0.85rem', color: '#EDE0C8', margin: '0 0 0.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {ev.title}
+                          </p>
+                          {ev.subtitle && (
+                            <p style={{ fontSize: '0.72rem', color: '#B0947A', margin: 0, opacity: 0.75 }}>{ev.subtitle}</p>
+                          )}
+                        </div>
+                        <span style={{ color: '#C8A848', opacity: 0.25, fontSize: '0.8rem', flexShrink: 0 }}>›</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ padding: '0.75rem 1.5rem', borderTop: '1px solid rgba(200,168,72,0.1)' }}>
+                    <a href={href} style={{ fontSize: '0.75rem', color: '#C8A848', opacity: 0.7, textDecoration: 'none' }}>
+                      View full schedule →
+                    </a>
+                  </div>
+                </div>
+              )
+
+              const widgetMap: Record<string, React.ReactNode> = {
+                announcements: announcements.length > 0 ? (
+                  <div style={{ border: '1px solid rgba(200,168,72,0.25)', borderRadius: '1rem', background: 'rgba(10,0,20,0.5)', overflow: 'hidden' }}>
+                    <div style={{ padding: '1rem 1.5rem 0.75rem', borderBottom: '1px solid rgba(200,168,72,0.12)' }}>
+                      <p style={{ fontSize: '0.62rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, margin: 0 }}>Announcements</p>
+                    </div>
+                    <div>
+                      {announcements.map((a, i) => (
+                        <div key={a.id} style={{ padding: '1rem 1.5rem', borderBottom: i < announcements.length - 1 ? '1px solid rgba(200,168,72,0.08)' : 'none' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: a.body ? '0.35rem' : 0 }}>
+                            {a.pinned && <span style={{ fontSize: '0.58rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#D239F8', border: '1px solid rgba(210,57,248,0.3)', borderRadius: '9999px', padding: '0.1rem 0.45rem', flexShrink: 0 }}>Pinned</span>}
+                            <p style={{ fontSize: '0.9rem', color: '#C8A848', margin: 0, fontFamily: 'TokyoDreams, serif' }}>{a.title}</p>
                           </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <p style={{ fontSize: '0.85rem', color: '#EDE0C8', margin: '0 0 0.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {ev.title}
-                            </p>
-                            {ev.subtitle && (
-                              <p style={{ fontSize: '0.72rem', color: '#B0947A', margin: 0, opacity: 0.75 }}>{ev.subtitle}</p>
-                            )}
-                          </div>
-                          <span style={{ color: '#C8A848', opacity: 0.25, fontSize: '0.8rem', flexShrink: 0 }}>›</span>
+                          {a.body && <p style={{ fontSize: '0.83rem', opacity: 0.7, margin: 0, lineHeight: 1.65 }}>{a.body}</p>}
+                          <p style={{ fontSize: '0.68rem', opacity: 0.3, margin: '0.4rem 0 0' }}>{timeAgo(a.created_at)}</p>
                         </div>
                       ))}
                     </div>
-                    <div style={{ padding: '0.75rem 1.5rem', borderTop: '1px solid rgba(200,168,72,0.1)' }}>
-                      <a href={href} style={{ fontSize: '0.75rem', color: '#C8A848', opacity: 0.7, textDecoration: 'none' }}>
-                        View full schedule →
-</a>
-                    </div>
                   </div>
-                )
-                return (
+                ) : null,
+
+                polls: <PollWidget polls={polls} />,
+
+                events: (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                     {preCamp.length > 0 && <EventList events={preCamp} label="Pre-Camp Gatherings" href="/schedule" />}
                     {atCamp.length > 0 && <EventList events={atCamp} label="Upcoming Gatherings" href="/schedule" />}
                     {upcomingEvents.length === 0 && <EventList events={[]} label="Upcoming Gatherings" href="/schedule" />}
                   </div>
-                )
-              })()}
+                ),
 
-            </div>
-
-            {/* ── ROW 3: Meet a Member + Your Schedule ── */}
-            {spotlightMember && (
-              <div style={{ display: 'grid', gridTemplateColumns: '5fr 7fr', gap: '1.25rem', alignItems: 'start', marginBottom: '1.25rem' }}>
-              <div style={{
-                position: 'relative',
-                padding: '1.5rem',
-                border: '1px solid rgba(200,168,72,0.2)',
-                borderRadius: '1rem',
-                background: 'rgba(10,0,20,0.6)',
-                marginBottom: '1.25rem',
-                overflow: 'hidden',
-              }}>
-                {/* Header row */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-                  <p style={{ fontSize: '0.62rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, margin: 0 }}>
-                    Meet a Member
-                  </p>
-                  <span style={{ color: '#C8A848', opacity: 0.4, fontSize: '0.85rem' }}>✳︎</span>
-                </div>
-
-                {/* Body — photo left, info right */}
-                <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'flex-start' }}>
-                  {/* Avatar */}
-                  <div style={{
-                    flexShrink: 0, width: '110px', height: '110px', borderRadius: '50%',
-                    overflow: 'hidden', border: '2px solid #6F491F',
-                    boxShadow: '0 0 0 1px rgba(200,168,72,0.15)',
-                    background: 'rgba(200,168,72,0.06)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    {spotlightMember.avatar_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={supabaseResizedUrl(spotlightMember.avatar_url, 220) ?? ''} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <span style={{ fontSize: '2rem', opacity: 0.2 }}>✦</span>
-                    )}
-                  </div>
-
-                  {/* Info */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.3rem', color: '#C8A848', margin: '0 0 0.1rem', lineHeight: 1.2 }}>
-                      {spotlightMember.preferred_name || spotlightMember.first_name || 'Fellow Hand'}
-                    </p>
-                    {(spotlightMember.role_name || spotlightMember.dept_name) && (
-                      <div style={{ margin: '0.3rem 0 0.65rem' }}>
-                        {spotlightMember.role_name && (
-                          <p style={{ fontSize: '0.82rem', opacity: 0.65, margin: 0, lineHeight: 1.5 }}>{spotlightMember.role_name}</p>
-                        )}
-                        {spotlightMember.dept_name && (
-                          <p style={{ fontSize: '0.78rem', opacity: 0.4, margin: 0, lineHeight: 1.5 }}>{spotlightMember.dept_name}</p>
-                        )}
+                spotlight: spotlightMember ? (
+                  <div className="dash-spotlight">
+                    <div style={{ position: 'relative', padding: '1.5rem', border: '1px solid rgba(200,168,72,0.2)', borderRadius: '1rem', background: 'rgba(10,0,20,0.6)', overflow: 'hidden' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                        <p style={{ fontSize: '0.62rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, margin: 0 }}>Meet a Member</p>
+                        <span style={{ color: '#C8A848', opacity: 0.4, fontSize: '0.85rem' }}>✳︎</span>
                       </div>
-                    )}
-                    {spotlightMember.find_at_camp && (
-                      <>
-                        <div style={{ height: '1px', background: 'linear-gradient(90deg, rgba(200,168,72,0.2), transparent)', margin: '0.6rem 0' }} />
-                        <p style={{ fontSize: '0.72rem', color: '#C8A848', opacity: 0.5, margin: '0 0 0.25rem', letterSpacing: '0.06em' }}>Currently exploring</p>
-                        <p style={{ fontSize: '0.85rem', opacity: 0.7, lineHeight: 1.6, margin: 0 }}>{spotlightMember.find_at_camp}</p>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.25rem' }}>
-                  {/* Dot indicator — decorative, shows position in pool */}
-                  <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                    {Array.from({ length: Math.min(spotlightPool.length, 7) }).map((_, i) => {
-                      const activeIdx = Math.floor(Date.now() / 60000) % spotlightPool.length
-                      return (
-                        <div key={i} style={{ width: '7px', height: '7px', borderRadius: '50%', border: '1px solid rgba(200,168,72,0.4)', background: i === activeIdx % Math.min(spotlightPool.length, 7) ? '#C8A848' : 'transparent' }} />
-                      )
-                    })}
-                  </div>
-                  <a
-                    href={`/members/${spotlightMember.clerk_user_id ?? spotlightMember.id}`}
-                    style={{ fontSize: '0.75rem', letterSpacing: '0.1em', color: '#C8A848', textDecoration: 'none', opacity: 0.75 }}
-                  >
-                    VIEW PROFILE →
-                  </a>
-                </div>
-              </div>
-
-              {/* Your Schedule */}
-              <div style={{ border: '1px solid rgba(200,168,72,0.25)', borderRadius: '1rem', background: 'rgba(10,0,20,0.5)', overflow: 'hidden' }}>
-                <div style={{ padding: '1.25rem 1.5rem 1rem', borderBottom: '1px solid rgba(200,168,72,0.15)' }}>
-                  <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '0.7rem', letterSpacing: '0.18em', color: '#C8A848', margin: 0, textTransform: 'uppercase', opacity: 0.9 }}>
-                    Your Schedule
-                  </p>
-                </div>
-                <div style={{ padding: '0.75rem 1rem' }}>
-                  <PersonalSchedule userId={userId!} contributions={contributions} />
-                </div>
-              </div>
-            </div>
-            )}
-
-            {/* ── RECENT ACTIVITY ── */}
-            {recentActivity.length > 0 && (
-              <div style={{ border: '1px solid rgba(200,168,72,0.2)', borderRadius: '1rem', background: 'rgba(10,0,20,0.5)', overflow: 'hidden', marginBottom: '1.25rem' }}>
-                <div style={{ padding: '1rem 1.5rem 0.75rem', borderBottom: '1px solid rgba(200,168,72,0.12)' }}>
-                  <p style={{ fontSize: '0.62rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, margin: 0 }}>
-                    Recent Activity
-                  </p>
-                </div>
-                <div>
-                  {recentActivity.map((item, i) => (
-                    <div key={i} style={{
-                      display: 'flex', alignItems: 'center', gap: '0.875rem',
-                      padding: '0.7rem 1.5rem',
-                      borderBottom: i < recentActivity.length - 1 ? '1px solid rgba(200,168,72,0.07)' : 'none',
-                    }}>
-                      <div style={{
-                        flexShrink: 0, width: '28px', height: '28px', borderRadius: '50%',
-                        overflow: 'hidden', border: '1px solid rgba(111,73,31,0.6)',
-                        background: 'rgba(200,168,72,0.06)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}>
-                        {item.avatar_url
-                          // eslint-disable-next-line @next/next/no-img-element
-                          ? <img src={supabaseResizedUrl(item.avatar_url, 56) ?? ''} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          : <span style={{ fontSize: '0.65rem', opacity: 0.3 }}>✦</span>
-                        }
+                      <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'flex-start' }}>
+                        <div style={{ flexShrink: 0, width: '110px', height: '110px', borderRadius: '50%', overflow: 'hidden', border: '2px solid #6F491F', boxShadow: '0 0 0 1px rgba(200,168,72,0.15)', background: 'rgba(200,168,72,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {spotlightMember.avatar_url
+                            // eslint-disable-next-line @next/next/no-img-element
+                            ? <img src={supabaseResizedUrl(spotlightMember.avatar_url, 220) ?? ''} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            : <span style={{ fontSize: '2rem', opacity: 0.2 }}>✦</span>}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.3rem', color: '#C8A848', margin: '0 0 0.1rem', lineHeight: 1.2 }}>{spotlightMember.preferred_name || spotlightMember.first_name || 'Fellow Hand'}</p>
+                          {(spotlightMember.role_name || spotlightMember.dept_name) && (
+                            <div style={{ margin: '0.3rem 0 0.65rem' }}>
+                              {spotlightMember.role_name && <p style={{ fontSize: '0.82rem', opacity: 0.65, margin: 0, lineHeight: 1.5 }}>{spotlightMember.role_name}</p>}
+                              {spotlightMember.dept_name && <p style={{ fontSize: '0.78rem', opacity: 0.4, margin: 0, lineHeight: 1.5 }}>{spotlightMember.dept_name}</p>}
+                            </div>
+                          )}
+                          {spotlightMember.find_at_camp && (
+                            <>
+                              <div style={{ height: '1px', background: 'linear-gradient(90deg, rgba(200,168,72,0.2), transparent)', margin: '0.6rem 0' }} />
+                              <p style={{ fontSize: '0.72rem', color: '#C8A848', opacity: 0.5, margin: '0 0 0.25rem', letterSpacing: '0.06em' }}>Currently exploring</p>
+                              <p style={{ fontSize: '0.85rem', opacity: 0.7, lineHeight: 1.6, margin: 0 }}>{spotlightMember.find_at_camp}</p>
+                            </>
+                          )}
+                        </div>
                       </div>
-                      <p style={{ flex: 1, margin: 0, fontSize: '0.82rem', lineHeight: 1.4 }}>
-                        <span style={{ color: '#C8A848', opacity: 0.9 }}>{item.name}</span>
-                        <span style={{ opacity: 0.5 }}> {item.label}</span>
-                      </p>
-                      <span style={{ fontSize: '0.7rem', opacity: 0.3, flexShrink: 0 }}>{timeAgo(item.ts)}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.25rem' }}>
+                        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                          {Array.from({ length: Math.min(spotlightPool.length, 7) }).map((_, i) => {
+                            const activeIdx = Math.floor(Date.now() / 60000) % spotlightPool.length
+                            return <div key={i} style={{ width: '7px', height: '7px', borderRadius: '50%', border: '1px solid rgba(200,168,72,0.4)', background: i === activeIdx % Math.min(spotlightPool.length, 7) ? '#C8A848' : 'transparent' }} />
+                          })}
+                        </div>
+                        <a href={`/members/${spotlightMember.clerk_user_id ?? spotlightMember.id}`} style={{ fontSize: '0.75rem', letterSpacing: '0.1em', color: '#C8A848', textDecoration: 'none', opacity: 0.75 }}>VIEW PROFILE →</a>
+                      </div>
                     </div>
-                  ))}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                      {preCamp.length > 0 && <EventList events={preCamp} label="Pre-Camp Gatherings" href="/schedule" />}
+                      {atCamp.length > 0 && <EventList events={atCamp} label="Upcoming Gatherings" href="/schedule" />}
+                      {upcomingEvents.length === 0 && <EventList events={[]} label="Upcoming Gatherings" href="/schedule" />}
+                    </div>
+                  </div>
+                ) : null,
+
+                activity: recentActivity.length > 0 ? (
+                  <div style={{ border: '1px solid rgba(200,168,72,0.2)', borderRadius: '1rem', background: 'rgba(10,0,20,0.5)', overflow: 'hidden' }}>
+                    <div style={{ padding: '1rem 1.5rem 0.75rem', borderBottom: '1px solid rgba(200,168,72,0.12)' }}>
+                      <p style={{ fontSize: '0.62rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, margin: 0 }}>Recent Activity</p>
+                    </div>
+                    <div>
+                      {recentActivity.map((item, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', padding: '0.7rem 1.5rem', borderBottom: i < recentActivity.length - 1 ? '1px solid rgba(200,168,72,0.07)' : 'none' }}>
+                          <div style={{ flexShrink: 0, width: '28px', height: '28px', borderRadius: '50%', overflow: 'hidden', border: '1px solid rgba(111,73,31,0.6)', background: 'rgba(200,168,72,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {item.avatar_url
+                              // eslint-disable-next-line @next/next/no-img-element
+                              ? <img src={supabaseResizedUrl(item.avatar_url, 56) ?? ''} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              : <span style={{ fontSize: '0.65rem', opacity: 0.3 }}>✦</span>}
+                          </div>
+                          <p style={{ flex: 1, margin: 0, fontSize: '0.82rem', lineHeight: 1.4 }}>
+                            <span style={{ color: '#C8A848', opacity: 0.9 }}>{item.name}</span>
+                            <span style={{ opacity: 0.5 }}> {item.label}</span>
+                          </p>
+                          <span style={{ fontSize: '0.7rem', opacity: 0.3, flexShrink: 0 }}>{timeAgo(item.ts)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null,
+              }
+
+              const widths = dashLayout.widths ?? {}
+              return (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.25rem', alignItems: 'flex-start' }}>
+                  {visibleWidgets.map(id => {
+                    const widget = widgetMap[id]
+                    if (!widget) return null
+                    const isHalf = widths[id] === 'half'
+                    return (
+                      <div
+                        key={id}
+                        data-widget-id={id}
+                        data-width={isHalf ? 'half' : 'full'}
+                        style={{ flex: isHalf ? '0 0 calc(50% - 0.625rem)' : '0 0 100%', minWidth: 0 }}
+                      >
+                        {widget}
+                      </div>
+                    )
+                  })}
                 </div>
-              </div>
-            )}
+              )
+            })()}
 
             {/* ── MANY HANDS LINK ── */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div className="dash-quicklinks">
               <a href="/signup" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem 1.5rem', border: '1px solid rgba(200,168,72,0.18)', borderRadius: '1rem', background: 'rgba(200,168,72,0.03)', textDecoration: 'none' }}>
                 <div>
                   <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.1rem', color: '#C8A848', margin: '0 0 0.2rem' }}>Role & Shift</p>

@@ -20,10 +20,10 @@ export default async function SchedulePage() {
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1 }}>
       <Header />
-      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '6rem 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
+      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '4.5rem 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
 
-        <div style={{ marginBottom: '3rem' }}>
-          <a href="/" style={{ fontSize: '0.8rem', letterSpacing: '0.1em', color: '#C8A848', textDecoration: 'none', opacity: 0.6 }}>
+        <div style={{ marginBottom: '2rem' }}>
+          <a href="/" style={{ fontSize: '0.78rem', letterSpacing: '0.12em', color: '#C8A848', textDecoration: 'none', opacity: 0.55 }}>
             ← Back to camp
           </a>
         </div>

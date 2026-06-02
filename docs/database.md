@@ -1,6 +1,6 @@
 # Database Schema
 
-All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations `001`–`021` in `supabase-migrations/` document incremental changes. Migrations `001`–`016` are confirmed applied; `017`–`021` may be pending depending on environment.
+All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations `001`–`024` in `supabase-migrations/` document incremental changes. Migrations `001`–`024` are confirmed applied.
 
 ---
 
@@ -45,6 +45,7 @@ One row per person who has submitted a camp application.
 | `acknowledgements` | TEXT[] | |
 | `shrimp_relationship` | TEXT | Fun question |
 | `avatar_url` | TEXT | Supabase Storage URL |
+| `custom_answers` | JSONB | Answers to admin-added custom fields/sections. Added in migration `023`. |
 | `status` | TEXT | `pending` / `approved` / `rejected` / `cancelled` |
 | `clerk_user_id` | TEXT | Set after Clerk account created |
 | `admin_notes` | TEXT | Internal only |
@@ -213,10 +214,32 @@ Admin-editable copy for the homepage. One row per key.
 | `updated_at` | TIMESTAMPTZ | |
 
 **Known keys:**
-- `home_tagline` — hero tagline (shown on public page + logged-in dashboard)
+- `home_tagline` — hero tagline (shown on public page + logged-in dashboard). Editable inline in page edit mode.
 - `home_quote` — quote card text in logged-in hero banner
-- `home_about_heading` / `home_about_body` — About section
-- `home_participate_heading` / `home_participate_body` — Participate section
+- `home_about_heading` / `home_about_body` — About section (public page)
+- `home_participate_heading` / `home_participate_body` — Participate section (public page)
+- `config_member_form` — JSON blob (`MemberFormConfig`) for the camp member application. Set by Application Builder. Merged with defaults from `lib/form-config.ts` on every load — custom steps and fields survive the merge.
+- `config_volunteer_form` — JSON blob (`VolunteerFormConfig`) for the volunteer signup. Same pattern.
+- `dashboard_layout` — JSON blob controlling the member dashboard widget layout. Shape: `{ order: string[], hidden: string[], widths: Record<string, 'half' | 'full'> }`. Managed by the inline page editor. Widget IDs: `announcements`, `polls`, `events`, `spotlight`, `activity`.
+
+---
+
+### `messages`
+
+Direct messages between approved camp members. Added in migration `022`.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | Auto-generated |
+| `sender_clerk_id` | TEXT NOT NULL | Sender's Clerk user ID |
+| `recipient_clerk_id` | TEXT NOT NULL | Recipient's Clerk user ID |
+| `body` | TEXT NOT NULL | Message content. Max 2,000 chars (DB-enforced CHECK) |
+| `read_at` | TIMESTAMPTZ | NULL = unread |
+| `created_at` | TIMESTAMPTZ NOT NULL | Defaults to NOW() |
+
+Indexed on `(recipient_clerk_id, created_at DESC)` and `(sender_clerk_id, created_at DESC)` for fast inbox + thread queries.
+
+**Privacy:** messages are private — only sender and recipient can access them. Admins have no read access. No FK to `applications` — join in JS using `clerk_user_id`.
 
 ---
 
@@ -275,3 +298,38 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `019_schedule_event_date.sql` | `event_date DATE` on `schedule_events` |
 | `020_announcements.sql` | `announcements` table |
 | `021_event_category.sql` | `event_category TEXT` on `schedule_events` (default `'at_camp'`) |
+| `022_messages.sql` | `messages` table with sender/recipient/body/read_at + indexes |
+| `023_custom_answers.sql` | `custom_answers JSONB` on `applications` for admin-added form fields |
+| `024_polls.sql` | `polls` and `poll_votes` tables |
+
+---
+
+### `polls`
+
+Admin-created polls shown to approved members on the dashboard.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `question` | TEXT NOT NULL | The poll question |
+| `options` | JSONB NOT NULL | Array of option strings e.g. `["Yes", "No", "Maybe"]` |
+| `visible` | BOOL NOT NULL | Whether shown to members. Default `true` |
+| `allow_multiple` | BOOL NOT NULL | Allow members to select more than one option. Default `false` |
+| `expires_at` | TIMESTAMPTZ | Auto-closes after this date. NULL = open indefinitely |
+| `created_at` | TIMESTAMPTZ NOT NULL | |
+
+---
+
+### `poll_votes`
+
+One row per member per option voted on.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `poll_id` | UUID FK → `polls.id` ON DELETE CASCADE | |
+| `clerk_user_id` | TEXT NOT NULL | Voter |
+| `option_index` | INT NOT NULL | Zero-based index into `polls.options` |
+| `created_at` | TIMESTAMPTZ NOT NULL | |
+
+**Unique constraint:** `(poll_id, clerk_user_id, option_index)` — one vote per option per member. Votes are replaced (not accumulated) when a member changes their answer: the API deletes existing votes for that poll+user then re-inserts.
