@@ -14,6 +14,7 @@ import { RoleRequestsSection } from './RoleRequestsSection'
 import { RoleSuggestionsSection } from './RoleSuggestionsSection'
 import { DebugSection } from './DebugSection'
 import { PollsManager } from './PollsManager'
+import { AdminsManager } from './AdminsManager'
 
 export default async function AdminPage() {
   const { userId } = await auth()
@@ -49,6 +50,20 @@ export default async function AdminPage() {
     .select('id, application_id, event_type, message, details, created_at, read_at')
     .order('created_at', { ascending: false })
     .limit(20)
+
+  // Fetch approved members + check which are admins in Clerk
+  const approvedWithClerk = (applications ?? []).filter(a => a.status === 'approved' && a.clerk_user_id)
+  const clerkUsers = await Promise.all(
+    approvedWithClerk.map(a => client.users.getUser(a.clerk_user_id!).catch(() => null))
+  )
+  const adminMembers = approvedWithClerk.map((a, i) => ({
+    clerk_user_id: a.clerk_user_id!,
+    first_name: a.first_name,
+    last_name: a.last_name,
+    preferred_name: a.preferred_name ?? null,
+    email: a.email,
+    isAdmin: clerkUsers[i]?.publicMetadata?.role === 'admin',
+  }))
 
   if (dbError) console.error('[Admin] Supabase query error:', dbError)
   if (notificationsError) console.error('[Admin] Notifications query error:', notificationsError)
@@ -219,6 +234,11 @@ export default async function AdminPage() {
             <span style={{ opacity: 0.5 }}>→</span>
           </a>
         </div>
+
+        {/* ── ADMINS ── */}
+        <CollapsibleSection title="Admins" summary="Grant or remove admin access">
+          <AdminsManager members={adminMembers} />
+        </CollapsibleSection>
 
         {/* ── DEBUG ── */}
         <CollapsibleSection title="Debug Tools" summary="Testing utilities">

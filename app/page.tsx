@@ -5,12 +5,11 @@ import { Footer } from '@/components/Footer'
 import { Section, Kicker, GoldDivider } from '@/components/Section'
 import { ScheduleSection } from '@/components/ScheduleSection'
 import { supabaseAdmin } from '@/lib/supabase'
-import { AttunementStatus } from '@/app/profile/AttunementStatus'
-import { DashboardCommitments } from '@/app/profile/DashboardCommitments'
 
 import { HomePageEditor } from './HomePageEditor'
 import { supabaseResizedUrl } from '@/lib/supabase-image'
 import { PollWidget } from './PollWidget'
+import { SpotlightWidget, type SpotlightMember } from './SpotlightWidget'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,7 +31,6 @@ export default async function Home() {
   let application: Record<string, unknown> | null = null
   let campSignup: Record<string, unknown> | null = null
   let upcomingEvents: { id: string; day: string; time: string; title: string; subtitle: string | null; icon_type: string; event_date: string | null; event_category: string }[] = []
-  let spotlightMember: { id: string; preferred_name: string | null; first_name: string | null; avatar_url: string | null; pronouns: string | null; clerk_user_id: string | null; find_at_camp?: string | null; role_name?: string | null; dept_name?: string | null } | null = null
   let spotlightPool: unknown[] = []
   let userFirstName: string | null = null
   type ActivityItem = { label: string; name: string; ts: string; avatar_url: string | null }
@@ -141,18 +139,22 @@ let isAdmin = false
       }
       activityFeed.sort((a, b) => b.ts.localeCompare(a.ts))
       recentActivity = activityFeed.slice(0, 6)
-      const pool = spotlightPool
-      const picked = pool.length ? pool[Math.floor(Date.now() / 60000) % pool.length] : null
-      if (picked?.clerk_user_id) {
-        const { data: signupRow } = await supabaseAdmin
+
+      // Batch-fetch role info for all spotlight pool members
+      const pool = spotlightPool as SpotlightMember[]
+      if (pool.length > 0) {
+        const clerkIds = pool.map(m => m.clerk_user_id).filter(Boolean) as string[]
+        const { data: signupRows } = await supabaseAdmin
           .from('camp_signups')
-          .select('roles(name, departments(name))')
-          .eq('clerk_user_id', picked.clerk_user_id)
-          .maybeSingle()
-        const role = signupRow?.roles as { name: string; departments: { name: string } | null } | null
-        spotlightMember = { ...picked, role_name: role?.name ?? null, dept_name: role?.departments?.name ?? null }
-      } else {
-        spotlightMember = picked
+          .select('clerk_user_id, roles(name, departments(name))')
+          .in('clerk_user_id', clerkIds)
+        const roleMap = Object.fromEntries(
+          (signupRows ?? []).map(r => {
+            const role = r.roles as { name: string; departments: { name: string } | null } | null
+            return [r.clerk_user_id, { role_name: role?.name ?? null, dept_name: role?.departments?.name ?? null }]
+          })
+        )
+        spotlightPool = pool.map(m => ({ ...m, ...( m.clerk_user_id ? roleMap[m.clerk_user_id] ?? {} : {}) }))
       }
     }
   }
@@ -210,15 +212,13 @@ let isAdmin = false
         <Header />
         <main style={{ paddingTop: '64px' }}>
           <style dangerouslySetInnerHTML={{ __html: `
-            .dash-grid       { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; align-items: start; margin-bottom: 1.25rem; }
             .dash-quote-card { display: block; }
             .dash-hero-inner { display: flex; width: 100%; padding: 2.25rem 2.5rem; align-items: center; justify-content: space-between; gap: 2rem; }
             .dash-spotlight  { display: grid; grid-template-columns: 5fr 7fr; gap: 1.25rem; align-items: start; }
             .dash-quicklinks { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
             @media (max-width: 680px) {
-              .dash-grid       { grid-template-columns: 1fr; }
               .dash-quote-card { display: none !important; }
-              [data-width="half"] { flex: 0 0 100% !important; }
+              [data-width="half"], [data-width="third"] { flex: 0 0 100% !important; }
               .dash-hero-inner { flex-direction: column; align-items: flex-start; padding: 1.5rem 1.25rem; gap: 1rem; }
               .dash-spotlight  { grid-template-columns: 1fr; }
               .dash-quicklinks { grid-template-columns: 1fr; }
@@ -283,17 +283,36 @@ let isAdmin = false
               </div>
             </div>
 
-            {/* ── ROW 1: Attunement + Commitments ── */}
-            <div className="dash-grid">
-              <AttunementStatus tasks={attunementTasks} />
-              <DashboardCommitments
-                contributions={contributions}
-                role={roleInfo ? { name: roleInfo.name ?? '', description: roleInfo.description ?? null, purpose: roleInfo.purpose ?? null } : null}
-                dept={roleInfo?.departments ? { name: roleInfo.departments.name ?? '', icon: roleInfo.departments.icon ?? null } : null}
-                shift={shiftInfo ? { title: shiftInfo.title ?? '', day: shiftInfo.day ?? '', time: shiftInfo.time ?? '', icon_type: shiftInfo.icon_type ?? 'star' } : null}
-                roleApprovalStatus={(campSignup?.role_approval_status as string | null) ?? null}
-              />
-            </div>
+            {/* ── ATTUNEMENT BANNER (only when incomplete) ── */}
+            {!allAttuned && (() => {
+              const outstanding = attunementTasks.filter(t => !t.done).length
+              return (
+                <a
+                  href="/profile"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '1rem',
+                    padding: '0.75rem 1.25rem',
+                    marginBottom: '1.25rem',
+                    borderRadius: '0.75rem',
+                    border: '1px solid rgba(200,168,72,0.25)',
+                    background: 'rgba(200,168,72,0.06)',
+                    textDecoration: 'none',
+                  }}
+                >
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: '#C8A848', opacity: 0.85 }}>
+                    <span style={{ fontFamily: 'TokyoDreams, serif', letterSpacing: '0.04em' }}>Attunement</span>
+                    <span style={{ opacity: 0.5, margin: '0 0.5rem' }}>·</span>
+                    <span style={{ fontStyle: 'italic', opacity: 0.7 }}>
+                      {outstanding} outstanding {outstanding === 1 ? 'task' : 'tasks'}
+                    </span>
+                  </p>
+                  <span style={{ fontSize: '0.75rem', color: '#C8A848', opacity: 0.45, flexShrink: 0 }}>View checklist →</span>
+                </a>
+              )
+            })()}
 
             {/* ── WIDGETS (order + visibility controlled by admin) ── */}
             {(() => {
@@ -382,53 +401,11 @@ let isAdmin = false
                   </div>
                 ),
 
-                spotlight: spotlightMember ? (
-                  <div className="dash-spotlight">
-                    <div style={{ position: 'relative', padding: '1.5rem', border: '1px solid rgba(200,168,72,0.2)', borderRadius: '1rem', background: 'rgba(10,0,20,0.6)', overflow: 'hidden' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-                        <p style={{ fontSize: '0.62rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, margin: 0 }}>Meet a Member</p>
-                        <span style={{ color: '#C8A848', opacity: 0.4, fontSize: '0.85rem' }}>✳︎</span>
-                      </div>
-                      <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'flex-start' }}>
-                        <div style={{ flexShrink: 0, width: '110px', height: '110px', borderRadius: '50%', overflow: 'hidden', border: '2px solid #6F491F', boxShadow: '0 0 0 1px rgba(200,168,72,0.15)', background: 'rgba(200,168,72,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {spotlightMember.avatar_url
-                            // eslint-disable-next-line @next/next/no-img-element
-                            ? <img src={supabaseResizedUrl(spotlightMember.avatar_url, 220) ?? ''} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            : <span style={{ fontSize: '2rem', opacity: 0.2 }}>✦</span>}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.3rem', color: '#C8A848', margin: '0 0 0.1rem', lineHeight: 1.2 }}>{spotlightMember.preferred_name || spotlightMember.first_name || 'Fellow Hand'}</p>
-                          {(spotlightMember.role_name || spotlightMember.dept_name) && (
-                            <div style={{ margin: '0.3rem 0 0.65rem' }}>
-                              {spotlightMember.role_name && <p style={{ fontSize: '0.82rem', opacity: 0.65, margin: 0, lineHeight: 1.5 }}>{spotlightMember.role_name}</p>}
-                              {spotlightMember.dept_name && <p style={{ fontSize: '0.78rem', opacity: 0.4, margin: 0, lineHeight: 1.5 }}>{spotlightMember.dept_name}</p>}
-                            </div>
-                          )}
-                          {spotlightMember.find_at_camp && (
-                            <>
-                              <div style={{ height: '1px', background: 'linear-gradient(90deg, rgba(200,168,72,0.2), transparent)', margin: '0.6rem 0' }} />
-                              <p style={{ fontSize: '0.72rem', color: '#C8A848', opacity: 0.5, margin: '0 0 0.25rem', letterSpacing: '0.06em' }}>Currently exploring</p>
-                              <p style={{ fontSize: '0.85rem', opacity: 0.7, lineHeight: 1.6, margin: 0 }}>{spotlightMember.find_at_camp}</p>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.25rem' }}>
-                        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                          {Array.from({ length: Math.min(spotlightPool.length, 7) }).map((_, i) => {
-                            const activeIdx = Math.floor(Date.now() / 60000) % spotlightPool.length
-                            return <div key={i} style={{ width: '7px', height: '7px', borderRadius: '50%', border: '1px solid rgba(200,168,72,0.4)', background: i === activeIdx % Math.min(spotlightPool.length, 7) ? '#C8A848' : 'transparent' }} />
-                          })}
-                        </div>
-                        <a href={`/members/${spotlightMember.clerk_user_id ?? spotlightMember.id}`} style={{ fontSize: '0.75rem', letterSpacing: '0.1em', color: '#C8A848', textDecoration: 'none', opacity: 0.75 }}>VIEW PROFILE →</a>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                      {preCamp.length > 0 && <EventList events={preCamp} label="Pre-Camp Gatherings" href="/schedule" />}
-                      {atCamp.length > 0 && <EventList events={atCamp} label="Upcoming Gatherings" href="/schedule" />}
-                      {upcomingEvents.length === 0 && <EventList events={[]} label="Upcoming Gatherings" href="/schedule" />}
-                    </div>
-                  </div>
+                spotlight: spotlightPool.length > 0 ? (
+                  <SpotlightWidget
+                    pool={spotlightPool as SpotlightMember[]}
+                    initialIndex={Math.floor(Date.now() / 60000) % spotlightPool.length}
+                  />
                 ) : null,
 
                 activity: recentActivity.length > 0 ? (
@@ -457,19 +434,21 @@ let isAdmin = false
                 ) : null,
               }
 
-              const widths = dashLayout.widths ?? {}
+              const widths = { spotlight: 'third', ...(dashLayout.widths ?? {}) }
               return (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.25rem', alignItems: 'flex-start' }}>
                   {visibleWidgets.map(id => {
                     const widget = widgetMap[id]
                     if (!widget) return null
-                    const isHalf = widths[id] === 'half'
+                    const w = widths[id]
+                    const isHalf = w === 'half'
+                    const isThird = w === 'third'
                     return (
                       <div
                         key={id}
                         data-widget-id={id}
-                        data-width={isHalf ? 'half' : 'full'}
-                        style={{ flex: isHalf ? '0 0 calc(50% - 0.625rem)' : '0 0 100%', minWidth: 0 }}
+                        data-width={isHalf ? 'half' : isThird ? 'third' : 'full'}
+                        style={{ flex: isThird ? '0 0 calc(33.333% - 0.833rem)' : isHalf ? '0 0 calc(50% - 0.625rem)' : '0 0 100%', minWidth: 0 }}
                       >
                         {widget}
                       </div>
@@ -519,40 +498,60 @@ let isAdmin = false
             flexDirection: 'column',
             alignItems: 'center',
             textAlign: 'center',
-            padding: '3rem 1.5rem 4rem',
+            padding: '3.5rem 1.5rem 5rem',
             position: 'relative',
             zIndex: 1,
           }}
         >
-          {/* Ambient glow behind image */}
+          {/* Ambient glow */}
           <div
             aria-hidden
             style={{
               position: 'absolute',
-              top: '40%',
+              top: '35%',
               left: '50%',
               transform: 'translate(-50%, -50%)',
-              width: '800px',
-              height: '500px',
+              width: '900px',
+              height: '600px',
               borderRadius: '50%',
-              background: 'radial-gradient(ellipse, rgba(210,57,248,0.15) 0%, rgba(200,168,72,0.05) 50%, transparent 70%)',
+              background: 'radial-gradient(ellipse, rgba(210,57,248,0.12) 0%, rgba(200,168,72,0.04) 50%, transparent 70%)',
               pointerEvents: 'none',
-              filter: 'blur(40px)',
+              filter: 'blur(50px)',
             }}
           />
 
-          {/* Event label */}
+          {/* Event kicker */}
           <p
             style={{
-              fontSize: '0.7rem',
-              letterSpacing: '0.3em',
+              fontSize: '0.68rem',
+              letterSpacing: '0.32em',
               textTransform: 'uppercase',
               color: '#D239F8',
-              marginBottom: '2rem',
+              marginBottom: '1.25rem',
               opacity: 0.85,
             }}
           >
             What If 2026 · Theme Camp
+          </p>
+
+          {/* Wordmark */}
+          <h1
+            style={{
+              fontFamily: 'TokyoDreams, serif',
+              fontSize: 'clamp(3.5rem, 12vw, 7rem)',
+              color: '#C8A848',
+              margin: '0 0 0.25rem',
+              lineHeight: 1,
+              textShadow: '0 0 40px rgba(210,57,248,0.5), 0 0 80px rgba(210,57,248,0.2), 0 4px 20px rgba(0,0,0,0.8)',
+              letterSpacing: '-0.01em',
+            }}
+          >
+            Glåüm
+          </h1>
+
+          {/* Sponsored by */}
+          <p style={{ fontSize: '0.65rem', letterSpacing: '0.2em', textTransform: 'uppercase', opacity: 0.3, marginBottom: '2.5rem' }}>
+            Sponsored by Shrimp™
           </p>
 
           {/* Hero image */}
@@ -563,88 +562,195 @@ let isAdmin = false
               maxWidth: '900px',
               borderRadius: '1.25rem',
               overflow: 'hidden',
-              boxShadow: '0 0 60px rgba(210, 57, 248, 0.25), 0 0 120px rgba(200, 168, 72, 0.1), 0 32px 80px rgba(0,0,0,0.6)',
-              border: '1px solid rgba(200, 168, 72, 0.2)',
+              boxShadow: '0 0 60px rgba(210,57,248,0.2), 0 0 120px rgba(200,168,72,0.08), 0 32px 80px rgba(0,0,0,0.7)',
+              border: '1px solid rgba(200,168,72,0.18)',
             }}
           >
             <Image
               src="/glaum-camp.jpg"
-              alt="Glåüm Camp — Gather, Connect, Attune. Sponsored by Shrimp™"
+              alt="Glåüm Camp — Gather, Connect, Attune."
               width={1200}
               height={675}
               priority
-              style={{ width: '100%', height: 'auto', display: 'block' }}
+              style={{ width: '100%', height: 'auto', display: 'block', filter: 'brightness(0.9) saturate(1.1)' }}
             />
+            {/* Bottom fade into ink */}
+            <div style={{
+              position: 'absolute',
+              bottom: 0, left: 0, right: 0,
+              height: '40%',
+              background: 'linear-gradient(to top, rgba(26,10,36,0.7), transparent)',
+              pointerEvents: 'none',
+            }} />
           </div>
 
-          {/* Tagline + CTAs */}
+          {/* Tagline */}
           <p
             style={{
-              fontSize: 'clamp(1rem, 3vw, 1.2rem)',
+              fontSize: 'clamp(0.95rem, 2.5vw, 1.15rem)',
               fontStyle: 'italic',
-              maxWidth: '480px',
-              lineHeight: 1.75,
-              opacity: 0.8,
+              maxWidth: '460px',
+              lineHeight: 1.8,
+              opacity: 0.7,
               marginTop: '2.5rem',
-              marginBottom: '2.25rem',
+              marginBottom: '2rem',
+              fontFamily: 'var(--font-libre-baskerville)',
             }}
           >
             {c('home_tagline', 'Built by many hands. Held by many hearts.')}
           </p>
+
+          {/* CTAs */}
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <a
+              href="/apply"
+              style={{
+                display: 'inline-block',
+                padding: '0.85rem 2.5rem',
+                borderRadius: '9999px',
+                border: '1px solid rgba(200,168,72,0.6)',
+                background: 'rgba(200,168,72,0.1)',
+                color: '#FFFACD',
+                textDecoration: 'none',
+                letterSpacing: '0.14em',
+                fontSize: '0.8rem',
+                fontFamily: 'TokyoDreams, serif',
+              }}
+            >
+              Apply to Camp
+            </a>
+            <a
+              href="/sign-in"
+              style={{
+                display: 'inline-block',
+                padding: '0.85rem 2.5rem',
+                borderRadius: '9999px',
+                border: '1px solid rgba(243,237,230,0.15)',
+                background: 'transparent',
+                color: '#F3EDE6',
+                textDecoration: 'none',
+                letterSpacing: '0.14em',
+                fontSize: '0.8rem',
+                fontFamily: 'TokyoDreams, serif',
+                opacity: 0.65,
+              }}
+            >
+              Sign In
+            </a>
+          </div>
         </div>
 
-        <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(210,57,248,0.4), transparent)' }} />
+        <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(210,57,248,0.35), transparent)' }} />
 
         {/* ─── ABOUT ────────────────────────────────────────── */}
         <Section id="about">
           <Kicker>What is this, exactly</Kicker>
-          <h2 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 5vw, 3rem)', marginBottom: '1.5rem', lineHeight: 1.15, textAlign: 'center' }}>
+          <h2 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 5vw, 3rem)', marginBottom: '2rem', lineHeight: 1.15, textAlign: 'center' }}>
             {c('home_about_heading', 'A camp. A collective.')}
           </h2>
-          {c('home_about_body', '').split('\n\n').filter(Boolean).map((para, i) => (
-            <p key={i} style={{ fontSize: '1.05rem', lineHeight: 1.8, marginBottom: '1.25rem', fontStyle: i === 3 ? 'italic' : undefined, opacity: i === 3 ? 0.7 : undefined }}>
-              {para}
-            </p>
-          ))}
+          <div style={{
+            border: '1px solid rgba(200,168,72,0.15)',
+            borderRadius: '1.25rem',
+            background: 'rgba(10,0,20,0.45)',
+            padding: '2rem 2.5rem',
+          }}>
+            {c('home_about_body', '').split('\n\n').filter(Boolean).map((para, i) => (
+              <p key={i} style={{ fontSize: '1.05rem', lineHeight: 1.85, marginBottom: '1.25rem', fontStyle: i === 3 ? 'italic' : undefined, opacity: i === 3 ? 0.65 : 0.85, fontFamily: 'var(--font-libre-baskerville)' }}>
+                {para}
+              </p>
+            ))}
+          </div>
         </Section>
 
-        <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.2), transparent)' }} />
+        <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.15), transparent)' }} />
+
+        {/* ─── PRINCIPLES ───────────────────────────────────── */}
+        <Section id="principles">
+          <Kicker>How we show up</Kicker>
+          <h2 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 5vw, 3rem)', marginBottom: '2.5rem', lineHeight: 1.15, textAlign: 'center' }}>
+            Our Principles
+          </h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem' }}>
+            {[
+              { title: 'Dignity', body: 'Every person deserves to be treated with dignity and respect.' },
+              { title: 'Participation', body: 'Communities thrive when people contribute within their capacity.' },
+              { title: 'Stewardship', body: 'No one person should be responsible for carrying the whole community.' },
+              { title: 'Communication', body: 'We strive to communicate honestly, directly, and in good faith.' },
+            ].map(({ title, body }) => (
+              <div key={title} style={{
+                border: '1px solid rgba(200,168,72,0.18)',
+                borderRadius: '1.25rem',
+                background: 'rgba(10,0,20,0.45)',
+                padding: '1.75rem 2rem',
+              }}>
+                <p style={{
+                  fontFamily: 'TokyoDreams, serif',
+                  fontSize: '1.1rem',
+                  color: '#C8A848',
+                  margin: '0 0 0.75rem',
+                  letterSpacing: '0.04em',
+                }}>
+                  {title}
+                </p>
+                <div style={{ height: '1px', background: 'linear-gradient(90deg, rgba(200,168,72,0.3), transparent)', marginBottom: '0.9rem' }} />
+                <p style={{
+                  fontSize: '0.97rem',
+                  lineHeight: 1.8,
+                  opacity: 0.75,
+                  margin: 0,
+                  fontFamily: 'var(--font-libre-baskerville)',
+                }}>
+                  {body}
+                </p>
+              </div>
+            ))}
+          </div>
+        </Section>
+
+        <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.15), transparent)' }} />
 
         {/* ─── PARTICIPATE ──────────────────────────────────── */}
         <Section id="participate">
           <Kicker>How to be in it</Kicker>
-          <h2 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 5vw, 3rem)', marginBottom: '1.5rem', textAlign: 'center' }}>
+          <h2 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 5vw, 3rem)', marginBottom: '2rem', textAlign: 'center' }}>
             {c('home_participate_heading', 'This Camp Runs on Participation')}
           </h2>
-          <p style={{ fontSize: '1.05rem', lineHeight: 1.8, marginBottom: '2.5rem' }}>
-            {c('home_participate_body', 'The Many Hands hold us all up. Sometimes we do the carrying. Sometimes we are carried. Everyone contributes in some way: setup, teardown, cooking, welcoming, cleaning, decorating, emotional support, infrastructure, care.')}
-          </p>
+          <div style={{
+            border: '1px solid rgba(200,168,72,0.15)',
+            borderRadius: '1.25rem',
+            background: 'rgba(10,0,20,0.45)',
+            padding: '2rem 2.5rem',
+            marginBottom: '2.5rem',
+          }}>
+            <p style={{ fontSize: '1.05rem', lineHeight: 1.85, margin: 0, opacity: 0.85, fontFamily: 'var(--font-libre-baskerville)' }}>
+              {c('home_participate_body', 'The Many Hands hold us all up. Sometimes we do the carrying. Sometimes we are carried. Everyone contributes in some way: setup, teardown, cooking, welcoming, cleaning, decorating, emotional support, infrastructure, care.')}
+            </p>
+          </div>
           <div style={{ textAlign: 'center' }}>
-          <a
-            href="/apply"
-            style={{
-              display: 'inline-block',
-              padding: '0.9rem 2.75rem',
-              borderRadius: '9999px',
-              border: '1px solid rgba(200,168,72,0.5)',
-              color: '#FFFACD',
-              textDecoration: 'none',
-              letterSpacing: '0.12em',
-              fontSize: '0.85rem',
-              fontFamily: 'TokyoDreams, serif',
-              backgroundColor: 'transparent',
-              transition: 'all 0.25s',
-            }}
-          >
-            Apply to Camp
-          </a>
+            <a
+              href="/apply"
+              style={{
+                display: 'inline-block',
+                padding: '0.9rem 2.75rem',
+                borderRadius: '9999px',
+                border: '1px solid rgba(200,168,72,0.55)',
+                background: 'rgba(200,168,72,0.1)',
+                color: '#FFFACD',
+                textDecoration: 'none',
+                letterSpacing: '0.14em',
+                fontSize: '0.82rem',
+                fontFamily: 'TokyoDreams, serif',
+              }}
+            >
+              Apply to Camp
+            </a>
           </div>
         </Section>
 
-        <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.2), transparent)' }} />
+        <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.15), transparent)' }} />
 
         {/* ─── SCHEDULE ─────────────────────────────────────── */}
-        <Section id="schedule" style={{ backgroundColor: 'rgba(210, 57, 248, 0.03)' }}>
+        <Section id="schedule">
           <Kicker>When things happen</Kicker>
           <h2 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 5vw, 3rem)', marginBottom: '3rem', textAlign: 'center' }}>
             Schedule

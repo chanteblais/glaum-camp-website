@@ -160,7 +160,11 @@ Max page width: `1100px`. Layout uses CSS classes (`profile-main-grid`, `profile
 ### Member Directory (`/members`)
 
 **Who:** Approved members only (redirects others to `/profile`)  
-**What:** Grid of approved member cards — avatar + name.
+**What:** Grid of approved member cards.
+
+Each card shows: circular avatar (80px, gold border `#6F491F`), display name, and role name if assigned and approved (gold small-caps). Members without an avatar show a `✦` glyph (Tokyo Dreams, gold) rather than an initial.
+
+The role text is always rendered (invisible via `opacity: 0` when absent) so every card has the same natural content height. The grid uses `grid-auto-rows: 1fr` and the `<a>` element uses `display: flex; height: 100%` with `flex: 1` on the inner card div, ensuring all cards are the same height across every row.
 
 Linked from nav as "Many Hands".
 
@@ -262,12 +266,28 @@ Reached via the "Configure Applications →" link on the admin dashboard.
 
 **Key file:** `lib/form-config.ts` — defines `MemberFormConfig`, `VolunteerFormConfig`, all default step/field definitions, and `mergeMemberConfig`/`mergeVolunteerConfig` helpers.
 
+**Mobile layout:** The sidebar collapses to a horizontal scrollable step-indicator strip at the top. Two-column form grids (name pairs, date pairs, etc.) collapse to single column at `< 768px`. `isMobile` is detected via `window.innerWidth < 768` and passed as a prop to each section component.
+
 ---
 
 ### Admin Application View (`/admin/[id]`)
 
 **Who:** Admin  
-**What:** Full detail view of a single application with approve/reject controls.
+**What:** Full detail view of a single application with approve/reject controls and role/shift management.
+
+Sections:
+- **Header** — avatar, name, status pill, submitted date
+- **Approve / Reject controls** (`AdminActions`) — visible for pending applications
+- **Role & Shift** (`MemberSignupCard`) — shown when the member has a `clerk_user_id`:
+  - Displays current role (department, role name, commitment level, approval status) and shift (title, time, day)
+  - **"Approve role"** button — appears when `role_approval_status === 'pending'`; calls `PATCH /api/admin/role-requests/[clerkUserId]`
+  - **"Remove role"** button — clears `role_id` + `role_approval_status` from `camp_signups` via `PATCH /api/admin/signups/[clerkUserId]` with `{ clear_role: true }`
+  - **"Remove shift"** button — clears `schedule_event_id` via the same endpoint with `{ clear_shift: true }`
+  - Confirmation dialog shown before any removal; UI updates optimistically after success
+- **Full application fields** — all submitted answers grouped by section
+
+**Key files:** `app/admin/[id]/page.tsx`, `app/admin/MemberSignupCard.tsx`  
+**API:** `PATCH /api/admin/signups/[userId]` — accepts `{ clear_role: true }` or `{ clear_shift: true }`
 
 ---
 
@@ -318,6 +338,26 @@ Admin creates polls in the Admin Dashboard → Polls section (or via `+ Poll` in
 ### Role Badge
 
 Generated at `/api/badge?role=...&dept=...` as a PNG. Displayed on profile and member pages. See [architecture.md](architecture.md) for generation details.
+
+### Role Selection & Approval Flow
+
+Members pick a role via `SignupSection` on `/profile`. The selection is submitted to `POST /api/signup`.
+
+**Approval logic in `POST /api/signup`:**
+- If the role changed (`isRoleChange = true`) and `roles.requires_approval = true` → `role_approval_status` is set to `'pending'` and an admin notification is created
+- If the role changed and `requires_approval = false` → `role_approval_status` is set to `null` (immediately confirmed)
+- If the role did **not** change (e.g. member is only updating their shift) → the existing `role_approval_status` is **preserved unchanged**. This is critical: without this, a shift-only update would silently wipe a `'pending'` approval status, making the role appear confirmed without ever being reviewed.
+
+**`role_approval_status` values:**
+| Value | Meaning |
+|---|---|
+| `null` | No approval needed (role doesn't require it), or role was cleared |
+| `'pending'` | Waiting for admin review |
+| `'approved'` | Admin approved the role request |
+
+**Admin approval:** via `PATCH /api/admin/role-requests/[clerkUserId]` with `{ decision: 'approved' | 'rejected' }`. Approval sets `role_approval_status = 'approved'`. Rejection sets `role_id = null` and clears the status. Both send a `user_notifications` row to the member.
+
+**Key file:** `app/api/signup/route.ts`
 
 ### Role Suggestion Flow
 

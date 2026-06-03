@@ -74,7 +74,7 @@ Sign-out flow:
 |---|---|---|
 | `/api/apply` | POST | Submit application |
 | `/api/volunteer` | POST | Submit volunteer signup |
-| `/api/signup` | POST/DELETE | Claim or drop a role+shift |
+| `/api/signup` | GET/POST | Fetch departments/roles/shifts + upsert member role+shift selection. Sets `role_approval_status = 'pending'` for roles with `requires_approval = true`. Preserves existing approval status on shift-only updates. |
 | `/api/profile/application` | PATCH | Update profile fields |
 | `/api/profile/avatar` | POST | Upload avatar to Supabase Storage |
 | `/api/profile/cancel` | POST | Cancel own application |

@@ -102,7 +102,12 @@ export async function POST(req: NextRequest) {
     roleData = data
     requiresApproval = roleData?.requires_approval ?? false
   }
-  const role_approval_status = next_role_id ? (requiresApproval ? 'pending' : null) : null
+
+  // When the role hasn't changed, preserve the existing approval status — don't wipe a pending
+  // approval just because the member is updating their shift.
+  const role_approval_status = isRoleChange
+    ? (next_role_id ? (requiresApproval ? 'pending' : null) : null)
+    : (existing?.role_approval_status ?? null)
 
   // Validate event capacity (skip if they already hold this event)
   if (next_event_id && isEventChange) {

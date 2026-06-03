@@ -34,6 +34,11 @@ Design docs live in `docs/` — read them when you need detail:
 - `rm -rf .next` restart sometimes needed after significant module changes
 - Inline `<style>` tags with attribute selectors must use `dangerouslySetInnerHTML` to avoid React hydration mismatches (quote encoding)
 
+**Mobile responsive breakpoints:**
+- `≤ 680px` — dashboard: `.dash-grid` (attunement/commitments row) stacks, `.dash-hero-inner` stacks and reduces padding, `.dash-spotlight` (5fr/7fr grid) stacks, `.dash-quicklinks` stacks; all widgets forced to full width
+- `≤ 768px` — apply wizard: two-column form grids collapse to single column; sidebar becomes horizontal step-indicator strip
+- `≤ 560px` — profile page: `.profile-main-grid` / `.profile-info-grid` / `.profile-badge-row` all stack
+
 ---
 
 ## Database (key tables)
@@ -126,6 +131,8 @@ app/
   admin/ScheduleManager.tsx       Schedule event CRUD
   admin/RoleSuggestionsSection.tsx  Review suggestions
   admin/NotificationsSection.tsx  Bell notifications
+  admin/[id]/page.tsx             Individual application detail — shows role/shift + full answers
+  admin/MemberSignupCard.tsx      Role & shift display with Remove role / Remove shift / Approve role buttons
   profile/page.tsx                Member profile hub (max-width 1100px)
   profile/AttunementStatus.tsx    Checklist card; dispatches glaum:open-settings event
   profile/SignupSection.tsx       Role/shift picker + "Suggest a role" button
@@ -142,6 +149,8 @@ app/
   api/admin/polls/[id]/route.ts   PATCH+DELETE poll (admin)
   api/polls/[id]/vote/route.ts    POST vote (authenticated members)
   api/admin/schedule/             GET+POST / [id] PATCH+DELETE / icon upload
+  api/admin/signups/[userId]/route.ts  PATCH — clear role ({clear_role:true}) or shift ({clear_shift:true})
+  api/signup/route.ts             GET+POST — member role+shift selection. IMPORTANT: when isRoleChange is false, preserves existing role_approval_status (prevents shift-only updates from wiping a pending approval)
 
 components/
   HeaderClient.tsx                Nav; clears localStorage on sign-out
