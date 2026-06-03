@@ -20,17 +20,16 @@ type NavAuthState = {
 }
 
 const publicNavLinks = [
-  { href: '#about', label: 'About' },
-  { href: '#participate', label: 'Participate' },
+  { href: '/about', label: 'About' },
   { href: '/schedule', label: 'Schedule' },
   { href: '/apply', label: 'Apply' },
 ]
 
 const memberNavLinks = [
-  { href: '/', label: 'Home' },
   { href: '/schedule', label: 'Schedule' },
   { href: '/members', label: 'Many Hands' },
   { href: '/messages', label: 'Messages', badge: true },
+  { href: '/signup', label: 'Participate' },
   { href: '/profile', label: 'My Profile' },
 ]
 
@@ -229,6 +228,7 @@ export function HeaderClient() {
             </div>
           )}
           {[
+            { href: '/about', label: 'About' },
             ...(isAdmin ? [{ href: '/admin', label: 'Admin' }] : []),
           ].map(({ href, label }) => (
             <Link
@@ -449,6 +449,9 @@ export function HeaderClient() {
 
           {signedIn && (
             <>
+              <a href="/#about" onClick={() => setMenuOpen(false)} style={{ ...mobileMenuLink, opacity: 0.6 }}>
+                About
+              </a>
               {isAdmin && (
                 <Link href="/admin" onClick={() => setMenuOpen(false)} style={{ ...mobileMenuLink, color: '#C8A848', opacity: 0.7 }}>
                   Admin

@@ -77,18 +77,21 @@ export default async function MembersPage() {
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+          gridAutoRows: '1fr',
           gap: '1.5rem',
         }}>
           {all.map(member => (
             <a
               key={member.dbId}
               href={`/members/${member.id}`}
-              style={{ textDecoration: 'none', color: 'inherit' }}
+              style={{ textDecoration: 'none', color: 'inherit', display: 'flex', height: '100%' }}
             >
               <div style={{
+                flex: 1,
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
+                justifyContent: 'center',
                 gap: '0.75rem',
                 padding: '1.25rem 1rem',
                 border: '1px solid rgba(200,168,72,0.15)',
@@ -96,8 +99,6 @@ export default async function MembersPage() {
                 background: 'rgba(255,255,255,0.02)',
                 cursor: 'pointer',
                 transition: 'border-color 0.2s, background 0.2s',
-                minHeight: '165px',
-                justifyContent: 'center',
               }}
               onMouseEnter={undefined}
               >
@@ -133,21 +134,20 @@ export default async function MembersPage() {
                   {member.name}
                 </p>
 
-                {/* Role pill (if assigned and approved) */}
-                {member.roleName && member.roleApprovalStatus !== 'pending' && (
-                  <p style={{
-                    fontSize: '0.62rem',
-                    color: '#C8A848',
-                    opacity: 0.65,
-                    textAlign: 'center',
-                    margin: 0,
-                    letterSpacing: '0.08em',
-                    textTransform: 'uppercase',
-                    lineHeight: 1.3,
-                  }}>
-                    {member.roleName}
-                  </p>
-                )}
+                {/* Role — always rendered so all cards have the same natural height */}
+                <p style={{
+                  fontSize: '0.62rem',
+                  color: '#C8A848',
+                  opacity: (member.roleName && member.roleApprovalStatus !== 'pending') ? 0.65 : 0,
+                  textAlign: 'center',
+                  margin: 0,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  lineHeight: 1.3,
+                  userSelect: 'none',
+                }}>
+                  {(member.roleName && member.roleApprovalStatus !== 'pending') ? member.roleName : ' '}
+                </p>
               </div>
             </a>
           ))}

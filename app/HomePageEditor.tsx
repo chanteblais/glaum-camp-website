@@ -35,7 +35,8 @@ function getCurrentOrder(): string[] {
 function getCurrentWidths(): Record<string, string> {
   const widths: Record<string, string> = {}
   getWidgetEls().forEach(el => {
-    if (el.dataset.width === 'half') widths[el.dataset.widgetId!] = 'half'
+    const w = el.dataset.width
+    if (w === 'half' || w === 'third') widths[el.dataset.widgetId!] = w
   })
   return widths
 }
@@ -213,6 +214,9 @@ export function HomePageEditor({ initialContent }: { initialContent: Content }) 
     document.head.appendChild(style)
     cleanups.push(() => style.remove())
 
+    // Map from widget element → its width-toggle button (for cross-widget resize on drop)
+    const widgetWidthBtnMap = new Map<HTMLElement, HTMLElement>()
+
     // Per-widget: inject handle + drag logic
     widgets.forEach(widget => {
       const id = widget.dataset.widgetId!
@@ -249,28 +253,30 @@ export function HomePageEditor({ initialContent }: { initialContent: Content }) 
         transition: opacity 0.15s, background 0.15s;
         user-select: none;
       `
-      widthBtn.textContent = widget.dataset.width === 'half' ? '½' : '⊞'
-      widthBtn.title = 'Toggle half / full width'
+      const widthLabel = (w: string) => w === 'half' ? '½' : w === 'third' ? '⅓' : '⊞'
+      widthBtn.textContent = widthLabel(widget.dataset.width ?? 'full')
+      widthBtn.title = 'Cycle width: full → half → third'
 
       handle.innerHTML = `<span style="font-size:15px;opacity:.65;line-height:1">⠿</span><span style="opacity:.55;font-size:10.5px;text-transform:uppercase;letter-spacing:.1em">${WIDGET_LABELS[id] ?? id}</span>`
       handle.appendChild(widthBtn)
 
       widthBtn.addEventListener('click', (e: MouseEvent) => {
         e.stopPropagation()
-        const isHalf = widget.dataset.width === 'half'
-        const next = isHalf ? 'full' : 'half'
+        const cur = widget.dataset.width ?? 'full'
+        const next = cur === 'full' ? 'half' : cur === 'half' ? 'third' : 'full'
         widget.dataset.width = next
-        widget.style.flex = next === 'half' ? '0 0 calc(50% - 0.625rem)' : '0 0 100%'
-        widthBtn.textContent = next === 'half' ? '½' : '⊞'
-        widthBtn.style.background = next === 'half' ? 'rgba(200,168,72,0.15)' : ''
+        widget.style.flex = next === 'third' ? '0 0 calc(33.333% - 0.833rem)' : next === 'half' ? '0 0 calc(50% - 0.625rem)' : '0 0 100%'
+        widthBtn.textContent = widthLabel(next)
+        widthBtn.style.background = next !== 'full' ? 'rgba(200,168,72,0.15)' : ''
         markChanged()
       })
 
       // Reflect initial state
-      if (widget.dataset.width === 'half') {
+      if (widget.dataset.width === 'half' || widget.dataset.width === 'third') {
         widthBtn.style.background = 'rgba(200,168,72,0.15)'
       }
 
+      widgetWidthBtnMap.set(widget, widthBtn)
       widget.appendChild(handle)
       cleanups.push(() => handle.remove())
 
@@ -287,8 +293,53 @@ export function HomePageEditor({ initialContent }: { initialContent: Content }) 
       // ── Pointer-capture drag ────────────────────────────────
       let isDragging = false
       let placeholder: HTMLElement | null = null
+      let placeholderHalf = false
+      let placeholderAdjacent: HTMLElement | null = null
+      let tempResizedWidget: HTMLElement | null = null
+      let tempOriginalFlex = ''
+
+      function restoreTempResize() {
+        if (tempResizedWidget) {
+          tempResizedWidget.style.flex = tempOriginalFlex
+          tempResizedWidget = null
+          tempOriginalFlex = ''
+        }
+      }
+
+      function setAdjacent(other: HTMLElement, goAfter: boolean) {
+        if (tempResizedWidget !== other) {
+          restoreTempResize()
+          const ow = other.dataset.width
+          tempOriginalFlex = ow === 'third' ? '0 0 calc(33.333% - 0.833rem)' : ow === 'half' ? '0 0 calc(50% - 0.625rem)' : '0 0 100%'
+          const adjFlex = ow === 'third' ? '0 0 calc(33.333% - 0.833rem)' : '0 0 calc(50% - 0.625rem)'
+          other.style.flex = adjFlex
+          tempResizedWidget = other
+        }
+        const adjFlex = other.dataset.width === 'third' ? '0 0 calc(33.333% - 0.833rem)' : '0 0 calc(50% - 0.625rem)'
+        placeholder!.style.flex = adjFlex
+        placeholderHalf = true
+        placeholderAdjacent = other
+        if (goAfter) {
+          if (other.nextSibling !== placeholder) other.after(placeholder!)
+        } else {
+          if (placeholder!.nextSibling !== other) other.parentNode?.insertBefore(placeholder!, other)
+        }
+      }
+
+      function setStack(other: HTMLElement, before: boolean) {
+        restoreTempResize()
+        placeholder!.style.flex = '0 0 100%'
+        placeholderHalf = false
+        placeholderAdjacent = null
+        if (before) {
+          if (placeholder!.nextSibling !== other) other.parentNode?.insertBefore(placeholder!, other)
+        } else {
+          if (other.nextSibling !== placeholder) other.after(placeholder!)
+        }
+      }
 
       handle.addEventListener('pointerdown', (e: PointerEvent) => {
+        if (e.target === widthBtn) return
         e.preventDefault()
         handle.setPointerCapture(e.pointerId)
         isDragging = true
@@ -297,13 +348,13 @@ export function HomePageEditor({ initialContent }: { initialContent: Content }) 
 
         const rect = widget.getBoundingClientRect()
         const offsetY = e.clientY - rect.top
+        const originalWidth = widget.dataset.width ?? 'full'
+        const originalFlex = widget.style.flex
 
-        // Create a same-height placeholder to hold the slot
-        const isHalf = widget.dataset.width === 'half'
         placeholder = document.createElement('div')
         placeholder.style.cssText = `
           height: ${rect.height}px;
-          flex: ${isHalf ? '0 0 calc(50% - 0.625rem)' : '0 0 100%'};
+          flex: ${widget.dataset.width === 'third' ? '0 0 calc(33.333% - 0.833rem)' : widget.dataset.width === 'half' ? '0 0 calc(50% - 0.625rem)' : '0 0 100%'};
           border: 1px dashed rgba(200,168,72,0.3);
           border-radius: 1rem;
           background: rgba(200,168,72,0.03);
@@ -312,7 +363,6 @@ export function HomePageEditor({ initialContent }: { initialContent: Content }) 
         `
         widget.parentNode?.insertBefore(placeholder, widget)
 
-        // Lift the widget out of flow so it follows the cursor
         widget.style.position = 'fixed'
         widget.style.top = rect.top + 'px'
         widget.style.left = rect.left + 'px'
@@ -324,30 +374,49 @@ export function HomePageEditor({ initialContent }: { initialContent: Content }) 
         widget.style.margin = '0'
         widget.style.borderRadius = '1rem'
 
-        function onMove(e: PointerEvent) {
+        function onMove(ev: PointerEvent) {
           if (!isDragging || !placeholder) return
 
-          // Card follows cursor
-          widget.style.top = (e.clientY - offsetY) + 'px'
+          widget.style.top = (ev.clientY - offsetY) + 'px'
 
-          // Move placeholder to show drop position
-          const cursorY = e.clientY
+          const cursorX = ev.clientX
+          const cursorY = ev.clientY
           const others = getWidgetEls().filter(w => w !== widget)
           let moved = false
 
+          // Top/bottom 25% of a widget → stack; middle 50% → side by side; gap → stack
           for (const other of others) {
             const r = other.getBoundingClientRect()
-            if (cursorY < r.top + r.height / 2) {
-              if (placeholder!.nextSibling !== other) {
-                other.parentNode?.insertBefore(placeholder!, other)
-              }
-              moved = true
-              break
+            if (cursorY < r.top || cursorY > r.bottom) continue
+            const relY = (cursorY - r.top) / r.height
+            if (relY < 0.25) {
+              setStack(other, true)
+            } else if (relY > 0.75) {
+              setStack(other, false)
+            } else {
+              setAdjacent(other, cursorX > r.left + r.width / 2)
             }
+            moved = true
+            break
           }
-          if (!moved && others.length > 0) {
-            const last = others[others.length - 1]
-            if (last.nextSibling !== placeholder) last.after(placeholder!)
+
+          if (!moved) {
+            restoreTempResize()
+            placeholderHalf = false
+            placeholderAdjacent = null
+            for (const other of others) {
+              const r = other.getBoundingClientRect()
+              if (cursorY < r.top) {
+                placeholder!.style.flex = '0 0 100%'
+                if (placeholder!.nextSibling !== other) other.parentNode?.insertBefore(placeholder!, other)
+                moved = true
+                break
+              }
+            }
+            if (!moved && others.length > 0) {
+              const last = others[others.length - 1]
+              if (last.nextSibling !== placeholder) last.after(placeholder!)
+            }
           }
         }
 
@@ -358,14 +427,14 @@ export function HomePageEditor({ initialContent }: { initialContent: Content }) 
           handle.removeEventListener('pointerup', onUp)
           handle.removeEventListener('pointercancel', onUp)
 
-          // Drop: put widget back into flow at placeholder position
+          restoreTempResize()
+
           if (placeholder && placeholder.parentNode) {
             placeholder.parentNode.insertBefore(widget, placeholder)
             placeholder.remove()
             placeholder = null
           }
 
-          // Restore widget styles
           widget.style.position = ''
           widget.style.top = ''
           widget.style.left = ''
@@ -379,6 +448,44 @@ export function HomePageEditor({ initialContent }: { initialContent: Content }) 
           handle.style.cursor = 'grab'
           handle.style.opacity = '0'
 
+          const snapHalf = (el: HTMLElement, btn: HTMLElement) => {
+            el.dataset.width = 'half'
+            el.style.flex = '0 0 calc(50% - 0.625rem)'
+            btn.textContent = '½'
+            btn.style.background = 'rgba(200,168,72,0.15)'
+          }
+          const snapFull = (el: HTMLElement, btn: HTMLElement) => {
+            el.dataset.width = 'full'
+            el.style.flex = '0 0 100%'
+            btn.textContent = '⊞'
+            btn.style.background = ''
+          }
+          const snapThird = (el: HTMLElement, btn: HTMLElement) => {
+            el.dataset.width = 'third'
+            el.style.flex = '0 0 calc(33.333% - 0.833rem)'
+            btn.textContent = '⅓'
+            btn.style.background = 'rgba(200,168,72,0.15)'
+          }
+
+          if (placeholderHalf) {
+            // Match the adjacent widget's width when placing beside it
+            const adjWidth = placeholderAdjacent?.dataset.width ?? 'half'
+            const snap = adjWidth === 'third' ? snapThird : snapHalf
+            snap(widget, widthBtn)
+            if (placeholderAdjacent) {
+              const adjBtn = widgetWidthBtnMap.get(placeholderAdjacent)
+              if (adjBtn) snap(placeholderAdjacent, adjBtn)
+            }
+          } else {
+            // Restore original width — don't resize when just reordering
+            widget.dataset.width = originalWidth
+            widget.style.flex = originalFlex
+            widthBtn.textContent = widthLabel(originalWidth)
+            widthBtn.style.background = originalWidth !== 'full' ? 'rgba(200,168,72,0.15)' : ''
+          }
+
+          placeholderHalf = false
+          placeholderAdjacent = null
           markChanged()
         }
 
