@@ -284,6 +284,8 @@ export default async function ProfilePage() {
         {application && application.status === 'approved' && (
           <>
 
+            <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.35), transparent)', marginBottom: '2.5rem' }} />
+
             <div className="profile-main-grid">
               <CommitmentsSection
                 contributions={contributions}

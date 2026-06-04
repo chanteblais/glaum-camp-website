@@ -7,6 +7,8 @@ type Props = {
   shift: { title: string; day: string; time: string; icon_type: string } | null
   roleApprovalStatus: string | null
   showManageLink?: boolean
+  title?: string
+  compact?: boolean
 }
 
 const CONTRIBUTION_META: Record<string, { icon: string; desc: string }> = {
@@ -31,10 +33,10 @@ const TAG_STYLES: Record<string, { color: string; border: string; bg: string }> 
   SHIFT:        { color: '#7dcf8e', border: 'rgba(100,200,120,0.35)', bg: 'rgba(100,200,120,0.07)' },
 }
 
-function CircleIcon({ children }: { children: React.ReactNode }) {
+function CircleIcon({ children, size = '56px' }: { children: React.ReactNode; size?: string }) {
   return (
     <div style={{
-      width: '74px', height: '74px', borderRadius: '50%', flexShrink: 0,
+      width: size, height: size, borderRadius: '50%', flexShrink: 0,
       border: '1.5px solid #C07C26',
       background: 'radial-gradient(circle at 42% 38%, rgba(200,168,72,0.14), rgba(8,0,18,0.85))',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -57,21 +59,26 @@ function Tag({ label }: { label: string }) {
   )
 }
 
-function Row({ circleContent, title, description, tag }: {
+function Row({ circleContent, title, description, tag, iconSize, compact }: {
   circleContent: React.ReactNode
   title: string
   description: string | null
   tag: string
+  iconSize?: string
+  compact?: boolean
 }) {
   return (
     <div className="commitments-row">
-      <CircleIcon>{circleContent}</CircleIcon>
+      <CircleIcon size={iconSize}>{circleContent}</CircleIcon>
       <div className="commitments-row-text">
-        <p style={{ fontSize: '0.95rem', fontWeight: 400, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#EDE0C8', margin: '0 0 0.2rem', lineHeight: 1.9 }}>
+        <p style={{ fontSize: '0.88rem', fontWeight: 400, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#EDE0C8', margin: '0 0 0.15rem', lineHeight: 1.5 }}>
           {title}
         </p>
-        {description && (
-          <p style={{ fontSize: '0.78rem', color: '#B0947A', lineHeight: 2.1, margin: 0, whiteSpace: 'pre-line' }}>{description}</p>
+        {description && !compact && (
+          <p style={{ fontSize: '0.75rem', color: '#B0947A', lineHeight: 1.55, margin: 0, whiteSpace: 'pre-line' }}>{description}</p>
+        )}
+        {description && compact && (
+          <p style={{ fontSize: '0.72rem', color: '#B0947A', lineHeight: 1.4, margin: 0, whiteSpace: 'pre-line', opacity: 0.85 }}>{description}</p>
         )}
       </div>
       <Tag label={tag} />
@@ -79,28 +86,32 @@ function Row({ circleContent, title, description, tag }: {
   )
 }
 
-export function CommitmentsSection({ contributions, role, dept, shift, roleApprovalStatus, showManageLink = false }: Props) {
+export function CommitmentsSection({ contributions, role, dept, shift, roleApprovalStatus, showManageLink = false, title = 'Your Commitments', compact = false }: Props) {
   const hasAnything = contributions.length > 0 || role || shift
   if (!hasAnything) return null
 
   const isPending = roleApprovalStatus === 'pending'
+  const iconSize = compact ? '44px' : '56px'
+  const rowPad = compact ? '0.55rem 0' : '0.75rem 0'
+  const rowGap = compact ? '0.75rem' : '1rem'
+  const sidepad = compact ? '0 1.25rem' : '0 1.5rem'
 
   return (
     <div style={{ border: '1.5px solid rgba(200,168,72,0.7)', borderRadius: '1rem', background: 'rgba(10,0,20,0.6)', overflow: 'hidden', boxShadow: '0 0 0 1px rgba(200,168,72,0.12), 0 0 24px rgba(200,168,72,0.08)' }}>
       <style>{`
-        .commitments-rows { padding: 0 2rem; }
-        .commitments-row  { display: flex; align-items: center; gap: 1.5rem; padding: 1.1rem 0; }
+        .commitments-rows { padding: ${sidepad}; }
+        .commitments-row  { display: flex; align-items: center; gap: ${rowGap}; padding: ${rowPad}; }
         .commitments-row-text { flex: 1; min-width: 0; padding-right: 0.5rem; }
         @media (max-width: 480px) {
           .commitments-rows { padding: 0 1rem; }
-          .commitments-row  { gap: 0.85rem; }
+          .commitments-row  { gap: 0.6rem; }
           .commitments-row-text { padding-right: 0; }
         }
       `}</style>
       {/* Header */}
-      <div style={{ padding: '1.1rem 1.5rem 1rem', textAlign: 'center' }}>
-        <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.6rem', color: '#C8A848', margin: '0 0 1rem', letterSpacing: '0.1em', textShadow: '0 0 20px rgba(200,168,72,0.4)' }}>
-          Your Commitments
+      <div style={{ padding: compact ? '0.65rem 1.25rem 0.55rem' : '0.85rem 1.5rem 0.75rem', textAlign: 'center' }}>
+        <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: compact ? '1.1rem' : '1.35rem', color: '#C8A848', margin: compact ? '0 0 0.55rem' : '0 0 0.75rem', letterSpacing: '0.1em', textShadow: '0 0 20px rgba(200,168,72,0.4)' }}>
+          {title}
         </p>
         <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent 5%, rgba(200,168,72,0.5) 20%, rgba(200,168,72,0.5) 80%, transparent 95%)' }} />
       </div>
@@ -113,10 +124,12 @@ export function CommitmentsSection({ contributions, role, dept, shift, roleAppro
           return (
             <div key={c}>
               <Row
-                circleContent={<span style={{ fontSize: '1.8rem', lineHeight: 1 }}>{meta.icon}</span>}
+                circleContent={<span style={{ fontSize: compact ? '1.1rem' : '1.4rem', lineHeight: 1 }}>{meta.icon}</span>}
                 title={c}
                 description={meta.desc}
                 tag="CONTRIBUTION"
+                iconSize={iconSize}
+                compact={compact}
               />
               {(i < contributions.length - 1 || role || shift) && (
                 <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.3), transparent)' }} />
@@ -132,13 +145,15 @@ export function CommitmentsSection({ contributions, role, dept, shift, roleAppro
               circleContent={
                 dept?.icon
                   ? dept.icon.startsWith('/')
-                    ? <img src={dept.icon} alt="" aria-hidden style={{ width: '68%', height: '68%', objectFit: 'contain', opacity: 0.85 }} />
-                    : <span style={{ fontSize: '1.8rem', lineHeight: 1 }}>{dept.icon}</span>
-                  : <img src="/handicon.png" alt="" aria-hidden style={{ width: '68%', height: '68%', objectFit: 'contain', opacity: 0.85 }} />
+                    ? <img src={dept.icon} alt="" aria-hidden style={{ width: '62%', height: '62%', objectFit: 'contain', opacity: 0.85 }} />
+                    : <span style={{ fontSize: compact ? '1.1rem' : '1.4rem', lineHeight: 1 }}>{dept.icon}</span>
+                  : <img src="/handicon.png" alt="" aria-hidden style={{ width: '62%', height: '62%', objectFit: 'contain', opacity: 0.85 }} />
               }
               title={isPending ? `${role.name} (pending)` : role.name}
               description={role.description || role.purpose}
               tag="DESIGNATION"
+              iconSize={iconSize}
+              compact={compact}
             />
             {shift && <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.3), transparent)' }} />}
           </div>
@@ -149,19 +164,21 @@ export function CommitmentsSection({ contributions, role, dept, shift, roleAppro
           <Row
             circleContent={
               <div style={{ color: '#C8A848', opacity: 0.75 }}>
-                <EventIcon type={shift.icon_type} size={48} />
+                <EventIcon type={shift.icon_type} size={compact ? 28 : 36} />
               </div>
             }
             title={shift.title}
             description={`${DAY_LABELS[shift.day] ?? shift.day}\n${shift.time}`}
             tag="SHIFT"
+            iconSize={iconSize}
+            compact={compact}
           />
         )}
       </div>
 
       {/* Footer */}
       {showManageLink && (
-        <div style={{ padding: '1rem 2rem' }}>
+        <div style={{ padding: '0.65rem 1.5rem' }}>
           <a href="/apply" style={{ fontSize: '0.78rem', color: '#C8A848', opacity: 0.85, textDecoration: 'none', letterSpacing: '0.04em' }}>
             Manage commitments →
           </a>

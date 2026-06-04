@@ -156,6 +156,8 @@ export default async function MemberPage({ params }: { params: { id: string } })
           dept={roleInfo?.departments ? { name: roleInfo.departments.name ?? '', icon: roleInfo.departments.icon ?? null } : null}
           shift={shiftInfo ? { title: shiftInfo.title ?? '', day: shiftInfo.day ?? '', time: shiftInfo.time ?? '', icon_type: shiftInfo.icon_type ?? 'star' } : null}
           roleApprovalStatus={campSignup?.role_approval_status ?? null}
+          title="Commitments"
+          compact
         />
 
       </div>

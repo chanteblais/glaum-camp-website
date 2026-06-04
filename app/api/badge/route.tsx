@@ -5,6 +5,23 @@ import path from 'path'
 
 export const runtime = 'nodejs'
 
+// Module-level cache: file buffers are read once per server instance
+let _badgeBuffer: Buffer | null = null
+let _fontBuffer: Buffer | null = null
+
+async function getAssets(): Promise<{ badgeBuffer: Buffer; fontBuffer: Buffer }> {
+  if (!_badgeBuffer || !_fontBuffer) {
+    ;[_badgeBuffer, _fontBuffer] = await Promise.all([
+      readFile(path.join(process.cwd(), 'public/badge_base.png')),
+      readFile(path.join(process.cwd(), 'public/fonts/TokyoDreams.otf')),
+    ])
+  }
+  return { badgeBuffer: _badgeBuffer!, fontBuffer: _fontBuffer! }
+}
+
+// Per-role+dept rendered image cache (avoids re-running Satori for the same combo)
+const renderCache = new Map<string, Buffer>()
+
 // Render at 2× for crisp text when downscaled for display
 const SCALE = 2
 const W = 365 * SCALE
@@ -50,36 +67,52 @@ function fitFontSize(
   return minPx
 }
 
+const CACHE_HEADERS = {
+  'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+  'Content-Type': 'image/png',
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const role = searchParams.get('role') ?? ''
   const dept = searchParams.get('dept') ?? ''
 
-  const [badgeBuffer, fontBuffer] = await Promise.all([
-    readFile(path.join(process.cwd(), 'public/badge_base.png')),
-    readFile(path.join(process.cwd(), 'public/fonts/TokyoDreams.otf')),
-  ])
+  const cacheKey = `${role}__${dept}`
+  const cached = renderCache.get(cacheKey)
+  if (cached) {
+    return new Response(cached.buffer as ArrayBuffer, { headers: CACHE_HEADERS })
+  }
 
+  const { badgeBuffer, fontBuffer } = await getAssets()
   const badgeDataUrl = `data:image/png;base64,${badgeBuffer.toString('base64')}`
 
-  // Zone dimensions at 1x — width, height, lineHeight, base, min
-  const deptFontSize = fitFontSize(dept, 365 - 55 * 2, 125, 1.5, 24, 11)
-  // Role renders one word per line — fit by longest word width & total stacked height
+  // Dept zone: 1x width=255, height=125 rendered but use 105 for fitting to guarantee breathing room
+  const deptFontSize = fitFontSize(dept, 365 - 55 * 2, 105, 1.5, 24, 11)
+
+  // Role zone: 1x height=122, effective fitting height=100 (22px breathing room top+bottom)
+  // 4+ word roles use natural word-wrap (same as dept); shorter roles stack one word per line
   const roleWords = role.toUpperCase().split(' ')
-  const longestRoleWord = Math.max(...roleWords.map(w => w.length))
+  const isLongRole = roleWords.length >= 4
   const roleFontSize = (() => {
     const CHAR_RATIO = 0.88
-    const zoneW = 365 - 42 * 2
-    const zoneH = 112
-    const lineH_ratio = 1.3
+    const zoneW = 365 - 42 * 2  // 281px
+    const effectiveH = 100       // 122px zone minus 22px breathing room
+
+    if (isLongRole) {
+      // Natural wrapping — reuse fitFontSize word-wrap simulation
+      return fitFontSize(role, zoneW, effectiveH, 1.3, 20, 11)
+    }
+
+    // One word per line — fit by longest word width & total stacked height
+    const longestWord = Math.max(...roleWords.map(w => w.length))
     for (let size = 26; size >= 11; size--) {
-      if (longestRoleWord * size * CHAR_RATIO <= zoneW &&
-          roleWords.length * size * lineH_ratio <= zoneH) return size
+      if (longestWord * size * CHAR_RATIO <= zoneW &&
+          roleWords.length * size * 1.3 <= effectiveH) return size
     }
     return 11
   })()
 
-  return new ImageResponse(
+  const imageResponse = new ImageResponse(
     (
       <div style={{ width: W, height: H, display: 'flex', position: 'relative' }}>
         {/* Badge background */}
@@ -109,16 +142,17 @@ export async function GET(req: NextRequest) {
           </span>
         </div>
 
-        {/* Role name — lower zone, one word per line */}
+        {/* Role name — lower zone */}
         <div style={{
           position: 'absolute',
-          top: s(258), left: s(42), right: s(42), height: s(112),
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          top: s(258), left: s(42), right: s(42), height: s(122),
+          // flex row (no flexDirection) mirrors the dept zone — required for Satori text wrapping
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
           overflow: 'hidden',
-          gap: 0,
         }}>
-          {roleWords.map((word, i) => (
-            <span key={i} style={{
+          {isLongRole ? (
+            // 4+ words: natural centered wrapping, same layout as dept zone
+            <span style={{
               fontFamily: 'TokyoDreams',
               color: '#D4B050',
               fontSize: s(roleFontSize),
@@ -126,11 +160,30 @@ export async function GET(req: NextRequest) {
               letterSpacing: '0.1em',
               lineHeight: 1.3,
               textShadow: '0 0 16px rgba(220,170,60,0.75), 0 1px 3px rgba(0,0,0,0.9)',
-              display: 'block',
+              wordBreak: 'break-word',
+              maxWidth: '100%',
             }}>
-              {word}
+              {role.toUpperCase()}
             </span>
-          ))}
+          ) : (
+            // 1–3 words: one word per line stacking
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
+              {roleWords.map((word, i) => (
+                <span key={i} style={{
+                  fontFamily: 'TokyoDreams',
+                  color: '#D4B050',
+                  fontSize: s(roleFontSize),
+                  textAlign: 'center',
+                  letterSpacing: '0.1em',
+                  lineHeight: 1.3,
+                  textShadow: '0 0 16px rgba(220,170,60,0.75), 0 1px 3px rgba(0,0,0,0.9)',
+                  display: 'block',
+                }}>
+                  {word}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     ),
@@ -138,9 +191,12 @@ export async function GET(req: NextRequest) {
       width: W,
       height: H,
       fonts: [{ name: 'TokyoDreams', data: fontBuffer, style: 'normal' }],
-      headers: {
-        'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
-      },
     },
   )
+
+  // Store in render cache for subsequent requests in this server instance
+  const imageBuffer = Buffer.from(await imageResponse.arrayBuffer())
+  renderCache.set(cacheKey, imageBuffer)
+
+  return new Response(imageBuffer.buffer as ArrayBuffer, { headers: CACHE_HEADERS })
 }

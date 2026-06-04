@@ -38,10 +38,13 @@ export function SpotlightWidget({
       borderRadius: '1rem',
       background: 'rgba(10,0,20,0.6)',
       overflow: 'hidden',
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100%',
+      boxSizing: 'border-box',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
         <p style={{ fontSize: '0.62rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, margin: 0 }}>Meet a Member</p>
-        <span style={{ color: '#C8A848', opacity: 0.4, fontSize: '0.85rem' }}>✳︎</span>
       </div>
 
       <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'flex-start' }}>
