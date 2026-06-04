@@ -12,6 +12,7 @@ import { TaskStatus } from './TaskStatus'
 import { PersonalSchedule } from './PersonalSchedule'
 import { RoleBadge } from './RoleBadge'
 import { AttunementStatus } from './AttunementStatus'
+import { parseContributionTypes } from '@/lib/application-options'
 
 export default async function ProfilePage() {
   const { userId } = await auth()
@@ -54,14 +55,26 @@ export default async function ProfilePage() {
   const badgeDeptName = roleInfo?.departments?.name ?? null
   const badgeDeptIcon = roleInfo?.departments?.icon ?? null
 
-  // Derive contributions: setup_preference from application + auto-Decor if role is in Decor dept
+  // Fetch community contribution types (configurable via admin)
+  const { data: contribRow } = await supabaseAdmin
+    .from('page_content')
+    .select('value')
+    .eq('key', 'community_contribution_types')
+    .maybeSingle()
+  const contributionTypes = parseContributionTypes(contribRow?.value)
+
+  // Derive contributions: setup_preference filtered to known types + auto-assigned types
   const deptName = badgeDeptName ?? ''
-  const isDecorRole = deptName.toLowerCase().includes('decor')
-  const VALID_CONTRIBUTIONS = ['Setup', 'Teardown', 'Decor', 'Other']
-  const baseContributions: string[] = ((application?.setup_preference as string[] | null) ?? []).filter(v => VALID_CONTRIBUTIONS.includes(v))
-  const contributions = isDecorRole && !baseContributions.includes('Decor')
-    ? [...baseContributions, 'Decor']
-    : baseContributions
+  const validValues = new Set(contributionTypes.map(t => t.value))
+  const baseContributions: string[] = ((application?.setup_preference as string[] | null) ?? []).filter(v => validValues.has(v))
+  // Auto-assign any type whose autoForDeptKeyword matches the member's department
+  const autoTypes = contributionTypes
+    .filter(t => t.autoForDeptKeyword && deptName.toLowerCase().includes(t.autoForDeptKeyword.toLowerCase()))
+    .map(t => t.value)
+  const contributions = [
+    ...baseContributions,
+    ...autoTypes.filter(v => !baseContributions.includes(v)),
+  ]
 
   // Link clerk_user_id for approved applications found by email
   if (application?.status === 'approved' && !application.clerk_user_id) {
@@ -143,7 +156,7 @@ export default async function ProfilePage() {
                   {displayName}
                 </h1>
                 {application && (application.status === 'approved' || application.status === 'pending') && (
-                  <ProfileSettings application={application} />
+                  <ProfileSettings application={application} contributionTypes={contributionTypes} />
                 )}
                 {volunteer && volunteer.status === 'active' && !application && (
                   <VolunteerSettings volunteer={volunteer} />
@@ -293,6 +306,7 @@ export default async function ProfilePage() {
                 dept={roleInfo?.departments ? { name: roleInfo.departments.name ?? '', icon: roleInfo.departments.icon ?? null } : null}
                 shift={shiftInfo ? { title: shiftInfo.title ?? '', day: shiftInfo.day ?? '', time: shiftInfo.time ?? '', icon_type: shiftInfo.icon_type ?? 'star' } : null}
                 roleApprovalStatus={campSignup?.role_approval_status ?? null}
+                contributionTypes={contributionTypes}
                 showManageLink
               />
               <div>

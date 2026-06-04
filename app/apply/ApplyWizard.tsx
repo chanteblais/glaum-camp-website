@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import Cropper from 'react-easy-crop'
 import type { Area } from 'react-easy-crop'
 import type { MemberFormConfig, StepConfig, FieldConfig } from '@/lib/form-config'
+import type { ContributionType } from '@/lib/application-options'
+import { DEFAULT_CONTRIBUTION_TYPES } from '@/lib/application-options'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -21,7 +23,8 @@ const MILESTONE_FOR_KEY: Record<string, number> = {
   basic: 0, registry: 1, plans: 2, roles: 2, agreement: 3, shrimp: 4,
 }
 
-const AGREEMENT_ITEMS = [
+// Fallback — replaced at runtime by items passed from page_content
+const AGREEMENT_ITEMS_FALLBACK = [
   'I have taken time to familiarise myself with Glåüm and believe it is a community I would genuinely enjoy contributing to.',
   'I understand Glåüm is participatory.',
   'I will contribute honestly within my capacity.',
@@ -54,7 +57,7 @@ type FormData = {
   avatar_url: string | null
   // II
   about_you: string; special_skills: string; find_at_camp: string
-  glaum_acceptance: string; attunement_status: string; attunement_status_other: string
+  community_acceptance: string; onboarding_status: string; onboarding_status_other: string
   // III
   attendance: string; arrival_date: string; departure_date: string
   vehicle: string; structures: string; rideshare: string
@@ -74,7 +77,7 @@ const BLANK: FormData = {
   email: '', phone: '', instagram: '', location: '',
   emergency_contact: '', referral: '', camped_before: '', avatar_url: null,
   about_you: '', special_skills: '', find_at_camp: '',
-  glaum_acceptance: '', attunement_status: '', attunement_status_other: '',
+  community_acceptance: '', onboarding_status: '', onboarding_status_other: '',
   attendance: '', arrival_date: '', departure_date: '',
   vehicle: '', structures: '', rideshare: '',
   department_interests: [], leadership_interest: '',
@@ -453,20 +456,20 @@ function SectionII({ form, set, fl, isMobile }: { form: FormData; set: (k: keyof
         </Field>
       )}
       {showAny && <Divider />}
-      <div style={{ display: 'grid', gridTemplateColumns: fl.visible('attunement_status') && !isMobile ? '1fr 1fr' : '1fr', gap: '2rem' }}>
-        <Field label={fl.label('glaum_acceptance')} required={fl.required('glaum_acceptance')}>
-          <RadioGroup options={['Yes', 'Not Yet', "It's Complicated"]} value={form.glaum_acceptance} onChange={v => set('glaum_acceptance', v)} />
+      <div style={{ display: 'grid', gridTemplateColumns: fl.visible('onboarding_status') && !isMobile ? '1fr 1fr' : '1fr', gap: '2rem' }}>
+        <Field label={fl.label('community_acceptance')} required={fl.required('community_acceptance')}>
+          <RadioGroup options={['Yes', 'Not Yet', "It's Complicated"]} value={form.community_acceptance} onChange={v => set('community_acceptance', v)} />
         </Field>
-        {fl.visible('attunement_status') && (
-          <Field label={fl.label('attunement_status')} optional={!fl.required('attunement_status')}>
+        {fl.visible('onboarding_status') && (
+          <Field label={fl.label('onboarding_status')} optional={!fl.required('onboarding_status')}>
             <RadioGroup
               options={['Emerging', 'Stable', 'Elevated', 'Classified', 'Other']}
-              value={form.attunement_status}
-              onChange={v => set('attunement_status', v)}
+              value={form.onboarding_status}
+              onChange={v => set('onboarding_status', v)}
             />
-            {form.attunement_status === 'Other' && (
+            {form.onboarding_status === 'Other' && (
               <div style={{ marginTop: '0.5rem' }}>
-                <Input value={form.attunement_status_other} onChange={v => set('attunement_status_other', v)} placeholder="Tell us more…" />
+                <Input value={form.onboarding_status_other} onChange={v => set('onboarding_status_other', v)} placeholder="Tell us more…" />
               </div>
             )}
           </Field>
@@ -476,7 +479,7 @@ function SectionII({ form, set, fl, isMobile }: { form: FormData; set: (k: keyof
   )
 }
 
-function SectionIII({ form, set, fl, isMobile }: { form: FormData; set: (k: keyof FormData, v: unknown) => void; fl: FlHelper; isMobile?: boolean }) {
+function SectionIII({ form, set, fl, isMobile, attendanceOptions }: { form: FormData; set: (k: keyof FormData, v: unknown) => void; fl: FlHelper; isMobile?: boolean; attendanceOptions: string[] }) {
   const cols2 = isMobile ? '1fr' : '1fr 1fr'
   const showDates = fl.visible('arrival_date') || fl.visible('departure_date')
   const showVehicle = fl.visible('vehicle') || fl.visible('structures')
@@ -484,7 +487,7 @@ function SectionIII({ form, set, fl, isMobile }: { form: FormData; set: (k: keyo
     <>
       <Field label={fl.label('attendance')} required={fl.required('attendance')}>
         <RadioGroup
-          options={['Camping with Glåüm', 'Staying nearby but participating', 'Mostly visiting socially', 'Still figuring it out']}
+          options={attendanceOptions}
           value={form.attendance}
           onChange={v => set('attendance', v)}
         />
@@ -520,7 +523,7 @@ function SectionIII({ form, set, fl, isMobile }: { form: FormData; set: (k: keyo
   )
 }
 
-function SectionIV({ form, set, fl }: { form: FormData; set: (k: keyof FormData, v: unknown) => void; fl: FlHelper }) {
+function SectionIV({ form, set, fl, contributionTypes }: { form: FormData; set: (k: keyof FormData, v: unknown) => void; fl: FlHelper; contributionTypes: ContributionType[] }) {
   return (
     <>
       {fl.visible('dept_interests') && (
@@ -542,7 +545,7 @@ function SectionIV({ form, set, fl }: { form: FormData; set: (k: keyof FormData,
       {!fl.visible('leadership_interest') && <Divider label="Communal Responsibilities" />}
       {fl.visible('setup_preference') && (
         <Field label={fl.label('setup_preference')} optional={!fl.required('setup_preference')}>
-          <CheckboxGroup options={['Setup', 'Teardown', 'Decor']} value={form.setup_preference} onChange={v => set('setup_preference', v as string[])} />
+          <CheckboxGroup options={contributionTypes.map(t => t.value)} value={form.setup_preference} onChange={v => set('setup_preference', v as string[])} />
         </Field>
       )}
       {fl.visible('setup_limitations') && (
@@ -566,21 +569,21 @@ function SectionIV({ form, set, fl }: { form: FormData; set: (k: keyof FormData,
   )
 }
 
-function SectionV({ form, set }: { form: FormData; set: (k: keyof FormData, v: unknown) => void }) {
-  const allChecked = form.acknowledgements.length === AGREEMENT_ITEMS.length
+function SectionV({ form, set, agreementItems }: { form: FormData; set: (k: keyof FormData, v: unknown) => void; agreementItems: string[] }) {
+  const allChecked = form.acknowledgements.length === agreementItems.length
   return (
     <>
       <p style={{ fontSize: '0.85rem', lineHeight: 1.8, opacity: 0.5, marginBottom: '2rem' }}>
         Please acknowledge the following. All items are required to complete your application.
       </p>
       <CheckboxGroup
-        options={AGREEMENT_ITEMS}
+        options={agreementItems}
         value={form.acknowledgements}
         onChange={v => set('acknowledgements', v as string[])}
       />
       {!allChecked && form.acknowledgements.length > 0 && (
         <p style={{ fontSize: '0.78rem', color: '#C8A848', opacity: 0.5, marginTop: '1rem', fontStyle: 'italic' }}>
-          {AGREEMENT_ITEMS.length - form.acknowledgements.length} item{AGREEMENT_ITEMS.length - form.acknowledgements.length !== 1 ? 's' : ''} remaining
+          {agreementItems.length - form.acknowledgements.length} item{agreementItems.length - form.acknowledgements.length !== 1 ? 's' : ''} remaining
         </p>
       )}
     </>
@@ -668,7 +671,16 @@ function CustomFieldsAppendix({ fields, answers, setAnswer }: {
 
 // ── Main wizard ───────────────────────────────────────────────────────────────
 
-export function ApplyWizard({ userEmail, formConfig }: { userEmail: string; formConfig: MemberFormConfig }) {
+export function ApplyWizard({ userEmail, formConfig, agreementItems, attendanceOptions, contributionTypes }: {
+  userEmail: string
+  formConfig: MemberFormConfig
+  agreementItems?: string[]
+  attendanceOptions?: string[]
+  contributionTypes?: ContributionType[]
+}) {
+  const resolvedAgreementItems = agreementItems ?? AGREEMENT_ITEMS_FALLBACK
+  const resolvedAttendanceOptions = attendanceOptions ?? ['Camping on site', 'Staying nearby but participating', 'Mostly visiting socially', 'Still figuring it out']
+  const resolvedContributionTypes = contributionTypes ?? DEFAULT_CONTRIBUTION_TYPES
   const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']
   const steps = formConfig.steps.filter(s => s.visible)
   const lastStep = steps.length - 1
@@ -731,9 +743,9 @@ export function ApplyWizard({ userEmail, formConfig }: { userEmail: string; form
         (!needAvatar || form.avatar_url)
       )
     }
-    if (currentStepKey === 'registry') return !!(form.glaum_acceptance)
+    if (currentStepKey === 'registry') return !!(form.community_acceptance)
     if (currentStepKey === 'plans') return !!(form.attendance)
-    if (currentStepKey === 'agreement') return form.acknowledgements.length === AGREEMENT_ITEMS.length
+    if (currentStepKey === 'agreement') return form.acknowledgements.length === resolvedAgreementItems.length
     // Custom steps: check required fields have answers
     const currentStep = steps[step]
     if (currentStep?.isCustom) {
@@ -756,7 +768,7 @@ export function ApplyWizard({ userEmail, formConfig }: { userEmail: string; form
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
-          attunement_status: form.attunement_status ? [form.attunement_status] : [],
+          onboarding_status: form.onboarding_status ? [form.onboarding_status] : [],
         }),
       })
       const data = await res.json()
@@ -913,9 +925,9 @@ export function ApplyWizard({ userEmail, formConfig }: { userEmail: string; form
       <div style={{ marginBottom: '3rem' }}>
         {steps[step]?.key === 'basic'     && <SectionI   form={form} set={set} fl={makeFlHelper(formConfig, 'basic')}     isMobile={isMobile} />}
         {steps[step]?.key === 'registry'  && <SectionII  form={form} set={set} fl={makeFlHelper(formConfig, 'registry')} isMobile={isMobile} />}
-        {steps[step]?.key === 'plans'     && <SectionIII form={form} set={set} fl={makeFlHelper(formConfig, 'plans')}     isMobile={isMobile} />}
-        {steps[step]?.key === 'roles'     && <SectionIV  form={form} set={set} fl={makeFlHelper(formConfig, 'roles')} />}
-        {steps[step]?.key === 'agreement' && <SectionV   form={form} set={set} />}
+        {steps[step]?.key === 'plans'     && <SectionIII form={form} set={set} fl={makeFlHelper(formConfig, 'plans')}     isMobile={isMobile} attendanceOptions={resolvedAttendanceOptions} />}
+        {steps[step]?.key === 'roles'     && <SectionIV  form={form} set={set} fl={makeFlHelper(formConfig, 'roles')} contributionTypes={resolvedContributionTypes} />}
+        {steps[step]?.key === 'agreement' && <SectionV   form={form} set={set} agreementItems={resolvedAgreementItems} />}
         {steps[step]?.key === 'shrimp'    && <SectionVI  form={form} set={set} fl={makeFlHelper(formConfig, 'shrimp')} />}
         {steps[step]?.isCustom && (
           <CustomSection

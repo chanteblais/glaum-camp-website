@@ -9,7 +9,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        glaum: {
+        brand: {
           purple: '#D239F8',
           gold: '#C8A848',
           'dark-gold': '#634D0B',

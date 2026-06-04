@@ -2,6 +2,8 @@
 
 import { useState, useCallback } from 'react'
 import type { MemberFormConfig, VolunteerFormConfig, StepConfig, FieldConfig } from '@/lib/form-config'
+import type { ContributionType } from '@/lib/application-options'
+import { DEFAULT_CONTRIBUTION_TYPES } from '@/lib/application-options'
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 
@@ -416,21 +418,24 @@ function StatusBanner({ open, saving, onToggle }: { open: boolean; saving: boole
 export function ApplicationBuilder({
   memberConfig: initialMember,
   volunteerConfig: initialVolunteer,
+  contributionTypes: initialContribTypes,
 }: {
   memberConfig: MemberFormConfig
   volunteerConfig: VolunteerFormConfig
+  contributionTypes?: ContributionType[]
 }) {
   const [memberConfig, setMemberConfig] = useState<MemberFormConfig>(initialMember)
   const [volunteerConfig, setVolunteerConfig] = useState<VolunteerFormConfig>(initialVolunteer)
+  const [contribTypes, setContribTypes] = useState<ContributionType[]>(initialContribTypes ?? DEFAULT_CONTRIBUTION_TYPES)
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [saveMsg, setSaveMsg] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'member' | 'volunteer'>('member')
+  const [activeTab, setActiveTab] = useState<'member' | 'volunteer' | 'contributions'>('member')
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set())
 
   // ── Patch helper ──
 
-  const patch = useCallback(async (key: 'config_member_form' | 'config_volunteer_form', value: object) => {
+  const patch = useCallback(async (key: 'config_member_form' | 'config_volunteer_form' | 'community_contribution_types', value: object | ContributionType[]) => {
     setSaving(true)
     setSaveMsg(null)
     try {
@@ -569,12 +574,13 @@ export function ApplicationBuilder({
 
   function handleSave() {
     if (activeTab === 'member') patch('config_member_form', memberConfig)
-    else patch('config_volunteer_form', volunteerConfig)
+    else if (activeTab === 'volunteer') patch('config_volunteer_form', volunteerConfig)
+    else patch('community_contribution_types', contribTypes)
   }
 
   // ── Tab style ──
 
-  function tabStyle(id: typeof activeTab): React.CSSProperties {
+  function tabStyle(id: 'member' | 'volunteer' | 'contributions'): React.CSSProperties {
     const active = activeTab === id
     return {
       padding: '0.45rem 1.1rem',
@@ -640,6 +646,7 @@ export function ApplicationBuilder({
         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginBottom: '2.5rem' }}>
           <button style={tabStyle('member')} onClick={() => setActiveTab('member')}>Camp Member Application</button>
           <button style={tabStyle('volunteer')} onClick={() => setActiveTab('volunteer')}>Volunteer Signup</button>
+          <button style={tabStyle('contributions')} onClick={() => setActiveTab('contributions')}>Contribution Types</button>
         </div>
 
         {/* ── MEMBER TAB ── */}
@@ -751,6 +758,159 @@ export function ApplicationBuilder({
                 Test this application →
               </a>
             </div>
+          </div>
+        )}
+
+        {/* ── CONTRIBUTIONS TAB ── */}
+        {activeTab === 'contributions' && (
+          <div>
+            <p style={{ fontSize: '0.82rem', lineHeight: 1.7, opacity: 0.5, marginBottom: '1.75rem' }}>
+              Contribution types are the communal responsibilities members can sign up for — such as Setup, Teardown, or Decor. They appear as checkboxes in the application form and profile settings, and as cards in the commitments section.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1.25rem' }}>
+              {contribTypes.map((ct, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    border: '1px solid rgba(200,168,72,0.15)',
+                    borderRadius: '0.75rem',
+                    background: 'rgba(200,168,72,0.02)',
+                    padding: '0.85rem 1rem',
+                    display: 'flex',
+                    gap: '0.75rem',
+                    alignItems: 'flex-start',
+                  }}
+                >
+                  {/* Emoji icon */}
+                  <input
+                    value={ct.icon}
+                    onChange={e => {
+                      const next = contribTypes.map((t, i) => i === idx ? { ...t, icon: e.target.value } : t)
+                      setContribTypes(next)
+                      setDirty(true)
+                    }}
+                    placeholder="⚒️"
+                    style={{
+                      width: '2.2rem', flexShrink: 0,
+                      background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(200,168,72,0.2)',
+                      borderRadius: '0.35rem', color: CREAM, fontSize: '1rem',
+                      padding: '0.3rem 0.2rem', textAlign: 'center', outline: 'none',
+                    }}
+                  />
+
+                  {/* Fields */}
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.4rem', minWidth: 0 }}>
+                    <input
+                      value={ct.value}
+                      onChange={e => {
+                        const next = contribTypes.map((t, i) => i === idx ? { ...t, value: e.target.value } : t)
+                        setContribTypes(next)
+                        setDirty(true)
+                      }}
+                      placeholder="Name (e.g. Setup)"
+                      style={{
+                        width: '100%', boxSizing: 'border-box',
+                        background: 'transparent', border: 'none',
+                        borderBottom: '1px solid rgba(200,168,72,0.2)',
+                        color: CREAM, fontSize: '0.85rem', outline: 'none',
+                        padding: '0 0 0.15rem', fontFamily: 'inherit',
+                      }}
+                    />
+                    <input
+                      value={ct.description}
+                      onChange={e => {
+                        const next = contribTypes.map((t, i) => i === idx ? { ...t, description: e.target.value } : t)
+                        setContribTypes(next)
+                        setDirty(true)
+                      }}
+                      placeholder="Short description shown in commitments card…"
+                      style={{
+                        width: '100%', boxSizing: 'border-box',
+                        background: 'transparent', border: 'none',
+                        borderBottom: '1px solid rgba(200,168,72,0.1)',
+                        color: CREAM, fontSize: '0.75rem', outline: 'none',
+                        padding: '0 0 0.1rem', opacity: 0.55, fontFamily: 'inherit', fontStyle: 'italic',
+                      }}
+                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.1rem' }}>
+                      <span style={{ fontSize: '0.65rem', opacity: 0.4, letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>Auto-add if dept contains</span>
+                      <input
+                        value={ct.autoForDeptKeyword ?? ''}
+                        onChange={e => {
+                          const next = contribTypes.map((t, i) => i === idx ? { ...t, autoForDeptKeyword: e.target.value || null } : t)
+                          setContribTypes(next)
+                          setDirty(true)
+                        }}
+                        placeholder="keyword (optional)"
+                        style={{
+                          flex: 1, minWidth: 0,
+                          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(200,168,72,0.12)',
+                          borderRadius: '0.3rem', color: CREAM, fontSize: '0.72rem',
+                          padding: '0.2rem 0.5rem', outline: 'none', fontFamily: 'inherit',
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Move + delete */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flexShrink: 0 }}>
+                    <button
+                      onClick={() => {
+                        if (idx === 0) return
+                        const next = [...contribTypes]
+                        ;[next[idx - 1], next[idx]] = [next[idx], next[idx - 1]]
+                        setContribTypes(next)
+                        setDirty(true)
+                      }}
+                      disabled={idx === 0}
+                      title="Move up"
+                      style={{ background: 'none', border: 'none', cursor: idx === 0 ? 'default' : 'pointer', color: GOLD, opacity: idx === 0 ? 0.2 : 0.5, fontSize: '0.75rem', padding: '0.1rem' }}
+                    >▲</button>
+                    <button
+                      onClick={() => {
+                        if (idx === contribTypes.length - 1) return
+                        const next = [...contribTypes]
+                        ;[next[idx], next[idx + 1]] = [next[idx + 1], next[idx]]
+                        setContribTypes(next)
+                        setDirty(true)
+                      }}
+                      disabled={idx === contribTypes.length - 1}
+                      title="Move down"
+                      style={{ background: 'none', border: 'none', cursor: idx === contribTypes.length - 1 ? 'default' : 'pointer', color: GOLD, opacity: idx === contribTypes.length - 1 ? 0.2 : 0.5, fontSize: '0.75rem', padding: '0.1rem' }}
+                    >▼</button>
+                    <button
+                      onClick={() => {
+                        if (!window.confirm(`Remove "${ct.value}"? Existing member data using this value won't be changed.`)) return
+                        setContribTypes(contribTypes.filter((_, i) => i !== idx))
+                        setDirty(true)
+                      }}
+                      title="Remove"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ff8a8a', opacity: 0.45, fontSize: '0.8rem', padding: '0.1rem', marginTop: '0.15rem' }}
+                    >✕</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => {
+                setContribTypes([...contribTypes, { value: 'New Type', icon: '✦', description: '', autoForDeptKeyword: null }])
+                setDirty(true)
+              }}
+              style={{
+                width: '100%', padding: '0.65rem',
+                border: '1px dashed rgba(210,57,248,0.25)',
+                borderRadius: '0.75rem', background: 'transparent',
+                color: PURPLE, fontSize: '0.8rem', letterSpacing: '0.08em',
+                cursor: 'pointer', opacity: 0.6,
+                transition: 'opacity 0.15s',
+              }}
+            >+ Add contribution type</button>
+
+            <p style={{ fontSize: '0.72rem', opacity: 0.35, marginTop: '1.5rem', lineHeight: 1.6, fontStyle: 'italic' }}>
+              The <strong style={{ fontStyle: 'normal', opacity: 0.7 }}>Auto-add if dept contains</strong> field automatically assigns a contribution type to any member whose department name includes the keyword (case-insensitive). For example, setting it to &quot;decor&quot; means members in a &quot;Decor&quot; or &quot;Aesthetic &amp; Decor&quot; department automatically receive that contribution.
+            </p>
           </div>
         )}
 

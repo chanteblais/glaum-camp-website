@@ -1,4 +1,6 @@
 import { EventIcon } from '@/components/EventIcon'
+import type { ContributionType } from '@/lib/application-options'
+import { DEFAULT_CONTRIBUTION_TYPES } from '@/lib/application-options'
 
 type Props = {
   contributions: string[]
@@ -6,16 +8,10 @@ type Props = {
   dept: { name: string; icon: string | null } | null
   shift: { title: string; day: string; time: string; icon_type: string } | null
   roleApprovalStatus: string | null
+  contributionTypes?: ContributionType[]
   showManageLink?: boolean
   title?: string
   compact?: boolean
-}
-
-const CONTRIBUTION_META: Record<string, { icon: string; desc: string }> = {
-  Setup:    { icon: '⚒️',  desc: 'Help build and transform the space before camp begins.' },
-  Teardown: { icon: '🔩',  desc: 'Help break down and restore the site after camp ends.' },
-  Decor:    { icon: '🕯️', desc: 'Create and maintain the visual atmosphere of camp.' },
-  Other:    { icon: '🤝',  desc: 'Contributing in another capacity.' },
 }
 
 const DAY_LABELS: Record<string, string> = {
@@ -86,7 +82,8 @@ function Row({ circleContent, title, description, tag, iconSize, compact }: {
   )
 }
 
-export function CommitmentsSection({ contributions, role, dept, shift, roleApprovalStatus, showManageLink = false, title = 'Your Commitments', compact = false }: Props) {
+export function CommitmentsSection({ contributions, role, dept, shift, roleApprovalStatus, contributionTypes = DEFAULT_CONTRIBUTION_TYPES, showManageLink = false, title = 'Your Commitments', compact = false }: Props) {
+  const metaByValue = Object.fromEntries(contributionTypes.map(t => [t.value, { icon: t.icon, desc: t.description }]))
   const hasAnything = contributions.length > 0 || role || shift
   if (!hasAnything) return null
 
@@ -120,7 +117,7 @@ export function CommitmentsSection({ contributions, role, dept, shift, roleAppro
       <div className="commitments-rows">
         {/* Contributions */}
         {contributions.map((c, i) => {
-          const meta = CONTRIBUTION_META[c] ?? { icon: '✦', desc: null }
+          const meta = metaByValue[c] ?? { icon: '✦', desc: null }
           return (
             <div key={c}>
               <Row

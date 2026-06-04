@@ -2,7 +2,7 @@
 
 type App = {
   status: string
-  camp_relationship: string | null
+  membership_type: string | null
   attendance: string | null
 }
 
@@ -60,19 +60,17 @@ function groupBy(apps: App[], key: keyof App) {
 export function OverviewSection({ applications }: { applications: App[] }) {
   const active = applications.filter(a => a.status === 'approved' || a.status === 'pending')
 
-  const campRelationship = groupBy(active, 'camp_relationship')
+  const membershipType = groupBy(active, 'membership_type')
   const attendance = groupBy(active, 'attendance')
 
-  const relationshipOrder = ['Camp with Glåüm', 'Stay nearby but participate', 'Mostly visit socially']
   const attendanceOrder = ['Full event', 'Partial event', 'Unsure']
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '2rem' }}>
-      <Subsection title="Camp Relationship">
-        {relationshipOrder.map(label => {
-          const counts = campRelationship[label] ?? { approved: 0, pending: 0 }
-          return <CountRow key={label} label={label} {...counts} />
-        })}
+      <Subsection title="Membership Type">
+        {Object.entries(membershipType).map(([label, counts]) => (
+          <CountRow key={label} label={label} {...counts} />
+        ))}
       </Subsection>
 
       <Subsection title="Attendance">
