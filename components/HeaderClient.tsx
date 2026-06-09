@@ -196,6 +196,8 @@ export function HeaderClient() {
           e.currentTarget.style.borderColor = 'rgba(200,168,72,0.4)'
         }}
         aria-label="Account menu"
+        aria-haspopup="menu"
+        aria-expanded={dropdownOpen}
       >
         {avatarUrl ? (
           <img
@@ -208,6 +210,8 @@ export function HeaderClient() {
 
       {dropdownOpen && (
         <div
+          role="menu"
+          aria-label="Account menu"
           style={{
             position: 'absolute',
             right: 0,
@@ -234,6 +238,7 @@ export function HeaderClient() {
             <Link
               key={href}
               href={href}
+              role="menuitem"
               onClick={() => setDropdownOpen(false)}
               style={{
                 display: 'block',
@@ -257,9 +262,10 @@ export function HeaderClient() {
               {label}
             </Link>
           ))}
-          <div style={{ height: '1px', background: 'rgba(200,168,72,0.1)', margin: '0.25rem 0' }} />
+          <div style={{ height: '1px', background: 'rgba(200,168,72,0.1)', margin: '0.25rem 0' }} role="separator" />
           <a
             href="/api/sign-out"
+            role="menuitem"
             onClick={() => {
               window.localStorage.removeItem(AUTH_MEMORY_KEY)
               window.localStorage.removeItem(AUTH_NAME_KEY)
@@ -319,6 +325,7 @@ export function HeaderClient() {
 
   return (
     <header
+      role="banner"
       style={{
         position: 'fixed',
         top: 0,
@@ -346,6 +353,7 @@ export function HeaderClient() {
         {/* Logo */}
         <Link
           href="/"
+          aria-label="Glåüm Camp home"
           style={{
             fontFamily: 'TokyoDreams, serif',
             fontSize: '1.4rem',
@@ -364,7 +372,7 @@ export function HeaderClient() {
 
         {/* Desktop nav */}
         {!isMobile && (
-          <nav style={{ display: 'flex', gap: '2rem', flex: 1, justifyContent: 'center' }}>
+          <nav aria-label="Primary" style={{ display: 'flex', gap: '2rem', flex: 1, justifyContent: 'center' }}>
             {activeNavLinks.map((link) => (
               'badge' in link && link.badge ? (
                 <MessagesNavLink
@@ -401,13 +409,15 @@ export function HeaderClient() {
               onClick={() => setMenuOpen(!menuOpen)}
               style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.4rem', color: '#C8A848', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={menuOpen}
+              aria-controls="mobile-nav-menu"
             >
               {menuOpen ? (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" focusable="false">
                   <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
               ) : (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" focusable="false">
                   <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
                 </svg>
               )}
@@ -419,6 +429,8 @@ export function HeaderClient() {
       {/* Mobile menu */}
       {isMobile && menuOpen && (
         <nav
+          id="mobile-nav-menu"
+          aria-label="Mobile"
           style={{
             backgroundColor: 'rgba(20, 8, 30, 0.98)',
             borderTop: '1px solid rgba(200,168,72,0.15)',

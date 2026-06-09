@@ -26,7 +26,7 @@ const TOGGLES: { key: keyof Prefs; label: string; description: string }[] = [
   },
 ]
 
-function Toggle({
+function PrefCheckbox({
   checked,
   onChange,
   label,
@@ -41,6 +41,7 @@ function Toggle({
 }) {
   return (
     <label
+      className="notif-pref-row"
       style={{
         display: 'flex',
         alignItems: 'flex-start',
@@ -50,40 +51,21 @@ function Toggle({
         borderBottom: '1px solid rgba(200,168,72,0.1)',
       }}
     >
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        aria-label={label}
+      <input
+        type="checkbox"
+        checked={checked}
         disabled={disabled}
-        onClick={() => onChange(!checked)}
+        aria-label={label}
+        onChange={e => onChange(e.target.checked)}
         style={{
           flexShrink: 0,
-          width: '44px',
-          height: '24px',
-          borderRadius: '9999px',
-          border: '1px solid rgba(200,168,72,0.4)',
-          background: checked ? 'rgba(210,57,248,0.55)' : 'rgba(255,255,255,0.06)',
-          position: 'relative',
+          width: '18px',
+          height: '18px',
+          marginTop: '0.15rem',
+          accentColor: '#D239F8',
           cursor: disabled ? 'wait' : 'pointer',
-          transition: 'background 0.2s',
-          marginTop: '0.1rem',
         }}
-      >
-        <span
-          style={{
-            position: 'absolute',
-            top: '2px',
-            left: checked ? '21px' : '2px',
-            width: '18px',
-            height: '18px',
-            borderRadius: '50%',
-            background: '#FFFACD',
-            transition: 'left 0.2s',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
-          }}
-        />
-      </button>
+      />
       <span style={{ flex: 1 }}>
         <span
           style={{
@@ -182,7 +164,7 @@ export function NotificationPreferences() {
       ) : prefs ? (
         <div>
           {TOGGLES.map(t => (
-            <Toggle
+            <PrefCheckbox
               key={t.key}
               label={t.label}
               description={t.description}

@@ -112,11 +112,12 @@ export function ThreadClient({ currentUserId, recipientId, displayName, avatarUr
         WebkitBackdropFilter: 'blur(12px)',
         zIndex: 10,
       }}>
-        <a href="/messages" style={{ color: '#C8A848', opacity: 0.5, textDecoration: 'none', fontSize: '0.8rem', letterSpacing: '0.08em', flexShrink: 0 }}>
-          ←
+        <a href="/messages" aria-label="Back to all messages" style={{ color: '#C8A848', opacity: 0.5, textDecoration: 'none', fontSize: '0.8rem', letterSpacing: '0.08em', flexShrink: 0 }}>
+          <span aria-hidden="true">←</span>
         </a>
         <a
           href={`/members/${recipientId}`}
+          aria-label={`View ${displayName}'s profile`}
           style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', textDecoration: 'none', color: 'inherit' }}
         >
           <div style={{
@@ -127,9 +128,9 @@ export function ThreadClient({ currentUserId, recipientId, displayName, avatarUr
           }}>
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={avatarUrl} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img src={avatarUrl} alt={`${displayName}'s avatar`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : (
-              <span style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1rem', color: '#C8A848', opacity: 0.6 }}>{initials}</span>
+              <span aria-hidden="true" style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1rem', color: '#C8A848', opacity: 0.6 }}>{initials}</span>
             )}
           </div>
           <div>
@@ -140,9 +141,9 @@ export function ThreadClient({ currentUserId, recipientId, displayName, avatarUr
       </div>
 
       {/* Messages */}
-      <div style={{ flex: 1, padding: '1.5rem 1.5rem 1rem', overflowY: 'auto' }}>
+      <div role="log" aria-label={`Conversation with ${displayName}`} aria-live="polite" aria-relevant="additions" style={{ flex: 1, padding: '1.5rem 1.5rem 1rem', overflowY: 'auto' }}>
         {loading && (
-          <p style={{ textAlign: 'center', opacity: 0.4, fontStyle: 'italic', fontSize: '0.9rem' }}>Loading…</p>
+          <p role="status" style={{ textAlign: 'center', opacity: 0.4, fontStyle: 'italic', fontSize: '0.9rem' }}>Loading…</p>
         )}
 
         {!loading && messages.length === 0 && (
@@ -168,7 +169,9 @@ export function ThreadClient({ currentUserId, recipientId, displayName, avatarUr
                 justifyContent: isMe ? 'flex-end' : 'flex-start',
                 marginBottom: '0.35rem',
               }}>
-                <div style={{
+                <div
+                  aria-label={`${isMe ? 'You' : displayName} said`}
+                  style={{
                   maxWidth: '72%',
                   padding: '0.6rem 0.9rem',
                   borderRadius: isMe ? '1.1rem 1.1rem 0.25rem 1.1rem' : '1.1rem 1.1rem 1.1rem 0.25rem',
@@ -204,16 +207,22 @@ export function ThreadClient({ currentUserId, recipientId, displayName, avatarUr
         WebkitBackdropFilter: 'blur(12px)',
       }}>
         {error && (
-          <p style={{ color: '#f87171', fontSize: '0.78rem', marginBottom: '0.5rem', opacity: 0.85 }}>{error}</p>
+          <p role="alert" style={{ color: '#f87171', fontSize: '0.78rem', marginBottom: '0.5rem', opacity: 0.85 }}>{error}</p>
         )}
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end' }}>
           <div style={{ flex: 1, position: 'relative' }}>
+            <label htmlFor="message-compose" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0 }}>
+              {`Message ${displayName}`}
+            </label>
             <textarea
+              id="message-compose"
               ref={textareaRef}
               value={body}
               onChange={e => setBody(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={`Message ${displayName}…`}
+              aria-label={`Message ${displayName}`}
+              aria-describedby="message-compose-hint"
               maxLength={MAX_CHARS}
               rows={1}
               style={{
@@ -242,11 +251,12 @@ export function ThreadClient({ currentUserId, recipientId, displayName, avatarUr
               }}
             />
             {body.length > MAX_CHARS * 0.8 && (
-              <span style={{
+              <span aria-live="polite" style={{
                 position: 'absolute', bottom: '0.45rem', right: '0.6rem',
                 fontSize: '0.65rem', opacity: 0.4,
                 color: isOver ? '#f87171' : '#F3EDE6',
               }}>
+                <span style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0 }}>characters remaining: </span>
                 {charsLeft}
               </span>
             )}
@@ -254,6 +264,7 @@ export function ThreadClient({ currentUserId, recipientId, displayName, avatarUr
           <button
             onClick={handleSend}
             disabled={!body.trim() || sending || isOver}
+            aria-label="Send message"
             style={{
               padding: '0.65rem 1.25rem',
               background: body.trim() && !isOver ? 'rgba(210,57,248,0.2)' : 'rgba(255,255,255,0.04)',
@@ -273,7 +284,7 @@ export function ThreadClient({ currentUserId, recipientId, displayName, avatarUr
             {sending ? '…' : 'Send'}
           </button>
         </div>
-        <p style={{ fontSize: '0.68rem', opacity: 0.25, marginTop: '0.4rem', marginBottom: 0 }}>
+        <p id="message-compose-hint" style={{ fontSize: '0.68rem', opacity: 0.25, marginTop: '0.4rem', marginBottom: 0 }}>
           Enter to send · Shift+Enter for new line
         </p>
       </div>

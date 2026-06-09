@@ -36,9 +36,9 @@ function Avatar({ avatarUrl, displayName, size = 44 }: { avatarUrl: string | nul
     }}>
       {avatarUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={supabaseResizedUrl(avatarUrl, size * 2) ?? ''} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        <img src={supabaseResizedUrl(avatarUrl, size * 2) ?? ''} alt={`${displayName}'s avatar`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       ) : (
-        <span style={{ fontFamily: 'TokyoDreams, serif', fontSize: size * 0.4, color: '#C8A848', opacity: 0.6 }}>
+        <span aria-hidden="true" style={{ fontFamily: 'TokyoDreams, serif', fontSize: size * 0.4, color: '#C8A848', opacity: 0.6 }}>
           {displayName.charAt(0).toUpperCase()}
         </span>
       )}
@@ -63,6 +63,9 @@ function NewMessageModal({ members, onClose }: { members: MemberOption[]; onClos
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="new-message-title"
       style={{
         position: 'fixed', inset: 0, zIndex: 200,
         background: 'rgba(10,4,18,0.75)',
@@ -82,18 +85,23 @@ function NewMessageModal({ members, onClose }: { members: MemberOption[]; onClos
       }}>
         {/* Modal header */}
         <div style={{ padding: '1.1rem 1.25rem 0.85rem', borderBottom: '1px solid rgba(200,168,72,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1rem', color: '#C8A848' }}>New Message</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#F3EDE6', opacity: 0.4, cursor: 'pointer', fontSize: '1.1rem', lineHeight: 1, padding: '0.1rem 0.3rem' }}>×</button>
+          <span id="new-message-title" style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1rem', color: '#C8A848' }}>New Message</span>
+          <button onClick={onClose} aria-label="Close new message dialog" style={{ background: 'none', border: 'none', color: '#F3EDE6', opacity: 0.4, cursor: 'pointer', fontSize: '1.1rem', lineHeight: 1, padding: '0.1rem 0.3rem' }}><span aria-hidden="true">×</span></button>
         </div>
 
         {/* Search */}
         <div style={{ padding: '0.75rem 1.25rem', borderBottom: '1px solid rgba(200,168,72,0.08)' }}>
+          <label htmlFor="new-message-search" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0 }}>
+            Search members
+          </label>
           <input
+            id="new-message-search"
             ref={inputRef}
             type="text"
             placeholder="Search members…"
             value={query}
             onChange={e => setQuery(e.target.value)}
+            aria-label="Search members"
             style={{
               width: '100%', padding: '0.55rem 0.75rem',
               background: 'rgba(255,255,255,0.04)',
@@ -109,14 +117,16 @@ function NewMessageModal({ members, onClose }: { members: MemberOption[]; onClos
         </div>
 
         {/* Member list */}
-        <div style={{ maxHeight: '340px', overflowY: 'auto' }}>
+        <div role="list" aria-label="Members" style={{ maxHeight: '340px', overflowY: 'auto' }}>
           {filtered.length === 0 ? (
-            <p style={{ padding: '1.5rem 1.25rem', fontSize: '0.85rem', opacity: 0.4, fontStyle: 'italic', margin: 0, textAlign: 'center' }}>No members found</p>
+            <p role="status" style={{ padding: '1.5rem 1.25rem', fontSize: '0.85rem', opacity: 0.4, fontStyle: 'italic', margin: 0, textAlign: 'center' }}>No members found</p>
           ) : (
             filtered.map(m => (
               <a
                 key={m.userId}
                 href={`/messages/${m.userId}`}
+                role="listitem"
+                aria-label={`Message ${m.displayName}`}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '0.85rem',
                   padding: '0.75rem 1.25rem',
@@ -171,6 +181,8 @@ export function MessagesInboxClient({ currentUserId, members }: { currentUserId:
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.25rem' }}>
         <button
           onClick={() => setShowNewMessage(true)}
+          aria-label="Start a new message"
+          aria-haspopup="dialog"
           style={{
             display: 'inline-flex', alignItems: 'center', gap: '0.45rem',
             padding: '0.5rem 1.1rem',
@@ -187,14 +199,14 @@ export function MessagesInboxClient({ currentUserId, members }: { currentUserId:
           onMouseEnter={e => { e.currentTarget.style.background = 'rgba(210,57,248,0.2)'; e.currentTarget.style.borderColor = 'rgba(210,57,248,0.6)' }}
           onMouseLeave={e => { e.currentTarget.style.background = 'rgba(210,57,248,0.12)'; e.currentTarget.style.borderColor = 'rgba(210,57,248,0.35)' }}
         >
-          <span style={{ fontSize: '1rem', lineHeight: 1 }}>✉</span>
+          <span aria-hidden="true" style={{ fontSize: '1rem', lineHeight: 1 }}>✉</span>
           New Message
         </button>
       </div>
 
       {/* Conversation list */}
       {loading ? (
-        <p style={{ textAlign: 'center', opacity: 0.4, fontStyle: 'italic', fontSize: '0.9rem' }}>Loading…</p>
+        <p role="status" aria-live="polite" style={{ textAlign: 'center', opacity: 0.4, fontStyle: 'italic', fontSize: '0.9rem' }}>Loading…</p>
       ) : conversations.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '3rem 0' }}>
           <p style={{ fontSize: '0.9rem', opacity: 0.4, fontStyle: 'italic', marginBottom: '1.5rem' }}>
@@ -202,6 +214,8 @@ export function MessagesInboxClient({ currentUserId, members }: { currentUserId:
           </p>
           <button
             onClick={() => setShowNewMessage(true)}
+            aria-label="Start a conversation"
+            aria-haspopup="dialog"
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
               fontSize: '0.82rem', color: '#C8A848', letterSpacing: '0.06em', opacity: 0.8,
@@ -212,10 +226,12 @@ export function MessagesInboxClient({ currentUserId, members }: { currentUserId:
           </button>
         </div>
       ) : (
-        conversations.map(conv => (
+        <ul role="list" aria-label="Conversations" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+          {conversations.map(conv => (
+          <li key={conv.otherUserId} role="listitem">
           <a
-            key={conv.otherUserId}
             href={`/messages/${conv.otherUserId}`}
+            aria-label={`Conversation with ${conv.displayName}${conv.unreadCount > 0 ? `, ${conv.unreadCount} unread message${conv.unreadCount === 1 ? '' : 's'}` : ''}`}
             style={{
               display: 'flex', alignItems: 'center', gap: '1rem',
               padding: '1rem 1.25rem',
@@ -249,7 +265,7 @@ export function MessagesInboxClient({ currentUserId, members }: { currentUserId:
               </p>
             </div>
             {conv.unreadCount > 0 && (
-              <div style={{
+              <div aria-hidden="true" style={{
                 minWidth: '20px', height: '20px', borderRadius: '9999px',
                 background: '#D239F8', color: '#fff',
                 fontSize: '0.65rem', fontWeight: 700,
@@ -260,7 +276,9 @@ export function MessagesInboxClient({ currentUserId, members }: { currentUserId:
               </div>
             )}
           </a>
-        ))
+          </li>
+          ))}
+        </ul>
       )}
 
       {/* New Message modal */}
