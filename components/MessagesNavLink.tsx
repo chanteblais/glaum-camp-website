@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
@@ -8,23 +8,45 @@ export function MessagesNavLink({ style }: { style?: React.CSSProperties }) {
   const [unread, setUnread] = useState(0)
   const pathname = usePathname()
 
-  useEffect(() => {
-    const fetch_ = () =>
-      fetch('/api/messages/unread', { cache: 'no-store' })
-        .then(r => r.json())
-        .then(d => setUnread(d.count ?? 0))
-        .catch(() => {})
+  const refresh = useCallback(() => {
+    return fetch('/api/messages/unread', { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : null))
+      .then((d: { count?: number } | null) => setUnread(d?.count ?? 0))
+      .catch(() => {})
+  }, [])
 
-    fetch_()
-    const id = setInterval(fetch_, 30_000)
-    return () => clearInterval(id)
-  }, [pathname])
+  useEffect(() => {
+    refresh()
+    const id = setInterval(refresh, 30_000)
+
+    // Re-check promptly when the tab regains focus or another part of the app
+    // signals that messages were read (e.g. opening a thread).
+    const onFocus = () => refresh()
+    const onRead = () => refresh()
+    window.addEventListener('focus', onFocus)
+    window.addEventListener('glaum:messages-read', onRead)
+
+    return () => {
+      clearInterval(id)
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('glaum:messages-read', onRead)
+    }
+    // Re-run on route change so the count updates after navigating into/out of /messages
+  }, [refresh, pathname])
 
   return (
     <Link
       href="/messages"
       aria-label={unread > 0 ? `Messages — ${unread} unread` : 'Messages'}
-      style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', ...style }}
+      style={{
+        position: 'relative',
+        display: 'inline-flex',
+        alignItems: 'center',
+        transition: 'opacity 0.2s, color 0.2s',
+        ...style,
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = '#C8A848' }}
+      onMouseLeave={(e) => { e.currentTarget.style.opacity = String(style?.opacity ?? 0.8); e.currentTarget.style.color = String(style?.color ?? '#F3EDE6') }}
     >
       Messages
       {unread > 0 && (
@@ -45,6 +67,7 @@ export function MessagesNavLink({ style }: { style?: React.CSSProperties }) {
             padding: '0 4px',
             lineHeight: 1,
             verticalAlign: 'middle',
+            boxShadow: '0 0 8px rgba(210,57,248,0.5)',
           }}
         >
           {unread > 9 ? '9+' : unread}
