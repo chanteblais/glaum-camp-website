@@ -50,6 +50,8 @@ fs.mkdirSync(logDir, { recursive: true });
 let log = `# AI Collaboration Log — ${timestamp}\n\n`;
 log += focus ? `**Focus:** ${focus}\n\n` : `**Mode:** Broad audit\n\n`;
 
+const requiredActions = [];
+
 function appendLog(section, content) {
   log += `## ${section}\n\n${content}\n\n`;
   fs.writeFileSync(logFile, log);
@@ -172,6 +174,24 @@ const TOOLS = [
     },
   },
   {
+    name: 'require_action',
+    description: 'Flag a manual action the developer must take before the new code will work correctly — e.g. running a database migration, adding an environment variable, or configuring a third-party service. Call this every time you create a migration file, reference a new env var, or add a feature that needs external setup.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        type: {
+          type: 'string',
+          enum: ['migration', 'env_var', 'service_config', 'deploy', 'other'],
+          description: 'Category of action required',
+        },
+        title: { type: 'string', description: 'Short label shown in the checklist, e.g. "Run migration 026_notification_preferences.sql"' },
+        description: { type: 'string', description: 'Full instructions the developer needs to complete this step' },
+        file: { type: 'string', description: 'Relevant file path, if any (e.g. supabase-migrations/026_notification_preferences.sql)' },
+      },
+      required: ['type', 'title', 'description'],
+    },
+  },
+  {
     name: 'done',
     description: 'Signal that all improvements have been implemented. Provide a summary of what was done.',
     input_schema: {
@@ -245,6 +265,13 @@ async function executeTool(name, input) {
       fs.writeFileSync(savePath, buffer);
       print(`  ✓ Saved image: public/${input.filename}`);
       return `Image saved to public/${input.filename}. Reference it in code as /${input.filename}`;
+    }
+
+    case 'require_action': {
+      requiredActions.push(input);
+      const icon = { migration: '🗄', env_var: '🔑', service_config: '⚙️', deploy: '🚀', other: '📋' }[input.type] || '📋';
+      print(`  ${icon} Action required: ${input.title}`);
+      return `Logged action: "${input.title}"`;
     }
 
     case 'shell': {
@@ -363,6 +390,7 @@ async function runClaudeImplementation(audit, codebaseCtx) {
 - Clerk v7: import Appearance from '@clerk/types', NOT '@clerk/nextjs/server'
 - Supabase nested selects (e.g. roles(name)) return arrays — always handle as arrays, not single objects
 - Run tsc --noEmit mentally before calling done — ensure no implicit any, no missing properties, no bad casts
+- ALWAYS call require_action whenever you: create a migration file, reference a new env var, add a Resend email trigger, or add any feature requiring external setup — do this immediately after the relevant write_file call, not at the end
 
 **Your task:**
 Work through the audit items below and implement the improvements. Start with high-priority, smaller-effort items. Read files before editing them. For each change, write the complete updated file content.
@@ -589,6 +617,25 @@ async function main() {
   print('');
   print('Summary:');
   print(summary.slice(0, 500));
+
+  if (requiredActions.length > 0) {
+    const icons = { migration: '🗄', env_var: '🔑', service_config: '⚙️', deploy: '🚀', other: '📋' };
+    print('');
+    print('╔═══════════════════════════════════════════╗');
+    print('║   ⚠  ACTION REQUIRED BEFORE DEPLOYING   ║');
+    print('╚═══════════════════════════════════════════╝');
+    requiredActions.forEach((a, i) => {
+      const icon = icons[a.type] || '📋';
+      print(`\n${i + 1}. ${icon}  ${a.title}`);
+      print(`   ${a.description}`);
+      if (a.file) print(`   File: ${a.file}`);
+    });
+    print('');
+    appendLog('⚠ Action Required', requiredActions.map((a, i) =>
+      `### ${i + 1}. ${a.title}\n**Type:** ${a.type}${a.file ? `  \n**File:** \`${a.file}\`` : ''}\n\n${a.description}`
+    ).join('\n\n'));
+  }
+
   print('');
   print(`To review: git diff main..${branchName}`);
   print(`To apply:  git checkout main && git merge ${branchName}`);
