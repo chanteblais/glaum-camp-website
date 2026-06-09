@@ -150,8 +150,9 @@ let isAdmin = false
           .in('clerk_user_id', clerkIds)
         const roleMap = Object.fromEntries(
           (signupRows ?? []).map(r => {
-            const role = r.roles as { name: string; departments: { name: string } | null } | null
-            return [r.clerk_user_id, { role_name: role?.name ?? null, dept_name: role?.departments?.name ?? null }]
+            const rolesRaw = r.roles as { name: string; departments: { name: string }[] | null } | { name: string; departments: { name: string }[] | null }[] | null
+            const role = (Array.isArray(rolesRaw) ? rolesRaw[0] : rolesRaw) as { name: string; departments: { name: string }[] | null } | null
+            return [r.clerk_user_id, { role_name: role?.name ?? null, dept_name: role?.departments?.[0]?.name ?? null }]
           })
         )
         spotlightPool = pool.map(m => ({ ...m, ...( m.clerk_user_id ? roleMap[m.clerk_user_id] ?? {} : {}) }))
@@ -160,7 +161,8 @@ let isAdmin = false
   }
 
   // ── Page content (editable by admin) ─────────────────────────
-  const { data: contentRows } = await supabaseAdmin.from('page_content').select('key, value').then(r => r).catch(() => ({ data: null }))
+  const pageContentResult = await supabaseAdmin.from('page_content').select('key, value')
+  const contentRows = pageContentResult.data
   const pageContent: Record<string, string> = Object.fromEntries((contentRows ?? []).map(r => [r.key, r.value]))
   const c = (key: string, fallback: string) => pageContent[key] ?? fallback
 
@@ -436,7 +438,7 @@ let isAdmin = false
                 ) : null,
               }
 
-              const widths = { spotlight: 'third', ...(dashLayout.widths ?? {}) }
+              const widths: Record<string, string> = { spotlight: 'third', ...(dashLayout.widths ?? {}) }
               return (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.25rem', alignItems: 'stretch' }}>
                   {visibleWidgets.map(id => {

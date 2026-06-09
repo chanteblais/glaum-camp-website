@@ -1,4 +1,4 @@
-import type { Appearance } from '@clerk/nextjs/server'
+import type { Appearance } from '@clerk/types'
 
 export const clerkAppearance: Appearance = {
   variables: {

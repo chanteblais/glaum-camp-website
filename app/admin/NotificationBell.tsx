@@ -7,7 +7,7 @@ type Notification = {
   application_id: string | null
   event_type: string
   message: string
-  details: { email?: string; reason?: string; changes?: Record<string, unknown> } | null
+  details: { email?: string; reason?: string; changes?: Record<string, unknown>; volunteer_id?: string } | null
   created_at: string
   read_at: string | null
 }

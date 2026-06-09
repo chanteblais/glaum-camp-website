@@ -359,6 +359,10 @@ async function runClaudeImplementation(audit, codebaseCtx) {
 - Always fetch applications and camp_signups separately and join in JS
 - Resend is available for email (import from 'resend')
 - Email FROM address: 'Glåüm Camp <notifications@glaum.camp>' (update if domain not yet verified)
+- Supabase queries return PromiseLike, NOT full Promise — never use .catch() on them; use try/catch or check .error
+- Clerk v7: import Appearance from '@clerk/types', NOT '@clerk/nextjs/server'
+- Supabase nested selects (e.g. roles(name)) return arrays — always handle as arrays, not single objects
+- Run tsc --noEmit mentally before calling done — ensure no implicit any, no missing properties, no bad casts
 
 **Your task:**
 Work through the audit items below and implement the improvements. Start with high-priority, smaller-effort items. Read files before editing them. For each change, write the complete updated file content.
@@ -448,7 +452,83 @@ ${auditSummary}`;
   appendLog('Changes Made', changesLog.map(c => `- ${c}`).join('\n'));
   appendLog('Summary', finalSummary);
 
-  return { summary: finalSummary, changes: changesLog };
+  return { summary: finalSummary, changes: changesLog, messages, systemPrompt };
+}
+
+// ─── Phase 3: TypeScript validation + self-healing ───────────────────────────
+
+async function runValidation(messages, systemPrompt) {
+  if (dryRun) {
+    print('\n[dry-run] Skipping TypeScript validation');
+    return true;
+  }
+
+  const MAX_REPAIR_ROUNDS = 3;
+
+  for (let round = 1; round <= MAX_REPAIR_ROUNDS; round++) {
+    print(`\n🔍 Phase 3: TypeScript check (round ${round})...`);
+    const result = spawnSync('npx', ['tsc', '--noEmit'], { cwd: ROOT, encoding: 'utf8', timeout: 60000 });
+    const tsErrors = (result.stdout + result.stderr).trim();
+
+    if (!tsErrors) {
+      print('  ✓ TypeScript clean — no errors');
+      return true;
+    }
+
+    const errorLines = tsErrors.split('\n').filter(l => l.includes('error TS')).slice(0, 30);
+    print(`  ✗ ${errorLines.length} TypeScript error(s) — asking Claude to fix...`);
+    appendLog(`TypeScript Errors (round ${round})`, '```\n' + errorLines.join('\n') + '\n```');
+
+    // Feed errors back to Claude for self-repair
+    messages.push({
+      role: 'user',
+      content: `TypeScript compilation failed with the following errors. Please fix them — read the affected files first, then write corrected versions. When all fixes are applied, call the done tool.\n\n\`\`\`\n${errorLines.join('\n')}\n\`\`\``,
+    });
+
+    const response = await anthropic.messages.create({
+      model: 'claude-opus-4-8',
+      max_tokens: 8096,
+      system: systemPrompt,
+      tools: TOOLS,
+      messages,
+    });
+
+    messages.push({ role: 'assistant', content: response.content });
+
+    const toolResults = [];
+    for (const block of response.content) {
+      if (block.type === 'text' && block.text.trim()) {
+        print(`  Claude: ${block.text.slice(0, 200)}${block.text.length > 200 ? '...' : ''}`);
+      }
+      if (block.type !== 'tool_use') continue;
+
+      print(`  → ${block.name}(${JSON.stringify(block.input).slice(0, 80)}...)`);
+      const result2 = await executeTool(block.name, block.input);
+      if (result2 === '__DONE__') break;
+
+      toolResults.push({
+        type: 'tool_result',
+        tool_use_id: block.id,
+        content: typeof result2 === 'string' ? result2 : JSON.stringify(result2),
+      });
+    }
+    if (toolResults.length > 0) {
+      messages.push({ role: 'user', content: toolResults });
+    }
+  }
+
+  // Final check after all repair rounds
+  print('\n🔍 Final TypeScript check...');
+  const finalResult = spawnSync('npx', ['tsc', '--noEmit'], { cwd: ROOT, encoding: 'utf8', timeout: 60000 });
+  const finalErrors = (finalResult.stdout + finalResult.stderr).trim();
+  if (!finalErrors) {
+    print('  ✓ TypeScript clean after repairs');
+    return true;
+  }
+
+  print(`  ⚠ TypeScript still has errors after ${MAX_REPAIR_ROUNDS} repair rounds — committing anyway, review manually`);
+  appendLog('Unresolved TypeScript Errors', '```\n' + finalErrors + '\n```');
+  return false;
 }
 
 // ─── Git commit ───────────────────────────────────────────────────────────────
@@ -498,8 +578,9 @@ async function main() {
   print('  ✓ Context built');
 
   const audit = await runGPTAudit(codebaseCtx);
-  const { summary, changes } = await runClaudeImplementation(audit, codebaseCtx);
+  const { summary, changes, messages: implMessages, systemPrompt: implSystem } = await runClaudeImplementation(audit, codebaseCtx);
 
+  await runValidation(implMessages, implSystem);
   commitChanges(changes);
 
   print('\n═══════════════════════════════════════════');

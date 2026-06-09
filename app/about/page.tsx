@@ -23,7 +23,8 @@ export default async function AboutPage() {
     hasApplied = !!data
   }
 
-  const { data: contentRows } = await supabaseAdmin.from('page_content').select('key, value').then(r => r).catch(() => ({ data: null }))
+  const pageContentResult = await supabaseAdmin.from('page_content').select('key, value')
+  const contentRows = pageContentResult.data
   const pageContent: Record<string, string> = Object.fromEntries((contentRows ?? []).map(r => [r.key, r.value]))
   const c = (key: string, fallback: string) => pageContent[key] ?? fallback
 
