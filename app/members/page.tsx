@@ -2,7 +2,7 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { Header } from '@/components/Header'
-import { supabaseResizedUrl } from '@/lib/supabase-image'
+import { MembersGrid, type MemberCard } from './MembersGrid'
 
 export default async function MembersPage() {
   const { userId } = await auth()
@@ -37,7 +37,7 @@ export default async function MembersPage() {
     (signups ?? []).map(s => [s.clerk_user_id, s])
   )
 
-  const all = (members ?? []).map(m => {
+  const all: MemberCard[] = (members ?? []).map(m => {
     const signup = m.clerk_user_id ? signupByUser[m.clerk_user_id] : null
     const role = signup?.roles as { name?: string; departments?: { name?: string; icon?: string } | null } | null
     return {
@@ -73,99 +73,7 @@ export default async function MembersPage() {
 
         <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.3), transparent)', marginBottom: '3rem' }} aria-hidden="true" />
 
-        {/* Member grid */}
-        <ul aria-label="Approved members" style={{
-          listStyle: 'none',
-          margin: 0,
-          padding: 0,
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-          gridAutoRows: '1fr',
-          gap: '1.5rem',
-        }}>
-          {all.map(member => {
-            const roleShown = member.roleName && member.roleApprovalStatus !== 'pending'
-            return (
-            <li key={member.dbId} style={{ display: 'flex', height: '100%' }}>
-            <a
-              href={`/members/${member.id}`}
-              aria-label={roleShown ? `View ${member.name}'s profile — ${member.roleName}` : `View ${member.name}'s profile`}
-              style={{ textDecoration: 'none', color: 'inherit', display: 'flex', height: '100%', width: '100%' }}
-            >
-              <div style={{
-                flex: 1,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.75rem',
-                padding: '1.25rem 1rem',
-                border: '1px solid rgba(200,168,72,0.15)',
-                borderRadius: '1rem',
-                background: 'rgba(255,255,255,0.02)',
-                cursor: 'pointer',
-                transition: 'border-color 0.2s, background 0.2s',
-              }}
-              onMouseEnter={undefined}
-              >
-                {/* Avatar */}
-                <div style={{
-                  width: '80px', height: '80px',
-                  borderRadius: '50%',
-                  border: '2px solid rgba(111,73,31,0.6)',
-                  background: 'rgba(200,168,72,0.08)',
-                  overflow: 'hidden',
-                  flexShrink: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  {member.avatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={supabaseResizedUrl(member.avatarUrl, 160) ?? ''} alt="" aria-hidden="true" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <span aria-hidden="true" style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.5rem', color: '#C8A848', opacity: 0.85 }}>
-                      ✦
-                    </span>
-                  )}
-                </div>
-
-                {/* Name */}
-                <p style={{
-                  fontSize: '0.88rem',
-                  color: '#EDE0C8',
-                  textAlign: 'center',
-                  margin: 0,
-                  lineHeight: 1.3,
-                  letterSpacing: '0.03em',
-                }}>
-                  {member.name}
-                </p>
-
-                {/* Role — always rendered so all cards have the same natural height */}
-                <p aria-hidden={!roleShown} style={{
-                  fontSize: '0.62rem',
-                  color: '#C8A848',
-                  opacity: roleShown ? 0.65 : 0,
-                  textAlign: 'center',
-                  margin: 0,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  lineHeight: 1.3,
-                  userSelect: 'none',
-                }}>
-                  {roleShown ? member.roleName : ' '}
-                </p>
-              </div>
-            </a>
-            </li>
-            )
-          })}
-        </ul>
-
-        {all.length === 0 && (
-          <p style={{ textAlign: 'center', opacity: 0.35, fontStyle: 'italic', fontSize: '0.9rem' }}>
-            No approved members yet.
-          </p>
-        )}
+        <MembersGrid members={all} />
 
       </main>
     </div>
