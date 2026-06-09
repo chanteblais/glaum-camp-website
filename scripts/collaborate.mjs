@@ -60,7 +60,29 @@ export function buildCodebaseContext() {
     'lib/send-email.ts',
   ];
 
-  let ctx = '';
+  // Build a directory tree so GPT-4o knows what already exists
+  const treeRoots = ['app', 'components', 'lib', 'public'];
+  let tree = '### File tree (key directories)\n```\n';
+  for (const dir of treeRoots) {
+    const full = path.join(ROOT, dir);
+    if (!fs.existsSync(full)) continue;
+    const walk = (d, prefix = '') => {
+      const entries = fs.readdirSync(d, { withFileTypes: true })
+        .sort((a, b) => {
+          if (a.isDirectory() !== b.isDirectory()) return a.isDirectory() ? -1 : 1;
+          return a.name.localeCompare(b.name);
+        });
+      for (const e of entries) {
+        tree += `${prefix}${e.isDirectory() ? e.name + '/' : e.name}\n`;
+        if (e.isDirectory() && prefix.length < 8) walk(path.join(d, e.name), prefix + '  ');
+      }
+    };
+    tree += `${dir}/\n`;
+    walk(full, '  ');
+  }
+  tree += '```';
+
+  let ctx = tree;
   for (const rel of keyFiles) {
     const full = path.join(ROOT, rel);
     if (fs.existsSync(full)) {
@@ -390,7 +412,7 @@ async function runCompletionAudit(taskDescription, messages, systemPrompt, state
     const noWrites = state.filesWritten.length === 0;
 
     const auditPrompt = noWrites
-      ? `The task was: "${taskDescription}"\n\nYou called done but wrote NO files. Either the task required no file changes (explain why) or the implementation was not completed. If changes are still needed, make them now using write_file. If truly nothing needed changing, call done again with an explanation.`
+      ? `The task was: "${taskDescription}"\n\nYou called done without writing any files. Please verify by reading the relevant files now — is this feature already fully implemented and working? If yes, call done with a summary explaining that it was already complete. If something is missing, make the changes now. Do NOT add extra changes just because you wrote nothing — only act if something is genuinely missing.`
       : `The task was: "${taskDescription}"\n\nYou wrote ${state.filesWritten.length} file(s). Here is their current content:\n\n${fileSnapshots}\n\nVerify the task is fully complete:\n- Are all required changes present in the files above?\n- Are there any files you intended to edit but didn't?\n- Is anything half-finished?\n\nIf the task is complete, call done. If not, make the remaining changes now.`;
 
     messages.push({ role: 'user', content: auditPrompt });

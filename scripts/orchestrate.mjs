@@ -68,18 +68,21 @@ ${focusClause}
 - Dark mystical aesthetic: ink background, gold headings, purple accents, TokyoDreams display font
 - Community platform: members apply, get approved, pick roles/shifts, message each other, see schedule
 
-**Known gaps:**
-- No notification preferences UI (opt-in/out of email types)
-- Department/event icons are mostly emoji — no cohesive icon set
-- Various pre-prod checklist items still open (docs/pre-prod.md)
+**The codebase context below includes a file tree. Study it carefully before planning. Do NOT recommend features that already exist as files in the tree.**
 
-Produce a prioritized list of specific, self-contained improvements. Each item must be something that can be implemented in isolation — one feature, one fix, one polish pass. Do not bundle multiple unrelated changes into one item.
+**STRICT RULES — tasks that violate these will be rejected:**
+1. Only recommend tasks that require WRITING CODE (creating or editing source files).
+2. Do NOT recommend: domain verification, DNS changes, env var swaps, Vercel config, Clerk dashboard changes, Resend dashboard changes, deployment steps, or any other manual configuration. Those are for the developer, not an AI coder.
+3. Do NOT recommend a feature whose component file already appears in the file tree.
+4. Each task must be completable by writing files in the repo — nothing else.
+
+Produce a prioritized list of specific, self-contained improvements.
 
 Return ONLY a JSON array:
 [
   {
     "priority": 1,
-    "category": "feature|polish|bug|mobile|accessibility|production",
+    "category": "feature|polish|bug|mobile|accessibility",
     "title": "Short imperative title (max 60 chars)",
     "task": "Precise implementation instructions for an AI developer. Name exact files, describe exact changes.",
     "effort": "small|medium|large",
@@ -108,8 +111,21 @@ Return ONLY a JSON array:
     tasks = [{ priority: 1, category: 'general', title: 'Improve overall quality', task: raw, effort: 'medium', dependsOn: [] }];
   }
 
-  print(`  ✓ Planned ${tasks.length} tasks`);
-  return tasks;
+  // Filter out non-code tasks that can't be implemented by writing files
+  const NON_CODE_PATTERNS = [
+    /domain/i, /dns/i, /vercel/i, /clerk dashboard/i, /resend dashboard/i,
+    /env.local/i, /environment variable/i, /\.env\b/i, /api key/i, /publishable.key/i,
+    /secret.key/i, /swap.*key/i, /configure.*service/i, /deploy/i,
+  ];
+  const filtered = tasks.filter(t => {
+    const text = `${t.title} ${t.task}`;
+    const isNonCode = NON_CODE_PATTERNS.some(p => p.test(text));
+    if (isNonCode) print(`  ⊘ Skipped (non-code task): ${t.title}`);
+    return !isNonCode;
+  });
+
+  print(`  ✓ Planned ${filtered.length} actionable tasks (${tasks.length - filtered.length} non-code skipped)`);
+  return filtered;
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -149,6 +165,18 @@ async function main() {
 
   // Kill any stale dev servers before starting
   killDevPorts();
+
+  // Pre-flight TypeScript check — abort if baseline is already broken
+  print('\n🔍 Pre-flight TypeScript check...');
+  const preflight = spawnSync('npx', ['tsc', '--noEmit'], { cwd: ROOT, encoding: 'utf8', timeout: 60000 });
+  const preflightErrors = (preflight.stdout + preflight.stderr).trim();
+  if (preflightErrors) {
+    const errLines = preflightErrors.split('\n').filter(l => l.includes('error TS')).slice(0, 10);
+    print('  ✗ Baseline TypeScript errors found — fix these before running orchestrate:');
+    errLines.forEach(l => print(`    ${l}`));
+    process.exit(1);
+  }
+  print('  ✓ Baseline TypeScript clean');
 
   // Build context once — shared across all tasks
   print('\n📁 Building codebase context...');
