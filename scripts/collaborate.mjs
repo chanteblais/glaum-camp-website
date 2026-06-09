@@ -299,10 +299,23 @@ ${taskDescription}
 
   const executeTool = makeExecuteTool(state);
   let iterations = 0;
-  const MAX_ITER = 40;
+  let iterationsSinceWrite = 0;
+  const MAX_ITER = 60;
+  const STUCK_THRESHOLD = 5;
 
   while (!state.done && iterations < MAX_ITER) {
     iterations++;
+
+    // Stuck detection — if Claude hasn't written anything in a while, intervene
+    if (iterationsSinceWrite >= STUCK_THRESHOLD) {
+      print(`  ⚠ No writes in ${iterationsSinceWrite} iterations — nudging Claude to act`);
+      messages.push({
+        role: 'user',
+        content: `You have been reading and planning for ${iterationsSinceWrite} iterations without writing any files. Stop planning and start writing. Use write_file now to make the actual changes, or call done if you genuinely cannot proceed.`,
+      });
+      iterationsSinceWrite = 0;
+      continue;
+    }
 
     const response = await anthropic.messages.create({
       model: 'claude-opus-4-8',
@@ -322,6 +335,7 @@ ${taskDescription}
 
     if (response.stop_reason === 'tool_use') {
       const toolResults = [];
+      let wroteThisRound = false;
 
       for (const block of response.content) {
         if (block.type !== 'tool_use') continue;
@@ -329,6 +343,7 @@ ${taskDescription}
         const result = await executeTool(block.name, block.input);
 
         if (result === '__DONE__') { state.done = true; break; }
+        if (block.name === 'write_file') wroteThisRound = true;
 
         toolResults.push({
           type: 'tool_result',
@@ -337,10 +352,13 @@ ${taskDescription}
         });
       }
 
+      iterationsSinceWrite = wroteThisRound ? 0 : iterationsSinceWrite + 1;
+
       if (!state.done && toolResults.length > 0) {
         messages.push({ role: 'user', content: toolResults });
       }
     } else {
+      // end_turn without calling done — treat as done but flag for audit
       state.done = true;
       if (!state.summary) {
         state.summary = response.content.find(b => b.type === 'text')?.text || 'Done.';
@@ -349,6 +367,93 @@ ${taskDescription}
   }
 
   return { messages, systemPrompt };
+}
+
+// ─── Completion audit ─────────────────────────────────────────────────────────
+
+async function runCompletionAudit(taskDescription, messages, systemPrompt, state) {
+  if (state.dryRun) { print('  [dry-run] Skipping completion audit'); return; }
+
+  const MAX_AUDIT_ROUNDS = 3;
+
+  for (let round = 1; round <= MAX_AUDIT_ROUNDS; round++) {
+    print(`\n  🔎 Completion audit (round ${round})...`);
+
+    // Build a snapshot of the files that were written
+    const fileSnapshots = state.filesWritten.map(rel => {
+      const full = path.join(ROOT, rel);
+      if (!fs.existsSync(full)) return `${rel}: (file not found)`;
+      const content = fs.readFileSync(full, 'utf8');
+      return `### ${rel}\n\`\`\`\n${content.slice(0, 6000)}${content.length > 6000 ? '\n[truncated]' : ''}\n\`\`\``;
+    }).join('\n\n');
+
+    const noWrites = state.filesWritten.length === 0;
+
+    const auditPrompt = noWrites
+      ? `The task was: "${taskDescription}"\n\nYou called done but wrote NO files. Either the task required no file changes (explain why) or the implementation was not completed. If changes are still needed, make them now using write_file. If truly nothing needed changing, call done again with an explanation.`
+      : `The task was: "${taskDescription}"\n\nYou wrote ${state.filesWritten.length} file(s). Here is their current content:\n\n${fileSnapshots}\n\nVerify the task is fully complete:\n- Are all required changes present in the files above?\n- Are there any files you intended to edit but didn't?\n- Is anything half-finished?\n\nIf the task is complete, call done. If not, make the remaining changes now.`;
+
+    messages.push({ role: 'user', content: auditPrompt });
+
+    const executeTool = makeExecuteTool(state);
+    let auditDone = false;
+    let auditIter = 0;
+
+    while (!auditDone && auditIter < 15) {
+      auditIter++;
+
+      const response = await anthropic.messages.create({
+        model: 'claude-opus-4-8',
+        max_tokens: 8096,
+        system: systemPrompt,
+        tools: TOOLS,
+        messages,
+      });
+
+      messages.push({ role: 'assistant', content: response.content });
+
+      for (const block of response.content) {
+        if (block.type === 'text' && block.text.trim()) {
+          print(`  Claude: ${block.text.slice(0, 200)}${block.text.length > 200 ? '…' : ''}`);
+        }
+      }
+
+      if (response.stop_reason === 'tool_use') {
+        const toolResults = [];
+
+        for (const block of response.content) {
+          if (block.type !== 'tool_use') continue;
+          print(`  → ${block.name}(${JSON.stringify(block.input).slice(0, 80)}…)`);
+          const result = await executeTool(block.name, block.input);
+
+          if (result === '__DONE__') { auditDone = true; break; }
+
+          toolResults.push({
+            type: 'tool_result',
+            tool_use_id: block.id,
+            content: typeof result === 'string' ? result : JSON.stringify(result),
+          });
+        }
+
+        if (!auditDone && toolResults.length > 0) {
+          messages.push({ role: 'user', content: toolResults });
+        }
+      } else {
+        auditDone = true;
+        if (!state.summary) {
+          state.summary = response.content.find(b => b.type === 'text')?.text || 'Done.';
+        }
+      }
+    }
+
+    // If Claude wrote new files in this audit round, loop for another check
+    // Otherwise we're satisfied
+    const wroteInAudit = state.filesWritten.length > (noWrites ? 0 : state.filesWritten.length);
+    if (!wroteInAudit) {
+      print(`  ✓ Completion audit passed`);
+      return;
+    }
+  }
 }
 
 // ─── TypeScript validation + self-healing ─────────────────────────────────────
@@ -451,6 +556,9 @@ export async function runTask(taskDescription, {
 
   // Run the agent
   const { messages, systemPrompt } = await runAgentLoop(taskDescription, ctx, state);
+
+  // Verify the task is actually complete — catches "planned but didn't execute"
+  await runCompletionAudit(taskDescription, messages, systemPrompt, state);
 
   // Auto-detect migrations that weren't flagged via require_action
   const autoMigrations = detectNewMigrations(state.filesWritten)
