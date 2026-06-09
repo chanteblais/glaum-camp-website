@@ -59,32 +59,43 @@ async function planTasks(codebaseCtx) {
     ? `Focus on: **${focus}**. Lead with items in this area, still flag anything critical elsewhere.`
     : 'Cover all areas: UX/polish, missing features, mobile, accessibility, production readiness.';
 
-  const systemPrompt = `You are an expert UX designer and full-stack developer auditing a community camp management web app called Glåüm Camp.
+  const systemPrompt = `You are an expert full-stack developer auditing a community camp management web app called Glåüm Camp.
 
 ${focusClause}
 
 **About the project:**
 - Next.js 14 App Router · TypeScript · Tailwind CSS · Clerk v7 auth · Supabase · Resend email
-- Dark mystical aesthetic: ink background, gold headings, purple accents, TokyoDreams display font
-- Community platform: members apply, get approved, pick roles/shifts, message each other, see schedule
+- **Fixed dark mystical aesthetic** — ink (#1A0A24) background, gold (#C8A848) headings, purple (#D239F8) accents, TokyoDreams display font. ALL styles are inline (not Tailwind classes). Do NOT suggest a dark mode toggle, theme switcher, or light mode — the dark theme is intentional and permanent.
+- Community platform: members apply → get approved → pick roles/shifts → message each other → see schedule
+- The codebase context includes a full file tree — study it before planning
 
-**The codebase context below includes a file tree. Study it carefully before planning. Do NOT recommend features that already exist as files in the tree.**
+**What's already done (do NOT re-suggest):**
+- ARIA roles, aria-labels, aria-expanded on nav and interactive elements
+- Notification preferences UI (app/profile/NotificationPreferences.tsx)
+- Email notifications for messages (lib/send-email.ts, app/api/messages/route.ts)
+- Error boundaries (app/error.tsx, app/not-found.tsx, app/global-error.tsx)
+- Hamburger mobile menu in HeaderClient.tsx
+
+**What to focus on — real gaps in this app:**
+- UX improvements on existing pages (empty states, loading states, better error messaging)
+- Missing features: e.g. message read receipts, unread count on messages page, search/filter in member directory, announcement badge, poll UX improvements
+- Polish: better empty states, skeleton loaders, transitions, form validation feedback
+- Mobile layout issues on specific pages
+- Admin dashboard improvements
 
 **STRICT RULES — tasks that violate these will be rejected:**
 1. Only recommend tasks that require WRITING CODE (creating or editing source files).
-2. Do NOT recommend: domain verification, DNS changes, env var swaps, Vercel config, Clerk dashboard changes, Resend dashboard changes, deployment steps, or any other manual configuration. Those are for the developer, not an AI coder.
+2. Do NOT recommend: dark mode, theme toggles, domain config, env var changes, Clerk/Resend/Vercel dashboard changes, or any manual steps.
 3. Do NOT recommend a feature whose component file already appears in the file tree.
-4. Each task must be completable by writing files in the repo — nothing else.
-
-Produce a prioritized list of specific, self-contained improvements.
+4. Be specific — name the exact files to change and describe the exact code changes needed.
 
 Return ONLY a JSON array:
 [
   {
     "priority": 1,
-    "category": "feature|polish|bug|mobile|accessibility",
+    "category": "feature|polish|bug|mobile",
     "title": "Short imperative title (max 60 chars)",
-    "task": "Precise implementation instructions for an AI developer. Name exact files, describe exact changes.",
+    "task": "Precise implementation instructions. Name exact files and describe exact changes.",
     "effort": "small|medium|large",
     "dependsOn": []
   }

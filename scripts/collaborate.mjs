@@ -47,14 +47,14 @@ function killDevPorts() {
 
 export function buildCodebaseContext() {
   const keyFiles = [
-    'docs/design-system.md',
     'docs/features.md',
-    'docs/pre-prod.md',
+    'docs/design-system.md',
     'docs/database.md',
     'tailwind.config.ts',
     'app/page.tsx',
     'app/profile/page.tsx',
     'app/messages/page.tsx',
+    'app/members/page.tsx',
     'components/HeaderClient.tsx',
     'lib/supabase.ts',
     'lib/send-email.ts',
