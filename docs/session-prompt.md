@@ -62,7 +62,7 @@ Design docs live in `docs/` — read them when you need detail:
 
 **Storage buckets:** `avatars` (profile photos), `schedule-icons` (custom event icons) — both must be public.
 
-**Migrations:** 001–024 applied.
+**Migrations:** 001–024, 027 applied. (025, 026 pending — notification_preferences table and messages.notified_at)
 
 ---
 
