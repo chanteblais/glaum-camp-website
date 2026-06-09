@@ -14,6 +14,7 @@ export function AvatarUpload({
   const inputRef = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState<string | null>(initialUrl)
   const [uploading, setUploading] = useState(false)
+  const [progress, setProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
   const initials = displayName
@@ -23,6 +24,37 @@ export function AvatarUpload({
     .join('')
     .toUpperCase()
 
+  // Upload via XHR so we can report real upload progress to the user.
+  const uploadAvatar = (file: File): Promise<{ ok: boolean; data: { avatarUrl?: string; error?: string } }> => {
+    return new Promise((resolve) => {
+      const formData = new FormData()
+      formData.append('avatar', file)
+
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', '/api/profile/avatar')
+
+      xhr.upload.onprogress = (ev) => {
+        if (ev.lengthComputable) {
+          setProgress(Math.round((ev.loaded / ev.total) * 100))
+        }
+      }
+
+      xhr.onload = () => {
+        let data: { avatarUrl?: string; error?: string } = {}
+        try {
+          data = JSON.parse(xhr.responseText)
+        } catch {
+          data = { error: 'Upload failed' }
+        }
+        resolve({ ok: xhr.status >= 200 && xhr.status < 300, data })
+      }
+
+      xhr.onerror = () => resolve({ ok: false, data: { error: 'Upload failed' } })
+
+      xhr.send(formData)
+    })
+  }
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -31,27 +63,26 @@ export function AvatarUpload({
     const objectUrl = URL.createObjectURL(file)
     setPreview(objectUrl)
     setError(null)
+    setProgress(0)
     setUploading(true)
 
     try {
-      const formData = new FormData()
-      formData.append('avatar', file)
+      const { ok, data } = await uploadAvatar(file)
 
-      const res = await fetch('/api/profile/avatar', { method: 'POST', body: formData })
-      const data = await res.json()
-
-      if (!res.ok) {
+      if (!ok) {
         setPreview(initialUrl) // revert on error
         setError(data.error ?? 'Upload failed')
         return
       }
 
-      setPreview(data.avatarUrl)
+      setProgress(100)
+      setPreview(data.avatarUrl ?? null)
       router.refresh()
       // Signal the header to re-fetch nav-auth so the avatar circle updates immediately
       window.dispatchEvent(new CustomEvent('glaum:avatar-updated', { detail: { avatarUrl: data.avatarUrl } }))
     } finally {
       setUploading(false)
+      setProgress(0)
       // Reset input so the same file can be re-selected
       if (inputRef.current) inputRef.current.value = ''
     }
@@ -65,6 +96,7 @@ export function AvatarUpload({
         onClick={() => inputRef.current?.click()}
         disabled={uploading}
         aria-label="Change profile picture"
+        aria-busy={uploading}
         style={{
           position: 'relative',
           width: '260px',
@@ -111,7 +143,7 @@ export function AvatarUpload({
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '0.25rem',
+            gap: '0.4rem',
             background: 'rgba(10,4,20,0.6)',
             opacity: uploading ? 1 : 0,
             transition: 'opacity 0.2s',
@@ -126,7 +158,29 @@ export function AvatarUpload({
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7, animation: 'spin 1s linear infinite' }}>
                 <path d="M21 12a9 9 0 1 1-6.219-8.56" />
               </svg>
-              <span>Uploading</span>
+              <span>Uploading {progress}%</span>
+              {/* Progress bar */}
+              <span
+                style={{
+                  width: '120px',
+                  height: '5px',
+                  borderRadius: '9999px',
+                  background: 'rgba(243,237,230,0.18)',
+                  overflow: 'hidden',
+                  marginTop: '0.1rem',
+                }}
+              >
+                <span
+                  style={{
+                    display: 'block',
+                    height: '100%',
+                    width: `${progress}%`,
+                    background: 'linear-gradient(90deg, #C8A848, #D239F8)',
+                    borderRadius: '9999px',
+                    transition: 'width 0.2s ease',
+                  }}
+                />
+              </span>
             </>
           ) : (
             <>
