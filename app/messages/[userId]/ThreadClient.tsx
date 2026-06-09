@@ -7,6 +7,7 @@ type Message = {
   sender_clerk_id: string
   recipient_clerk_id: string
   body: string
+  read: boolean
   read_at: string | null
   created_at: string
 }
@@ -39,6 +40,14 @@ export function ThreadClient({ currentUserId, recipientId, displayName, avatarUr
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const initials = displayName.charAt(0).toUpperCase()
+
+  // Index of the last message I sent — used to anchor the read receipt.
+  const lastSentIndex = (() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].sender_clerk_id === currentUserId) return i
+    }
+    return -1
+  })()
 
   const fetchMessages = useCallback(async () => {
     try {
@@ -156,6 +165,8 @@ export function ThreadClient({ currentUserId, recipientId, displayName, avatarUr
           const isMe = msg.sender_clerk_id === currentUserId
           const prev = i > 0 ? messages[i - 1] : null
           const showTime = !prev || new Date(msg.created_at).getTime() - new Date(prev.created_at).getTime() > 5 * 60 * 1000
+          // Show a read receipt under the most recent message I sent.
+          const showReceipt = isMe && i === lastSentIndex
 
           return (
             <div key={msg.id}>
@@ -190,6 +201,23 @@ export function ThreadClient({ currentUserId, recipientId, displayName, avatarUr
                   {msg.body}
                 </div>
               </div>
+              {showReceipt && (
+                <p
+                  aria-live="polite"
+                  style={{
+                    textAlign: 'right',
+                    margin: '0.1rem 0.15rem 0.35rem',
+                    fontSize: '0.66rem',
+                    letterSpacing: '0.05em',
+                    color: msg.read ? '#D239F8' : '#F3EDE6',
+                    opacity: msg.read ? 0.7 : 0.35,
+                  }}
+                >
+                  {msg.read
+                    ? `Read${msg.read_at ? ` · ${formatTime(msg.read_at)}` : ''}`
+                    : 'Delivered'}
+                </p>
+              )}
             </div>
           )
         })}
