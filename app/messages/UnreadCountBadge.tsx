@@ -1,22 +1,38 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { usePathname } from 'next/navigation'
 
 export function UnreadCountBadge() {
   const [unread, setUnread] = useState(0)
+  const pathname = usePathname()
+
+  const refresh = useCallback(() => {
+    return fetch('/api/messages/unread', { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : null))
+      .then((d: { count?: number } | null) => setUnread(d?.count ?? 0))
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
-    let cancelled = false
-    fetch('/api/messages/unread', { cache: 'no-store' })
-      .then(r => r.json())
-      .then((d: { count?: number }) => {
-        if (!cancelled) setUnread(d.count ?? 0)
-      })
-      .catch(() => {})
+    refresh()
+    // Poll every 30s for near-real-time updates.
+    const id = setInterval(refresh, 30_000)
+
+    // Re-check promptly when the tab regains focus or another part of the app
+    // signals that messages were read (e.g. opening a thread).
+    const onFocus = () => refresh()
+    const onRead = () => refresh()
+    window.addEventListener('focus', onFocus)
+    window.addEventListener('glaum:messages-read', onRead)
+
     return () => {
-      cancelled = true
+      clearInterval(id)
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('glaum:messages-read', onRead)
     }
-  }, [])
+    // Re-run on route change so the count updates after navigating.
+  }, [refresh, pathname])
 
   if (unread <= 0) return null
 

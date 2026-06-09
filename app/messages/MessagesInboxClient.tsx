@@ -26,6 +26,42 @@ function timeAgo(iso: string) {
   return new Date(iso).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })
 }
 
+// Read/unread status label for a conversation row.
+// - Incoming unread messages → "Unread"
+// - Incoming, all read → "Read"
+// - Outgoing last message → "Sent"
+function ReadStatus({ conv }: { conv: Conversation }) {
+  let label: string
+  let color: string
+  let unread = false
+
+  if (conv.lastMessageFromMe) {
+    label = 'Sent'
+    color = '#F3EDE6'
+  } else if (conv.unreadCount > 0) {
+    label = 'Unread'
+    color = '#D239F8'
+    unread = true
+  } else {
+    label = 'Read'
+    color = '#C8A848'
+  }
+
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+      fontSize: '0.62rem', letterSpacing: '0.08em', textTransform: 'uppercase',
+      color, opacity: unread ? 0.95 : 0.45, fontWeight: unread ? 700 : 500,
+    }}>
+      <span aria-hidden="true" style={{
+        width: '6px', height: '6px', borderRadius: '50%',
+        background: color, opacity: unread ? 1 : 0.6, display: 'inline-block',
+      }} />
+      {label}
+    </span>
+  )
+}
+
 function Avatar({ avatarUrl, displayName, size = 44 }: { avatarUrl: string | null; displayName: string; size?: number }) {
   return (
     <div style={{
@@ -231,7 +267,7 @@ export function MessagesInboxClient({ currentUserId, members }: { currentUserId:
           <li key={conv.otherUserId} role="listitem">
           <a
             href={`/messages/${conv.otherUserId}`}
-            aria-label={`Conversation with ${conv.displayName}${conv.unreadCount > 0 ? `, ${conv.unreadCount} unread message${conv.unreadCount === 1 ? '' : 's'}` : ''}`}
+            aria-label={`Conversation with ${conv.displayName}${conv.unreadCount > 0 ? `, ${conv.unreadCount} unread message${conv.unreadCount === 1 ? '' : 's'}` : conv.lastMessageFromMe ? ', last message sent by you' : ', read'}`}
             style={{
               display: 'flex', alignItems: 'center', gap: '1rem',
               padding: '1rem 1.25rem',
@@ -263,6 +299,10 @@ export function MessagesInboxClient({ currentUserId, members }: { currentUserId:
               }}>
                 {conv.lastMessageFromMe ? 'You: ' : ''}{conv.lastMessage}
               </p>
+              {/* Read / unread status */}
+              <div style={{ marginTop: '0.3rem' }}>
+                <ReadStatus conv={conv} />
+              </div>
             </div>
             {conv.unreadCount > 0 && (
               <div aria-hidden="true" style={{
