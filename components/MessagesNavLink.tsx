@@ -23,26 +23,30 @@ export function MessagesNavLink({ style }: { style?: React.CSSProperties }) {
   return (
     <Link
       href="/messages"
+      aria-label={unread > 0 ? `Messages — ${unread} unread` : 'Messages'}
       style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', ...style }}
     >
       Messages
       {unread > 0 && (
-        <span style={{
-          marginLeft: '5px',
-          minWidth: '16px',
-          height: '16px',
-          borderRadius: '9999px',
-          background: '#D239F8',
-          color: '#fff',
-          fontSize: '0.6rem',
-          fontWeight: 700,
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '0 4px',
-          lineHeight: 1,
-          verticalAlign: 'middle',
-        }}>
+        <span
+          aria-hidden="true"
+          style={{
+            marginLeft: '5px',
+            minWidth: '16px',
+            height: '16px',
+            borderRadius: '9999px',
+            background: '#D239F8',
+            color: '#fff',
+            fontSize: '0.6rem',
+            fontWeight: 700,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '0 4px',
+            lineHeight: 1,
+            verticalAlign: 'middle',
+          }}
+        >
           {unread > 9 ? '9+' : unread}
         </span>
       )}

@@ -54,16 +54,16 @@ export default async function MembersPage() {
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
       <Header />
-      <img src="/hands-left.svg"  alt="" aria-hidden style={{ position: 'fixed', left: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
-      <img src="/hands-right.svg" alt="" aria-hidden style={{ position: 'fixed', right: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
+      <img src="/hands-left.svg"  alt="" aria-hidden role="presentation" style={{ position: 'fixed', left: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
+      <img src="/hands-right.svg" alt="" aria-hidden role="presentation" style={{ position: 'fixed', right: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
 
-      <div style={{ maxWidth: '960px', margin: '0 auto', padding: '6rem 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
+      <main aria-labelledby="members-heading" style={{ maxWidth: '960px', margin: '0 auto', padding: '6rem 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
 
         <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
           <p style={{ fontSize: '0.65rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: '#D239F8', opacity: 0.7, marginBottom: '0.5rem' }}>
-            ✦ &nbsp;Glåüm Camp 2026&nbsp; ✦
+            <span aria-hidden="true">✦ &nbsp;</span>Glåüm Camp 2026<span aria-hidden="true">&nbsp; ✦</span>
           </p>
-          <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 6vw, 3rem)', color: '#C8A848', marginBottom: '0.25rem', textShadow: '0 0 40px rgba(210,57,248,0.4)' }}>
+          <h1 id="members-heading" style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 6vw, 3rem)', color: '#C8A848', marginBottom: '0.25rem', textShadow: '0 0 40px rgba(210,57,248,0.4)' }}>
             Many Hands
           </h1>
           <p style={{ fontSize: '0.85rem', opacity: 0.4 }}>
@@ -71,20 +71,26 @@ export default async function MembersPage() {
           </p>
         </div>
 
-        <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.3), transparent)', marginBottom: '3rem' }} />
+        <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.3), transparent)', marginBottom: '3rem' }} aria-hidden="true" />
 
         {/* Member grid */}
-        <div style={{
+        <ul aria-label="Approved members" style={{
+          listStyle: 'none',
+          margin: 0,
+          padding: 0,
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
           gridAutoRows: '1fr',
           gap: '1.5rem',
         }}>
-          {all.map(member => (
+          {all.map(member => {
+            const roleShown = member.roleName && member.roleApprovalStatus !== 'pending'
+            return (
+            <li key={member.dbId} style={{ display: 'flex', height: '100%' }}>
             <a
-              key={member.dbId}
               href={`/members/${member.id}`}
-              style={{ textDecoration: 'none', color: 'inherit', display: 'flex', height: '100%' }}
+              aria-label={roleShown ? `View ${member.name}'s profile — ${member.roleName}` : `View ${member.name}'s profile`}
+              style={{ textDecoration: 'none', color: 'inherit', display: 'flex', height: '100%', width: '100%' }}
             >
               <div style={{
                 flex: 1,
@@ -114,9 +120,9 @@ export default async function MembersPage() {
                 }}>
                   {member.avatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={supabaseResizedUrl(member.avatarUrl, 160) ?? ''} alt={member.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={supabaseResizedUrl(member.avatarUrl, 160) ?? ''} alt="" aria-hidden="true" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
-                    <span style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.5rem', color: '#C8A848', opacity: 0.85 }}>
+                    <span aria-hidden="true" style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.5rem', color: '#C8A848', opacity: 0.85 }}>
                       ✦
                     </span>
                   )}
@@ -135,10 +141,10 @@ export default async function MembersPage() {
                 </p>
 
                 {/* Role — always rendered so all cards have the same natural height */}
-                <p style={{
+                <p aria-hidden={!roleShown} style={{
                   fontSize: '0.62rem',
                   color: '#C8A848',
-                  opacity: (member.roleName && member.roleApprovalStatus !== 'pending') ? 0.65 : 0,
+                  opacity: roleShown ? 0.65 : 0,
                   textAlign: 'center',
                   margin: 0,
                   letterSpacing: '0.08em',
@@ -146,12 +152,14 @@ export default async function MembersPage() {
                   lineHeight: 1.3,
                   userSelect: 'none',
                 }}>
-                  {(member.roleName && member.roleApprovalStatus !== 'pending') ? member.roleName : ' '}
+                  {roleShown ? member.roleName : ' '}
                 </p>
               </div>
             </a>
-          ))}
-        </div>
+            </li>
+            )
+          })}
+        </ul>
 
         {all.length === 0 && (
           <p style={{ textAlign: 'center', opacity: 0.35, fontStyle: 'italic', fontSize: '0.9rem' }}>
@@ -159,7 +167,7 @@ export default async function MembersPage() {
           </p>
         )}
 
-      </div>
+      </main>
     </div>
   )
 }

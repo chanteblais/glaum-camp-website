@@ -79,10 +79,10 @@ export default async function MemberPage({ params }: { params: { id: string } })
         }
       `}</style>
 
-      <img src="/hands-left.svg"  alt="" aria-hidden style={{ position: 'fixed', left: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
-      <img src="/hands-right.svg" alt="" aria-hidden style={{ position: 'fixed', right: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
+      <img src="/hands-left.svg"  alt="" aria-hidden role="presentation" style={{ position: 'fixed', left: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
+      <img src="/hands-right.svg" alt="" aria-hidden role="presentation" style={{ position: 'fixed', right: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
 
-      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '6rem 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
+      <main aria-labelledby="member-heading" style={{ maxWidth: '1100px', margin: '0 auto', padding: '6rem 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
 
         {/* Badge + avatar row */}
         <div style={{ marginBottom: '3rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -92,7 +92,7 @@ export default async function MemberPage({ params }: { params: { id: string } })
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={`/api/badge?role=${encodeURIComponent(badgeRoleName)}&dept=${encodeURIComponent(badgeDeptName)}`}
-                  alt={`${badgeRoleName} badge`}
+                  alt={`${displayName}'s ${badgeRoleName} role badge`}
                   width={175}
                   height={203}
                   style={{ display: 'block', transform: 'translate(-40px, -28px)', filter: 'drop-shadow(0 8px 24px rgba(0,0,0,0.6)) drop-shadow(0 2px 8px rgba(0,0,0,0.4))' }}
@@ -113,15 +113,15 @@ export default async function MemberPage({ params }: { params: { id: string } })
             }}>
               {member.avatar_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={supabaseResizedUrl(member.avatar_url, 520) ?? ''} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img src={supabaseResizedUrl(member.avatar_url, 520) ?? ''} alt={`${displayName}'s avatar`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
-                <span style={{ fontFamily: 'TokyoDreams, serif', fontSize: '3rem', color: '#C8A848', opacity: 0.5 }}>
+                <span aria-hidden="true" style={{ fontFamily: 'TokyoDreams, serif', fontSize: '3rem', color: '#C8A848', opacity: 0.5 }}>
                   {displayName.charAt(0).toUpperCase()}
                 </span>
               )}
             </div>
 
-            <div className="member-badge-spacer" />
+            <div className="member-badge-spacer" aria-hidden="true" />
           </div>
 
           {/* Name + meta */}
@@ -129,7 +129,7 @@ export default async function MemberPage({ params }: { params: { id: string } })
             <p style={{ fontSize: '0.65rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: '#D239F8', marginBottom: '0.3rem', opacity: 0.85 }}>
               Approved Camper
             </p>
-            <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 6vw, 3rem)', color: '#C8A848', marginBottom: '0.15rem', textShadow: '0 0 40px rgba(210,57,248,0.4)' }}>
+            <h1 id="member-heading" style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 6vw, 3rem)', color: '#C8A848', marginBottom: '0.15rem', textShadow: '0 0 40px rgba(210,57,248,0.4)' }}>
               {displayName}
             </h1>
             {member.pronouns && (
@@ -137,6 +137,7 @@ export default async function MemberPage({ params }: { params: { id: string } })
             )}
             <a
               href={`/messages/${member.clerk_user_id}`}
+              aria-label={`Send a message to ${displayName}`}
               style={{
                 display: 'inline-block',
                 marginTop: '0.75rem',
@@ -152,7 +153,7 @@ export default async function MemberPage({ params }: { params: { id: string } })
                 fontFamily: 'TokyoDreams, serif',
               }}
             >
-              ✉ Message
+              <span aria-hidden="true">✉ </span>Message
             </a>
           </div>
         </div>
@@ -169,7 +170,7 @@ export default async function MemberPage({ params }: { params: { id: string } })
           compact
         />
 
-      </div>
+      </main>
     </div>
   )
 }

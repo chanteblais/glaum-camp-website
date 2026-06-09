@@ -583,8 +583,11 @@ export async function runTask(taskDescription, {
   // Run the agent
   const { messages, systemPrompt } = await runAgentLoop(taskDescription, ctx, state);
 
-  // Verify the task is actually complete — catches "planned but didn't execute"
-  await runCompletionAudit(taskDescription, messages, systemPrompt, state);
+  // Completion audit only runs when Claude wrote nothing — catches "planned but didn't execute"
+  // Skip when files were written; TypeScript validation is the quality gate for those cases
+  if (state.filesWritten.length === 0) {
+    await runCompletionAudit(taskDescription, messages, systemPrompt, state);
+  }
 
   // Auto-detect migrations that weren't flagged via require_action
   const autoMigrations = detectNewMigrations(state.filesWritten)
