@@ -19,7 +19,18 @@ export function MembersGrid({ members }: { members: MemberCard[] }) {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return members
-    return members.filter(m => m.name.toLowerCase().includes(q))
+    return members.filter(m => {
+      const roleSearchable = m.roleApprovalStatus !== 'pending'
+      const haystack = [
+        m.name,
+        roleSearchable ? m.roleName : null,
+        roleSearchable ? m.deptName : null,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return haystack.includes(q)
+    })
   }, [members, query])
 
   return (
@@ -27,14 +38,14 @@ export function MembersGrid({ members }: { members: MemberCard[] }) {
       {/* Search bar */}
       <div style={{ maxWidth: '420px', margin: '0 auto 3rem' }}>
         <label htmlFor="member-search" style={{ position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}>
-          Search members by name
+          Search members by name or role
         </label>
         <input
           id="member-search"
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search members by name…"
+          placeholder="Search members by name or role…"
           autoComplete="off"
           style={{
             width: '100%',
