@@ -13,53 +13,162 @@ export type MemberCard = {
   roleApprovalStatus: string | null
 }
 
+type RoleFilter = 'all' | 'with-role' | 'without-role'
+
 export function MembersGrid({ members }: { members: MemberCard[] }) {
   const [query, setQuery] = useState('')
+  const [deptFilter, setDeptFilter] = useState<string>('all')
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>('all')
+
+  // Distinct departments among members whose role is approved (visible)
+  const departments = useMemo(() => {
+    const set = new Set<string>()
+    members.forEach(m => {
+      if (m.deptName && m.roleApprovalStatus !== 'pending') set.add(m.deptName)
+    })
+    return Array.from(set).sort((a, b) => a.localeCompare(b))
+  }, [members])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return members
     return members.filter(m => {
-      const roleSearchable = m.roleApprovalStatus !== 'pending'
-      const haystack = [
-        m.name,
-        roleSearchable ? m.roleName : null,
-        roleSearchable ? m.deptName : null,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-      return haystack.includes(q)
+      const roleVisible = m.roleApprovalStatus !== 'pending'
+
+      // Text search across name + (visible) role/department
+      if (q) {
+        const haystack = [
+          m.name,
+          roleVisible ? m.roleName : null,
+          roleVisible ? m.deptName : null,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+        if (!haystack.includes(q)) return false
+      }
+
+      // Department filter
+      if (deptFilter !== 'all') {
+        if (!roleVisible || m.deptName !== deptFilter) return false
+      }
+
+      // Role presence filter
+      if (roleFilter === 'with-role' && !(roleVisible && m.roleName)) return false
+      if (roleFilter === 'without-role' && roleVisible && m.roleName) return false
+
+      return true
     })
-  }, [members, query])
+  }, [members, query, deptFilter, roleFilter])
+
+  const hasActiveFilter = query.trim() !== '' || deptFilter !== 'all' || roleFilter !== 'all'
+
+  const selectStyle: React.CSSProperties = {
+    padding: '0.75rem 2rem 0.75rem 1rem',
+    fontSize: '0.85rem',
+    color: '#F3EDE6',
+    background: 'rgba(255,255,255,0.03)',
+    border: '1px solid rgba(200,168,72,0.25)',
+    borderRadius: '0.75rem',
+    outline: 'none',
+    letterSpacing: '0.03em',
+    appearance: 'none',
+    cursor: 'pointer',
+    backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23C8A848' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E\")",
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right 0.9rem center',
+  }
 
   return (
     <>
-      {/* Search bar */}
-      <div style={{ maxWidth: '420px', margin: '0 auto 3rem' }}>
-        <label htmlFor="member-search" style={{ position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}>
-          Search members by name or role
+      <style dangerouslySetInnerHTML={{ __html: `
+        .members-filter-bar {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          justify-content: center;
+          gap: 0.75rem;
+          max-width: 720px;
+          margin: 0 auto 3rem;
+        }
+        .members-filter-bar .member-search-wrap { flex: 1 1 240px; min-width: 200px; }
+        .members-filter-bar select option { color: #1A0A24; }
+      ` }} />
+
+      {/* Search + filter bar */}
+      <div className="members-filter-bar">
+        <div className="member-search-wrap">
+          <label htmlFor="member-search" style={{ position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}>
+            Search members by name or role
+          </label>
+          <input
+            id="member-search"
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by name or role…"
+            autoComplete="off"
+            style={{
+              width: '100%',
+              padding: '0.75rem 1rem',
+              fontSize: '0.9rem',
+              color: '#F3EDE6',
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(200,168,72,0.25)',
+              borderRadius: '0.75rem',
+              outline: 'none',
+              letterSpacing: '0.03em',
+            }}
+          />
+        </div>
+
+        <label htmlFor="member-dept-filter" style={{ position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}>
+          Filter by department
         </label>
-        <input
-          id="member-search"
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search members by name or role…"
-          autoComplete="off"
-          style={{
-            width: '100%',
-            padding: '0.75rem 1rem',
-            fontSize: '0.9rem',
-            color: '#F3EDE6',
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(200,168,72,0.25)',
-            borderRadius: '0.75rem',
-            outline: 'none',
-            textAlign: 'center',
-            letterSpacing: '0.03em',
-          }}
-        />
+        <select
+          id="member-dept-filter"
+          value={deptFilter}
+          onChange={(e) => setDeptFilter(e.target.value)}
+          style={selectStyle}
+          disabled={departments.length === 0}
+        >
+          <option value="all">All departments</option>
+          {departments.map(d => (
+            <option key={d} value={d}>{d}</option>
+          ))}
+        </select>
+
+        <label htmlFor="member-role-filter" style={{ position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}>
+          Filter by role status
+        </label>
+        <select
+          id="member-role-filter"
+          value={roleFilter}
+          onChange={(e) => setRoleFilter(e.target.value as RoleFilter)}
+          style={selectStyle}
+        >
+          <option value="all">All members</option>
+          <option value="with-role">With a role</option>
+          <option value="without-role">Without a role</option>
+        </select>
+
+        {hasActiveFilter && (
+          <button
+            type="button"
+            onClick={() => { setQuery(''); setDeptFilter('all'); setRoleFilter('all') }}
+            style={{
+              padding: '0.75rem 1rem',
+              fontSize: '0.8rem',
+              color: '#C8A848',
+              background: 'transparent',
+              border: '1px solid rgba(200,168,72,0.25)',
+              borderRadius: '0.75rem',
+              cursor: 'pointer',
+              letterSpacing: '0.05em',
+            }}
+          >
+            Clear
+          </button>
+        )}
       </div>
 
       {/* Member grid */}
@@ -157,7 +266,7 @@ export function MembersGrid({ members }: { members: MemberCard[] }) {
 
       {members.length > 0 && filtered.length === 0 && (
         <p style={{ textAlign: 'center', opacity: 0.35, fontStyle: 'italic', fontSize: '0.9rem' }}>
-          No members match “{query.trim()}”.
+          No members match your filters.
         </p>
       )}
     </>
