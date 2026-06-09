@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { Header } from '@/components/Header'
 import { MessagesInboxClient } from './MessagesInboxClient'
+import { UnreadCountBadge } from './UnreadCountBadge'
 
 export type MemberOption = {
   userId: string
@@ -50,8 +51,9 @@ export default async function MessagesPage() {
             <p style={{ fontSize: '0.65rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: '#D239F8', opacity: 0.7, marginBottom: '0.4rem' }}>
               <span aria-hidden="true">✦ &nbsp;</span>Messages<span aria-hidden="true">&nbsp; ✦</span>
             </p>
-            <h1 id="messages-heading" style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(1.8rem, 5vw, 2.5rem)', color: '#C8A848', margin: 0, textShadow: '0 2px 8px rgba(0,0,0,0.8)' }}>
+            <h1 id="messages-heading" style={{ display: 'flex', alignItems: 'center', fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(1.8rem, 5vw, 2.5rem)', color: '#C8A848', margin: 0, textShadow: '0 2px 8px rgba(0,0,0,0.8)' }}>
               Messages
+              <UnreadCountBadge />
             </h1>
           </div>
         </div>
