@@ -75,13 +75,20 @@ ${focusClause}
 - Email notifications for messages (lib/send-email.ts, app/api/messages/route.ts)
 - Error boundaries (app/error.tsx, app/not-found.tsx, app/global-error.tsx)
 - Hamburger mobile menu in HeaderClient.tsx
+- Message read receipts with dedicated POST endpoint (app/api/messages/[userId]/read/route.ts, ThreadClient.tsx)
+- Unread message count badge in nav (components/MessagesNavLink.tsx) and on messages page (app/messages/UnreadCountBadge.tsx)
+- Per-message read/unread status in inbox (app/messages/MessagesInboxClient.tsx)
+- Member directory search + filter by name, role, and department (app/members/MembersGrid.tsx)
 
-**What to focus on — real gaps in this app:**
-- UX improvements on existing pages (empty states, loading states, better error messaging)
-- Missing features: e.g. message read receipts, unread count on messages page, search/filter in member directory, announcement badge, poll UX improvements
-- Polish: better empty states, skeleton loaders, transitions, form validation feedback
-- Mobile layout issues on specific pages
-- Admin dashboard improvements
+**What to focus on — real gaps still open:**
+- Profile page: missing empty states, incomplete attunement checklist feedback, no avatar upload progress indicator
+- Admin dashboard: bulk actions, better filtering, sorting of applications
+- Schedule page: no way to RSVP or indicate attendance from the calendar
+- Announcements: no way for members to mark an announcement as read/dismissed
+- Polls: no results visualization (just raw counts), no closing animation
+- Messages: no typing indicator, no message deletion, thread empty state could be richer
+- Apply wizard: no progress save (if you close mid-wizard, you lose everything), no draft state
+- General: loading skeletons instead of blank flashes, better mobile layouts on profile and admin pages
 
 **STRICT RULES — tasks that violate these will be rejected:**
 1. Only recommend tasks that require WRITING CODE (creating or editing source files).

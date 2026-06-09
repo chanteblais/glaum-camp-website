@@ -54,8 +54,12 @@ export function buildCodebaseContext() {
     'app/page.tsx',
     'app/profile/page.tsx',
     'app/messages/page.tsx',
+    'app/messages/MessagesInboxClient.tsx',
+    'app/messages/[userId]/ThreadClient.tsx',
     'app/members/page.tsx',
+    'app/members/MembersGrid.tsx',
     'components/HeaderClient.tsx',
+    'components/MessagesNavLink.tsx',
     'lib/supabase.ts',
     'lib/send-email.ts',
   ];
