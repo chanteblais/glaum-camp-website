@@ -234,6 +234,42 @@ API: `POST /api/admin/announcements`, `PATCH/DELETE /api/admin/announcements/[id
 
 ---
 
+## AI Collaboration Script
+
+Runs an autonomous improvement pass using GPT-4o (audit) + Claude (implementation) + DALL-E 3 (images). Changes land on a new git branch.
+
+**Requirements:** Both `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` must be set in `.env.local`.
+
+```bash
+# Broad pass — GPT-4o finds its own priorities:
+npm run collaborate
+
+# Targeted pass — focus on a specific area:
+npm run collaborate -- --focus "mobile layout"
+npm run collaborate -- --focus "email notifications"
+npm run collaborate -- --focus "icon and graphic design"
+npm run collaborate -- --focus "polish and production readiness"
+
+# Preview plan without writing any files:
+npm run collaborate -- --dry-run
+npm run collaborate -- --focus "messaging" --dry-run
+```
+
+**Output:**
+- New git branch: `ai-collab-{timestamp}`
+- Work log: `scripts/logs/collab-{timestamp}.md`
+
+**After reviewing:**
+```bash
+git diff main..ai-collab-{timestamp}   # review changes
+git merge ai-collab-{timestamp}        # apply
+git branch -D ai-collab-{timestamp}    # discard
+```
+
+**Script:** `scripts/collaborate.mjs`
+
+---
+
 ## Homepage editable copy
 
 Admin → floating "✎ Edit Page" button (bottom-right, visible when signed in as admin)

@@ -145,6 +145,16 @@ export function MessagesInboxClient({ currentUserId, members }: { currentUserId:
   const [loading, setLoading] = useState(true)
   const [showNewMessage, setShowNewMessage] = useState(false)
 
+  // Deep-link: /messages?to=<userId> (e.g. from an email "Read & reply" link)
+  // jumps straight into that conversation thread.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const to = new URLSearchParams(window.location.search).get('to')
+    if (to && to !== currentUserId) {
+      window.location.replace(`/messages/${to}`)
+    }
+  }, [currentUserId])
+
   useEffect(() => {
     fetch('/api/messages')
       .then(r => r.json())
