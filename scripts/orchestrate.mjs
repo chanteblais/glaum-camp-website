@@ -215,6 +215,9 @@ async function main() {
       });
     } catch (err) {
       print(`  ✗ Task threw an error: ${err.message}`);
+      if (err.status === 400 && err.message?.includes('context')) {
+        print(`  ℹ  Context window exceeded — agent conversation grew too large`);
+      }
       result = { task: t.task, success: false, summary: err.message, filesWritten: [], requiredActions: [] };
     }
 

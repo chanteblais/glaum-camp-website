@@ -392,100 +392,74 @@ ${taskDescription}
 }
 
 // ─── Completion audit ─────────────────────────────────────────────────────────
+// Only called when filesWritten === 0 — catches "Claude planned but didn't execute"
+// Uses a FRESH context (not the full agent history) to avoid context-window errors.
 
-async function runCompletionAudit(taskDescription, messages, systemPrompt, state) {
+async function runCompletionAudit(taskDescription, codebaseCtx, systemPrompt, state) {
   if (state.dryRun) { print('  [dry-run] Skipping completion audit'); return; }
 
-  const MAX_AUDIT_ROUNDS = 3;
+  print(`\n  🔎 Completion audit (task wrote 0 files)...`);
 
-  for (let round = 1; round <= MAX_AUDIT_ROUNDS; round++) {
-    print(`\n  🔎 Completion audit (round ${round})...`);
+  const auditMessages = [
+    {
+      role: 'user',
+      content: `Codebase context:\n${codebaseCtx}\n\nThe task was: "${taskDescription}"\n\nYou need to check whether this task is already fully implemented. Read the relevant files now. If everything is already in place, call done with a brief explanation. If something is genuinely missing, implement it now with write_file. Do NOT make changes just to make changes — only act if something is clearly absent.`,
+    },
+  ];
 
-    // Build a snapshot of the files that were written
-    const fileSnapshots = state.filesWritten.map(rel => {
-      const full = path.join(ROOT, rel);
-      if (!fs.existsSync(full)) return `${rel}: (file not found)`;
-      const content = fs.readFileSync(full, 'utf8');
-      return `### ${rel}\n\`\`\`\n${content.slice(0, 6000)}${content.length > 6000 ? '\n[truncated]' : ''}\n\`\`\``;
-    }).join('\n\n');
+  const executeTool = makeExecuteTool(state);
+  let auditDone = false;
+  let auditIter = 0;
 
-    const noWrites = state.filesWritten.length === 0;
+  while (!auditDone && auditIter < 20) {
+    auditIter++;
 
-    const auditPrompt = noWrites
-      ? `The task was: "${taskDescription}"\n\nYou called done without writing any files. Please verify by reading the relevant files now — is this feature already fully implemented and working? If yes, call done with a summary explaining that it was already complete. If something is missing, make the changes now. Do NOT add extra changes just because you wrote nothing — only act if something is genuinely missing.`
-      : `The task was: "${taskDescription}"\n\nYou wrote ${state.filesWritten.length} file(s). Here is their current content:\n\n${fileSnapshots}\n\nVerify the task is fully complete:\n- Are all required changes present in the files above?\n- Are there any files you intended to edit but didn't?\n- Is anything half-finished?\n\nIf the task is complete, call done. If not, make the remaining changes now.`;
+    const response = await anthropic.messages.create({
+      model: 'claude-opus-4-8',
+      max_tokens: 8096,
+      system: systemPrompt,
+      tools: TOOLS,
+      messages: auditMessages,
+    });
 
-    messages.push({ role: 'user', content: auditPrompt });
+    auditMessages.push({ role: 'assistant', content: response.content });
 
-    const executeTool = makeExecuteTool(state);
-    let auditDone = false;
-    let auditIter = 0;
-
-    while (!auditDone && auditIter < 15) {
-      auditIter++;
-
-      const response = await anthropic.messages.create({
-        model: 'claude-opus-4-8',
-        max_tokens: 8096,
-        system: systemPrompt,
-        tools: TOOLS,
-        messages,
-      });
-
-      messages.push({ role: 'assistant', content: response.content });
-
-      for (const block of response.content) {
-        if (block.type === 'text' && block.text.trim()) {
-          print(`  Claude: ${block.text.slice(0, 200)}${block.text.length > 200 ? '…' : ''}`);
-        }
-      }
-
-      if (response.stop_reason === 'tool_use') {
-        const toolResults = [];
-
-        for (const block of response.content) {
-          if (block.type !== 'tool_use') continue;
-          print(`  → ${block.name}(${JSON.stringify(block.input).slice(0, 80)}…)`);
-          const result = await executeTool(block.name, block.input);
-
-          if (result === '__DONE__') { auditDone = true; break; }
-
-          toolResults.push({
-            type: 'tool_result',
-            tool_use_id: block.id,
-            content: typeof result === 'string' ? result : JSON.stringify(result),
-          });
-        }
-
-        if (!auditDone && toolResults.length > 0) {
-          messages.push({ role: 'user', content: toolResults });
-        }
-      } else {
-        auditDone = true;
-        if (!state.summary) {
-          state.summary = response.content.find(b => b.type === 'text')?.text || 'Done.';
-        }
+    for (const block of response.content) {
+      if (block.type === 'text' && block.text.trim()) {
+        print(`  Claude: ${block.text.slice(0, 200)}${block.text.length > 200 ? '…' : ''}`);
       }
     }
 
-    // If Claude wrote new files in this audit round, loop for another check
-    // Otherwise we're satisfied
-    const wroteInAudit = state.filesWritten.length > (noWrites ? 0 : state.filesWritten.length);
-    if (!wroteInAudit) {
-      print(`  ✓ Completion audit passed`);
-      return;
+    if (response.stop_reason === 'tool_use') {
+      const toolResults = [];
+      for (const block of response.content) {
+        if (block.type !== 'tool_use') continue;
+        print(`  → ${block.name}(${JSON.stringify(block.input).slice(0, 80)}…)`);
+        const result = await executeTool(block.name, block.input);
+        if (result === '__DONE__') { auditDone = true; break; }
+        toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: String(result) });
+      }
+      if (!auditDone && toolResults.length > 0) {
+        auditMessages.push({ role: 'user', content: toolResults });
+      }
+    } else {
+      auditDone = true;
+      if (!state.summary) {
+        state.summary = response.content.find(b => b.type === 'text')?.text || 'Done.';
+      }
     }
   }
+
+  print(`  ✓ Completion audit done (${state.filesWritten.length} file(s) written)`);
 }
 
 // ─── TypeScript validation + self-healing ─────────────────────────────────────
+// Uses a FRESH context for each repair round — never the full agent history.
 
-async function runValidation(messages, systemPrompt, state) {
+async function runValidation(systemPrompt, state) {
   if (state.dryRun) { print('  [dry-run] Skipping TypeScript check'); return true; }
 
   const MAX_ROUNDS = 3;
-
-  // Delete stale incremental cache before each tsc run to avoid phantom errors
   const tsbuildinfo = path.join(ROOT, 'tsconfig.tsbuildinfo');
 
   for (let round = 1; round <= MAX_ROUNDS + 1; round++) {
@@ -499,17 +473,30 @@ async function runValidation(messages, systemPrompt, state) {
     }
 
     if (round > MAX_ROUNDS) {
-      print(`  ⚠ TypeScript still has errors after ${MAX_ROUNDS} repair rounds — commit manually after review`);
+      print(`  ⚠ TypeScript still has errors after ${MAX_ROUNDS} repair rounds`);
       return false;
     }
 
     const errorLines = errors.split('\n').filter(l => l.includes('error TS')).slice(0, 30);
-    print(`  ✗ ${errorLines.length} error(s) — repair round ${round}...`);
+    print(`  ✗ ${errorLines.length} TypeScript error(s) — repair round ${round}...`);
 
-    messages.push({
-      role: 'user',
-      content: `TypeScript errors — please fix them. Read affected files first, then write corrected versions. Call done when fixed.\n\n\`\`\`\n${errorLines.join('\n')}\n\`\`\``,
-    });
+    // Build fresh context: just the broken files + the errors
+    const affectedFiles = [...new Set(
+      errorLines.map(l => { const m = l.match(/^([^(]+)\(/); return m ? m[1].replace(ROOT + '/', '') : null; }).filter(Boolean)
+    )];
+    const fileSnapshots = affectedFiles.map(rel => {
+      const full = path.join(ROOT, rel);
+      if (!fs.existsSync(full)) return `${rel}: (not found)`;
+      const content = fs.readFileSync(full, 'utf8');
+      return `### ${rel}\n\`\`\`tsx\n${content.slice(0, 8000)}\n\`\`\``;
+    }).join('\n\n');
+
+    const repairMessages = [
+      {
+        role: 'user',
+        content: `Fix these TypeScript errors. Here are the affected files:\n\n${fileSnapshots}\n\nErrors:\n\`\`\`\n${errorLines.join('\n')}\n\`\`\`\n\nWrite the corrected file(s) using write_file. Call done when finished.`,
+      },
+    ];
 
     const executeTool = makeExecuteTool(state);
     const response = await anthropic.messages.create({
@@ -517,10 +504,10 @@ async function runValidation(messages, systemPrompt, state) {
       max_tokens: 8096,
       system: systemPrompt,
       tools: TOOLS,
-      messages,
+      messages: repairMessages,
     });
 
-    messages.push({ role: 'assistant', content: response.content });
+    repairMessages.push({ role: 'assistant', content: response.content });
     const toolResults = [];
 
     for (const block of response.content) {
@@ -534,7 +521,22 @@ async function runValidation(messages, systemPrompt, state) {
       toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: String(result) });
     }
 
-    if (toolResults.length > 0) messages.push({ role: 'user', content: toolResults });
+    if (toolResults.length > 0) {
+      repairMessages.push({ role: 'user', content: toolResults });
+      // Give Claude a chance to respond to tool results
+      const response2 = await anthropic.messages.create({
+        model: 'claude-opus-4-8',
+        max_tokens: 4096,
+        system: systemPrompt,
+        tools: TOOLS,
+        messages: repairMessages,
+      });
+      for (const block of response2.content) {
+        if (block.type !== 'tool_use') continue;
+        print(`  → ${block.name}(${JSON.stringify(block.input).slice(0, 80)}…)`);
+        await executeTool(block.name, block.input);
+      }
+    }
   }
 
   return false;
@@ -586,7 +588,7 @@ export async function runTask(taskDescription, {
   // Completion audit only runs when Claude wrote nothing — catches "planned but didn't execute"
   // Skip when files were written; TypeScript validation is the quality gate for those cases
   if (state.filesWritten.length === 0) {
-    await runCompletionAudit(taskDescription, messages, systemPrompt, state);
+    await runCompletionAudit(taskDescription, ctx, systemPrompt, state);
   }
 
   // Auto-detect migrations that weren't flagged via require_action
@@ -597,7 +599,7 @@ export async function runTask(taskDescription, {
   // TypeScript validation
   if (state.filesWritten.length > 0) {
     print('\n  🔍 Validating TypeScript...');
-    const valid = await runValidation(messages, systemPrompt, state);
+    const valid = await runValidation(systemPrompt, state);
     state.tsClean = valid;
   } else {
     state.tsClean = true;
