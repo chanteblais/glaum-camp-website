@@ -485,8 +485,12 @@ async function runValidation(messages, systemPrompt, state) {
 
   const MAX_ROUNDS = 3;
 
+  // Delete stale incremental cache before each tsc run to avoid phantom errors
+  const tsbuildinfo = path.join(ROOT, 'tsconfig.tsbuildinfo');
+
   for (let round = 1; round <= MAX_ROUNDS + 1; round++) {
-    const r = spawnSync('npx', ['tsc', '--noEmit'], { cwd: ROOT, encoding: 'utf8', timeout: 60000 });
+    if (fs.existsSync(tsbuildinfo)) fs.unlinkSync(tsbuildinfo);
+    const r = spawnSync('npx', ['tsc', '--noEmit'], { cwd: ROOT, encoding: 'utf8', timeout: 90000 });
     const errors = (r.stdout + r.stderr).trim();
 
     if (!errors) {
@@ -608,7 +612,7 @@ export async function runTask(taskDescription, {
       execSync(`git -C "${ROOT}" commit -m "${shortTask.replace(/"/g, "'")}"`, { stdio: 'pipe' });
       if (!quiet) print(`  ✓ Committed: "${shortTask}"`);
     } catch (e) {
-      if (!quiet) print(`  ⚠ Git commit failed: ${e.message}`);
+      if (!quiet) print(`  ⚠ Git commit failed: ${e.message}\n  (changes are still on disk — commit manually with: git add -A && git commit -m "...")`);
     }
   }
 

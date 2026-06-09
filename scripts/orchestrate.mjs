@@ -168,7 +168,9 @@ async function main() {
 
   // Pre-flight TypeScript check — abort if baseline is already broken
   print('\n🔍 Pre-flight TypeScript check...');
-  const preflight = spawnSync('npx', ['tsc', '--noEmit'], { cwd: ROOT, encoding: 'utf8', timeout: 60000 });
+  const tsbuildinfo = path.join(ROOT, 'tsconfig.tsbuildinfo');
+  if (fs.existsSync(tsbuildinfo)) fs.unlinkSync(tsbuildinfo);
+  const preflight = spawnSync('npx', ['tsc', '--noEmit'], { cwd: ROOT, encoding: 'utf8', timeout: 90000 });
   const preflightErrors = (preflight.stdout + preflight.stderr).trim();
   if (preflightErrors) {
     const errLines = preflightErrors.split('\n').filter(l => l.includes('error TS')).slice(0, 10);
