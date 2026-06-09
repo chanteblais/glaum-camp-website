@@ -614,7 +614,11 @@ export async function runTask(taskDescription, {
       }
       execSync(`git -C "${ROOT}" add -A`, { stdio: 'pipe' });
       const shortTask = taskDescription.slice(0, 72);
-      execSync(`git -C "${ROOT}" commit -m "${shortTask.replace(/"/g, "'")}"`, { stdio: 'pipe' });
+      // Write message to a file to avoid shell escaping issues with backticks, quotes, etc.
+      const msgFile = path.join(ROOT, '.git', 'COLLAB_COMMIT_MSG');
+      fs.writeFileSync(msgFile, shortTask);
+      execSync(`git -C "${ROOT}" commit -F "${msgFile}"`, { stdio: 'pipe' });
+      try { fs.unlinkSync(msgFile); } catch {}
       if (!quiet) print(`  ✓ Committed: "${shortTask}"`);
     } catch (e) {
       if (!quiet) print(`  ⚠ Git commit failed: ${e.message}\n  (changes are still on disk — commit manually with: git add -A && git commit -m "...")`);
