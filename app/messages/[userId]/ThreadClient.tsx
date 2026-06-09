@@ -49,16 +49,32 @@ export function ThreadClient({ currentUserId, recipientId, displayName, avatarUr
     return -1
   })()
 
+  // Tell the server that messages from the recipient have been viewed/read.
+  const markRead = useCallback(async () => {
+    try {
+      await fetch(`/api/messages/${recipientId}/read`, { method: 'POST' })
+    } catch {
+      // Non-fatal — read receipts are best-effort.
+    }
+  }, [recipientId])
+
   const fetchMessages = useCallback(async () => {
     try {
       const res = await fetch(`/api/messages/${recipientId}`, { cache: 'no-store' })
       const data = await res.json()
-      setMessages(data.messages ?? [])
+      const fetched: Message[] = data.messages ?? []
+      setMessages(fetched)
       setLoading(false)
+
+      // If any incoming messages are unread, mark them read on the server.
+      const hasUnread = fetched.some(
+        m => m.recipient_clerk_id === currentUserId && !m.read,
+      )
+      if (hasUnread) await markRead()
     } catch {
       setLoading(false)
     }
-  }, [recipientId])
+  }, [recipientId, currentUserId, markRead])
 
   useEffect(() => {
     fetchMessages()
