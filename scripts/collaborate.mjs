@@ -1,20 +1,17 @@
 #!/usr/bin/env node
 /**
- * AI Collaboration Script — Glåüm Camp Website
+ * collaborate.mjs — Single-task AI implementation
  *
- * Usage:
- *   node scripts/collaborate.js                          # broad audit pass
- *   node scripts/collaborate.js --focus "mobile layout"  # targeted pass
- *   node scripts/collaborate.js --dry-run                # plan only, no file writes
+ * Implements ONE specific improvement to the Glåüm Camp website.
+ * Designed to be called directly or imported by orchestrate.mjs.
  *
- * What it does:
- *   1. GPT-4o does a fresh-eyes audit of the codebase and produces a prioritized
- *      list of improvements (design, UX, features, bugs).
- *   2. Claude reads the audit + codebase and implements the improvements using
- *      tool calls (read_file, write_file, generate_image, shell).
- *   3. DALL-E 3 generates any images Claude requests inline.
- *   4. All changes land on a new git branch: ai-collab-{timestamp}
- *   5. A work log is written to scripts/logs/collab-{timestamp}.md
+ * CLI usage:
+ *   node scripts/collaborate.mjs --task "add email notifications for messages"
+ *   node scripts/collaborate.mjs --task "..." --dry-run
+ *
+ * Programmatic usage (from orchestrate.mjs):
+ *   import { runTask } from './collaborate.mjs'
+ *   const result = await runTask('add email notifications', { branchName, logFile })
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -25,183 +22,148 @@ import { execSync, spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import * as dotenv from 'dotenv';
 
-// ─── Setup ───────────────────────────────────────────────────────────────────
-
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 
-// Load env vars from .env.local
 dotenv.config({ path: path.join(ROOT, '.env.local') });
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai    = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const args = process.argv.slice(2);
-const focusIdx = args.indexOf('--focus');
-const focus = focusIdx !== -1 ? args[focusIdx + 1] : null;
-const dryRun = args.includes('--dry-run');
-const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-const branchName = `ai-collab-${timestamp}`;
-const logDir = path.join(ROOT, 'scripts', 'logs');
-const logFile = path.join(logDir, `collab-${timestamp}.md`);
+// ─── Port cleanup ─────────────────────────────────────────────────────────────
 
-fs.mkdirSync(logDir, { recursive: true });
-
-let log = `# AI Collaboration Log — ${timestamp}\n\n`;
-log += focus ? `**Focus:** ${focus}\n\n` : `**Mode:** Broad audit\n\n`;
-
-const requiredActions = [];
-
-function appendLog(section, content) {
-  log += `## ${section}\n\n${content}\n\n`;
-  fs.writeFileSync(logFile, log);
-}
-
-function print(msg) {
-  process.stdout.write(msg + '\n');
-}
-
-// ─── Git branch ───────────────────────────────────────────────────────────────
-
-function setupBranch() {
-  if (dryRun) {
-    print(`[dry-run] Would create branch: ${branchName}`);
-    return;
-  }
-  try {
-    execSync(`git -C "${ROOT}" checkout -b "${branchName}"`, { stdio: 'pipe' });
-    print(`✓ Created branch: ${branchName}`);
-  } catch (e) {
-    print(`⚠ Could not create git branch (is this a git repo?): ${e.message}`);
+function killDevPorts() {
+  for (const port of [3000, 3001]) {
+    try {
+      const r = spawnSync('lsof', ['-ti', `:${port}`], { encoding: 'utf8' });
+      const pids = r.stdout.trim().split('\n').filter(Boolean);
+      for (const pid of pids) spawnSync('kill', ['-9', pid], { encoding: 'utf8' });
+      if (pids.length) print(`  ✓ Freed port ${port}`);
+    } catch {}
   }
 }
 
 // ─── Codebase context ─────────────────────────────────────────────────────────
 
-function buildCodebaseContext() {
+export function buildCodebaseContext() {
   const keyFiles = [
     'docs/design-system.md',
     'docs/features.md',
     'docs/pre-prod.md',
+    'docs/database.md',
+    'tailwind.config.ts',
     'app/page.tsx',
-    'app/HomePageEditor.tsx',
     'app/profile/page.tsx',
     'app/messages/page.tsx',
     'components/HeaderClient.tsx',
     'lib/supabase.ts',
-    'tailwind.config.ts',
+    'lib/send-email.ts',
   ];
 
   let ctx = '';
   for (const rel of keyFiles) {
     const full = path.join(ROOT, rel);
     if (fs.existsSync(full)) {
-      const content = fs.readFileSync(full, 'utf8').slice(0, 6000);
+      const content = fs.readFileSync(full, 'utf8').slice(0, 5000);
       ctx += `\n\n### ${rel}\n\`\`\`\n${content}\n\`\`\``;
     }
   }
   return ctx;
 }
 
-// ─── Tool definitions for Claude ─────────────────────────────────────────────
+// ─── Tool definitions ─────────────────────────────────────────────────────────
 
 const TOOLS = [
   {
     name: 'read_file',
-    description: 'Read the contents of a file in the project. Paths are relative to the project root.',
+    description: 'Read a file. Always read a file before editing it.',
     input_schema: {
       type: 'object',
       properties: {
-        path: { type: 'string', description: 'Relative path from project root, e.g. app/page.tsx' },
+        path: { type: 'string', description: 'Relative path from project root' },
       },
       required: ['path'],
     },
   },
   {
     name: 'write_file',
-    description: 'Write or overwrite a file in the project. Creates parent directories as needed.',
+    description: 'Write a file. For existing files: make targeted edits, preserve everything else. Do NOT rewrite a working file from scratch unless the task explicitly requires a full rewrite.',
     input_schema: {
       type: 'object',
       properties: {
-        path: { type: 'string', description: 'Relative path from project root' },
-        content: { type: 'string', description: 'Full file content to write' },
+        path:    { type: 'string', description: 'Relative path from project root' },
+        content: { type: 'string', description: 'Full file content' },
       },
       required: ['path', 'content'],
     },
   },
   {
     name: 'list_files',
-    description: 'List files in a directory (non-recursive, relative to project root).',
+    description: 'List files in a directory.',
     input_schema: {
       type: 'object',
       properties: {
-        dir: { type: 'string', description: 'Relative directory path, e.g. app/api or components' },
+        dir: { type: 'string', description: 'Relative directory path' },
       },
       required: ['dir'],
     },
   },
   {
     name: 'generate_image',
-    description: 'Generate an image using DALL-E 3 and save it to the public/ directory. Returns the saved path.',
+    description: 'Generate an image with DALL-E 3 and save it under public/.',
     input_schema: {
       type: 'object',
       properties: {
-        prompt: { type: 'string', description: 'Detailed DALL-E 3 prompt describing the image' },
-        filename: { type: 'string', description: 'Filename to save under public/, e.g. icons/schedule.png' },
-        size: {
-          type: 'string',
-          enum: ['1024x1024', '1792x1024', '1024x1792'],
-          description: 'Image dimensions. Default 1024x1024.',
-        },
-        style: {
-          type: 'string',
-          enum: ['vivid', 'natural'],
-          description: 'DALL-E style. Default natural.',
-        },
+        prompt:   { type: 'string', description: 'Detailed DALL-E 3 prompt' },
+        filename: { type: 'string', description: 'Save path under public/, e.g. icons/schedule.png' },
+        size:     { type: 'string', enum: ['1024x1024', '1792x1024', '1024x1792'] },
+        style:    { type: 'string', enum: ['vivid', 'natural'] },
       },
       required: ['prompt', 'filename'],
     },
   },
   {
     name: 'shell',
-    description: 'Run a safe read-only shell command (ls, cat, grep, find). Write operations are blocked.',
+    description: 'Run a safe read-only shell command (ls, cat, grep, find). No writes.',
     input_schema: {
       type: 'object',
       properties: {
-        command: { type: 'string', description: 'Shell command to run' },
+        command: { type: 'string' },
       },
       required: ['command'],
     },
   },
   {
     name: 'require_action',
-    description: 'Flag a manual action the developer must take before the new code will work correctly — e.g. running a database migration, adding an environment variable, or configuring a third-party service. Call this every time you create a migration file, reference a new env var, or add a feature that needs external setup.',
+    description: 'Flag a manual step the developer must take (migration, env var, service config). Call this immediately after creating a migration file or referencing a new env var.',
     input_schema: {
       type: 'object',
       properties: {
-        type: {
-          type: 'string',
-          enum: ['migration', 'env_var', 'service_config', 'deploy', 'other'],
-          description: 'Category of action required',
-        },
-        title: { type: 'string', description: 'Short label shown in the checklist, e.g. "Run migration 026_notification_preferences.sql"' },
-        description: { type: 'string', description: 'Full instructions the developer needs to complete this step' },
-        file: { type: 'string', description: 'Relevant file path, if any (e.g. supabase-migrations/026_notification_preferences.sql)' },
+        type:        { type: 'string', enum: ['migration', 'env_var', 'service_config', 'deploy', 'other'] },
+        title:       { type: 'string', description: 'Short label, e.g. "Run migration 026_..."' },
+        description: { type: 'string', description: 'Full instructions' },
+        file:        { type: 'string', description: 'Relevant file path if any' },
       },
       required: ['type', 'title', 'description'],
     },
   },
   {
     name: 'done',
-    description: 'Signal that all improvements have been implemented. Provide a summary of what was done.',
+    description: 'Signal that the task is complete.',
     input_schema: {
       type: 'object',
       properties: {
-        summary: { type: 'string', description: 'Summary of all changes made' },
-        changes: {
+        summary: { type: 'string', description: 'What was done' },
+        changes: { type: 'array', items: { type: 'string' }, description: 'List of files changed' },
+        visibleChanges: {
           type: 'array',
           items: { type: 'string' },
-          description: 'List of specific changes made',
+          description: 'Changes visible in the browser — new pages (with their URL), UI updates, layout changes',
+        },
+        backendChanges: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Backend-only changes — API routes, lib files, migrations, config',
         },
       },
       required: ['summary', 'changes'],
@@ -211,211 +173,135 @@ const TOOLS = [
 
 // ─── Tool execution ───────────────────────────────────────────────────────────
 
-async function executeTool(name, input) {
-  switch (name) {
-    case 'read_file': {
-      const full = path.join(ROOT, input.path);
-      if (!full.startsWith(ROOT)) return 'Error: path outside project root';
-      if (!fs.existsSync(full)) return `Error: file not found: ${input.path}`;
-      const content = fs.readFileSync(full, 'utf8');
-      return content.length > 12000 ? content.slice(0, 12000) + '\n[truncated]' : content;
-    }
+function print(msg) { process.stdout.write(msg + '\n'); }
 
-    case 'write_file': {
-      const full = path.join(ROOT, input.path);
-      if (!full.startsWith(ROOT)) return 'Error: path outside project root';
-      if (dryRun) {
-        print(`  [dry-run] Would write: ${input.path}`);
-        return `[dry-run] Would write ${input.path}`;
+function makeExecuteTool(state) {
+  return async function executeTool(name, input) {
+    switch (name) {
+      case 'read_file': {
+        const full = path.join(ROOT, input.path);
+        if (!full.startsWith(ROOT)) return 'Error: path outside project root';
+        if (!fs.existsSync(full)) return `Error: file not found: ${input.path}`;
+        const content = fs.readFileSync(full, 'utf8');
+        return content.length > 14000 ? content.slice(0, 14000) + '\n[truncated]' : content;
       }
-      fs.mkdirSync(path.dirname(full), { recursive: true });
-      fs.writeFileSync(full, input.content, 'utf8');
-      print(`  ✓ Wrote: ${input.path}`);
-      return `Successfully wrote ${input.path}`;
-    }
 
-    case 'list_files': {
-      const full = path.join(ROOT, input.dir);
-      if (!full.startsWith(ROOT)) return 'Error: path outside project root';
-      if (!fs.existsSync(full)) return `Error: directory not found: ${input.dir}`;
-      const entries = fs.readdirSync(full, { withFileTypes: true });
-      return entries.map(e => `${e.isDirectory() ? '[dir] ' : ''}${e.name}`).join('\n');
-    }
-
-    case 'generate_image': {
-      if (dryRun) {
-        print(`  [dry-run] Would generate image: ${input.filename}`);
-        return `[dry-run] Would generate image at public/${input.filename}`;
+      case 'write_file': {
+        const full = path.join(ROOT, input.path);
+        if (!full.startsWith(ROOT)) return 'Error: path outside project root';
+        if (state.dryRun) {
+          print(`  [dry-run] Would write: ${input.path}`);
+          return `[dry-run] Would write ${input.path}`;
+        }
+        const isNew = !fs.existsSync(full);
+        fs.mkdirSync(path.dirname(full), { recursive: true });
+        fs.writeFileSync(full, input.content, 'utf8');
+        print(`  ✓ ${isNew ? 'Created' : 'Updated'}: ${input.path}`);
+        state.filesWritten.push(input.path);
+        return `Successfully ${isNew ? 'created' : 'updated'} ${input.path}`;
       }
-      print(`  🎨 Generating image: ${input.filename}...`);
-      const response = await openai.images.generate({
-        model: 'dall-e-3',
-        prompt: input.prompt,
-        size: input.size || '1024x1024',
-        style: input.style || 'natural',
-        response_format: 'url',
-      });
 
-      const url = response.data[0].url;
-      const imgResponse = await fetch(url);
-      const buffer = Buffer.from(await imgResponse.arrayBuffer());
-
-      const savePath = path.join(ROOT, 'public', input.filename);
-      fs.mkdirSync(path.dirname(savePath), { recursive: true });
-      fs.writeFileSync(savePath, buffer);
-      print(`  ✓ Saved image: public/${input.filename}`);
-      return `Image saved to public/${input.filename}. Reference it in code as /${input.filename}`;
-    }
-
-    case 'require_action': {
-      requiredActions.push(input);
-      const icon = { migration: '🗄', env_var: '🔑', service_config: '⚙️', deploy: '🚀', other: '📋' }[input.type] || '📋';
-      print(`  ${icon} Action required: ${input.title}`);
-      return `Logged action: "${input.title}"`;
-    }
-
-    case 'shell': {
-      // Safeguard: block write operations
-      const blocked = ['rm ', 'mv ', 'cp ', 'mkdir', 'touch', 'chmod', 'chown', '>', '>>', 'npm install', 'npm run'];
-      if (blocked.some(b => input.command.includes(b))) {
-        return 'Error: write operations are not allowed via shell tool. Use write_file instead.';
+      case 'list_files': {
+        const full = path.join(ROOT, input.dir);
+        if (!full.startsWith(ROOT)) return 'Error: path outside project root';
+        if (!fs.existsSync(full)) return `Error: directory not found: ${input.dir}`;
+        return fs.readdirSync(full, { withFileTypes: true })
+          .map(e => `${e.isDirectory() ? '[dir] ' : ''}${e.name}`)
+          .join('\n');
       }
-      const result = spawnSync('bash', ['-c', input.command], { cwd: ROOT, encoding: 'utf8', timeout: 10000 });
-      return (result.stdout || '') + (result.stderr ? `\nSTDERR: ${result.stderr}` : '');
-    }
 
-    case 'done': {
-      return '__DONE__';
-    }
+      case 'generate_image': {
+        if (state.dryRun) {
+          print(`  [dry-run] Would generate: ${input.filename}`);
+          return `[dry-run] Would generate public/${input.filename}`;
+        }
+        print(`  🎨 Generating: ${input.filename}...`);
+        const resp = await openai.images.generate({
+          model: 'dall-e-3',
+          prompt: input.prompt,
+          size: input.size || '1024x1024',
+          style: input.style || 'natural',
+          response_format: 'url',
+        });
+        const imgResp = await fetch(resp.data[0].url);
+        const buf = Buffer.from(await imgResp.arrayBuffer());
+        const savePath = path.join(ROOT, 'public', input.filename);
+        fs.mkdirSync(path.dirname(savePath), { recursive: true });
+        fs.writeFileSync(savePath, buf);
+        print(`  ✓ Saved: public/${input.filename}`);
+        state.filesWritten.push(`public/${input.filename}`);
+        return `Image saved to public/${input.filename}. Use src="/${input.filename}" in code.`;
+      }
 
-    default:
-      return `Unknown tool: ${name}`;
-  }
+      case 'shell': {
+        const blocked = ['rm ', 'mv ', 'cp ', 'mkdir', 'touch', 'chmod', '>', '>>', 'npm install', 'npm run'];
+        if (blocked.some(b => input.command.includes(b))) {
+          return 'Error: write operations blocked. Use write_file instead.';
+        }
+        const r = spawnSync('bash', ['-c', input.command], { cwd: ROOT, encoding: 'utf8', timeout: 10000 });
+        return (r.stdout || '') + (r.stderr ? `\nSTDERR: ${r.stderr}` : '');
+      }
+
+      case 'require_action': {
+        state.requiredActions.push(input);
+        const icons = { migration: '🗄', env_var: '🔑', service_config: '⚙️', deploy: '🚀', other: '📋' };
+        print(`  ${icons[input.type] || '📋'} Action required: ${input.title}`);
+        return `Logged: "${input.title}"`;
+      }
+
+      case 'done': {
+        state.summary       = input.summary || '';
+        state.changes       = input.changes || [];
+        state.visibleChanges = input.visibleChanges || [];
+        state.backendChanges = input.backendChanges || [];
+        return '__DONE__';
+      }
+
+      default:
+        return `Unknown tool: ${name}`;
+    }
+  };
 }
 
-// ─── Phase 1: GPT-4o audit ────────────────────────────────────────────────────
+// ─── Claude agent loop ────────────────────────────────────────────────────────
 
-async function runGPTAudit(codebaseCtx) {
-  print('\n📋 Phase 1: GPT-4o audit...');
+async function runAgentLoop(taskDescription, codebaseCtx, state) {
+  const systemPrompt = `You are an expert Next.js 14 / TypeScript / Tailwind developer making a single targeted improvement to the Glåüm Camp website.
 
-  const focusClause = focus
-    ? `Pay special attention to: **${focus}**. Lead your list with issues in this area, though still flag anything critical you notice elsewhere.`
-    : 'Cover all areas: visual polish, UX flow, missing features, mobile responsiveness, accessibility, and production readiness.';
+**Your task (implement ONLY this, nothing else):**
+${taskDescription}
 
-  const systemPrompt = `You are an expert UX designer and web developer doing a fresh-eyes audit of a community camp management web application called Glåüm Camp. You have no prior context — judge it purely on what you see in the code and documentation.
-
-Your job is to produce a prioritized, actionable list of specific improvements. Be concrete and direct. Each item should name the exact file(s) to change and what to do.
-
-${focusClause}
-
-**About the project:**
-- Next.js 14 App Router · Tailwind CSS · TypeScript · Clerk auth · Supabase
-- Design aesthetic: dark mystical/gothic (ink background, gold headings, purple accents, Tokyo Dreams display font)
-- It's a camp community platform: members apply, get approved, select roles/shifts, message each other
-- Already has: email via Resend (installed but notification preferences not built), image gen via DALL-E available, polls, announcements, member directory, schedule, messaging
-
-**Known gaps from the pre-prod checklist and feature wishlist:**
-- Members do NOT get email notifications when they receive a message (Resend is installed but this isn't wired up)
-- No notification preferences UI for members (opt-out of emails)
-- Icon/graphic design could be more cohesive — department icons and event type icons are mostly emoji
-- Various pre-prod items in docs/pre-prod.md still open
-
-Return your audit as a JSON array of improvement objects:
-[
-  {
-    "priority": 1,
-    "category": "feature|polish|bug|mobile|accessibility",
-    "title": "Short title",
-    "description": "What to do and why",
-    "files": ["app/foo.tsx", "lib/bar.ts"],
-    "effort": "small|medium|large",
-    "imageNeeded": false
-  }
-]
-
-Return ONLY the JSON array, no prose around it.`;
-
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: `Here is the codebase context:\n${codebaseCtx}` },
-    ],
-    temperature: 0.4,
-    max_tokens: 4000,
-  });
-
-  const raw = response.choices[0].message.content.trim();
-
-  // Strip markdown code fences if present
-  const jsonStr = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
-
-  let audit;
-  try {
-    audit = JSON.parse(jsonStr);
-  } catch {
-    print('⚠ GPT-4o returned non-JSON, using raw text as audit');
-    audit = [{ priority: 1, category: 'general', title: 'GPT-4o Audit', description: raw, files: [], effort: 'medium', imageNeeded: false }];
-  }
-
-  print(`  ✓ GPT-4o identified ${audit.length} improvements`);
-  appendLog('GPT-4o Audit', '```json\n' + JSON.stringify(audit, null, 2) + '\n```');
-  return audit;
-}
-
-// ─── Phase 2: Claude implementation ──────────────────────────────────────────
-
-async function runClaudeImplementation(audit, codebaseCtx) {
-  print('\n🔨 Phase 2: Claude implementing improvements...\n');
-
-  const auditSummary = audit
-    .slice(0, 12)
-    .map((item, i) => `${i + 1}. [${item.priority}] ${item.title} (${item.effort}, ${item.category})\n   ${item.description}\n   Files: ${item.files?.join(', ') || 'TBD'}`)
-    .join('\n\n');
-
-  const focusNote = focus ? `\nThe user specifically requested focus on: **${focus}** — prioritize those items.\n` : '';
-
-  const systemPrompt = `You are an expert Next.js/TypeScript/Tailwind developer implementing improvements to the Glåüm Camp website. You have full access to read and write files in the project.
-
-**Project:** Next.js 14 App Router · Clerk v7 auth · Supabase · Tailwind CSS · TypeScript
-**Design system:** Dark mystical aesthetic — ink (#1A0A24) background, gold (#C8A848) headings, purple (#D239F8) accents, TokyoDreams display font, Libre Baskerville body serif
-**Key conventions:**
-- No shared layout header — each page manages its own header row
+**Project conventions:**
+- Stack: Next.js 14 App Router · Clerk v7 auth · Supabase · Tailwind CSS · TypeScript
+- Design: ink (#1A0A24) bg · gold (#C8A848) headings · purple (#D239F8) accents · TokyoDreams display font
 - Server components use supabaseAdmin directly; client components fetch /api/...
-- Inline <style> tags with attribute selectors must use dangerouslySetInnerHTML
-- Always fetch applications and camp_signups separately and join in JS
-- Resend is available for email (import from 'resend')
-- Email FROM address: 'Glåüm Camp <notifications@glaum.camp>' (update if domain not yet verified)
-- Supabase queries return PromiseLike, NOT full Promise — never use .catch() on them; use try/catch or check .error
-- Clerk v7: import Appearance from '@clerk/types', NOT '@clerk/nextjs/server'
-- Supabase nested selects (e.g. roles(name)) return arrays — always handle as arrays, not single objects
-- Run tsc --noEmit mentally before calling done — ensure no implicit any, no missing properties, no bad casts
-- ALWAYS call require_action whenever you: create a migration file, reference a new env var, add a Resend email trigger, or add any feature requiring external setup — do this immediately after the relevant write_file call, not at the end
+- No shared layout header — each page manages its own header row
+- Inline <style> with attribute selectors → use dangerouslySetInnerHTML
+- Supabase queries return PromiseLike, NOT Promise — no .catch(); use try/catch
+- Supabase nested selects return arrays — handle as arrays, not single objects
+- Clerk v7: import Appearance from '@clerk/types', not '@clerk/nextjs/server'
+- Resend email: import from 'resend'; FROM 'Glåüm Camp <notifications@glaum.camp>'
 
-**Your task:**
-Work through the audit items below and implement the improvements. Start with high-priority, smaller-effort items. Read files before editing them. For each change, write the complete updated file content.
-
-If you need a custom image or icon, use the generate_image tool with a detailed DALL-E 3 prompt matching the dark mystical aesthetic (dark backgrounds, gold/purple palette, ethereal quality).
-
-When you have implemented everything meaningful in this pass, call the done tool with a summary.
-${focusNote}
-**GPT-4o's audit (prioritized):**
-${auditSummary}`;
+**Critical editing rules:**
+- ALWAYS read a file before writing it
+- For existing files: make targeted additions or edits — preserve everything else
+- Do NOT rewrite a working page from scratch; add what's needed and leave the rest intact
+- Call require_action immediately after creating a migration file or adding a new env var
+- In done.visibleChanges list any new pages with their URL path so the developer knows where to look
+- Mentally run tsc --noEmit before calling done — no implicit any, no missing props, no bad casts`;
 
   const messages = [
     {
       role: 'user',
-      content: `Here is the current codebase context to get you started (you can read more files as needed):\n${codebaseCtx}\n\nPlease implement the improvements from the audit. Start with the highest-priority, most impactful items.`,
+      content: `Codebase context:\n${codebaseCtx}\n\nPlease implement the task. Read any additional files you need before editing them.`,
     },
   ];
 
+  const executeTool = makeExecuteTool(state);
   let iterations = 0;
-  const MAX_ITERATIONS = 40;
-  let isDone = false;
-  let finalSummary = '';
-  const changesLog = [];
+  const MAX_ITER = 40;
 
-  while (!isDone && iterations < MAX_ITERATIONS) {
+  while (!state.done && iterations < MAX_ITER) {
     iterations++;
 
     const response = await anthropic.messages.create({
@@ -426,39 +312,23 @@ ${auditSummary}`;
       messages,
     });
 
-    // Add assistant response to history
     messages.push({ role: 'assistant', content: response.content });
 
-    // Log any text output
     for (const block of response.content) {
       if (block.type === 'text' && block.text.trim()) {
-        print(`  Claude: ${block.text.slice(0, 200)}${block.text.length > 200 ? '...' : ''}`);
+        print(`  Claude: ${block.text.slice(0, 200)}${block.text.length > 200 ? '…' : ''}`);
       }
     }
 
-    // Process tool calls
     if (response.stop_reason === 'tool_use') {
       const toolResults = [];
 
       for (const block of response.content) {
         if (block.type !== 'tool_use') continue;
-
-        print(`  → ${block.name}(${JSON.stringify(block.input).slice(0, 80)}...)`);
+        print(`  → ${block.name}(${JSON.stringify(block.input).slice(0, 80)}…)`);
         const result = await executeTool(block.name, block.input);
 
-        if (result === '__DONE__') {
-          isDone = true;
-          finalSummary = block.input.summary || '';
-          changesLog.push(...(block.input.changes || []));
-          break;
-        }
-
-        if (block.name === 'write_file') {
-          changesLog.push(`Updated ${block.input.path}`);
-        }
-        if (block.name === 'generate_image') {
-          changesLog.push(`Generated image: public/${block.input.filename}`);
-        }
+        if (result === '__DONE__') { state.done = true; break; }
 
         toolResults.push({
           type: 'tool_result',
@@ -467,52 +337,50 @@ ${auditSummary}`;
         });
       }
 
-      if (!isDone) {
+      if (!state.done && toolResults.length > 0) {
         messages.push({ role: 'user', content: toolResults });
       }
     } else {
-      // end_turn — Claude is done naturally
-      isDone = true;
-      finalSummary = response.content.find(b => b.type === 'text')?.text || 'Implementation complete.';
+      state.done = true;
+      if (!state.summary) {
+        state.summary = response.content.find(b => b.type === 'text')?.text || 'Done.';
+      }
     }
   }
 
-  appendLog('Changes Made', changesLog.map(c => `- ${c}`).join('\n'));
-  appendLog('Summary', finalSummary);
-
-  return { summary: finalSummary, changes: changesLog, messages, systemPrompt };
+  return { messages, systemPrompt };
 }
 
-// ─── Phase 3: TypeScript validation + self-healing ───────────────────────────
+// ─── TypeScript validation + self-healing ─────────────────────────────────────
 
-async function runValidation(messages, systemPrompt) {
-  if (dryRun) {
-    print('\n[dry-run] Skipping TypeScript validation');
-    return true;
-  }
+async function runValidation(messages, systemPrompt, state) {
+  if (state.dryRun) { print('  [dry-run] Skipping TypeScript check'); return true; }
 
-  const MAX_REPAIR_ROUNDS = 3;
+  const MAX_ROUNDS = 3;
 
-  for (let round = 1; round <= MAX_REPAIR_ROUNDS; round++) {
-    print(`\n🔍 Phase 3: TypeScript check (round ${round})...`);
-    const result = spawnSync('npx', ['tsc', '--noEmit'], { cwd: ROOT, encoding: 'utf8', timeout: 60000 });
-    const tsErrors = (result.stdout + result.stderr).trim();
+  for (let round = 1; round <= MAX_ROUNDS + 1; round++) {
+    const r = spawnSync('npx', ['tsc', '--noEmit'], { cwd: ROOT, encoding: 'utf8', timeout: 60000 });
+    const errors = (r.stdout + r.stderr).trim();
 
-    if (!tsErrors) {
-      print('  ✓ TypeScript clean — no errors');
+    if (!errors) {
+      print(`  ✓ TypeScript clean${round > 1 ? ' after repair' : ''}`);
       return true;
     }
 
-    const errorLines = tsErrors.split('\n').filter(l => l.includes('error TS')).slice(0, 30);
-    print(`  ✗ ${errorLines.length} TypeScript error(s) — asking Claude to fix...`);
-    appendLog(`TypeScript Errors (round ${round})`, '```\n' + errorLines.join('\n') + '\n```');
+    if (round > MAX_ROUNDS) {
+      print(`  ⚠ TypeScript still has errors after ${MAX_ROUNDS} repair rounds — commit manually after review`);
+      return false;
+    }
 
-    // Feed errors back to Claude for self-repair
+    const errorLines = errors.split('\n').filter(l => l.includes('error TS')).slice(0, 30);
+    print(`  ✗ ${errorLines.length} error(s) — repair round ${round}...`);
+
     messages.push({
       role: 'user',
-      content: `TypeScript compilation failed with the following errors. Please fix them — read the affected files first, then write corrected versions. When all fixes are applied, call the done tool.\n\n\`\`\`\n${errorLines.join('\n')}\n\`\`\``,
+      content: `TypeScript errors — please fix them. Read affected files first, then write corrected versions. Call done when fixed.\n\n\`\`\`\n${errorLines.join('\n')}\n\`\`\``,
     });
 
+    const executeTool = makeExecuteTool(state);
     const response = await anthropic.messages.create({
       model: 'claude-opus-4-8',
       max_tokens: 8096,
@@ -522,128 +390,209 @@ async function runValidation(messages, systemPrompt) {
     });
 
     messages.push({ role: 'assistant', content: response.content });
-
     const toolResults = [];
+
     for (const block of response.content) {
       if (block.type === 'text' && block.text.trim()) {
-        print(`  Claude: ${block.text.slice(0, 200)}${block.text.length > 200 ? '...' : ''}`);
+        print(`  Claude: ${block.text.slice(0, 200)}${block.text.length > 200 ? '…' : ''}`);
       }
       if (block.type !== 'tool_use') continue;
-
-      print(`  → ${block.name}(${JSON.stringify(block.input).slice(0, 80)}...)`);
-      const result2 = await executeTool(block.name, block.input);
-      if (result2 === '__DONE__') break;
-
-      toolResults.push({
-        type: 'tool_result',
-        tool_use_id: block.id,
-        content: typeof result2 === 'string' ? result2 : JSON.stringify(result2),
-      });
+      print(`  → ${block.name}(${JSON.stringify(block.input).slice(0, 80)}…)`);
+      const result = await executeTool(block.name, block.input);
+      if (result === '__DONE__') break;
+      toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: String(result) });
     }
-    if (toolResults.length > 0) {
-      messages.push({ role: 'user', content: toolResults });
-    }
+
+    if (toolResults.length > 0) messages.push({ role: 'user', content: toolResults });
   }
 
-  // Final check after all repair rounds
-  print('\n🔍 Final TypeScript check...');
-  const finalResult = spawnSync('npx', ['tsc', '--noEmit'], { cwd: ROOT, encoding: 'utf8', timeout: 60000 });
-  const finalErrors = (finalResult.stdout + finalResult.stderr).trim();
-  if (!finalErrors) {
-    print('  ✓ TypeScript clean after repairs');
-    return true;
-  }
-
-  print(`  ⚠ TypeScript still has errors after ${MAX_REPAIR_ROUNDS} repair rounds — committing anyway, review manually`);
-  appendLog('Unresolved TypeScript Errors', '```\n' + finalErrors + '\n```');
   return false;
 }
 
-// ─── Git commit ───────────────────────────────────────────────────────────────
+// ─── Migration auto-detection ─────────────────────────────────────────────────
 
-function commitChanges(changes) {
-  if (dryRun) {
-    print('\n[dry-run] Would commit changes');
-    return;
-  }
-  try {
-    execSync(`git -C "${ROOT}" add -A`, { stdio: 'pipe' });
-    const msg = `AI collaboration pass: ${changes.length} improvements\n\nFocus: ${focus || 'broad audit'}\nLog: scripts/logs/collab-${timestamp}.md`;
-    execSync(`git -C "${ROOT}" commit -m "${msg.replace(/"/g, "'")}"`, { stdio: 'pipe' });
-    print(`✓ Committed to branch: ${branchName}`);
-  } catch (e) {
-    print(`⚠ Git commit failed: ${e.message}`);
-  }
+function detectNewMigrations(filesWritten) {
+  return filesWritten
+    .filter(f => f.startsWith('supabase-migrations/') && f.endsWith('.sql'))
+    .map(f => ({
+      type: 'migration',
+      title: `Run migration: ${path.basename(f)}`,
+      description: `Apply via Supabase SQL Editor → paste contents of ${f} → Run.`,
+      file: f,
+    }));
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
+// ─── Main exported function ───────────────────────────────────────────────────
 
-async function main() {
-  print('');
-  print('╔═══════════════════════════════════════════╗');
-  print('║   Glåüm Camp — AI Collaboration Script    ║');
-  print('╚═══════════════════════════════════════════╝');
-  print('');
-
-  if (!process.env.ANTHROPIC_API_KEY) {
-    print('✗ ANTHROPIC_API_KEY not found in .env.local');
-    process.exit(1);
-  }
-  if (!process.env.OPENAI_API_KEY) {
-    print('✗ OPENAI_API_KEY not found in .env.local');
-    process.exit(1);
+export async function runTask(taskDescription, {
+  dryRun      = false,
+  branchName  = null,
+  codebaseCtx = null,
+  logFile     = null,
+  quiet       = false,
+} = {}) {
+  if (!quiet) {
+    print(`\n  📌 Task: ${taskDescription}`);
   }
 
-  if (focus) print(`Focus: ${focus}`);
-  if (dryRun) print('Mode: DRY RUN (no files will be written)');
-  print(`Log: ${logFile}`);
+  const state = {
+    dryRun,
+    done:           false,
+    summary:        '',
+    changes:        [],
+    visibleChanges: [],
+    backendChanges: [],
+    filesWritten:   [],
+    requiredActions: [],
+  };
+
+  // Build context if not provided
+  const ctx = codebaseCtx ?? buildCodebaseContext();
+
+  // Run the agent
+  const { messages, systemPrompt } = await runAgentLoop(taskDescription, ctx, state);
+
+  // Auto-detect migrations that weren't flagged via require_action
+  const autoMigrations = detectNewMigrations(state.filesWritten)
+    .filter(m => !state.requiredActions.some(a => a.file === m.file));
+  state.requiredActions.push(...autoMigrations);
+
+  // TypeScript validation
+  if (state.filesWritten.length > 0) {
+    print('\n  🔍 Validating TypeScript...');
+    const valid = await runValidation(messages, systemPrompt, state);
+    state.tsClean = valid;
+  } else {
+    state.tsClean = true;
+  }
+
+  // Commit
+  if (!dryRun && state.filesWritten.length > 0) {
+    try {
+      if (branchName) {
+        // Ensure we're on the right branch
+        execSync(`git -C "${ROOT}" checkout "${branchName}" 2>/dev/null || git -C "${ROOT}" checkout -b "${branchName}"`, { stdio: 'pipe' });
+      }
+      execSync(`git -C "${ROOT}" add -A`, { stdio: 'pipe' });
+      const shortTask = taskDescription.slice(0, 72);
+      execSync(`git -C "${ROOT}" commit -m "${shortTask.replace(/"/g, "'")}"`, { stdio: 'pipe' });
+      if (!quiet) print(`  ✓ Committed: "${shortTask}"`);
+    } catch (e) {
+      if (!quiet) print(`  ⚠ Git commit failed: ${e.message}`);
+    }
+  }
+
+  // Write log entry if a logFile is specified
+  if (logFile) {
+    const entry = [
+      `## Task: ${taskDescription}`,
+      '',
+      `**Summary:** ${state.summary}`,
+      '',
+      state.filesWritten.length ? `**Files changed:**\n${state.filesWritten.map(f => `- ${f}`).join('\n')}` : '',
+      state.visibleChanges.length ? `\n**Visible changes:**\n${state.visibleChanges.map(c => `- ${c}`).join('\n')}` : '',
+      state.backendChanges.length ? `\n**Backend changes:**\n${state.backendChanges.map(c => `- ${c}`).join('\n')}` : '',
+      state.requiredActions.length ? `\n**Actions required:**\n${state.requiredActions.map(a => `- ${a.title}`).join('\n')}` : '',
+      '',
+      '---',
+      '',
+    ].filter(l => l !== null).join('\n');
+
+    fs.appendFileSync(logFile, entry);
+  }
+
+  return {
+    task:           taskDescription,
+    success:        state.tsClean,
+    summary:        state.summary,
+    filesWritten:   state.filesWritten,
+    visibleChanges: state.visibleChanges,
+    backendChanges: state.backendChanges,
+    requiredActions: state.requiredActions,
+  };
+}
+
+// ─── CLI entry point ──────────────────────────────────────────────────────────
+
+const isCLI = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isCLI) {
+  const args    = process.argv.slice(2);
+  const taskIdx = args.indexOf('--task');
+  const task    = taskIdx !== -1 ? args[taskIdx + 1] : null;
+  const dryRun  = args.includes('--dry-run');
+
+  if (!task) {
+    console.error('Usage: node scripts/collaborate.mjs --task "description" [--dry-run]');
+    console.error('       For a full multi-task pass, use: node scripts/orchestrate.mjs');
+    process.exit(1);
+  }
+
+  if (!process.env.ANTHROPIC_API_KEY) { console.error('✗ ANTHROPIC_API_KEY missing from .env.local'); process.exit(1); }
+  if (!process.env.OPENAI_API_KEY)    { console.error('✗ OPENAI_API_KEY missing from .env.local');    process.exit(1); }
+
+  const timestamp  = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const branchName = `ai-collab-${timestamp}`;
+  const logDir     = path.join(ROOT, 'scripts', 'logs');
+  const logFile    = path.join(logDir, `collab-${timestamp}.md`);
+  fs.mkdirSync(logDir, { recursive: true });
+
+  print('');
+  print('╔══════════════════════════════════════════╗');
+  print('║  Glåüm Camp — AI Collaboration (single)  ║');
+  print('╚══════════════════════════════════════════╝');
+  print(`Task:   ${task}`);
+  print(`Branch: ${branchName}`);
+  print(`Log:    ${logFile}`);
+  if (dryRun) print('Mode:   DRY RUN');
   print('');
 
-  setupBranch();
+  if (!dryRun) {
+    try {
+      execSync(`git -C "${ROOT}" checkout -b "${branchName}"`, { stdio: 'pipe' });
+      print(`✓ Created branch: ${branchName}`);
+    } catch (e) {
+      print(`⚠ Branch creation failed: ${e.message}`);
+    }
+  }
 
-  print('\n📁 Building codebase context...');
-  const codebaseCtx = buildCodebaseContext();
-  print('  ✓ Context built');
+  const result = await runTask(task, { dryRun, branchName, logFile }).catch(e => {
+    print(`\n✗ Fatal: ${e.message}`);
+    process.exit(1);
+  });
 
-  const audit = await runGPTAudit(codebaseCtx);
-  const { summary, changes, messages: implMessages, systemPrompt: implSystem } = await runClaudeImplementation(audit, codebaseCtx);
+  killDevPorts();
 
-  await runValidation(implMessages, implSystem);
-  commitChanges(changes);
-
-  print('\n═══════════════════════════════════════════');
-  print(`✓ Done! ${changes.length} changes on branch: ${branchName}`);
+  print('\n══════════════════════════════════════════');
+  print(result.success ? '✓ Complete' : '⚠ Complete with TypeScript warnings');
   print(`📄 Log: ${logFile}`);
   print('');
-  print('Summary:');
-  print(summary.slice(0, 500));
 
-  if (requiredActions.length > 0) {
-    const icons = { migration: '🗄', env_var: '🔑', service_config: '⚙️', deploy: '🚀', other: '📋' };
+  if (result.visibleChanges?.length) {
+    print('👁  Visible changes (check in browser):');
+    result.visibleChanges.forEach(c => print(`   • ${c}`));
     print('');
-    print('╔═══════════════════════════════════════════╗');
-    print('║   ⚠  ACTION REQUIRED BEFORE DEPLOYING   ║');
-    print('╚═══════════════════════════════════════════╝');
-    requiredActions.forEach((a, i) => {
-      const icon = icons[a.type] || '📋';
-      print(`\n${i + 1}. ${icon}  ${a.title}`);
+  }
+  if (result.backendChanges?.length) {
+    print('⚙  Backend changes:');
+    result.backendChanges.forEach(c => print(`   • ${c}`));
+    print('');
+  }
+
+  if (result.requiredActions?.length) {
+    print('╔══════════════════════════════════════════╗');
+    print('║   ⚠  ACTION REQUIRED BEFORE DEPLOYING  ║');
+    print('╚══════════════════════════════════════════╝');
+    const icons = { migration: '🗄', env_var: '🔑', service_config: '⚙️', deploy: '🚀', other: '📋' };
+    result.requiredActions.forEach((a, i) => {
+      print(`\n${i + 1}. ${icons[a.type] || '📋'}  ${a.title}`);
       print(`   ${a.description}`);
       if (a.file) print(`   File: ${a.file}`);
     });
     print('');
-    appendLog('⚠ Action Required', requiredActions.map((a, i) =>
-      `### ${i + 1}. ${a.title}\n**Type:** ${a.type}${a.file ? `  \n**File:** \`${a.file}\`` : ''}\n\n${a.description}`
-    ).join('\n\n'));
   }
 
-  print('');
   print(`To review: git diff main..${branchName}`);
   print(`To apply:  git checkout main && git merge ${branchName}`);
   print(`To discard: git branch -D ${branchName}`);
 }
-
-main().catch(e => {
-  print(`\n✗ Fatal error: ${e.message}`);
-  console.error(e);
-  process.exit(1);
-});

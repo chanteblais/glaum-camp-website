@@ -234,39 +234,43 @@ API: `POST /api/admin/announcements`, `PATCH/DELETE /api/admin/announcements/[id
 
 ---
 
-## AI Collaboration Script
+## AI Collaboration Scripts
 
-Runs an autonomous improvement pass using GPT-4o (audit) + Claude (implementation) + DALL-E 3 (images). Changes land on a new git branch.
+Two-layer system: `orchestrate.mjs` plans and loops; `collaborate.mjs` executes one task at a time.  
+**Requirements:** `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` in `.env.local`.
 
-**Requirements:** Both `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` must be set in `.env.local`.
+### orchestrate.mjs — multi-task pass (recommended)
+
+GPT-4o produces a prioritized task list, then Claude executes each task as a separate commit. Stops if TypeScript fails. Kills stale dev server ports on completion.
 
 ```bash
-# Broad pass — GPT-4o finds its own priorities:
-npm run collaborate
+npm run orchestrate                                   # broad pass
+npm run orchestrate -- --focus "mobile layout"        # targeted area
+npm run orchestrate -- --focus "polish" --max-tasks 3 # limit task count
+npm run orchestrate -- --dry-run                      # plan only, no writes
+```
 
-# Targeted pass — focus on a specific area:
-npm run collaborate -- --focus "mobile layout"
-npm run collaborate -- --focus "email notifications"
-npm run collaborate -- --focus "icon and graphic design"
-npm run collaborate -- --focus "polish and production readiness"
+### collaborate.mjs — single task
 
-# Preview plan without writing any files:
-npm run collaborate -- --dry-run
-npm run collaborate -- --focus "messaging" --dry-run
+For a specific, well-defined change. One commit, one thing.
+
+```bash
+npm run collaborate -- --task "add notification preferences UI to profile page"
+npm run collaborate -- --task "wire up email for announcements"
+npm run collaborate -- --dry-run --task "..."
 ```
 
 **Output:**
 - New git branch: `ai-collab-{timestamp}`
-- Work log: `scripts/logs/collab-{timestamp}.md`
+- Work log: `scripts/logs/orchestrate-{timestamp}.md` or `collab-{timestamp}.md`
+- End-of-run summary: visible changes (with URLs), backend changes, required actions checklist
 
 **After reviewing:**
 ```bash
-git diff main..ai-collab-{timestamp}   # review changes
-git merge ai-collab-{timestamp}        # apply
+git diff main..ai-collab-{timestamp}   # review
+git checkout main && git merge ai-collab-{timestamp}  # apply
 git branch -D ai-collab-{timestamp}    # discard
 ```
-
-**Script:** `scripts/collaborate.mjs`
 
 ---
 

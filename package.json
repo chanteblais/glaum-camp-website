@@ -10,7 +10,7 @@
     "export": "next build && next export",
     "deploy": "npm run build && gh-pages -d out",
     "collaborate": "node scripts/collaborate.mjs",
-    "collab": "node scripts/collaborate.mjs"
+    "orchestrate": "node scripts/orchestrate.mjs"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.39.3",
