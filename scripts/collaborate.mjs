@@ -344,7 +344,7 @@ ${taskDescription}
     }
 
     const response = await anthropic.messages.create({
-      model: 'claude-opus-4-8',
+      model: 'claude-sonnet-4-6',
       max_tokens: 8096,
       system: systemPrompt,
       tools: TOOLS,
@@ -419,7 +419,7 @@ async function runCompletionAudit(taskDescription, codebaseCtx, systemPrompt, st
     auditIter++;
 
     const response = await anthropic.messages.create({
-      model: 'claude-opus-4-8',
+      model: 'claude-sonnet-4-6',
       max_tokens: 8096,
       system: systemPrompt,
       tools: TOOLS,
@@ -504,7 +504,7 @@ async function runValidation(systemPrompt, state) {
 
     const executeTool = makeExecuteTool(state);
     const response = await anthropic.messages.create({
-      model: 'claude-opus-4-8',
+      model: 'claude-sonnet-4-6',
       max_tokens: 8096,
       system: systemPrompt,
       tools: TOOLS,
@@ -529,7 +529,7 @@ async function runValidation(systemPrompt, state) {
       repairMessages.push({ role: 'user', content: toolResults });
       // Give Claude a chance to respond to tool results
       const response2 = await anthropic.messages.create({
-        model: 'claude-opus-4-8',
+        model: 'claude-sonnet-4-6',
         max_tokens: 4096,
         system: systemPrompt,
         tools: TOOLS,

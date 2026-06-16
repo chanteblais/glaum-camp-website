@@ -13,6 +13,10 @@ const PURPLE = '#D239F8'
 const CREAM  = '#F3EDE6'
 const LAVENDER = '#D9B3FF'
 
+// Section numerals shown in the builder — mirror the applicant-facing wizard,
+// which numbers visible sections by position (ApplyWizard ROMAN).
+const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']
+
 // ── Toggle ────────────────────────────────────────────────────────────────────
 
 function Toggle({ checked, disabled, onChange, color = GOLD }: {
@@ -243,13 +247,14 @@ function FieldRow({
 // ── Step section ──────────────────────────────────────────────────────────────
 
 function StepSection({
-  step, index, total, expanded, saving, dirty,
+  step, index, total, displayNum, expanded, saving, dirty,
   onToggleExpand, onToggleVisible, onMoveUp, onMoveDown,
   onTitleChange, onSubtitleChange, onFieldChange, onDelete, onAddField, onDeleteField,
 }: {
   step: StepConfig
   index: number
   total: number
+  displayNum: string
   expanded: boolean
   saving: boolean
   dirty: boolean
@@ -288,7 +293,7 @@ function StepSection({
           </svg>
         </button>
 
-        <span style={{ fontSize: '0.65rem', letterSpacing: '0.15em', color: GOLD, opacity: 0.7, flexShrink: 0 }}>{step.num}</span>
+        <span style={{ fontSize: '0.65rem', letterSpacing: '0.15em', color: GOLD, opacity: step.visible ? 0.7 : 0.3, flexShrink: 0, minWidth: '1.2em' }}>{displayNum}</span>
 
         <input
           value={step.title}
@@ -660,6 +665,11 @@ export function ApplicationBuilder({
                 step={step}
                 index={idx}
                 total={memberConfig.steps.length}
+                displayNum={
+                  step.visible
+                    ? (ROMAN[memberConfig.steps.slice(0, idx).filter(s => s.visible).length] ?? '')
+                    : '–'
+                }
                 expanded={expandedSteps.has(step.key)}
                 saving={saving}
                 dirty={dirty}

@@ -2,6 +2,7 @@ import { auth, clerkClient } from '@clerk/nextjs/server'
 import { redirect, notFound } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { AdminActions } from '../AdminActions'
+import { RemoveMemberButton } from '../RemoveMemberButton'
 import { MemberSignupCard } from '../MemberSignupCard'
 
 export default async function ApplicationDetailPage({ params }: { params: { id: string } }) {
@@ -247,6 +248,20 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
             <Divider />
             <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
               <AdminActions id={app.id} email={app.email} redirectAfter="/admin" />
+            </div>
+          </>
+        )}
+
+        {/* Remove an approved member */}
+        {app.status === 'approved' && (
+          <>
+            <Divider />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+              <RemoveMemberButton
+                id={app.id}
+                name={`${app.preferred_name || app.first_name} ${app.last_name}`}
+                redirectAfter="/admin"
+              />
             </div>
           </>
         )}
