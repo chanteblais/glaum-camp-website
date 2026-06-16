@@ -5,9 +5,10 @@ import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import {
   ATTENDANCE_OPTIONS,
-  CAMP_RELATIONSHIP_OPTIONS,
-  SETUP_PREFERENCE_OPTIONS,
+  MEMBERSHIP_TYPE_OPTIONS,
   RIDESHARE_OPTIONS,
+  DEFAULT_CONTRIBUTION_TYPES,
+  type ContributionType,
 } from '@/lib/application-options'
 
 type ApplicationData = {
@@ -21,7 +22,7 @@ type ApplicationData = {
   attendance?: string | null
   arrival_date?: string | null
   departure_date?: string | null
-  camp_relationship?: string | null
+  membership_type?: string | null
   vehicle?: string | null
   space_requirements?: string | null
   structures?: string | null
@@ -59,7 +60,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-export function ProfileSettings({ application }: { application: ApplicationData }) {
+export function ProfileSettings({ application, contributionTypes = DEFAULT_CONTRIBUTION_TYPES }: { application: ApplicationData; contributionTypes?: ContributionType[] }) {
   const router = useRouter()
   const menuRef = useRef<HTMLDivElement>(null)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -78,12 +79,12 @@ export function ProfileSettings({ application }: { application: ApplicationData 
     attendance: application.attendance ?? '',
     arrival_date: application.arrival_date ?? '',
     departure_date: application.departure_date ?? '',
-    camp_relationship: application.camp_relationship ?? '',
+    membership_type: application.membership_type ?? '',
     vehicle: application.vehicle ?? '',
     space_requirements: application.space_requirements ?? '',
     structures: application.structures ?? '',
     rideshare: application.rideshare ?? '',
-    setup_preference: (application.setup_preference ?? []).filter(v => SETUP_PREFERENCE_OPTIONS.includes(v as typeof SETUP_PREFERENCE_OPTIONS[number])),
+    setup_preference: (application.setup_preference ?? []).filter(v => contributionTypes.some(t => t.value === v)),
   })
 
   useEffect(() => {
@@ -96,12 +97,12 @@ export function ProfileSettings({ application }: { application: ApplicationData 
       attendance: application.attendance ?? '',
       arrival_date: application.arrival_date ?? '',
       departure_date: application.departure_date ?? '',
-      camp_relationship: application.camp_relationship ?? '',
+      membership_type: application.membership_type ?? '',
       vehicle: application.vehicle ?? '',
       space_requirements: application.space_requirements ?? '',
       structures: application.structures ?? '',
       rideshare: application.rideshare ?? '',
-      setup_preference: (application.setup_preference ?? []).filter(v => SETUP_PREFERENCE_OPTIONS.includes(v as typeof SETUP_PREFERENCE_OPTIONS[number])),
+      setup_preference: (application.setup_preference ?? []).filter(v => contributionTypes.some(t => t.value === v)),
     })
   }, [application])
 
@@ -367,14 +368,14 @@ export function ProfileSettings({ application }: { application: ApplicationData 
             </Field>
           </div>
 
-          <Field label="Camp relationship">
+          <Field label="Camp membership type">
             <select
               style={inputStyle}
-              value={form.camp_relationship}
-              onChange={(e) => setForm({ ...form, camp_relationship: e.target.value })}
+              value={form.membership_type}
+              onChange={(e) => setForm({ ...form, membership_type: e.target.value })}
             >
               <option value="">Select…</option>
-              {CAMP_RELATIONSHIP_OPTIONS.map((o) => (
+              {MEMBERSHIP_TYPE_OPTIONS.map((o) => (
                 <option key={o} value={o}>{o}</option>
               ))}
             </select>
@@ -419,18 +420,21 @@ export function ProfileSettings({ application }: { application: ApplicationData 
 
           <Field label="Contributions">
             <div id="settings-field-contribution" style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
-              {SETUP_PREFERENCE_OPTIONS.map((option) => (
+              {contributionTypes.map((ct) => (
                 <label
-                  key={option}
+                  key={ct.value}
                   style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start', fontSize: '0.85rem', cursor: 'pointer', color: '#F3EDE6' }}
                 >
                   <input
                     type="checkbox"
-                    checked={form.setup_preference.includes(option)}
-                    onChange={() => toggleSetupPreference(option)}
+                    checked={form.setup_preference.includes(ct.value)}
+                    onChange={() => toggleSetupPreference(ct.value)}
                     style={{ marginTop: '0.15rem', accentColor: '#D239F8' }}
                   />
-                  {option}
+                  <span>
+                    {ct.icon && <span style={{ marginRight: '0.35rem' }}>{ct.icon}</span>}
+                    {ct.value}
+                  </span>
                 </label>
               ))}
             </div>

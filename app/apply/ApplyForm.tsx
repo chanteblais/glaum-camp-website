@@ -223,7 +223,7 @@ export function ApplyForm({ userEmail }: { userEmail: string }) {
     const formData = new FormData(e.currentTarget)
 
     const acknowledgements = formData.getAll('acknowledgements') as string[]
-    const attunementStatus = formData.getAll('attunement_status') as string[]
+    const attunementStatus = formData.getAll('onboarding_status') as string[]
     const setupPreference = formData.getAll('setup_preference') as string[]
     const setupLimitations = formData.getAll('setup_limitations') as string[]
 
@@ -245,20 +245,20 @@ export function ApplyForm({ userEmail }: { userEmail: string }) {
       camped_before: formData.get('camped_before'),
 
       // Section 2 — About You
-      glaum_acceptance: formData.get('glaum_acceptance'),
+      community_acceptance: formData.get('community_acceptance'),
       special_skills: formData.get('special_skills'),
       recent_achievements: formData.get('recent_achievements'),
       official_designation: formData.get('official_designation'),
       research_interests: formData.get('research_interests'),
       known_side_effects: formData.get('known_side_effects'),
-      attunement_status: attunementStatus,
-      attunement_status_other: formData.get('attunement_status_other'),
+      onboarding_status: attunementStatus,
+      onboarding_status_other: formData.get('onboarding_status_other'),
 
       // Section 3 — What If Plans
       attendance: formData.get('attendance'),
       arrival_date: formData.get('arrival'),
       departure_date: formData.get('departure'),
-      camp_relationship: formData.get('camp_relationship'),
+      membership_type: formData.get('membership_type'),
       vehicle: formData.get('vehicle'),
       space_requirements: formData.get('space'),
       structures: formData.get('structures'),
@@ -276,7 +276,7 @@ export function ApplyForm({ userEmail }: { userEmail: string }) {
       skills_contribution: formData.get('skills_contribution'),
 
       // Section 5 — Camp Culture
-      draws_to_glaum: formData.get('draws_to_glaum'),
+      draws_to_community: formData.get('draws_to_community'),
       healthy_community: formData.get('healthy_community'),
 
       // Section 6 — Contribution Expectations
@@ -597,7 +597,7 @@ export function ApplyForm({ userEmail }: { userEmail: string }) {
 
               <Field label="Have you accepted Glåüm into your heart?">
                 <RadioGroup
-                  name="glaum_acceptance"
+                  name="community_acceptance"
                   options={['Yes', 'Not Yet', "It's Complicated"]}
                 />
               </Field>
@@ -647,7 +647,7 @@ export function ApplyForm({ userEmail }: { userEmail: string }) {
                     >
                       <input
                         type="checkbox"
-                        name="attunement_status"
+                        name="onboarding_status"
                         value={option}
                         style={{ marginTop: '0.2rem', width: '1rem', height: '1rem', flexShrink: 0, accentColor: '#D239F8', cursor: 'pointer' }}
                       />
@@ -659,7 +659,7 @@ export function ApplyForm({ userEmail }: { userEmail: string }) {
                   >
                     <input
                       type="checkbox"
-                      name="attunement_status"
+                      name="onboarding_status"
                       value="Other"
                       checked={attunementOther}
                       onChange={(e) => setAttunementOther(e.target.checked)}
@@ -670,7 +670,7 @@ export function ApplyForm({ userEmail }: { userEmail: string }) {
                   {attunementOther && (
                     <input
                       type="text"
-                      name="attunement_status_other"
+                      name="onboarding_status_other"
                       placeholder="Please describe..."
                       style={{ ...inputStyle, marginTop: '0.25rem' }}
                       onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(210,57,248,0.6)' }}
@@ -706,7 +706,7 @@ export function ApplyForm({ userEmail }: { userEmail: string }) {
 
               <Field label="Will you:">
                 <RadioGroup
-                  name="camp_relationship"
+                  name="membership_type"
                   options={[
                     'Camp with Glåüm',
                     'Stay nearby but participate',
@@ -828,7 +828,7 @@ export function ApplyForm({ userEmail }: { userEmail: string }) {
 
               <Field label="What draws you to Glåüm?">
                 <TextArea
-                  name="draws_to_glaum"
+                  name="draws_to_community"
                   placeholder="Take your time with this one."
                   rows={5}
                 />

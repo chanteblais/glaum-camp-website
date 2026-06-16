@@ -2,6 +2,8 @@ import { auth, currentUser, clerkClient } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { mergeMemberConfig, mergeVolunteerConfig } from '@/lib/form-config'
+import { DEFAULT_AGREEMENT_ITEMS, DEFAULT_ATTENDANCE_OPTIONS } from '@/lib/site-config'
+import { parseContributionTypes } from '@/lib/application-options'
 import { ApplyWizard } from './ApplyWizard'
 import { TrackPicker } from './TrackPicker'
 
@@ -25,7 +27,13 @@ export default async function ApplyPage({ searchParams }: { searchParams: { trac
   const [{ data: existing }, { data: volunteer }, { data: configRows }] = await Promise.all([
     supabaseAdmin.from('applications').select('id, status').eq('clerk_user_id', userId).maybeSingle(),
     supabaseAdmin.from('volunteers').select('id, status').eq('clerk_user_id', userId).maybeSingle(),
-    supabaseAdmin.from('page_content').select('key, value').in('key', ['config_member_form', 'config_volunteer_form']),
+    supabaseAdmin.from('page_content').select('key, value').in('key', [
+      'config_member_form',
+      'config_volunteer_form',
+      'member_acknowledgements',
+      'member_attendance_options',
+      'community_contribution_types',
+    ]),
   ])
 
   const configMap = Object.fromEntries((configRows ?? []).map(r => [r.key, r.value]))
@@ -34,6 +42,12 @@ export default async function ApplyPage({ searchParams }: { searchParams: { trac
   let volunteerRaw: object = {}
   try { if (configMap['config_member_form']) memberRaw = JSON.parse(configMap['config_member_form']) } catch { /* use defaults */ }
   try { if (configMap['config_volunteer_form']) volunteerRaw = JSON.parse(configMap['config_volunteer_form']) } catch { /* use defaults */ }
+
+  let agreementItems: string[] = DEFAULT_AGREEMENT_ITEMS
+  let attendanceOptions: string[] = DEFAULT_ATTENDANCE_OPTIONS
+  try { if (configMap['member_acknowledgements']) agreementItems = JSON.parse(configMap['member_acknowledgements']) } catch { /* use defaults */ }
+  try { if (configMap['member_attendance_options']) attendanceOptions = JSON.parse(configMap['member_attendance_options']) } catch { /* use defaults */ }
+  const contributionTypes = parseContributionTypes(configMap['community_contribution_types'])
 
   const memberConfig = mergeMemberConfig(memberRaw)
   const volunteerConfig = mergeVolunteerConfig(volunteerRaw)
@@ -54,7 +68,7 @@ export default async function ApplyPage({ searchParams }: { searchParams: { trac
     if (!memberOpen && !isAdmin) {
       return <ClosedPage message="Camp member applications are not currently open." />
     }
-    return <ApplyWizard userEmail={email} formConfig={memberConfig} />
+    return <ApplyWizard userEmail={email} formConfig={memberConfig} agreementItems={agreementItems} attendanceOptions={attendanceOptions} contributionTypes={contributionTypes} />
   }
 
   // Both closed → generic closed state

@@ -175,7 +175,7 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
         <Section title="What If Plans">
           <Grid>
             <Field label="Attendance" value={app.attendance} />
-            <Field label="Camp Relationship" value={app.camp_relationship} />
+            <Field label="Membership Type" value={app.membership_type} />
             {app.arrival_date && <Field label="Arrival" value={app.arrival_date} />}
             {app.departure_date && <Field label="Departure" value={app.departure_date} />}
             {app.vehicle && <Field label="Vehicle" value={app.vehicle} />}
@@ -215,7 +215,7 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
         <Divider />
 
         <Section title="Camp Culture">
-          {app.draws_to_glaum && <LongField label="What draws you to Glåüm" value={app.draws_to_glaum} />}
+          {app.draws_to_community && <LongField label="What draws you to the community" value={app.draws_to_community} />}
           {app.healthy_community && <LongField label="Healthy community means" value={app.healthy_community} />}
         </Section>
 

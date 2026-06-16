@@ -149,3 +149,39 @@ Sign-out flow:
 - **Camp signups join** — always fetch `applications` and `camp_signups` separately and join in JS; Supabase can't resolve the FK via nested select
 - **Lazy Supabase client** — `lib/supabase.ts` uses Proxy to avoid build-time env var errors
 - **Form config system** — `lib/form-config.ts` defines `MemberFormConfig` and `VolunteerFormConfig` types, default step/field definitions, and `mergeMemberConfig`/`mergeVolunteerConfig` helpers. Configs are fetched from `page_content` as JSON and merged with defaults on every request. Custom steps and admin-added fields survive the merge; built-in fields are updated with saved overrides only (label, description, visible, required). The Application Builder (`/admin/configure`) writes to `page_content` via `PATCH /api/admin/page-content`.
+
+---
+
+## Multi-Community Architecture
+
+> See [multi-community.md](multi-community.md) for the full roadmap.
+
+This codebase is being evolved toward a **multi-community platform**. Glåüm is the first community. As features are added, follow these patterns to keep the platform generalisable:
+
+### Community identity — `lib/site-config.ts`
+
+Site name, event name, and description are driven by env vars (`NEXT_PUBLIC_SITE_NAME`, `NEXT_PUBLIC_EVENT_NAME`, `NEXT_PUBLIC_SITE_DESCRIPTION`). Use these constants anywhere a community name appears in source code rather than hardcoding `"Glåüm"`.
+
+### Configurable content — `page_content` table
+
+`page_content` is the primary mechanism for community-specific text and option lists. Before hardcoding a string in source, ask whether it belongs in `page_content`. Currently configurable via this pattern:
+
+- Homepage copy (`home_*`)
+- Form field labels, step titles, custom fields (`config_member_form`)
+- Agreement checkbox items (`member_acknowledgements`)
+- Attendance options (`member_attendance_options`)
+- Any text editable via the inline page editor
+
+The pattern for each: fetch the key from `page_content` in the server component, parse JSON, pass down as a prop. Fall back to constants in `lib/site-config.ts` if the key is absent.
+
+### What is NOT yet community-scoped
+
+These are explicitly deferred until a second community exists:
+
+- **Database rows** — all tables are currently single-community. There is no `community_id` column.
+- **Clerk** — single Clerk instance, single admin role. No org-level isolation.
+- **Storage** — single `avatars` / `schedule-icons` bucket shared by all.
+- **Badge** — font (`TokyoDreams`) and base image (`badge_base.png`) are Glåüm-specific.
+- **Branding** — colors, fonts, and design system are Glåüm's. Per-community theming is deferred.
+
+When adding a feature that would need to be community-specific: implement it for a single community first using `page_content` or `lib/site-config.ts` defaults. The multi-tenancy layer comes later.

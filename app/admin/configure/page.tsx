@@ -2,6 +2,7 @@ import { auth, clerkClient } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { mergeMemberConfig, mergeVolunteerConfig } from '@/lib/form-config'
+import { parseContributionTypes } from '@/lib/application-options'
 import { ApplicationBuilder } from './ApplicationBuilder'
 
 export default async function ConfigurePage() {
@@ -15,7 +16,7 @@ export default async function ConfigurePage() {
   const { data: configRows } = await supabaseAdmin
     .from('page_content')
     .select('key, value')
-    .in('key', ['config_member_form', 'config_volunteer_form'])
+    .in('key', ['config_member_form', 'config_volunteer_form', 'community_contribution_types'])
 
   const configMap = Object.fromEntries((configRows ?? []).map(r => [r.key, r.value]))
 
@@ -32,6 +33,7 @@ export default async function ConfigurePage() {
 
   const memberConfig = mergeMemberConfig(memberRaw)
   const volunteerConfig = mergeVolunteerConfig(volunteerRaw)
+  const contributionTypes = parseContributionTypes(configMap['community_contribution_types'])
 
-  return <ApplicationBuilder memberConfig={memberConfig} volunteerConfig={volunteerConfig} />
+  return <ApplicationBuilder memberConfig={memberConfig} volunteerConfig={volunteerConfig} contributionTypes={contributionTypes} />
 }

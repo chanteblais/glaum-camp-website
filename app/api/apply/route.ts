@@ -44,20 +44,20 @@ export async function POST(req: NextRequest) {
 
         // Section 2 — About You
         about_you: data.about_you || null,
-        glaum_acceptance: data.glaum_acceptance || null,
+        community_acceptance: data.community_acceptance || null,
         special_skills: data.special_skills || null,
         recent_achievements: data.recent_achievements || null,
         official_designation: data.official_designation || null,
         research_interests: data.research_interests || null,
         known_side_effects: data.known_side_effects || null,
-        attunement_status: data.attunement_status || [],
-        attunement_status_other: data.attunement_status_other || null,
+        onboarding_status: data.onboarding_status || [],
+        onboarding_status_other: data.onboarding_status_other || null,
 
-        // Section 3 — What If Plans
+        // Section 3 — Event Plans
         attendance: data.attendance,
         arrival_date: data.arrival_date || null,
         departure_date: data.departure_date || null,
-        camp_relationship: data.camp_relationship,
+        membership_type: data.membership_type,
         vehicle: data.vehicle || null,
         space_requirements: data.space_requirements || null,
         structures: data.structures || null,
@@ -78,8 +78,8 @@ export async function POST(req: NextRequest) {
         leadership_note: data.leadership_note || null,
         skills_contribution: data.skills_contribution || null,
 
-        // Section 5 — Camp Culture
-        draws_to_glaum: data.draws_to_glaum || null,
+        // Section 5 — Community Culture
+        draws_to_community: data.draws_to_community || null,
         healthy_community: data.healthy_community || null,
 
         // Section 6 — Contribution Expectations

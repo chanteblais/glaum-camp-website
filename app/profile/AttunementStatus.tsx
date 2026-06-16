@@ -89,7 +89,7 @@ export function AttunementStatus({ tasks }: Props) {
 
         {/* Header */}
         <div style={{
-          padding: '1.45rem 1.4rem 0.48rem',
+          padding: '1rem 1.2rem 0.4rem',
           position: 'relative',
           zIndex: 1,
           display: 'grid',
@@ -116,7 +116,7 @@ export function AttunementStatus({ tasks }: Props) {
         </div>
 
         {/* Task list */}
-        <div style={{ padding: '0.6rem 1.75rem 0.7rem', position: 'relative', zIndex: 1 }}>
+        <div style={{ padding: '0.35rem 1.4rem 0.45rem', position: 'relative', zIndex: 1 }}>
           {tasks.map(task => {
             const isActionable = !task.done && (task.section || task.href)
             return (
@@ -139,7 +139,7 @@ export function AttunementStatus({ tasks }: Props) {
                 }
               }
             }}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.72rem', padding: '0.65rem 0.5rem', cursor: isActionable ? 'pointer' : 'default', borderRadius: '0.4rem', transition: 'background 0.15s', background: 'transparent' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', padding: '0.42rem 0.4rem', cursor: isActionable ? 'pointer' : 'default', borderRadius: '0.4rem', transition: 'background 0.15s', background: 'transparent' }}
             onMouseEnter={e => { if (isActionable) e.currentTarget.style.background = 'rgba(122,85,32,0.1)' }}
             onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
           >
@@ -182,27 +182,27 @@ export function AttunementStatus({ tasks }: Props) {
         </div>
 
         {/* Status footer */}
-        <div style={{ padding: '0.72rem 1.45rem 1.25rem', display: 'flex', gap: '1rem', alignItems: 'flex-start', position: 'relative', zIndex: 1 }}>
+        <div style={{ padding: '0.5rem 1.2rem 0.9rem', display: 'flex', gap: '0.75rem', alignItems: 'flex-start', position: 'relative', zIndex: 1 }}>
           <img
             src="/handicon.png"
             alt=""
             aria-hidden
-            style={{ width: '52px', height: '52px', flexShrink: 0, objectFit: 'contain', opacity: 0.78, filter: 'sepia(0.82) saturate(1.35) brightness(0.76)' }}
+            style={{ width: '40px', height: '40px', flexShrink: 0, objectFit: 'contain', opacity: 0.78, filter: 'sepia(0.82) saturate(1.35) brightness(0.76)' }}
           />
           <div style={{ flex: 1, minWidth: 0 }}>
             {allDone ? (
               <>
-                <p style={{ fontSize: '1.2rem', fontWeight: 700, letterSpacing: '0.08em', color: '#7A4E0E', margin: '0 0 0.2rem', textTransform: 'uppercase', fontFamily: 'var(--font-cormorant-garamond), serif', textShadow: '0 0 12px rgba(180,120,30,0.5), 0 1px 0 rgba(255,255,255,0.3)' }}>
+                <p style={{ fontSize: '1.05rem', fontWeight: 700, letterSpacing: '0.08em', color: '#7A4E0E', margin: '0 0 0.15rem', textTransform: 'uppercase', fontFamily: 'var(--font-cormorant-garamond), serif', textShadow: '0 0 12px rgba(180,120,30,0.5), 0 1px 0 rgba(255,255,255,0.3)' }}>
                   Fully Attuned
                 </p>
-                <p style={{ fontSize: '1.05rem', color: '#5C3D1A', margin: 0, fontFamily: 'var(--font-cormorant-garamond), serif', lineHeight: 1.4 }}>All preparations complete.</p>
+                <p style={{ fontSize: '0.92rem', color: '#5C3D1A', margin: 0, fontFamily: 'var(--font-cormorant-garamond), serif', lineHeight: 1.4 }}>All preparations complete.</p>
               </>
             ) : (
               <>
-                <p style={{ fontSize: '1.2rem', fontWeight: 700, letterSpacing: '0.08em', color: '#7A4E0E', margin: '0 0 0.2rem', textTransform: 'uppercase', fontFamily: 'var(--font-cormorant-garamond), serif', textShadow: '0 0 12px rgba(180,120,30,0.5), 0 1px 0 rgba(255,255,255,0.3)' }}>
+                <p style={{ fontSize: '1.05rem', fontWeight: 700, letterSpacing: '0.08em', color: '#7A4E0E', margin: '0 0 0.15rem', textTransform: 'uppercase', fontFamily: 'var(--font-cormorant-garamond), serif', textShadow: '0 0 12px rgba(180,120,30,0.5), 0 1px 0 rgba(255,255,255,0.3)' }}>
                   Status: {statusLabel}
                 </p>
-                <p style={{ fontSize: '1.05rem', fontWeight: 700, color: '#250838', margin: 0, fontFamily: 'var(--font-cormorant-garamond), serif', lineHeight: 1.4, textShadow: '0 0 8px rgba(150,40,220,0.4), 0 0 18px rgba(150,40,220,0.2), 0 1px 0 rgba(255,255,255,0.35)' }}>
+                <p style={{ fontSize: '0.92rem', fontWeight: 700, color: '#250838', margin: 0, fontFamily: 'var(--font-cormorant-garamond), serif', lineHeight: 1.4, textShadow: '0 0 8px rgba(150,40,220,0.4), 0 0 18px rgba(150,40,220,0.2), 0 1px 0 rgba(255,255,255,0.35)' }}>
                   {remaining} item{remaining !== 1 ? 's' : ''} require{remaining === 1 ? 's' : ''} attention
                 </p>
               </>

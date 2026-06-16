@@ -1,6 +1,6 @@
 # Database Schema
 
-All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations `001`–`024` in `supabase-migrations/` document incremental changes. Migrations `001`–`024` are confirmed applied.
+All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations `001`–`025` in `supabase-migrations/` document incremental changes. Migrations `001`–`024` are confirmed applied; `025` must be applied before the next deploy.
 
 ---
 
@@ -23,10 +23,10 @@ One row per person who has submitted a camp application.
 | `instagram` | TEXT | |
 | `location` | TEXT | |
 | `camped_before` | TEXT | |
-| `attendance` | TEXT | "What If" plans |
+| `attendance` | TEXT | How they plan to participate |
 | `arrival_date` | TEXT | |
 | `departure_date` | TEXT | |
-| `camp_relationship` | TEXT | |
+| `membership_type` | TEXT | Camping on site / staying nearby / visiting socially / etc. Renamed from `camp_relationship` in migration `025`. Options configurable via `page_content` key `member_membership_types`. |
 | `vehicle` | TEXT | |
 | `space_requirements` | TEXT | |
 | `structures` | TEXT | |
@@ -40,10 +40,13 @@ One row per person who has submitted a camp application.
 | `accessibility` | TEXT | |
 | `capacity` | TEXT | |
 | `participation_style` | TEXT | |
-| `draws_to_glaum` | TEXT | |
+| `community_acceptance` | TEXT | "Yes / Not Yet / It's Complicated". Renamed from `glaum_acceptance` in migration `025`. Label configurable via form-config. |
+| `onboarding_status` | TEXT[] | Self-reported onboarding/attunement status. Renamed from `attunement_status` in migration `025`. |
+| `onboarding_status_other` | TEXT | Free-text when `onboarding_status = 'Other'`. Renamed from `attunement_status_other` in migration `025`. |
+| `draws_to_community` | TEXT | What drew them to this community. Renamed from `draws_to_glaum` in migration `025`. |
 | `healthy_community` | TEXT | |
-| `acknowledgements` | TEXT[] | |
-| `shrimp_relationship` | TEXT | Fun question |
+| `acknowledgements` | TEXT[] | The agreement items they checked. Items are configurable via `page_content` key `member_acknowledgements`. |
+| `shrimp_relationship` | TEXT | Glåüm-specific fun question — will move to `custom_answers` in a future migration. |
 | `avatar_url` | TEXT | Supabase Storage URL |
 | `custom_answers` | JSONB | Answers to admin-added custom fields/sections. Added in migration `023`. |
 | `status` | TEXT | `pending` / `approved` / `rejected` / `cancelled` |
@@ -221,6 +224,10 @@ Admin-editable copy for the homepage. One row per key.
 - `config_member_form` — JSON blob (`MemberFormConfig`) for the camp member application. Set by Application Builder. Merged with defaults from `lib/form-config.ts` on every load — custom steps and fields survive the merge.
 - `config_volunteer_form` — JSON blob (`VolunteerFormConfig`) for the volunteer signup. Same pattern.
 - `dashboard_layout` — JSON blob controlling the member dashboard widget layout. Shape: `{ order: string[], hidden: string[], widths: Record<string, 'half' | 'full'> }`. Managed by the inline page editor. Widget IDs: `announcements`, `polls`, `events`, `spotlight`, `activity`.
+- `member_acknowledgements` — JSON array of strings. The agreement checkbox items shown in the application form. If absent, falls back to `DEFAULT_AGREEMENT_ITEMS` in `lib/site-config.ts`.
+- `member_attendance_options` — JSON array of strings. Radio options for the attendance question in the application form. Falls back to `DEFAULT_ATTENDANCE_OPTIONS` in `lib/site-config.ts`.
+- `member_membership_types` — JSON array of strings. Options for the membership type dropdown in profile settings. Falls back to `MEMBERSHIP_TYPE_OPTIONS` in `lib/application-options.ts`.
+- `community_contribution_types` — JSON array of `ContributionType` objects. Defines the communal responsibilities members can sign up for (stored in `setup_preference`). Each object has `value` (string, stored in DB), `icon` (emoji), `description` (shown in commitments card), and `autoForDeptKeyword` (optional — if a member's dept name contains this keyword, the contribution is auto-added). Managed via Admin → Application Builder → Contribution Types tab. Falls back to `DEFAULT_CONTRIBUTION_TYPES` in `lib/application-options.ts`.
 
 ---
 
@@ -301,6 +308,7 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `022_messages.sql` | `messages` table with sender/recipient/body/read_at + indexes |
 | `023_custom_answers.sql` | `custom_answers JSONB` on `applications` for admin-added form fields |
 | `024_polls.sql` | `polls` and `poll_votes` tables |
+| `025_rename_community_fields.sql` | Renames five community-specific columns on `applications` to generic equivalents: `glaum_acceptance → community_acceptance`, `attunement_status → onboarding_status`, `attunement_status_other → onboarding_status_other`, `draws_to_glaum → draws_to_community`, `camp_relationship → membership_type`. **Must be applied before next deploy.** |
 
 ---
 

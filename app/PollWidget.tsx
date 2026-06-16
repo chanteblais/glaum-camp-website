@@ -127,6 +127,9 @@ export function PollWidget({ polls }: { polls: Poll[] }) {
       borderRadius: '1rem',
       background: 'rgba(10,0,20,0.5)',
       overflow: 'hidden',
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100%',
     }}>
       <div style={{ padding: '1rem 1.5rem 0.75rem', borderBottom: '1px solid rgba(200,168,72,0.12)' }}>
         <p style={{ fontSize: '0.62rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, margin: 0 }}>

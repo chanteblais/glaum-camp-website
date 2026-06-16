@@ -213,6 +213,8 @@ let isAdmin = false
         <main style={{ paddingTop: '64px' }}>
           <style dangerouslySetInnerHTML={{ __html: `
             .dash-quote-card { display: block; }
+            [data-widget-id] { display: flex; flex-direction: column; }
+            [data-widget-id] > * { flex: 1; }
             .dash-hero-inner { display: flex; width: 100%; padding: 2.25rem 2.5rem; align-items: center; justify-content: space-between; gap: 2rem; }
             .dash-spotlight  { display: grid; grid-template-columns: 5fr 7fr; gap: 1.25rem; align-items: start; }
             .dash-quicklinks { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
@@ -319,13 +321,13 @@ let isAdmin = false
               const preCamp = upcomingEvents.filter(e => e.event_category === 'pre_camp')
               const atCamp = upcomingEvents.filter(e => e.event_category !== 'pre_camp')
               const EventList = ({ events, label, href }: { events: typeof upcomingEvents; label: string; href: string }) => (
-                <div style={{ border: '1px solid rgba(200,168,72,0.25)', borderRadius: '1rem', background: 'rgba(10,0,20,0.5)', overflow: 'hidden' }}>
+                <div style={{ border: '1px solid rgba(200,168,72,0.25)', borderRadius: '1rem', background: 'rgba(10,0,20,0.5)', overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
                   <div style={{ padding: '1.25rem 1.5rem 1rem', borderBottom: '1px solid rgba(200,168,72,0.15)' }}>
                     <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '0.7rem', letterSpacing: '0.18em', color: '#C8A848', margin: 0, textTransform: 'uppercase', opacity: 0.9 }}>
                       {label}
                     </p>
                   </div>
-                  <div style={{ padding: '0.5rem 0' }}>
+                  <div style={{ padding: '0.5rem 0', flex: 1 }}>
                     {events.length === 0 ? (
                       <p style={{ fontSize: '0.85rem', opacity: 0.4, fontStyle: 'italic', textAlign: 'center', padding: '1.5rem' }}>
                         Nothing scheduled yet.
@@ -372,7 +374,7 @@ let isAdmin = false
 
               const widgetMap: Record<string, React.ReactNode> = {
                 announcements: announcements.length > 0 ? (
-                  <div style={{ border: '1px solid rgba(200,168,72,0.25)', borderRadius: '1rem', background: 'rgba(10,0,20,0.5)', overflow: 'hidden' }}>
+                  <div style={{ border: '1px solid rgba(200,168,72,0.25)', borderRadius: '1rem', background: 'rgba(10,0,20,0.5)', overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
                     <div style={{ padding: '1rem 1.5rem 0.75rem', borderBottom: '1px solid rgba(200,168,72,0.12)' }}>
                       <p style={{ fontSize: '0.62rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, margin: 0 }}>Announcements</p>
                     </div>
@@ -394,7 +396,7 @@ let isAdmin = false
                 polls: <PollWidget polls={polls} />,
 
                 events: (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', height: '100%' }}>
                     {preCamp.length > 0 && <EventList events={preCamp} label="Pre-Camp Gatherings" href="/schedule" />}
                     {atCamp.length > 0 && <EventList events={atCamp} label="Upcoming Gatherings" href="/schedule" />}
                     {upcomingEvents.length === 0 && <EventList events={[]} label="Upcoming Gatherings" href="/schedule" />}
@@ -409,7 +411,7 @@ let isAdmin = false
                 ) : null,
 
                 activity: recentActivity.length > 0 ? (
-                  <div style={{ border: '1px solid rgba(200,168,72,0.2)', borderRadius: '1rem', background: 'rgba(10,0,20,0.5)', overflow: 'hidden' }}>
+                  <div style={{ border: '1px solid rgba(200,168,72,0.2)', borderRadius: '1rem', background: 'rgba(10,0,20,0.5)', overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
                     <div style={{ padding: '1rem 1.5rem 0.75rem', borderBottom: '1px solid rgba(200,168,72,0.12)' }}>
                       <p style={{ fontSize: '0.62rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, margin: 0 }}>Recent Activity</p>
                     </div>
@@ -436,7 +438,7 @@ let isAdmin = false
 
               const widths = { spotlight: 'third', ...(dashLayout.widths ?? {}) }
               return (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.25rem', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.25rem', alignItems: 'stretch' }}>
                   {visibleWidgets.map(id => {
                     const widget = widgetMap[id]
                     if (!widget) return null
@@ -459,7 +461,7 @@ let isAdmin = false
             })()}
 
             {/* ── MANY HANDS LINK ── */}
-            <div className="dash-quicklinks">
+            <div className="dash-quicklinks" style={{ marginTop: '1.25rem' }}>
               <a href="/signup" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem 1.5rem', border: '1px solid rgba(200,168,72,0.18)', borderRadius: '1rem', background: 'rgba(200,168,72,0.03)', textDecoration: 'none' }}>
                 <div>
                   <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.1rem', color: '#C8A848', margin: '0 0 0.2rem' }}>Role & Shift</p>

@@ -3,6 +3,7 @@ import { Libre_Baskerville, Marcellus, Cormorant_Garamond } from 'next/font/goog
 import { ClerkProvider } from '@clerk/nextjs'
 import { headers } from 'next/headers'
 import { clerkFallbackHome, resolveSiteOrigin } from '@/lib/site-origin'
+import { SITE_NAME, EVENT_NAME, SITE_DESCRIPTION } from '@/lib/site-config'
 import './globals.css'
 
 const libreBaskerville = Libre_Baskerville({
@@ -24,8 +25,8 @@ const cormorantGaramond = Cormorant_Garamond({
 })
 
 export const metadata: Metadata = {
-  title: 'Glåüm @ What If 2026',
-  description: 'Glåüm Theme Camp at What If 2026. Sponsored by Shrimp™. Find your attunement in the forest.',
+  title: `${SITE_NAME} @ ${EVENT_NAME}`,
+  description: SITE_DESCRIPTION,
   icons: {
     icon: [
       { url: '/favicon/favicon-16x16.png', sizes: '16x16', type: 'image/png' },

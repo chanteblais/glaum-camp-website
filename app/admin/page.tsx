@@ -35,7 +35,7 @@ export default async function AdminPage() {
 
   const { data: applications, error: dbError } = await supabaseAdmin
     .from('applications')
-    .select('id, clerk_user_id, first_name, last_name, preferred_name, email, status, submitted_at, attendance, camp_relationship, camped_before, setup_preference')
+    .select('id, clerk_user_id, first_name, last_name, preferred_name, email, status, submitted_at, attendance, membership_type, camped_before, setup_preference')
     .order('submitted_at', { ascending: false })
 
   const { data: signupsRaw } = await supabaseAdmin

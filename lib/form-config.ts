@@ -75,8 +75,8 @@ export const DEFAULT_MEMBER_CONFIG: MemberFormConfig = {
         { key: 'about_you',         label: 'What are you currently excited about?',                              visible: true, required: false, canHide: true,  canChangeRequired: false },
         { key: 'special_skills',    label: 'What special skills do you possess?', description: 'What might be useful at camp.', visible: true, required: false, canHide: true, canChangeRequired: false },
         { key: 'find_at_camp',      label: 'If we encountered you at camp, what would we find you doing?', description: 'Picture a typical Glåüm moment.', visible: true, required: false, canHide: true, canChangeRequired: false },
-        { key: 'glaum_acceptance',  label: 'Have you accepted Glåüm into your heart?',                          visible: true, required: true,  canHide: false, canChangeRequired: false },
-        { key: 'attunement_status', label: 'Current Attunement Status',                                         visible: true, required: false, canHide: true,  canChangeRequired: false },
+        { key: 'community_acceptance', label: 'Have you accepted Glåüm into your heart?',  visible: true, required: true,  canHide: false, canChangeRequired: false },
+        { key: 'onboarding_status',    label: 'Current Attunement Status',                 visible: true, required: false, canHide: true,  canChangeRequired: false },
       ],
     },
     {
