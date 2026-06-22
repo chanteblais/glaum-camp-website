@@ -23,14 +23,17 @@ export async function GET() {
   const application = await requireApprovedCamper(userId)
   if (!application) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const [deptRes, rolesRes, signupRes, roleCounts, eventSignupCounts, scheduleRes] = await Promise.all([
+  const [deptRes, rolesRes, signupRes, roleCounts, eventSignupCounts, scheduleRes, shiftFlagRes] = await Promise.all([
     supabaseAdmin.from('departments').select('id, name, description, icon, sort_order').order('sort_order'),
     supabaseAdmin.from('roles').select('id, name, description, capacity, sort_order, department_id, purpose, responsibilities_before, responsibilities_during, ideal_for, commitment, commitment_period, requires_approval').order('sort_order'),
     supabaseAdmin.from('camp_signups').select('role_id, schedule_event_id, role_approval_status').eq('clerk_user_id', userId).maybeSingle(),
     supabaseAdmin.from('camp_signups').select('role_id').not('role_id', 'is', null),
     supabaseAdmin.from('camp_signups').select('schedule_event_id').not('schedule_event_id', 'is', null),
     supabaseAdmin.from('schedule_events').select('id, day, time, title, subtitle, icon_type, highlight, is_recurring, capacity').eq('visible', true).order('sort_order'),
+    supabaseAdmin.from('page_content').select('value').eq('key', 'config_shift_signup_open').maybeSingle(),
   ])
+
+  const shiftSignupOpen = shiftFlagRes.data?.value !== 'false'
 
   const roleSignupCounts: Record<string, number> = {}
   for (const row of roleCounts.data ?? []) {
@@ -62,6 +65,7 @@ export async function GET() {
     signup: signupRes.data ?? null,
     departments,
     scheduleEvents,
+    shiftSignupOpen,
   })
 }
 
@@ -92,6 +96,19 @@ export async function POST(req: NextRequest) {
 
   const isRoleChange = existing?.role_id !== next_role_id
   const isEventChange = existing?.schedule_event_id !== next_event_id
+
+  // Block new/changed shift selections while shift signup is closed.
+  // Clearing a shift (next_event_id === null) stays allowed so members can cancel.
+  if (isEventChange && next_event_id) {
+    const { data: shiftFlag } = await supabaseAdmin
+      .from('page_content')
+      .select('value')
+      .eq('key', 'config_shift_signup_open')
+      .maybeSingle()
+    if (shiftFlag?.value === 'false') {
+      return NextResponse.json({ error: 'Shift signup is currently closed.' }, { status: 403 })
+    }
+  }
 
   // Check if the new role requires approval
   let requiresApproval = false

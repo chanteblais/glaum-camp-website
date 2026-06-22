@@ -70,7 +70,13 @@ export default async function ApplyPage({ searchParams }: { searchParams: { trac
     if (!memberOpen && !isAdmin) {
       return <ClosedPage message="Camp member applications are not currently open." />
     }
-    return <ApplyWizard userEmail={email} formConfig={memberConfig} agreementItems={agreementItems} attendanceOptions={attendanceOptions} contributionTypes={contributionTypes} />
+    // All groups — a "Group selection" field (if the admin added one) picks which
+    // of these it offers via the field's own config (field.options).
+    const { data: selectableGroups } = await supabaseAdmin
+      .from('groups')
+      .select('id, name, description')
+      .order('sort_order', { ascending: true })
+    return <ApplyWizard userEmail={email} formConfig={memberConfig} agreementItems={agreementItems} attendanceOptions={attendanceOptions} contributionTypes={contributionTypes} selectableGroups={selectableGroups ?? []} />
   }
 
   // Both closed → generic closed state

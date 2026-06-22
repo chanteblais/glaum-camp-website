@@ -58,6 +58,8 @@ type FormData = {
   shrimp_relationship: string
   // Custom sections
   custom_answers: Record<string, string | string[]>
+  // Optional group opt-in (group ids the applicant selected)
+  group_choices: string[]
 }
 
 const BLANK: FormData = {
@@ -73,6 +75,7 @@ const BLANK: FormData = {
   acknowledgements: [],
   shrimp_relationship: '',
   custom_answers: {},
+  group_choices: [],
 }
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
@@ -569,19 +572,54 @@ function AgreementChecklist({ options, value, onChange }: { options: string[]; v
   )
 }
 
+type SelectableGroup = { id: string; name: string; description: string | null }
+
+// Checklist of admin-defined groups the applicant can opt into. Stores group ids.
+function GroupChecklist({ groups, value, onChange }: { groups: SelectableGroup[]; value: string[]; onChange: (v: string[]) => void }) {
+  if (groups.length === 0) {
+    return <p style={{ fontSize: '0.82rem', opacity: 0.4, fontStyle: 'italic', margin: 0 }}>No groups are open for sign-up right now.</p>
+  }
+  const toggle = (id: string) => onChange(value.includes(id) ? value.filter(v => v !== id) : [...value, id])
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      {groups.map(g => {
+        const checked = value.includes(g.id)
+        return (
+          <label key={g.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer', padding: '0.65rem 0.85rem', borderRadius: '0.5rem', border: `1px solid ${checked ? 'rgba(200,168,72,0.4)' : 'rgba(200,168,72,0.15)'}`, background: checked ? 'rgba(200,168,72,0.06)' : 'rgba(255,255,255,0.02)' }}>
+            <input type="checkbox" checked={checked} onChange={() => toggle(g.id)} style={{ marginTop: '0.2rem', accentColor: GOLD }} />
+            <span style={{ minWidth: 0 }}>
+              <span style={{ display: 'block', fontSize: '0.9rem', color: CREAM }}>{g.name}</span>
+              {g.description && <span style={{ display: 'block', fontSize: '0.78rem', opacity: 0.5, marginTop: '0.15rem', lineHeight: 1.5 }}>{g.description}</span>}
+            </span>
+          </label>
+        )
+      })}
+    </div>
+  )
+}
+
 // Renders the input control for a single field (without the Field label wrapper).
-function FieldControl({ field, form, set, answers, setAnswer, optionSources }: {
+function FieldControl({ field, form, set, answers, setAnswer, optionSources, groups }: {
   field: FieldConfig
   form: FormData
   set: (k: keyof FormData, v: unknown) => void
   answers: Record<string, string | string[]>
   setAnswer: (key: string, val: string | string[]) => void
   optionSources: OptionSources
+  groups: SelectableGroup[]
 }) {
   const d = FIELD_DESCRIPTORS[field.key]
 
   // Admin-added custom field → render by its declared type, bound to custom_answers.
   if (!d) {
+    // Group selection writes to group_choices (top-level), not custom_answers,
+    // so /api/apply can create the memberships. The field's `options` hold the
+    // group ids it offers (unset ⇒ all groups); groups themselves come from the DB.
+    if (field.type === 'group_select') {
+      const ids = field.options
+      const shown = ids === undefined ? groups : groups.filter(g => ids.includes(g.id))
+      return <GroupChecklist groups={shown} value={form.group_choices} onChange={v => set('group_choices', v)} />
+    }
     if (field.type === 'textarea')
       return <Textarea value={(answers[field.key] as string) ?? ''} onChange={v => setAnswer(field.key, v)} placeholder="Your answer…" />
     if (field.type === 'radio' && field.options) {
@@ -669,13 +707,14 @@ function FieldControl({ field, form, set, answers, setAnswer, optionSources }: {
 
 // Renders one entry: a layout element (divider/paragraph), the photo block, or a
 // labelled input cell.
-function FieldCell({ field, form, set, answers, setAnswer, optionSources }: {
+function FieldCell({ field, form, set, answers, setAnswer, optionSources, groups }: {
   field: FieldConfig
   form: FormData
   set: (k: keyof FormData, v: unknown) => void
   answers: Record<string, string | string[]>
   setAnswer: (key: string, val: string | string[]) => void
   optionSources: OptionSources
+  groups: SelectableGroup[]
 }) {
   if (field.element === 'divider') {
     return <Divider label={field.label || undefined} />
@@ -702,12 +741,12 @@ function FieldCell({ field, form, set, answers, setAnswer, optionSources }: {
       {field.description && FIELD_DESCRIPTORS[field.key]?.descPlaceholder === undefined && (
         <p style={{ fontSize: '0.8rem', opacity: 0.4, margin: '0 0 0.5rem', fontStyle: 'italic' }}>{field.description}</p>
       )}
-      <FieldControl field={field} form={form} set={set} answers={answers} setAnswer={setAnswer} optionSources={optionSources} />
+      <FieldControl field={field} form={form} set={set} answers={answers} setAnswer={setAnswer} optionSources={optionSources} groups={groups} />
     </Field>
   )
 }
 
-function ModularSection({ step, form, set, answers, setAnswer, optionSources, isMobile, requiredHint }: {
+function ModularSection({ step, form, set, answers, setAnswer, optionSources, isMobile, requiredHint, groups }: {
   step: StepConfig
   form: FormData
   set: (k: keyof FormData, v: unknown) => void
@@ -716,8 +755,12 @@ function ModularSection({ step, form, set, answers, setAnswer, optionSources, is
   optionSources: OptionSources
   isMobile?: boolean
   requiredHint?: boolean
+  groups: SelectableGroup[]
 }) {
-  const visible = step.fields.filter(f => f.visible)
+  // `setup_preference` (the old contributions multi-select) is retired — groups
+  // replace it (admin-assigned + the optional `group_select` field admins can add).
+  // Filtered here so it never renders even if a saved config still lists it.
+  const visible = step.fields.filter(f => f.visible && f.key !== 'setup_preference')
 
   // Group consecutive `half` fields into two-column rows (greedy pairing).
   const rows: FieldConfig[][] = []
@@ -734,7 +777,7 @@ function ModularSection({ step, form, set, answers, setAnswer, optionSources, is
     }
   }
 
-  const cellProps = { form, set, answers, setAnswer, optionSources }
+  const cellProps = { form, set, answers, setAnswer, optionSources, groups }
 
   return (
     <>
@@ -758,12 +801,14 @@ function ModularSection({ step, form, set, answers, setAnswer, optionSources, is
 
 // ── Main wizard ───────────────────────────────────────────────────────────────
 
-export function ApplyWizard({ userEmail, formConfig, agreementItems, attendanceOptions, contributionTypes, initialStep = 0 }: {
+export function ApplyWizard({ userEmail, formConfig, agreementItems, attendanceOptions, contributionTypes, selectableGroups = [], initialStep = 0 }: {
   userEmail: string
   formConfig: MemberFormConfig
   agreementItems?: string[]
   attendanceOptions?: string[]
   contributionTypes?: ContributionType[]
+  // Groups the applicant can optionally opt into (admin-toggled per group).
+  selectableGroups?: SelectableGroup[]
   // Dev/preview only: forces the starting step so a given section can be
   // server-rendered for verification. Real /apply usage leaves this at 0.
   initialStep?: number
@@ -865,6 +910,8 @@ export function ApplyWizard({ userEmail, formConfig, agreementItems, attendanceO
       return currentStep.fields
         .filter(f => f.visible && f.required)
         .every(f => {
+          // Group selection is stored in group_choices, not custom_answers.
+          if (f.type === 'group_select') return form.group_choices.length > 0
           const val = form.custom_answers[f.key]
           // Agreement fields require every clause to be checked.
           if (f.type === 'agreement') return Array.isArray(val) && val.length === (f.options?.length ?? 0)
@@ -1048,6 +1095,7 @@ export function ApplyWizard({ userEmail, formConfig, agreementItems, attendanceO
             optionSources={optionSources}
             isMobile={isMobile}
             requiredHint={steps[step].key === 'basic'}
+            groups={selectableGroups}
           />
         )}
       </div>

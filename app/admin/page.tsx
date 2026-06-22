@@ -10,11 +10,16 @@ import { AdminTabBar } from './AdminTabBar'
 import { ScheduleManager } from './ScheduleManager'
 import { AnnouncementsManager } from './AnnouncementsManager'
 import { DepartmentsManager } from './DepartmentsManager'
+import { GroupsManager } from './GroupsManager'
+import { getGroupNamesByUser } from '@/lib/groups'
 import { RoleRequestsSection } from './RoleRequestsSection'
 import { RoleSuggestionsSection } from './RoleSuggestionsSection'
 import { DebugSection } from './DebugSection'
 import { PollsManager } from './PollsManager'
 import { AdminsManager } from './AdminsManager'
+import { AttunementTasksManager } from './AttunementTasksManager'
+import { ShiftSignupToggle } from './ShiftSignupToggle'
+import { parseAttunementTasks } from '@/lib/site-config'
 
 export default async function AdminPage() {
   const { userId } = await auth()
@@ -38,12 +43,22 @@ export default async function AdminPage() {
     .select('id, clerk_user_id, first_name, last_name, preferred_name, email, status, submitted_at, attendance, membership_type, camped_before, setup_preference')
     .order('submitted_at', { ascending: false })
 
+  const groupNamesByUser = await getGroupNamesByUser()
+
   const { data: signupsRaw } = await supabaseAdmin
     .from('camp_signups')
     .select('clerk_user_id, schedule_event_id')
   const signupEventMap = Object.fromEntries(
     (signupsRaw ?? []).map(s => [s.clerk_user_id, s.schedule_event_id ?? null])
   )
+
+  const { data: configRows } = await supabaseAdmin
+    .from('page_content')
+    .select('key, value')
+    .in('key', ['config_attunement_tasks', 'config_shift_signup_open'])
+  const configMap = Object.fromEntries((configRows ?? []).map(r => [r.key, r.value]))
+  const attunementTasks = parseAttunementTasks(configMap['config_attunement_tasks'])
+  const shiftSignupOpen = configMap['config_shift_signup_open'] !== 'false'
 
   const { data: notifications, error: notificationsError } = await supabaseAdmin
     .from('admin_notifications')
@@ -157,7 +172,7 @@ export default async function AdminPage() {
               last_name: a.last_name,
               preferred_name: a.preferred_name ?? null,
               email: a.email,
-              contributions: a.setup_preference ?? null,
+              contributions: a.clerk_user_id ? groupNamesByUser[a.clerk_user_id] ?? null : null,
               attendance: a.attendance ?? null,
               schedule_event_id: signupEventMap[a.clerk_user_id] ?? null,
             }))}
@@ -189,6 +204,22 @@ export default async function AdminPage() {
           <DepartmentsManager />
         </CollapsibleSection>
 
+        {/* ── GROUPS ── */}
+        <CollapsibleSection
+          title="Groups"
+          summary="See and assign who's in each group (e.g. Setup, Teardown, Decor)"
+        >
+          <GroupsManager
+            members={approved
+              .filter(a => a.clerk_user_id)
+              .map(a => ({
+                clerk_user_id: a.clerk_user_id!,
+                displayName: [a.preferred_name || a.first_name, a.last_name].filter(Boolean).join(' '),
+                email: a.email,
+              }))}
+          />
+        </CollapsibleSection>
+
         {/* ── ANNOUNCEMENTS ── */}
         <CollapsibleSection
           title="Announcements"
@@ -210,7 +241,16 @@ export default async function AdminPage() {
           title="Schedule"
           summary="Edit public schedule"
         >
+          <ShiftSignupToggle initialOpen={shiftSignupOpen} />
           <ScheduleManager />
+        </CollapsibleSection>
+
+        {/* ── ATTUNEMENT TASKS ── */}
+        <CollapsibleSection
+          title="Attunement Tasks"
+          summary="Profile checklist items members complete"
+        >
+          <AttunementTasksManager initialTasks={attunementTasks} />
         </CollapsibleSection>
 
         {/* ── CONFIGURATION ── */}

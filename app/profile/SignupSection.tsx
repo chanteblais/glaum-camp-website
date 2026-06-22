@@ -819,6 +819,7 @@ export function SignupSection({ showPickers = true }: { showPickers?: boolean })
   const [departments, setDepartments] = useState<Department[]>([])
   const [scheduleEvents, setScheduleEvents] = useState<ScheduleEvent[]>([])
   const [signup, setSignup] = useState<Signup | null>(null)
+  const [shiftSignupOpen, setShiftSignupOpen] = useState(true)
   const [loading, setLoading] = useState(true)
 
   const [selectedRole, setSelectedRole] = useState<string | null>(null)
@@ -834,6 +835,7 @@ export function SignupSection({ showPickers = true }: { showPickers?: boolean })
         setDepartments(d.departments ?? [])
         setScheduleEvents(d.scheduleEvents ?? [])
         setSignup(d.signup ?? null)
+        setShiftSignupOpen(d.shiftSignupOpen !== false)
         setSelectedRole(d.signup?.role_id ?? null)
         setSelectedShift(d.signup?.schedule_event_id ?? null)
       })
@@ -996,8 +998,8 @@ export function SignupSection({ showPickers = true }: { showPickers?: boolean })
             </button>
           </div>
 
-          {/* Calendar shift picker */}
-          {hasCalendarEvents && (
+          {/* Calendar shift picker — hidden while shift signup is closed */}
+          {hasCalendarEvents && shiftSignupOpen && (
             <div style={{ padding: '1.5rem', border: '1px solid rgba(210,57,248,0.15)', borderRadius: '1rem', background: 'rgba(210,57,248,0.02)' }}>
               <ShiftPicker
                 scheduleEvents={scheduleEvents}
@@ -1008,6 +1010,17 @@ export function SignupSection({ showPickers = true }: { showPickers?: boolean })
                 saving={saving}
                 error={error}
               />
+            </div>
+          )}
+
+          {hasCalendarEvents && !shiftSignupOpen && (
+            <div style={{ padding: '1.5rem', border: '1px solid rgba(210,57,248,0.15)', borderRadius: '1rem', background: 'rgba(210,57,248,0.02)', textAlign: 'center' }}>
+              <p style={{ fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#D239F8', opacity: 0.85, marginBottom: '0.5rem' }}>
+                Shifts
+              </p>
+              <p style={{ fontSize: '0.85rem', opacity: 0.6, margin: 0, lineHeight: 1.6 }}>
+                Shift times aren&rsquo;t confirmed yet. Shift signup will open here once the schedule is set — check back soon.
+              </p>
             </div>
           )}
         </div>

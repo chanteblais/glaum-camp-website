@@ -5,6 +5,7 @@ import { Footer } from '@/components/Footer'
 import { Section, Kicker, GoldDivider } from '@/components/Section'
 import { ScheduleSection } from '@/components/ScheduleSection'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getMemberGroups } from '@/lib/groups'
 
 import { HomePageEditor } from './HomePageEditor'
 import { supabaseResizedUrl } from '@/lib/supabase-image'
@@ -186,10 +187,8 @@ let isAdmin = false
   const badgeDeptName = roleInfo?.departments?.name ?? null
   const badgeRoleName = roleInfo?.name ?? null
 
-  const VALID_CONTRIBUTIONS = ['Setup', 'Teardown', 'Decor', 'Other']
-  const baseContributions: string[] = ((application?.setup_preference as string[] | null) ?? []).filter(v => VALID_CONTRIBUTIONS.includes(v))
-  const isDecorRole = (badgeDeptName ?? '').toLowerCase().includes('decor')
-  const contributions = isDecorRole && !baseContributions.includes('Decor') ? [...baseContributions, 'Decor'] : baseContributions
+  // Groups the member belongs to (replaces the old setup_preference "contributions").
+  const contributions = (await getMemberGroups(application?.clerk_user_id as string | null)).map(g => g.name)
 
   const displayName = (application?.preferred_name as string | null) ?? (application?.first_name as string | null) ?? userFirstName ?? 'Welcome'
 

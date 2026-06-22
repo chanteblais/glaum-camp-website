@@ -70,7 +70,6 @@ export async function POST(req: NextRequest) {
         department_interests: data.department_interests || [],
         leadership_interest: data.leadership_interest || null,
         setup_available: data.setup_available || null,
-        setup_preference: data.setup_preference || [],
         setup_limitations: data.setup_limitations || [],
         setup_notes: data.setup_notes || null,
         community_contribution: data.community_contribution || null,
@@ -101,6 +100,48 @@ export async function POST(req: NextRequest) {
     if (error) {
       console.error('Supabase error:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // Optional group opt-in — add the applicant to selected groups, but only ones
+    // actually offered by a visible "Group selection" field in the member form
+    // config (a field with unset `options` offers every group).
+    if (Array.isArray(data.group_choices) && data.group_choices.length > 0) {
+      const { data: cfgRow } = await supabaseAdmin
+        .from('page_content')
+        .select('value')
+        .eq('key', 'config_member_form')
+        .maybeSingle()
+
+      let allowAll = false
+      const explicitIds = new Set<string>()
+      try {
+        const cfg = cfgRow?.value
+          ? (JSON.parse(cfgRow.value) as { steps?: { fields?: { type?: string; visible?: boolean; options?: string[] }[] }[] })
+          : null
+        for (const step of cfg?.steps ?? []) {
+          for (const f of step.fields ?? []) {
+            if (f?.type !== 'group_select' || f.visible === false) continue
+            if (f.options === undefined || f.options === null) allowAll = true
+            else for (const id of f.options) explicitIds.add(id)
+          }
+        }
+      } catch { /* malformed config → no groups allowed */ }
+
+      if (allowAll || explicitIds.size > 0) {
+        const { data: validGroups } = await supabaseAdmin
+          .from('groups')
+          .select('id')
+          .in('id', data.group_choices)
+        const rows = (validGroups ?? [])
+          .filter(g => allowAll || explicitIds.has(g.id))
+          .map(g => ({ group_id: g.id, clerk_user_id: userId, source: 'application' }))
+        if (rows.length > 0) {
+          const { error: gmError } = await supabaseAdmin
+            .from('group_members')
+            .upsert(rows, { onConflict: 'group_id,clerk_user_id', ignoreDuplicates: true })
+          if (gmError) console.error('group_members insert error:', gmError)
+        }
+      }
     }
 
     const displayName = [data.preferred_name || data.first_name, data.last_name].filter(Boolean).join(' ')

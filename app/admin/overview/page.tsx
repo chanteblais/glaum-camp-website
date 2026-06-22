@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { NotificationBell } from '@/app/admin/NotificationBell'
 import { AdminTabBar } from '@/app/admin/AdminTabBar'
 import { MembersDropdown } from './MembersDropdown'
+import { getGroupNamesByUser } from '@/lib/groups'
 
 const HOURS_PER_MEMBER = 3
 
@@ -147,12 +148,14 @@ export default async function OverviewPage() {
   const pendingHours = incomplete * HOURS_PER_MEMBER
   const volunteerHours = activeVolunteers.length * HOURS_PER_MEMBER
 
-  // Contributions — derived from setup_preference
-  const setupTeam = approved.filter(a => ((a.setup_preference as string[]) ?? []).includes('Setup'))
-  const teardownTeam = approved.filter(a => ((a.setup_preference as string[]) ?? []).includes('Teardown'))
-  const decorTeam = approved.filter(a => ((a.setup_preference as string[]) ?? []).includes('Decor'))
+  // Contributions — derived from group membership (admin-assigned groups).
+  const groupNamesByUser = await getGroupNamesByUser()
+  const memberGroupNames = (a: { clerk_user_id?: string | null }) => (a.clerk_user_id ? groupNamesByUser[a.clerk_user_id] ?? [] : [])
+  const setupTeam = approved.filter(a => memberGroupNames(a).includes('Setup'))
+  const teardownTeam = approved.filter(a => memberGroupNames(a).includes('Teardown'))
+  const decorTeam = approved.filter(a => memberGroupNames(a).includes('Decor'))
   const limitations = approved.filter(a => ((a.setup_limitations as string[]) ?? []).length > 0)
-  const unassigned = approved.filter(a => ((a.setup_preference as string[]) ?? []).length === 0)
+  const unassigned = approved.filter(a => memberGroupNames(a).length === 0)
 
   // Rideshare
   const RIDESHARE_OPTIONS = ['I need a ride', 'I can offer a ride', "I'm sorted", 'Not sure yet']

@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { CommitmentsSection } from '@/app/profile/CommitmentsSection'
 import { Header } from '@/components/Header'
 import { supabaseResizedUrl } from '@/lib/supabase-image'
-import { parseContributionTypes } from '@/lib/application-options'
+import { getMemberGroups, groupCommitmentMeta } from '@/lib/groups'
 
 export default async function MemberPage({ params }: { params: { id: string } }) {
   const { userId } = await auth()
@@ -28,7 +28,7 @@ export default async function MemberPage({ params }: { params: { id: string } })
 
   const { data: member } = await supabaseAdmin
     .from('applications')
-    .select('id, first_name, preferred_name, pronouns, avatar_url, clerk_user_id, setup_preference')
+    .select('id, first_name, preferred_name, pronouns, avatar_url, clerk_user_id')
     .eq('status', 'approved')
     .eq(isUuid ? 'id' : 'clerk_user_id', params.id)
     .maybeSingle()
@@ -47,20 +47,10 @@ export default async function MemberPage({ params }: { params: { id: string } })
   const roleInfo = campSignup?.roles as { name?: string; description?: string | null; purpose?: string | null; departments?: { name?: string; icon?: string } | null } | null
   const shiftInfo = campSignup?.schedule_events as { title?: string; day?: string; time?: string; icon_type?: string } | null
 
-  const { data: contribRow } = await supabaseAdmin
-    .from('page_content')
-    .select('value')
-    .eq('key', 'community_contribution_types')
-    .maybeSingle()
-  const contributionTypes = parseContributionTypes(contribRow?.value)
-
-  const deptName = roleInfo?.departments?.name ?? ''
-  const validValues = new Set(contributionTypes.map(t => t.value))
-  const baseContributions: string[] = ((member.setup_preference as string[] | null) ?? []).filter((v: string) => validValues.has(v))
-  const autoTypes = contributionTypes
-    .filter(t => t.autoForDeptKeyword && deptName.toLowerCase().includes(t.autoForDeptKeyword.toLowerCase()))
-    .map(t => t.value)
-  const contributions = [...baseContributions, ...autoTypes.filter(v => !baseContributions.includes(v))]
+  // Groups this member belongs to (replaces the old setup_preference "contributions").
+  const memberGroups = await getMemberGroups(member.clerk_user_id as string | null)
+  const contributions = memberGroups.map(g => g.name)
+  const groupMeta = groupCommitmentMeta(memberGroups)
 
   const displayName = member.preferred_name || member.first_name || 'Member'
   const badgeRoleName = roleInfo?.name ?? null
@@ -165,7 +155,7 @@ export default async function MemberPage({ params }: { params: { id: string } })
           dept={roleInfo?.departments ? { name: roleInfo.departments.name ?? '', icon: roleInfo.departments.icon ?? null } : null}
           shift={shiftInfo ? { title: shiftInfo.title ?? '', day: shiftInfo.day ?? '', time: shiftInfo.time ?? '', icon_type: shiftInfo.icon_type ?? 'star' } : null}
           roleApprovalStatus={campSignup?.role_approval_status ?? null}
-          contributionTypes={contributionTypes}
+          contributionTypes={groupMeta}
           title="Commitments"
           compact
         />

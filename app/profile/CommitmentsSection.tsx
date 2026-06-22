@@ -24,7 +24,7 @@ const DAY_LABELS: Record<string, string> = {
 }
 
 const TAG_STYLES: Record<string, { color: string; border: string; bg: string }> = {
-  CONTRIBUTION: { color: '#c8a848', border: 'rgba(200,168,72,0.4)', bg: 'rgba(200,168,72,0.08)' },
+  GROUP:        { color: '#c8a848', border: 'rgba(200,168,72,0.4)', bg: 'rgba(200,168,72,0.08)' },
   DESIGNATION:  { color: '#D239F8', border: 'rgba(210,57,248,0.35)', bg: 'rgba(210,57,248,0.07)' },
   SHIFT:        { color: '#7dcf8e', border: 'rgba(100,200,120,0.35)', bg: 'rgba(100,200,120,0.07)' },
 }
@@ -43,7 +43,7 @@ function CircleIcon({ children, size = '56px' }: { children: React.ReactNode; si
 }
 
 function Tag({ label }: { label: string }) {
-  const s = TAG_STYLES[label] ?? TAG_STYLES.CONTRIBUTION
+  const s = TAG_STYLES[label] ?? TAG_STYLES.GROUP
   return (
     <span style={{
       fontSize: '0.6rem', letterSpacing: '0.14em', textTransform: 'uppercase',
@@ -124,7 +124,7 @@ export function CommitmentsSection({ contributions, role, dept, shift, roleAppro
                 circleContent={<span style={{ fontSize: compact ? '1.1rem' : '1.4rem', lineHeight: 1 }}>{meta.icon}</span>}
                 title={c}
                 description={meta.desc}
-                tag="CONTRIBUTION"
+                tag="GROUP"
                 iconSize={iconSize}
                 compact={compact}
               />

@@ -32,7 +32,7 @@ One row per person who has submitted a camp application.
 | `structures` | TEXT | |
 | `rideshare` | TEXT | |
 | `contributions` | TEXT[] | **Legacy** — superseded by `setup_preference` |
-| `setup_preference` | TEXT[] | Values: `'Setup'`, `'Teardown'`, `'Decor'`, `'Other'` |
+| `setup_preference` | TEXT[] | **Legacy / frozen** as of migration `030` — superseded by the `groups`/`group_members` tables. No longer written or read by the app (historical values remain for backfill). |
 | `setup_limitations` | TEXT | |
 | `setup_notes` | TEXT | |
 | `energizing_participation` | TEXT | |
@@ -108,6 +108,40 @@ Individual camp roles within a department.
 | `description` | TEXT | |
 | `capacity` | INT | Max number of people for this role |
 | `sort_order` | INT | |
+
+---
+
+### `groups`
+
+Configurable groups members belong to (e.g. Setup, Teardown, Decor). Added in migration `030`. **Replaced** the old contribution-types (`setup_preference`) mechanism: members are admin-assigned via Admin → Groups. Applicants can also opt in if an admin adds a **Group selection** field (`type: 'group_select'`) to the member application in the Application Builder. Each such field carries its own configurable list of offered groups in `FieldConfig.options` (group ids; **unset = all groups**, picked via a checklist in the builder). Picks write to `group_choices` → `group_members` (source `'application'`) on submit; `/api/apply` independently re-validates choices against the visible group_select fields' configured ids. Member-facing "contributions" (profile Commitments, attunement task, personal-schedule filtering, members directory) and the admin overview/registry now read group membership via `lib/groups.ts` (`getMemberGroups`, `getGroupNamesByUser`).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `name` | TEXT NOT NULL | |
+| `description` | TEXT | Shown to applicants when `apply_selectable` is on |
+| `icon` | TEXT | Emoji |
+| `apply_selectable` | BOOL | **Legacy/unused.** Which groups appear on the application is now controlled per-field by the **Group selection** field's `options` (see below), not this column. |
+| `sort_order` | INT | |
+| `created_at` | TIMESTAMPTZ | |
+
+Managed via Admin → **Groups** (`GroupsManager.tsx`). API: `/api/admin/groups` (GET/POST), `/api/admin/groups/[id]` (PATCH/DELETE).
+
+---
+
+### `group_members`
+
+One row per member assigned to a group. Added in migration `030`.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `group_id` | UUID FK → `groups.id` ON DELETE CASCADE | |
+| `clerk_user_id` | TEXT NOT NULL | Member identity (join to `applications` in JS, no FK) |
+| `source` | TEXT | How they joined: `'admin'` (assigned) or `'application'` (opted in on apply form). Default `'admin'` |
+| `created_at` | TIMESTAMPTZ | |
+
+**Unique constraint:** `(group_id, clerk_user_id)`. Adds use upsert with `ignoreDuplicates`. Roster API: `/api/admin/groups/[id]/members` (GET roster enriched from `applications`, POST add, DELETE remove via `?clerk_user_id=`). Application opt-ins are inserted in `/api/apply` for groups flagged `apply_selectable`.
 
 ---
 
@@ -228,7 +262,9 @@ Admin-editable copy for the homepage. One row per key.
 - `member_acknowledgements` — JSON array of strings. **Legacy** source for the Many Hands Agreement clauses — now superseded by the `acknowledgements` field's `options` in `config_member_form` (the Agreement field type, edited in the builder). Still read as a fallback when that field has no options. Falls back to `DEFAULT_AGREEMENT_ITEMS` in `lib/site-config.ts`.
 - `member_attendance_options` — JSON array of strings. Radio options for the attendance question in the application form. Falls back to `DEFAULT_ATTENDANCE_OPTIONS` in `lib/site-config.ts`.
 - `member_membership_types` — JSON array of strings. Options for the membership type dropdown in profile settings. Falls back to `MEMBERSHIP_TYPE_OPTIONS` in `lib/application-options.ts`.
-- `community_contribution_types` — JSON array of `ContributionType` objects. Defines the communal responsibilities members can sign up for (stored in `setup_preference`). Each object has `value` (string, stored in DB), `icon` (emoji), `description` (shown in commitments card), and `autoForDeptKeyword` (optional — if a member's dept name contains this keyword, the contribution is auto-added). Managed via Admin → Application Builder → Contribution Types tab. Falls back to `DEFAULT_CONTRIBUTION_TYPES` in `lib/application-options.ts`.
+- `community_contribution_types` — **Retired** in migration `030` (Groups replaced contribution types). No longer read; the Application Builder "Contribution Types" tab and the `setup_preference` application field were removed. Any existing row is orphaned/harmless. `parseContributionTypes`/`DEFAULT_CONTRIBUTION_TYPES` remain in `lib/application-options.ts` only as the `ContributionType` shape (`{ value, icon, description }`) reused for group commitment metadata.
+- `config_attunement_tasks` — JSON array of `AttunementTask` objects (`{ id, label, requirement, enabled }`) driving the profile **Attunement Status** checklist. `requirement` is one of `role | shift | contribution | photo | approved` and auto-completes the item (logic in `app/profile/page.tsx`). Managed via Admin → Manage → Attunement Tasks (`AttunementTasksManager.tsx`). Falls back to `DEFAULT_ATTUNEMENT_TASKS` in `lib/site-config.ts` (mirrors the original five items).
+- `config_shift_signup_open` — string `'true'`/`'false'` (defaults open when absent). When `'false'`, the `/signup` shift picker is hidden behind a "times not confirmed" notice, `/api/signup` POST rejects new/changed shift selections (cancelling an existing shift is still allowed), and any `shift`-requirement attunement task is hidden from the profile checklist (`app/profile/page.tsx`). Toggled via Admin → Manage → Schedule (`ShiftSignupToggle.tsx`). Read by `app/api/signup/route.ts` (returns `shiftSignupOpen` on GET).
 
 ---
 
@@ -315,6 +351,7 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `027_messages_read.sql` | Message read/notification tracking on `messages` |
 | `028_event_rsvps.sql` | `event_rsvps` table |
 | `029_application_files_bucket.sql` | Public `application-files` storage bucket + read policy (for File-upload fields). **Must be applied** (or create the bucket manually). |
+| `030_groups.sql` | `groups` + `group_members` tables. Backfills groups from distinct `setup_preference` values and memberships from approved members' selections. **Must be applied** before the Groups feature works. Idempotent. |
 
 ---
 

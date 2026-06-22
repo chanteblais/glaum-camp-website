@@ -3,8 +3,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import type { MemberFormConfig, VolunteerFormConfig, StepConfig, FieldConfig } from '@/lib/form-config'
 import { mergeMemberConfig } from '@/lib/form-config'
-import type { ContributionType } from '@/lib/application-options'
-import { DEFAULT_CONTRIBUTION_TYPES } from '@/lib/application-options'
 import { DEFAULT_TRACK_COPY, type TrackCopy } from '@/lib/site-config'
 
 // ── Colors ────────────────────────────────────────────────────────────────────
@@ -86,7 +84,7 @@ function EyeBtn({ visible, disabled, onChange }: { visible: boolean; disabled?: 
 // ── Field row ─────────────────────────────────────────────────────────────────
 
 const FIELD_TYPE_LABELS: Record<string, string> = {
-  text: 'Short text', textarea: 'Long text', radio: 'Single choice', checkbox: 'Multiple choice', file: 'File upload', agreement: 'Agreement',
+  text: 'Short text', textarea: 'Long text', radio: 'Single choice', checkbox: 'Multiple choice', file: 'File upload', agreement: 'Agreement', group_select: 'Group selection',
 }
 
 // Layout element row (divider / paragraph) — editable caption/text, reorder,
@@ -161,7 +159,7 @@ function FieldRow({
   field, saving,
   onToggleVisible, onToggleRequired, onLabelChange, onDescChange,
   onOptionsChange, onDelete,
-  onMoveUp, onMoveDown, isFirst, isLast, onToggleWidth,
+  onMoveUp, onMoveDown, isFirst, isLast, onToggleWidth, groups = [],
 }: {
   field: FieldConfig
   saving: boolean
@@ -177,6 +175,7 @@ function FieldRow({
   isFirst?: boolean
   isLast?: boolean
   onToggleWidth?: () => void
+  groups?: { id: string; name: string }[]
 }) {
   const showOptions = (field.isCustom && (field.type === 'radio' || field.type === 'checkbox')) || field.type === 'agreement'
   const isAgreement = field.type === 'agreement'
@@ -379,6 +378,46 @@ function FieldRow({
           >+ Add {isAgreement ? 'clause' : 'option'}</button>
         </div>
       )}
+
+      {/* Group picker for the Group selection field. options = included group ids
+          (unset = all groups). onOptionsChange always provided for custom fields. */}
+      {field.type === 'group_select' && onOptionsChange && (
+        <div style={{ padding: '0 0.85rem 0.75rem 2.5rem' }}>
+          {groups.length === 0 ? (
+            <p style={{ fontSize: '0.72rem', opacity: 0.45, fontStyle: 'italic', margin: 0 }}>
+              No groups yet — create groups in Admin → Groups, then choose which appear here.
+            </p>
+          ) : (
+            <>
+              <p style={{ fontSize: '0.68rem', opacity: 0.45, margin: '0 0 0.4rem' }}>
+                Groups offered by this field {field.options === undefined ? '(all — uncheck any to limit)' : ''}
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                {groups.map(g => {
+                  // Unset options ⇒ all included; otherwise only the listed ids.
+                  const included = field.options === undefined ? true : field.options.includes(g.id)
+                  return (
+                    <label key={g.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', color: CREAM, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={included}
+                        onChange={() => {
+                          // First edit on an unset field starts from "all included".
+                          const base = field.options === undefined ? groups.map(x => x.id) : field.options
+                          const next = included ? base.filter(id => id !== g.id) : [...base, g.id]
+                          onOptionsChange(next)
+                        }}
+                        style={{ accentColor: PURPLE }}
+                      />
+                      {g.name}
+                    </label>
+                  )
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -389,7 +428,7 @@ function StepSection({
   step, index, total, displayNum, expanded, saving,
   onToggleExpand, onToggleVisible, onMoveUp, onMoveDown,
   onTitleChange, onSubtitleChange, onFieldChange, onDelete, onAddField, onDeleteField,
-  fieldsModular, onMoveField, onToggleFieldWidth, onAddElement,
+  fieldsModular, onMoveField, onToggleFieldWidth, onAddElement, groups,
 }: {
   step: StepConfig
   index: number
@@ -397,6 +436,7 @@ function StepSection({
   displayNum: string
   expanded: boolean
   saving: boolean
+  groups: { id: string; name: string }[]
   onToggleExpand: () => void
   onToggleVisible: () => void
   onMoveUp: () => void
@@ -541,11 +581,12 @@ function StepSection({
                 isLast={pinDown}
                 onToggleWidth={fieldsModular && onToggleFieldWidth ? () => onToggleFieldWidth(field.key) : undefined}
                 onDelete={!field.locked ? () => onDeleteField(field.key) : undefined}
+                groups={groups}
               />
             )
           })}
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
-              {(['text', 'textarea', 'radio', 'checkbox', 'file', 'agreement'] as const).map(type => (
+              {(['text', 'textarea', 'radio', 'checkbox', 'file', 'agreement', ...(fieldsModular ? ['group_select'] as const : [])] as const).map(type => (
                 <button
                   key={type}
                   onClick={() => onAddField(type)}
@@ -635,33 +676,38 @@ function StatusBanner({ open, saving, onToggle }: { open: boolean; saving: boole
 export function ApplicationBuilder({
   memberConfig: initialMember,
   volunteerConfig: initialVolunteer,
-  contributionTypes: initialContribTypes,
   trackCopy: initialTrackCopy,
 }: {
   memberConfig: MemberFormConfig
   volunteerConfig: VolunteerFormConfig
-  contributionTypes?: ContributionType[]
   trackCopy?: TrackCopy
 }) {
   const [memberConfig, setMemberConfig] = useState<MemberFormConfig>(initialMember)
   const [volunteerConfig, setVolunteerConfig] = useState<VolunteerFormConfig>(initialVolunteer)
-  const [contribTypes, setContribTypes] = useState<ContributionType[]>(initialContribTypes ?? DEFAULT_CONTRIBUTION_TYPES)
   const [trackCopy, setTrackCopy] = useState<TrackCopy>(initialTrackCopy ?? DEFAULT_TRACK_COPY)
   const [saving, setSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'member' | 'volunteer' | 'contributions'>('member')
+  const [activeTab, setActiveTab] = useState<'member' | 'volunteer'>('member')
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set())
+  // All groups, for the "Group selection" field's group picker.
+  const [allGroups, setAllGroups] = useState<{ id: string; name: string }[]>([])
+  useEffect(() => {
+    fetch('/api/admin/groups')
+      .then(r => r.json())
+      .then(d => setAllGroups((d.groups ?? []).map((g: { id: string; name: string }) => ({ id: g.id, name: g.name }))))
+      .catch(() => { /* leave empty */ })
+  }, [])
 
   // Pending debounced text-edit save + the value it will persist.
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const pendingSave = useRef<{ key: SaveKey; value: object | ContributionType[] } | null>(null)
+  const pendingSave = useRef<{ key: SaveKey; value: object } | null>(null)
 
   // ── Patch helper ──
 
-  type SaveKey = 'config_member_form' | 'config_volunteer_form' | 'community_contribution_types' | 'config_track_picker'
+  type SaveKey = 'config_member_form' | 'config_volunteer_form' | 'config_track_picker'
 
-  const patch = useCallback(async (key: SaveKey, value: object | ContributionType[]) => {
+  const patch = useCallback(async (key: SaveKey, value: object) => {
     // An immediate (structural) save supersedes any pending debounced one.
     if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null }
     pendingSave.current = null
@@ -690,7 +736,7 @@ export function ApplicationBuilder({
 
   // Debounced autosave for text edits (typing a label/description/title). Shows
   // "Saving…" immediately, then persists once typing pauses.
-  const queueSave = useCallback((key: SaveKey, value: object | ContributionType[]) => {
+  const queueSave = useCallback((key: SaveKey, value: object) => {
     pendingSave.current = { key, value }
     setSaveStatus('saving')
     setSaveError(null)
@@ -814,7 +860,10 @@ export function ApplicationBuilder({
   function handleAddField(stepKey: string, type: string) {
     const fieldKey = `cf_${Date.now()}`
     const newField: FieldConfig = {
-      key: fieldKey, label: 'New question', visible: true, required: false,
+      key: fieldKey,
+      label: type === 'group_select' ? 'Which groups would you like to join?' : 'New question',
+      description: type === 'group_select' ? 'Optional — you can be added or removed later.' : undefined,
+      visible: true, required: false,
       canHide: true, canChangeRequired: true,
       isCustom: true,
       type: type as FieldConfig['type'],
@@ -896,13 +945,12 @@ export function ApplicationBuilder({
 
   function handleSave() {
     if (activeTab === 'member') patch('config_member_form', memberConfig)
-    else if (activeTab === 'volunteer') patch('config_volunteer_form', volunteerConfig)
-    else patch('community_contribution_types', contribTypes)
+    else patch('config_volunteer_form', volunteerConfig)
   }
 
   // ── Tab style ──
 
-  function tabStyle(id: 'member' | 'volunteer' | 'contributions'): React.CSSProperties {
+  function tabStyle(id: 'member' | 'volunteer'): React.CSSProperties {
     const active = activeTab === id
     return {
       padding: '0.45rem 1.1rem',
@@ -977,7 +1025,6 @@ export function ApplicationBuilder({
         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginBottom: '2.5rem' }}>
           <button style={tabStyle('member')} onClick={() => setActiveTab('member')}>Camp Member Application</button>
           <button style={tabStyle('volunteer')} onClick={() => setActiveTab('volunteer')}>Volunteer Signup</button>
-          <button style={tabStyle('contributions')} onClick={() => setActiveTab('contributions')}>Contribution Types</button>
         </div>
 
         {/* ── MEMBER TAB ── */}
@@ -1031,6 +1078,7 @@ export function ApplicationBuilder({
                 onMoveField={(fieldKey, dir) => moveMemberField(step.key, fieldKey, dir)}
                 onToggleFieldWidth={fieldKey => toggleMemberFieldWidth(step.key, fieldKey)}
                 onAddElement={element => handleAddElement(step.key, element)}
+                groups={allGroups}
               />
             ))}
 
@@ -1131,160 +1179,6 @@ export function ApplicationBuilder({
           </div>
         )}
 
-        {/* ── CONTRIBUTIONS TAB ── */}
-        {activeTab === 'contributions' && (
-          <div>
-            <p style={{ fontSize: '0.82rem', lineHeight: 1.7, opacity: 0.5, marginBottom: '1.75rem' }}>
-              Contribution types are the communal responsibilities members can sign up for — such as Setup, Teardown, or Decor. They appear as checkboxes in the application form and profile settings, and as cards in the commitments section.
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1.25rem' }}>
-              {contribTypes.map((ct, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    border: '1px solid rgba(200,168,72,0.15)',
-                    borderRadius: '0.75rem',
-                    background: 'rgba(200,168,72,0.02)',
-                    padding: '0.85rem 1rem',
-                    display: 'flex',
-                    gap: '0.75rem',
-                    alignItems: 'flex-start',
-                  }}
-                >
-                  {/* Emoji icon */}
-                  <input
-                    value={ct.icon}
-                    onChange={e => {
-                      const next = contribTypes.map((t, i) => i === idx ? { ...t, icon: e.target.value } : t)
-                      setContribTypes(next)
-                      queueSave('community_contribution_types', next)
-                    }}
-                    placeholder="⚒️"
-                    style={{
-                      width: '2.2rem', flexShrink: 0,
-                      background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(200,168,72,0.2)',
-                      borderRadius: '0.35rem', color: CREAM, fontSize: '1rem',
-                      padding: '0.3rem 0.2rem', textAlign: 'center', outline: 'none',
-                    }}
-                  />
-
-                  {/* Fields */}
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.4rem', minWidth: 0 }}>
-                    <input
-                      value={ct.value}
-                      onChange={e => {
-                        const next = contribTypes.map((t, i) => i === idx ? { ...t, value: e.target.value } : t)
-                        setContribTypes(next)
-                        queueSave('community_contribution_types', next)
-                      }}
-                      placeholder="Name (e.g. Setup)"
-                      style={{
-                        width: '100%', boxSizing: 'border-box',
-                        background: 'transparent', border: 'none',
-                        borderBottom: '1px solid rgba(200,168,72,0.2)',
-                        color: CREAM, fontSize: '0.85rem', outline: 'none',
-                        padding: '0 0 0.15rem', fontFamily: 'inherit',
-                      }}
-                    />
-                    <input
-                      value={ct.description}
-                      onChange={e => {
-                        const next = contribTypes.map((t, i) => i === idx ? { ...t, description: e.target.value } : t)
-                        setContribTypes(next)
-                        queueSave('community_contribution_types', next)
-                      }}
-                      placeholder="Short description shown in commitments card…"
-                      style={{
-                        width: '100%', boxSizing: 'border-box',
-                        background: 'transparent', border: 'none',
-                        borderBottom: '1px solid rgba(200,168,72,0.1)',
-                        color: CREAM, fontSize: '0.75rem', outline: 'none',
-                        padding: '0 0 0.1rem', opacity: 0.55, fontFamily: 'inherit', fontStyle: 'italic',
-                      }}
-                    />
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.1rem' }}>
-                      <span style={{ fontSize: '0.65rem', opacity: 0.4, letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>Auto-add if dept contains</span>
-                      <input
-                        value={ct.autoForDeptKeyword ?? ''}
-                        onChange={e => {
-                          const next = contribTypes.map((t, i) => i === idx ? { ...t, autoForDeptKeyword: e.target.value || null } : t)
-                          setContribTypes(next)
-                          queueSave('community_contribution_types', next)
-                        }}
-                        placeholder="keyword (optional)"
-                        style={{
-                          flex: 1, minWidth: 0,
-                          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(200,168,72,0.12)',
-                          borderRadius: '0.3rem', color: CREAM, fontSize: '0.72rem',
-                          padding: '0.2rem 0.5rem', outline: 'none', fontFamily: 'inherit',
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Move + delete */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flexShrink: 0 }}>
-                    <button
-                      onClick={() => {
-                        if (idx === 0) return
-                        const next = [...contribTypes]
-                        ;[next[idx - 1], next[idx]] = [next[idx], next[idx - 1]]
-                        setContribTypes(next)
-                        queueSave('community_contribution_types', next)
-                      }}
-                      disabled={idx === 0}
-                      title="Move up"
-                      style={{ background: 'none', border: 'none', cursor: idx === 0 ? 'default' : 'pointer', color: GOLD, opacity: idx === 0 ? 0.2 : 0.5, fontSize: '0.75rem', padding: '0.1rem' }}
-                    >▲</button>
-                    <button
-                      onClick={() => {
-                        if (idx === contribTypes.length - 1) return
-                        const next = [...contribTypes]
-                        ;[next[idx], next[idx + 1]] = [next[idx + 1], next[idx]]
-                        setContribTypes(next)
-                        queueSave('community_contribution_types', next)
-                      }}
-                      disabled={idx === contribTypes.length - 1}
-                      title="Move down"
-                      style={{ background: 'none', border: 'none', cursor: idx === contribTypes.length - 1 ? 'default' : 'pointer', color: GOLD, opacity: idx === contribTypes.length - 1 ? 0.2 : 0.5, fontSize: '0.75rem', padding: '0.1rem' }}
-                    >▼</button>
-                    <button
-                      onClick={() => {
-                        if (!window.confirm(`Remove "${ct.value}"? Existing member data using this value won't be changed.`)) return
-                        const next = contribTypes.filter((_, i) => i !== idx)
-                        setContribTypes(next)
-                        queueSave('community_contribution_types', next)
-                      }}
-                      title="Remove"
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ff8a8a', opacity: 0.45, fontSize: '0.8rem', padding: '0.1rem', marginTop: '0.15rem' }}
-                    >✕</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <button
-              onClick={() => {
-                const next = [...contribTypes, { value: 'New Type', icon: '✦', description: '', autoForDeptKeyword: null }]
-                setContribTypes(next)
-                queueSave('community_contribution_types', next)
-              }}
-              style={{
-                width: '100%', padding: '0.65rem',
-                border: '1px dashed rgba(210,57,248,0.25)',
-                borderRadius: '0.75rem', background: 'transparent',
-                color: PURPLE, fontSize: '0.8rem', letterSpacing: '0.08em',
-                cursor: 'pointer', opacity: 0.6,
-                transition: 'opacity 0.15s',
-              }}
-            >+ Add contribution type</button>
-
-            <p style={{ fontSize: '0.72rem', opacity: 0.35, marginTop: '1.5rem', lineHeight: 1.6, fontStyle: 'italic' }}>
-              The <strong style={{ fontStyle: 'normal', opacity: 0.7 }}>Auto-add if dept contains</strong> field automatically assigns a contribution type to any member whose department name includes the keyword (case-insensitive). For example, setting it to &quot;decor&quot; means members in a &quot;Decor&quot; or &quot;Aesthetic &amp; Decor&quot; department automatically receive that contribution.
-            </p>
-          </div>
-        )}
 
       </div>
     </div>

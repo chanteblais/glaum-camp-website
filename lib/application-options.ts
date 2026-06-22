@@ -50,7 +50,6 @@ export const EDITABLE_APPLICATION_FIELDS = [
   'space_requirements',
   'structures',
   'rideshare',
-  'setup_preference',
 ] as const
 
 export type EditableApplicationField = (typeof EDITABLE_APPLICATION_FIELDS)[number]

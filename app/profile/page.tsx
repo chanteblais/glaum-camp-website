@@ -13,7 +13,8 @@ import { TaskStatus } from './TaskStatus'
 import { PersonalSchedule } from './PersonalSchedule'
 import { RoleBadge } from './RoleBadge'
 import { AttunementStatus } from './AttunementStatus'
-import { parseContributionTypes } from '@/lib/application-options'
+import { getMemberGroups, groupCommitmentMeta } from '@/lib/groups'
+import { parseAttunementTasks } from '@/lib/site-config'
 
 export default async function ProfilePage() {
   const { userId } = await auth()
@@ -56,26 +57,42 @@ export default async function ProfilePage() {
   const badgeDeptName = roleInfo?.departments?.name ?? null
   const badgeDeptIcon = roleInfo?.departments?.icon ?? null
 
-  // Fetch community contribution types (configurable via admin)
-  const { data: contribRow } = await supabaseAdmin
-    .from('page_content')
-    .select('value')
-    .eq('key', 'community_contribution_types')
-    .maybeSingle()
-  const contributionTypes = parseContributionTypes(contribRow?.value)
+  // Groups the member belongs to (replaces the old setup_preference "contributions").
+  // `contributions` = group names; `groupMeta` carries each group's icon/description
+  // for the commitments card (keyed by name, the shape CommitmentsSection expects).
+  const memberGroups = await getMemberGroups(application?.clerk_user_id ?? userId)
+  const contributions = memberGroups.map(g => g.name)
+  const groupMeta = groupCommitmentMeta(memberGroups)
 
-  // Derive contributions: setup_preference filtered to known types + auto-assigned types
-  const deptName = badgeDeptName ?? ''
-  const validValues = new Set(contributionTypes.map(t => t.value))
-  const baseContributions: string[] = ((application?.setup_preference as string[] | null) ?? []).filter(v => validValues.has(v))
-  // Auto-assign any type whose autoForDeptKeyword matches the member's department
-  const autoTypes = contributionTypes
-    .filter(t => t.autoForDeptKeyword && deptName.toLowerCase().includes(t.autoForDeptKeyword.toLowerCase()))
-    .map(t => t.value)
-  const contributions = [
-    ...baseContributions,
-    ...autoTypes.filter(v => !baseContributions.includes(v)),
-  ]
+  // Attunement checklist — admin-configured tasks, each auto-completed from its
+  // requirement type (Admin → Manage → Attunement Tasks).
+  const { data: attuneConfigRows } = await supabaseAdmin
+    .from('page_content')
+    .select('key, value')
+    .in('key', ['config_attunement_tasks', 'config_shift_signup_open'])
+  const attuneConfig = Object.fromEntries((attuneConfigRows ?? []).map(r => [r.key, r.value]))
+  const shiftSignupOpen = attuneConfig['config_shift_signup_open'] !== 'false'
+  const roleDone = !!campSignup?.role_id && campSignup?.role_approval_status !== 'pending'
+  const attunementTasks = parseAttunementTasks(attuneConfig['config_attunement_tasks'])
+    // Drop shift tasks while shift signup is closed — they can't be completed yet.
+    .filter(t => t.enabled && (t.requirement !== 'shift' || shiftSignupOpen))
+    .map(t => {
+      switch (t.requirement) {
+        case 'photo':
+          return { id: t.id, label: t.label, done: !!application?.avatar_url, section: 'photo' as const }
+        case 'contribution':
+          // Group membership is admin-assigned now, so this is status-only (not
+          // a clickable self-serve action). Admins can relabel it in Attunement Tasks.
+          return { id: t.id, label: t.label, done: contributions.length > 0 }
+        case 'role':
+          return { id: t.id, label: t.label, done: roleDone, href: '/signup' }
+        case 'shift':
+          return { id: t.id, label: t.label, done: !!campSignup?.schedule_event_id, href: '/signup' }
+        case 'approved':
+        default:
+          return { id: t.id, label: t.label, done: true }
+      }
+    })
 
   // Link clerk_user_id for approved applications found by email
   if (application?.status === 'approved' && !application.clerk_user_id) {
@@ -157,7 +174,7 @@ export default async function ProfilePage() {
                   {displayName}
                 </h1>
                 {application && (application.status === 'approved' || application.status === 'pending') && (
-                  <ProfileSettings application={application} contributionTypes={contributionTypes} />
+                  <ProfileSettings application={application} />
                 )}
                 {volunteer && volunteer.status === 'active' && !application && (
                   <VolunteerSettings volunteer={volunteer} />
@@ -307,17 +324,11 @@ export default async function ProfilePage() {
                 dept={roleInfo?.departments ? { name: roleInfo.departments.name ?? '', icon: roleInfo.departments.icon ?? null } : null}
                 shift={shiftInfo ? { title: shiftInfo.title ?? '', day: shiftInfo.day ?? '', time: shiftInfo.time ?? '', icon_type: shiftInfo.icon_type ?? 'star' } : null}
                 roleApprovalStatus={campSignup?.role_approval_status ?? null}
-                contributionTypes={contributionTypes}
+                contributionTypes={groupMeta}
                 showManageLink
               />
               <div>
-                <AttunementStatus tasks={[
-                  { id: 'approved',      label: 'Application Approved',  done: true },
-                  { id: 'photo',         label: 'Photo Uploaded',         done: !!(application?.avatar_url),  section: 'photo' as const },
-                  { id: 'contribution',  label: 'Contribution Selected',  done: contributions.length > 0,     section: 'contribution' as const },
-                  { id: 'role',          label: 'Role Selected',          done: !!campSignup?.role_id && campSignup?.role_approval_status !== 'pending', href: '/signup' },
-                  { id: 'shift',         label: 'Shift Assigned',         done: !!campSignup?.schedule_event_id, href: '/signup' },
-                ]} />
+                {attunementTasks.length > 0 && <AttunementStatus tasks={attunementTasks} />}
               </div>
             </div>
             <div style={{ marginBottom: '1.5rem' }}>

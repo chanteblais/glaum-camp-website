@@ -7,8 +7,6 @@ import {
   ATTENDANCE_OPTIONS,
   MEMBERSHIP_TYPE_OPTIONS,
   RIDESHARE_OPTIONS,
-  DEFAULT_CONTRIBUTION_TYPES,
-  type ContributionType,
 } from '@/lib/application-options'
 
 type ApplicationData = {
@@ -27,7 +25,6 @@ type ApplicationData = {
   space_requirements?: string | null
   structures?: string | null
   rideshare?: string | null
-  setup_preference?: string[] | null
 }
 
 const inputStyle: React.CSSProperties = {
@@ -60,7 +57,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-export function ProfileSettings({ application, contributionTypes = DEFAULT_CONTRIBUTION_TYPES }: { application: ApplicationData; contributionTypes?: ContributionType[] }) {
+export function ProfileSettings({ application }: { application: ApplicationData }) {
   const router = useRouter()
   const menuRef = useRef<HTMLDivElement>(null)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -84,7 +81,6 @@ export function ProfileSettings({ application, contributionTypes = DEFAULT_CONTR
     space_requirements: application.space_requirements ?? '',
     structures: application.structures ?? '',
     rideshare: application.rideshare ?? '',
-    setup_preference: (application.setup_preference ?? []).filter(v => contributionTypes.some(t => t.value === v)),
   })
 
   useEffect(() => {
@@ -102,7 +98,6 @@ export function ProfileSettings({ application, contributionTypes = DEFAULT_CONTR
       space_requirements: application.space_requirements ?? '',
       structures: application.structures ?? '',
       rideshare: application.rideshare ?? '',
-      setup_preference: (application.setup_preference ?? []).filter(v => contributionTypes.some(t => t.value === v)),
     })
   }, [application])
 
@@ -155,15 +150,6 @@ export function ProfileSettings({ application, contributionTypes = DEFAULT_CONTR
     setError(null)
     setSuccess(null)
     if (next === 'cancel') setCancelReason('')
-  }
-
-  const toggleSetupPreference = (option: string) => {
-    setForm((prev) => ({
-      ...prev,
-      setup_preference: prev.setup_preference.includes(option)
-        ? prev.setup_preference.filter((c) => c !== option)
-        : [...prev.setup_preference, option],
-    }))
   }
 
   const handleSave = async () => {
@@ -416,28 +402,6 @@ export function ProfileSettings({ application, contributionTypes = DEFAULT_CONTR
                 <option key={o} value={o}>{o}</option>
               ))}
             </select>
-          </Field>
-
-          <Field label="Contributions">
-            <div id="settings-field-contribution" style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
-              {contributionTypes.map((ct) => (
-                <label
-                  key={ct.value}
-                  style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start', fontSize: '0.85rem', cursor: 'pointer', color: '#F3EDE6' }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={form.setup_preference.includes(ct.value)}
-                    onChange={() => toggleSetupPreference(ct.value)}
-                    style={{ marginTop: '0.15rem', accentColor: '#D239F8' }}
-                  />
-                  <span>
-                    {ct.icon && <span style={{ marginRight: '0.35rem' }}>{ct.icon}</span>}
-                    {ct.value}
-                  </span>
-                </label>
-              ))}
-            </div>
           </Field>
 
           {error && <p style={{ color: '#ff8a8a', fontSize: '0.85rem', marginBottom: '0.75rem' }}>{error}</p>}

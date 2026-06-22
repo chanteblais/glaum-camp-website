@@ -4,7 +4,10 @@ import { DEFAULT_AGREEMENT_ITEMS } from './site-config'
 
 // 'agreement' = a checklist of statements/clauses the applicant must acknowledge
 // (all required when the field is required), like the Many Hands Agreement.
-export type FieldType = 'text' | 'textarea' | 'radio' | 'checkbox' | 'file' | 'agreement'
+// 'group_select' = a checklist of admin-defined Groups (the ones flagged
+// "applicants can opt in"). Selections add the applicant to those groups on submit
+// (writes to group_choices, not custom_answers). Member form only.
+export type FieldType = 'text' | 'textarea' | 'radio' | 'checkbox' | 'file' | 'agreement' | 'group_select'
 
 export type FieldConfig = {
   key: string
@@ -127,7 +130,6 @@ export const DEFAULT_MEMBER_CONFIG: MemberFormConfig = {
         { key: 'el_roles_div1',        element: 'divider', label: '', visible: true, required: false, canHide: true, canChangeRequired: false },
         { key: 'leadership_interest',  label: 'Are you interested in a leadership role?', visible: true, required: false, canHide: true,  canChangeRequired: true, width: 'full' },
         { key: 'el_roles_communal',    element: 'divider', label: 'Communal Responsibilities', visible: true, required: false, canHide: true, canChangeRequired: false },
-        { key: 'setup_preference',     label: 'Communal Responsibilities', description: 'Setup, teardown, or decor preference', visible: true, required: false, canHide: true, canChangeRequired: true, width: 'full' },
         { key: 'setup_limitations',    label: 'Setup/Teardown Limitations',               visible: true, required: false, canHide: true,  canChangeRequired: true, width: 'full' },
         { key: 'el_roles_div2',        element: 'divider', label: '', visible: true, required: false, canHide: true, canChangeRequired: false },
         { key: 'setup_notes',          label: 'What brings you to Glåüm this year?',      visible: true, required: false, canHide: true,  canChangeRequired: true, width: 'full' },

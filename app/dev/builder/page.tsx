@@ -4,7 +4,6 @@
 import { notFound } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { mergeMemberConfig, mergeVolunteerConfig } from '@/lib/form-config'
-import { parseContributionTypes } from '@/lib/application-options'
 import { ApplicationBuilder } from '../../admin/configure/ApplicationBuilder'
 
 export default async function DevBuilderPage() {
@@ -13,7 +12,7 @@ export default async function DevBuilderPage() {
   const { data: configRows } = await supabaseAdmin
     .from('page_content')
     .select('key, value')
-    .in('key', ['config_member_form', 'config_volunteer_form', 'community_contribution_types'])
+    .in('key', ['config_member_form', 'config_volunteer_form'])
 
   const configMap = Object.fromEntries((configRows ?? []).map(r => [r.key, r.value]))
 
@@ -24,7 +23,6 @@ export default async function DevBuilderPage() {
 
   const memberConfig = mergeMemberConfig(memberRaw)
   const volunteerConfig = mergeVolunteerConfig(volunteerRaw)
-  const contributionTypes = parseContributionTypes(configMap['community_contribution_types'])
 
-  return <ApplicationBuilder memberConfig={memberConfig} volunteerConfig={volunteerConfig} contributionTypes={contributionTypes} />
+  return <ApplicationBuilder memberConfig={memberConfig} volunteerConfig={volunteerConfig} />
 }

@@ -140,12 +140,13 @@ Collects name, contact info, pronouns, photo, signup intent, days available, and
 
 Sections:
 - **Header row** — avatar (260px circle, gold border), centered via `1fr auto 1fr` grid, with role badge overlaid (`transform: translate(-40px, -28px)`). Gear icon (⚙) sits next to the display name and opens `ProfileSettings`.
-- **Attunement Status** (`AttunementStatus.tsx`) — parchment card with checklist:
-  - Application Approved (always done once on this page)
-  - Photo Uploaded — checks `avatar_url`
-  - Contribution Selected — checks `contributions.length > 0`; clicking opens ProfileSettings to contributions field
-  - Role Selected — checks `campSignup.role_id` (non-pending)
-  - Shift Assigned — checks `campSignup.schedule_event_id`
+- **Attunement Status** (`AttunementStatus.tsx`) — parchment card with checklist. **Fully admin-managed** (Admin → Manage → Attunement Tasks, `AttunementTasksManager.tsx`); the list lives in `page_content.config_attunement_tasks` (JSON), parsed by `parseAttunementTasks` in `lib/site-config.ts`. Each task has a `requirement` that auto-completes it; the done/action logic is computed in `app/profile/page.tsx`. Card is hidden if no enabled tasks. Requirement types (`ATTUNEMENT_REQUIREMENTS`):
+  - `role` — `campSignup.role_id` set & non-pending; links to `/signup`
+  - `shift` — `campSignup.schedule_event_id` set; links to `/signup`
+  - `contribution` — `contributions.length > 0`; clicking opens ProfileSettings to contributions field
+  - `photo` — checks `avatar_url`; opens ProfileSettings photo
+  - `approved` — always done on this page (reassuring first step)
+  - Default list (when key absent) mirrors the original five hardcoded items, so behaviour is unchanged until an admin edits it.
 - **Signup Section** (`SignupSection.tsx`) — role/shift picker for approved members. Has "Suggest a role" button that opens `SuggestRoleModal`
 - **Commitments** (`CommitmentsSection.tsx`) — shows selected role + shift. `showManageLink` prop controls the "Manage commitments →" footer link — only `true` on `/profile`, not on member-view pages.
 - **Personal Schedule** (`PersonalScheduleCalendar.tsx`) — events relevant to the member based on their `setup_preference` and `contribution_type` matching. "View full calendar →" links to `/schedule`.
@@ -249,9 +250,9 @@ Reached via the "Configure Applications →" link on the admin dashboard.
 - Open/closed toggle — hides the form from new applicants when closed
 - Collapsible step sections (built-in: Basic Information, Many Hands Registry, What If Plans, Participation & Roles, The Many Hands Agreement, Shrimp) plus any custom sections. Per section: editable title/subtitle, hide, ↑↓ reorder (a custom section can sit **anywhere**, including first), ✕ delete (Basic Information can't be deleted).
 - Per field: hide (eye), inline label + description editors, **REQUIRED/OPTIONAL** toggle, **½ / ▭ width** toggle (consecutive halves pair into a two-column row), **↑↓ reorder** (non-locked fields can move past locked ones), ✕ delete. A small read-only type tag shows each custom field's type.
-- **Field types:** Short text, Long text, Single choice, Multiple choice (choice fields auto-reveal a fill-in when an option named "Other" is selected), **File upload**, **Agreement** (a checklist of clauses — all required when the field is required). Plus **Divider** and **Text block** layout elements (text blocks render markdown-lite: blank-line paragraphs, `*`/`✦` bullets, `[text](url)`/bare links, `**bold**`).
+- **Field types:** Short text, Long text, Single choice, Multiple choice (choice fields auto-reveal a fill-in when an option named "Other" is selected), **File upload**, **Agreement** (a checklist of clauses — all required when the field is required), **Group selection** (`group_select`, member form only — a checklist of Groups the applicant can opt into; the admin picks *which* groups the field offers via a checklist in the builder, stored in the field's `options` (unset = all groups); selections add the applicant to those groups on submit). Plus **Divider** and **Text block** layout elements (text blocks render markdown-lite: blank-line paragraphs, `*`/`✦` bullets, `[text](url)`/bare links, `**bold**`).
 - **Locked core fields:** First/Last Name, Email, Phone (always present + required, read-only in the builder); Photo is also locked but its Required is toggleable (so admins can allow blank profiles). These are the only NOT-NULL-backed fields.
-- "+ Short text / Long text / Single choice / Multiple choice / File upload / Agreement / Divider / Text block" buttons at the bottom of every expanded step; "+ Add section" below the step list.
+- "+ Short text / Long text / Single choice / Multiple choice / File upload / Agreement / Group selection / Divider / Text block" buttons at the bottom of every expanded step; "+ Add section" below the step list.
 - **Apply-page card editor** — each tab has a title + description editor for the `/apply` TrackPicker card (Camp Member card on the Member tab, Volunteer card on the Volunteer tab), stored in `page_content.config_track_picker`.
 
 **Tab: Volunteer Signup** — open/closed toggle + flat field list with the same per-field controls.
