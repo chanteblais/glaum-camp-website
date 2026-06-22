@@ -1,6 +1,8 @@
 'use client'
 
-export function TrackPicker({ hideMember = false, hideVolunteer = false }: { hideMember?: boolean; hideVolunteer?: boolean }) {
+import { DEFAULT_TRACK_COPY, type TrackCopy } from '@/lib/site-config'
+
+export function TrackPicker({ hideMember = false, hideVolunteer = false, copy = DEFAULT_TRACK_COPY }: { hideMember?: boolean; hideVolunteer?: boolean; copy?: TrackCopy }) {
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
       <img src="/hands-left.svg" alt="" aria-hidden style={{ position: 'fixed', left: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
@@ -51,10 +53,10 @@ export function TrackPicker({ hideMember = false, hideVolunteer = false }: { hid
             >
               <p style={{ fontSize: '1.6rem', marginBottom: '0.75rem', lineHeight: 1 }}>✦</p>
               <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.3rem', color: '#C8A848', marginBottom: '0.6rem', letterSpacing: '0.05em' }}>
-                Camp Member
+                {copy.memberTitle}
               </p>
-              <p style={{ fontSize: '0.85rem', lineHeight: 1.7, opacity: 0.55, margin: 0 }}>
-                Apply for full membership — fill out an application and join the community as a Glåüm member.
+              <p style={{ fontSize: '0.85rem', lineHeight: 1.7, opacity: 0.55, margin: 0, whiteSpace: 'pre-wrap' }}>
+                {copy.memberDesc}
               </p>
             </div>
           </a>}
@@ -84,10 +86,10 @@ export function TrackPicker({ hideMember = false, hideVolunteer = false }: { hid
             >
               <p style={{ fontSize: '1.6rem', marginBottom: '0.75rem', lineHeight: 1 }}>🤝</p>
               <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.3rem', color: '#D239F8', marginBottom: '0.6rem', letterSpacing: '0.05em' }}>
-                Volunteer
+                {copy.volunteerTitle}
               </p>
-              <p style={{ fontSize: '0.85rem', lineHeight: 1.7, opacity: 0.55, margin: 0 }}>
-                Sign up as a volunteer — help with setup, teardown, or other roles without a full membership application.
+              <p style={{ fontSize: '0.85rem', lineHeight: 1.7, opacity: 0.55, margin: 0, whiteSpace: 'pre-wrap' }}>
+                {copy.volunteerDesc}
               </p>
             </div>
           </a>}

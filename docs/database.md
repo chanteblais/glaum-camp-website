@@ -1,6 +1,6 @@
 # Database Schema
 
-All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations `001`–`025` in `supabase-migrations/` document incremental changes. Migrations `001`–`024` are confirmed applied; `025` must be applied before the next deploy.
+All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations in `supabase-migrations/` document incremental changes (latest: `029`). Confirm `025` (column renames), and `029` (the `application-files` bucket) are applied before relying on those features.
 
 ---
 
@@ -221,10 +221,11 @@ Admin-editable copy for the homepage. One row per key.
 - `home_quote` — quote card text in logged-in hero banner
 - `home_about_heading` / `home_about_body` — About section (public page)
 - `home_participate_heading` / `home_participate_body` — Participate section (public page)
-- `config_member_form` — JSON blob (`MemberFormConfig`) for the camp member application. Set by Application Builder. Merged with defaults from `lib/form-config.ts` on every load — custom steps and fields survive the merge.
-- `config_volunteer_form` — JSON blob (`VolunteerFormConfig`) for the volunteer signup. Same pattern.
+- `config_member_form` — JSON blob (`MemberFormConfig`) for the camp member application. Set by Application Builder. `mergeMemberConfig` (in `lib/form-config.ts`) reconciles it with defaults on every load: preserves the saved order of **all** sections (built-in + custom, so a custom section can be first), merges built-in field overrides, keeps custom fields/elements as-is, and re-injects only missing *locked* core fields. Field option lists and **agreement clauses** now live in each field's `options` here (editable in the builder).
+- `config_volunteer_form` — JSON blob (`VolunteerFormConfig`) for the volunteer signup. Same pattern (flat field list, no custom sections).
+- `config_track_picker` — JSON `{ memberTitle, memberDesc, volunteerTitle, volunteerDesc }` for the `/apply` TrackPicker cards. Edited in the Application Builder (Member/Volunteer tabs). Falls back to `DEFAULT_TRACK_COPY` in `lib/site-config.ts`.
 - `dashboard_layout` — JSON blob controlling the member dashboard widget layout. Shape: `{ order: string[], hidden: string[], widths: Record<string, 'half' | 'full'> }`. Managed by the inline page editor. Widget IDs: `announcements`, `polls`, `events`, `spotlight`, `activity`.
-- `member_acknowledgements` — JSON array of strings. The agreement checkbox items shown in the application form. If absent, falls back to `DEFAULT_AGREEMENT_ITEMS` in `lib/site-config.ts`.
+- `member_acknowledgements` — JSON array of strings. **Legacy** source for the Many Hands Agreement clauses — now superseded by the `acknowledgements` field's `options` in `config_member_form` (the Agreement field type, edited in the builder). Still read as a fallback when that field has no options. Falls back to `DEFAULT_AGREEMENT_ITEMS` in `lib/site-config.ts`.
 - `member_attendance_options` — JSON array of strings. Radio options for the attendance question in the application form. Falls back to `DEFAULT_ATTENDANCE_OPTIONS` in `lib/site-config.ts`.
 - `member_membership_types` — JSON array of strings. Options for the membership type dropdown in profile settings. Falls back to `MEMBERSHIP_TYPE_OPTIONS` in `lib/application-options.ts`.
 - `community_contribution_types` — JSON array of `ContributionType` objects. Defines the communal responsibilities members can sign up for (stored in `setup_preference`). Each object has `value` (string, stored in DB), `icon` (emoji), `description` (shown in commitments card), and `autoForDeptKeyword` (optional — if a member's dept name contains this keyword, the contribution is auto-added). Managed via Admin → Application Builder → Contribution Types tab. Falls back to `DEFAULT_CONTRIBUTION_TYPES` in `lib/application-options.ts`.
@@ -278,8 +279,9 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 
 | Bucket | Used for | Bucket access |
 |---|---|---|
-| `avatars` | Member profile photos (uploaded via `AvatarUpload`) | Public |
+| `avatars` | Member profile photos (uploaded via `AvatarUpload`; also the application Photo field → `/api/profile/avatar`) | Public |
 | `schedule-icons` | Custom icons for schedule events | Public (must be configured) |
+| `application-files` | Attachments for admin-added **File upload** application fields (`/api/apply/file`) | Public — **must be created** (migration `029`, or create in the Supabase dashboard like `avatars`) |
 
 ---
 
@@ -309,6 +311,10 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `023_custom_answers.sql` | `custom_answers JSONB` on `applications` for admin-added form fields |
 | `024_polls.sql` | `polls` and `poll_votes` tables |
 | `025_rename_community_fields.sql` | Renames five community-specific columns on `applications` to generic equivalents: `glaum_acceptance → community_acceptance`, `attunement_status → onboarding_status`, `attunement_status_other → onboarding_status_other`, `draws_to_glaum → draws_to_community`, `camp_relationship → membership_type`. **Must be applied before next deploy.** |
+| `026_notification_preferences.sql` | `notification_preferences` table |
+| `027_messages_read.sql` | Message read/notification tracking on `messages` |
+| `028_event_rsvps.sql` | `event_rsvps` table |
+| `029_application_files_bucket.sql` | Public `application-files` storage bucket + read policy (for File-upload fields). **Must be applied** (or create the bucket manually). |
 
 ---
 

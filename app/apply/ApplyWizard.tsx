@@ -11,18 +11,6 @@ import { DEFAULT_CONTRIBUTION_TYPES } from '@/lib/application-options'
 
 const DRAFT_KEY = 'glaum-apply-draft-v2'
 
-const MILESTONES = [
-  'Application\nReceived',
-  'Registry Entry\nin Progress',
-  'Participation\nPlanned',
-  'Attunement\nPending',
-  'Welcome to\nGlåüm',
-]
-
-const MILESTONE_FOR_KEY: Record<string, number> = {
-  basic: 0, registry: 1, plans: 2, roles: 2, agreement: 3, shrimp: 4,
-}
-
 // Fallback — replaced at runtime by items passed from page_content
 const AGREEMENT_ITEMS_FALLBACK = [
   'I have taken time to familiarise myself with Glåüm and believe it is a community I would genuinely enjoy contributing to.',
@@ -126,7 +114,7 @@ function makeFlHelper(formConfig: MemberFormConfig, stepKey: string): FlHelper {
 
 function Label({ children, optional }: { children: React.ReactNode; optional?: boolean }) {
   return (
-    <p style={{ fontSize: '0.72rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: GOLD, opacity: 0.75, margin: '0 0 0.4rem' }}>
+    <p style={{ fontSize: '0.72rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: GOLD, opacity: 0.75, margin: '0 0 0.6rem' }}>
       {children}{optional && <span style={{ opacity: 0.5, marginLeft: '0.4rem', textTransform: 'none', letterSpacing: 0, fontSize: '0.78rem' }}>(optional)</span>}
     </p>
   )
@@ -134,7 +122,7 @@ function Label({ children, optional }: { children: React.ReactNode; optional?: b
 
 function Field({ label, optional, required, children }: { label: string; optional?: boolean; required?: boolean; children: React.ReactNode }) {
   return (
-    <div style={{ marginBottom: '1.25rem' }}>
+    <div style={{ marginBottom: '1.9rem' }}>
       <Label optional={optional}>
         {label}
         {required && <span style={{ color: '#ff8a8a', marginLeft: '0.25rem', opacity: 0.85 }}>*</span>}
@@ -179,7 +167,7 @@ function Textarea({ value, onChange, placeholder, maxLength = 500 }: {
 
 function RadioGroup({ options, value, onChange }: { options: string[]; value: string; onChange: (v: string) => void }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
       {options.map(opt => (
         <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', fontSize: '0.9rem', color: CREAM, opacity: value === opt ? 1 : 0.65 }}>
           <div style={{
@@ -200,7 +188,7 @@ function RadioGroup({ options, value, onChange }: { options: string[]; value: st
 function CheckboxGroup({ options, value, onChange }: { options: string[]; value: string[]; onChange: (v: string[]) => void }) {
   const toggle = (opt: string) => onChange(value.includes(opt) ? value.filter(v => v !== opt) : [...value, opt])
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
       {options.map(opt => (
         <label key={opt} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer', fontSize: '0.9rem', color: CREAM, opacity: value.includes(opt) ? 1 : 0.65, lineHeight: 1.5 }}>
           <div style={{
@@ -367,325 +355,434 @@ function PhotoUpload({ value, onChange }: { value: string | null; onChange: (url
 
 // ── Sections ──────────────────────────────────────────────────────────────────
 
-function SectionI({ form, set, fl, isMobile }: { form: FormData; set: (k: keyof FormData, v: unknown) => void; fl: FlHelper; isMobile?: boolean }) {
-  const cols2 = isMobile ? '1fr' : '1fr 1fr'
+// ── File upload (admin-added "File upload" fields) ───────────────────────────
+
+function fileNameFromUrl(url: string): string {
+  try {
+    const seg = decodeURIComponent(url.split('?')[0].split('/').pop() ?? '')
+    return seg.replace(/^\d{10,}-/, '') || 'Uploaded file'
+  } catch {
+    return 'Uploaded file'
+  }
+}
+
+function ApplicationFileUpload({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const ref = useRef<HTMLInputElement>(null)
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setUploading(true)
+    setError(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/apply/file', { method: 'POST', body: fd })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error ?? 'Upload failed'); setUploading(false); return }
+      onChange(data.url)
+    } catch {
+      setError('Something went wrong. Please try again.')
+    }
+    setUploading(false)
+  }
+
+  return (
+    <div>
+      <input ref={ref} type="file" style={{ display: 'none' }} onChange={handleFile} />
+      {value ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <a href={value} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: GOLD, fontSize: '0.85rem', textDecoration: 'none', maxWidth: '100%', overflow: 'hidden' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" style={{ flexShrink: 0 }}>
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+            </svg>
+            <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{fileNameFromUrl(value)}</span>
+          </a>
+          <button type="button" onClick={() => ref.current?.click()} disabled={uploading} style={{ padding: '0.35rem 0.85rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.3)', background: 'transparent', color: GOLD, fontSize: '0.75rem', cursor: uploading ? 'not-allowed' : 'pointer' }}>
+            {uploading ? 'Uploading…' : 'Replace'}
+          </button>
+          <button type="button" onClick={() => onChange('')} disabled={uploading} style={{ background: 'none', border: 'none', color: '#ff8a8a', opacity: 0.6, fontSize: '0.8rem', cursor: 'pointer' }}>Remove</button>
+        </div>
+      ) : (
+        <button type="button" onClick={() => ref.current?.click()} disabled={uploading} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.55rem 1.1rem', borderRadius: '9999px', border: '1px dashed rgba(200,168,72,0.35)', background: 'transparent', color: GOLD, fontSize: '0.82rem', cursor: uploading ? 'not-allowed' : 'pointer' }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+          {uploading ? 'Uploading…' : 'Upload file'}
+        </button>
+      )}
+      <p style={{ fontSize: '0.72rem', opacity: 0.4, margin: '0.4rem 0 0' }}>Images, PDF, Word, or text — up to 10 MB.</p>
+      {error && <p style={{ fontSize: '0.78rem', color: '#ff8a8a', margin: '0.35rem 0 0' }}>{error}</p>}
+    </div>
+  )
+}
+
+// ── Modular section renderer (config-driven, width-paired) ───────────────────
+//
+// Renders a section's fields in config order, reusing the same primitives as the
+// hand-written sections. Consecutive `half` fields pair into a two-column row; an
+// unpaired `half` (or any `full`) takes the whole row. Built-in fields render via
+// the descriptor registry; admin-added fields render by their `type`.
+
+// Built-in steps rendered by the config-driven ModularSection (all of them).
+const MODULAR_STEP_KEYS = ['basic', 'registry', 'plans', 'roles', 'agreement', 'shrimp']
+
+type FieldDescriptor = {
+  widget: 'text' | 'email' | 'tel' | 'date' | 'radio' | 'checkbox' | 'textarea' | 'photo' | 'agreement'
+  placeholder?: string
+  // When set, the field's own description is used as the placeholder (falling
+  // back to this value) instead of being rendered as a separate paragraph.
+  descPlaceholder?: string
+  maxLength?: number
+  options?: string[]
+  // Options resolved at runtime from `optionSources[field.key]` (attendance,
+  // contribution types, agreement items, departments…).
+  optionsFromSource?: boolean
+  // FormData key when it differs from the field key (e.g. dept_interests).
+  formKey?: keyof FormData
+}
+
+// Built-in field descriptors, keyed by field key.
+const FIELD_DESCRIPTORS: Record<string, FieldDescriptor> = {
+  // Basic Information
+  first_name:        { widget: 'text', placeholder: 'First name', maxLength: 50 },
+  last_name:         { widget: 'text', placeholder: 'Last name', maxLength: 50 },
+  preferred_name:    { widget: 'text', placeholder: 'If different', maxLength: 50 },
+  pronouns:          { widget: 'text', placeholder: 'e.g. she/her' },
+  email:             { widget: 'email', placeholder: 'your@email.com' },
+  phone:             { widget: 'tel', placeholder: 'For camp logistics' },
+  instagram:         { widget: 'text', descPlaceholder: '@handle' },
+  location:          { widget: 'text', placeholder: "City, region, or 'the void'" },
+  emergency_contact: { widget: 'text', descPlaceholder: 'Name and phone number' },
+  referral:          { widget: 'text', placeholder: 'Name or how you found us' },
+  camped_before:     { widget: 'radio', options: ['Yes', 'No'] },
+  avatar_url:        { widget: 'photo' },
+  // Many Hands Registry
+  about_you:            { widget: 'textarea', placeholder: 'Share the projects, ideas, pursuits, or obsessions lighting you up right now.' },
+  special_skills:       { widget: 'textarea', placeholder: 'Your answer…' },
+  find_at_camp:         { widget: 'textarea', placeholder: 'Your answer…' },
+  community_acceptance: { widget: 'radio', options: ['Yes', 'Not Yet', "It's Complicated"] },
+  onboarding_status:    { widget: 'radio', options: ['Emerging', 'Stable', 'Elevated', 'Classified', 'Other'] },
+  // What If Plans
+  attendance:     { widget: 'radio', optionsFromSource: true },
+  arrival_date:   { widget: 'date' },
+  departure_date: { widget: 'date' },
+  vehicle:        { widget: 'text', descPlaceholder: 'Make, model, passengers, cargo capacity' },
+  structures:     { widget: 'text', descPlaceholder: 'Tents, shade structures, etc.' },
+  rideshare:      { widget: 'radio', options: ['I need a ride', 'I can offer a ride', "I'm sorted", 'Not sure yet'] },
+  // Participation & Roles
+  dept_interests:      { widget: 'checkbox', optionsFromSource: true, formKey: 'department_interests' },
+  leadership_interest: { widget: 'radio', options: ['Yes', 'Maybe', 'Not this year'] },
+  setup_preference:    { widget: 'checkbox', optionsFromSource: true },
+  setup_limitations:   { widget: 'checkbox', options: ['None', 'Unable to participate in setup', 'Unable to participate in teardown', 'Unable to participate in either', 'Prefer to discuss privately'] },
+  setup_notes:         { widget: 'textarea', placeholder: 'Your answer…', maxLength: 800 },
+  // The Many Hands Agreement — clauses come from the field's editable `options`
+  // (falling back to the legacy member_acknowledgements source if unset).
+  acknowledgements:    { widget: 'agreement' },
+  // Shrimp
+  shrimp_relationship: { widget: 'textarea', placeholder: 'Reflect carefully. There are no wrong answers. There are, however, better ones.', maxLength: 500 },
+}
+
+function isPhotoField(field: FieldConfig): boolean {
+  return FIELD_DESCRIPTORS[field.key]?.widget === 'photo'
+}
+
+// Layout elements and the photo uploader are never paired into a two-column row.
+function isFullBleed(field: FieldConfig): boolean {
+  return !!field.element || isPhotoField(field)
+}
+
+type OptionSources = Record<string, string[]>
+
+// A list of statements/clauses to acknowledge (Many Hands Agreement style) with a
+// "N items remaining" nudge. All items must be checked when the field is required.
+// ── Lightweight rich-text for text-block elements ────────────────────────────
+// Supports paragraphs (blank-line separated), bullet lists (lines starting with
+// *, -, • or ✦), links ([text](url) and bare URLs), and **bold**. No deps.
+
+function renderInline(text: string): React.ReactNode[] {
+  const linkStyle: React.CSSProperties = { color: GOLD, textDecoration: 'underline', textUnderlineOffset: '2px' }
+  const nodes: React.ReactNode[] = []
+  const re = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s)]+)|\*\*([^*]+)\*\*/g
+  let last = 0
+  let key = 0
+  let m: RegExpExecArray | null
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) nodes.push(text.slice(last, m.index))
+    if (m[1] && m[2]) {
+      nodes.push(<a key={key++} href={m[2]} target="_blank" rel="noopener noreferrer" style={linkStyle}>{m[1]}</a>)
+    } else if (m[3]) {
+      // Trim trailing sentence punctuation off bare URLs.
+      const trail = m[3].match(/[.,;:!?]+$/)?.[0] ?? ''
+      const url = trail ? m[3].slice(0, -trail.length) : m[3]
+      nodes.push(<a key={key++} href={url} target="_blank" rel="noopener noreferrer" style={linkStyle}>{url}</a>)
+      if (trail) nodes.push(trail)
+    } else if (m[4]) {
+      nodes.push(<strong key={key++}>{m[4]}</strong>)
+    }
+    last = m.index + m[0].length
+  }
+  if (last < text.length) nodes.push(text.slice(last))
+  return nodes
+}
+
+function RichText({ text }: { text: string }) {
+  const blocks = text.trim().split(/\n\s*\n/).filter(Boolean)
+  const base: React.CSSProperties = { fontSize: '0.92rem', lineHeight: 1.8, color: CREAM, opacity: 0.7 }
+  return (
+    <div style={{ marginBottom: '2rem' }}>
+      {blocks.map((block, bi) => {
+        const lines = block.split('\n').map(l => l.trim()).filter(Boolean)
+        const isList = lines.length > 0 && lines.every(l => /^[*\-•✦]\s+/.test(l))
+        if (isList) {
+          return (
+            <ul key={bi} style={{ listStyle: 'none', padding: 0, margin: '0 0 1.1rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+              {lines.map((l, li) => (
+                <li key={li} style={{ ...base, display: 'flex', gap: '0.65rem', alignItems: 'flex-start' }}>
+                  <span style={{ color: GOLD, flexShrink: 0, opacity: 0.85, marginTop: '0.05rem' }}>✦</span>
+                  <span>{renderInline(l.replace(/^[*\-•✦\s]+/, ''))}</span>
+                </li>
+              ))}
+            </ul>
+          )
+        }
+        return <p key={bi} style={{ ...base, margin: '0 0 1.1rem' }}>{renderInline(block.replace(/\n/g, ' '))}</p>
+      })}
+    </div>
+  )
+}
+
+function AgreementChecklist({ options, value, onChange }: { options: string[]; value: string[]; onChange: (v: string[]) => void }) {
+  const remaining = options.length - value.length
   return (
     <>
-      <p style={{ fontSize: '0.72rem', opacity: 0.4, textAlign: 'right', marginBottom: '1rem', marginTop: '-0.5rem' }}>
-        <span style={{ color: '#ff8a8a' }}>*</span> required
-      </p>
-      <div style={{ display: 'grid', gridTemplateColumns: cols2, gap: '1rem' }}>
-        <Field label={fl.label('first_name')} required={fl.required('first_name')}><Input value={form.first_name} onChange={v => set('first_name', v)} placeholder="First name" maxLength={50} /></Field>
-        <Field label={fl.label('last_name')} required={fl.required('last_name')}><Input value={form.last_name} onChange={v => set('last_name', v)} placeholder="Last name" maxLength={50} /></Field>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: cols2, gap: '1rem' }}>
-        {fl.visible('preferred_name') && (
-          <Field label={fl.label('preferred_name')} optional={!fl.required('preferred_name')} required={fl.required('preferred_name')}><Input value={form.preferred_name} onChange={v => set('preferred_name', v)} placeholder="If different" maxLength={50} /></Field>
+      <CheckboxGroup options={options} value={value} onChange={onChange} />
+      {value.length > 0 && remaining > 0 && (
+        <p style={{ fontSize: '0.78rem', color: GOLD, opacity: 0.5, marginTop: '1rem', fontStyle: 'italic' }}>
+          {remaining} item{remaining !== 1 ? 's' : ''} remaining
+        </p>
+      )}
+    </>
+  )
+}
+
+// Renders the input control for a single field (without the Field label wrapper).
+function FieldControl({ field, form, set, answers, setAnswer, optionSources }: {
+  field: FieldConfig
+  form: FormData
+  set: (k: keyof FormData, v: unknown) => void
+  answers: Record<string, string | string[]>
+  setAnswer: (key: string, val: string | string[]) => void
+  optionSources: OptionSources
+}) {
+  const d = FIELD_DESCRIPTORS[field.key]
+
+  // Admin-added custom field → render by its declared type, bound to custom_answers.
+  if (!d) {
+    if (field.type === 'textarea')
+      return <Textarea value={(answers[field.key] as string) ?? ''} onChange={v => setAnswer(field.key, v)} placeholder="Your answer…" />
+    if (field.type === 'radio' && field.options) {
+      const val = (answers[field.key] as string) ?? ''
+      const other = field.options.find(o => o.trim().toLowerCase() === 'other')
+      return (
+        <>
+          <RadioGroup options={field.options} value={val} onChange={v => setAnswer(field.key, v)} />
+          {other && val === other && (
+            <div style={{ marginTop: '0.5rem' }}>
+              <Input value={(answers[field.key + '__other'] as string) ?? ''} onChange={v => setAnswer(field.key + '__other', v)} placeholder="Please specify…" />
+            </div>
+          )}
+        </>
+      )
+    }
+    if (field.type === 'checkbox' && field.options) {
+      const vals = (answers[field.key] as string[]) ?? []
+      const other = field.options.find(o => o.trim().toLowerCase() === 'other')
+      return (
+        <>
+          <CheckboxGroup options={field.options} value={vals} onChange={v => setAnswer(field.key, v as string[])} />
+          {other && vals.includes(other) && (
+            <div style={{ marginTop: '0.5rem' }}>
+              <Input value={(answers[field.key + '__other'] as string) ?? ''} onChange={v => setAnswer(field.key + '__other', v)} placeholder="Please specify…" />
+            </div>
+          )}
+        </>
+      )
+    }
+    if (field.type === 'agreement')
+      return <AgreementChecklist options={field.options ?? []} value={(answers[field.key] as string[]) ?? []} onChange={v => setAnswer(field.key, v)} />
+    if (field.type === 'file')
+      return <ApplicationFileUpload value={(answers[field.key] as string) ?? ''} onChange={v => setAnswer(field.key, v)} />
+    return <Input value={(answers[field.key] as string) ?? ''} onChange={v => setAnswer(field.key, v)} placeholder="Your answer…" />
+  }
+
+  const key = (d.formKey ?? field.key) as keyof FormData
+  const options = d.optionsFromSource ? (optionSources[field.key] ?? []) : (d.options ?? [])
+
+  if (d.widget === 'agreement') {
+    // Clauses come from the field's editable options, falling back to the legacy
+    // source (member_acknowledgements) for configs saved before they were editable.
+    const clauses = field.options?.length ? field.options : (optionSources[field.key] ?? [])
+    return <AgreementChecklist options={clauses} value={(form[key] as string[]) ?? []} onChange={v => set(key, v as string[])} />
+  }
+
+  if (d.widget === 'textarea')
+    return <Textarea value={(form[key] as string) ?? ''} onChange={v => set(key, v)} placeholder={d.placeholder} maxLength={d.maxLength} />
+
+  if (d.widget === 'checkbox') {
+    return <CheckboxGroup options={options} value={(form[key] as string[]) ?? []} onChange={v => set(key, v as string[])} />
+  }
+
+  if (d.widget === 'radio') {
+    // onboarding_status reveals a free-text field when "Other" is selected.
+    if (field.key === 'onboarding_status') {
+      return (
+        <>
+          <RadioGroup options={options} value={(form[key] as string) ?? ''} onChange={v => set(key, v)} />
+          {form.onboarding_status === 'Other' && (
+            <div style={{ marginTop: '0.5rem' }}>
+              <Input value={form.onboarding_status_other} onChange={v => set('onboarding_status_other', v)} placeholder="Tell us more…" />
+            </div>
+          )}
+        </>
+      )
+    }
+    return <RadioGroup options={options} value={(form[key] as string) ?? ''} onChange={v => set(key, v)} />
+  }
+
+  const placeholder = d.descPlaceholder ? (field.description || d.descPlaceholder) : d.placeholder
+  const inputType = d.widget === 'text' ? 'text' : d.widget
+  return (
+    <Input
+      value={(form[key] as string) ?? ''}
+      onChange={v => set(key, v)}
+      type={inputType}
+      placeholder={placeholder}
+      maxLength={d.maxLength}
+      readOnly={field.key === 'email' ? !!form.email : false}
+    />
+  )
+}
+
+// Renders one entry: a layout element (divider/paragraph), the photo block, or a
+// labelled input cell.
+function FieldCell({ field, form, set, answers, setAnswer, optionSources }: {
+  field: FieldConfig
+  form: FormData
+  set: (k: keyof FormData, v: unknown) => void
+  answers: Record<string, string | string[]>
+  setAnswer: (key: string, val: string | string[]) => void
+  optionSources: OptionSources
+}) {
+  if (field.element === 'divider') {
+    return <Divider label={field.label || undefined} />
+  }
+  if (field.element === 'paragraph') {
+    return <RichText text={field.description ?? ''} />
+  }
+
+  if (isPhotoField(field)) {
+    return (
+      <>
+        <Divider label={`${field.label}${field.required ? ' *' : ''}`} />
+        {field.description && (
+          <p style={{ fontSize: '0.85rem', lineHeight: 1.8, opacity: 0.5, marginBottom: '1.25rem' }}>
+            Please upload a photo for the Many Hands Photo Board. A photo where people can reasonably tell it&apos;s you is appreciated.
+          </p>
         )}
-        {fl.visible('pronouns') && (
-          <Field label={fl.label('pronouns')} optional={!fl.required('pronouns')} required={fl.required('pronouns')}><Input value={form.pronouns} onChange={v => set('pronouns', v)} placeholder="e.g. she/her" /></Field>
-        )}
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: cols2, gap: '1rem' }}>
-        <Field label={fl.label('email')} required={fl.required('email')}><Input value={form.email} onChange={v => set('email', v)} type="email" placeholder="your@email.com" readOnly={!!form.email} /></Field>
-        <Field label={fl.label('phone')} required={fl.required('phone')} optional={!fl.required('phone')}><Input value={form.phone} onChange={v => set('phone', v)} type="tel" placeholder="For camp logistics" /></Field>
-      </div>
-      {(fl.visible('instagram') || fl.visible('location')) && (
-        fl.visible('instagram') && fl.visible('location') ? (
-          <div style={{ display: 'grid', gridTemplateColumns: cols2, gap: '1rem' }}>
-            <Field label={fl.label('instagram')} optional={!fl.required('instagram')}><Input value={form.instagram} onChange={v => set('instagram', v)} placeholder={fl.desc('instagram') ?? '@handle'} /></Field>
-            <Field label={fl.label('location')} optional={!fl.required('location')}><Input value={form.location} onChange={v => set('location', v)} placeholder="City, region, or 'the void'" /></Field>
+        <PhotoUpload value={form.avatar_url} onChange={url => set('avatar_url', url)} />
+      </>
+    )
+  }
+  return (
+    <Field label={field.label} required={field.required} optional={!field.required}>
+      {field.description && FIELD_DESCRIPTORS[field.key]?.descPlaceholder === undefined && (
+        <p style={{ fontSize: '0.8rem', opacity: 0.4, margin: '0 0 0.5rem', fontStyle: 'italic' }}>{field.description}</p>
+      )}
+      <FieldControl field={field} form={form} set={set} answers={answers} setAnswer={setAnswer} optionSources={optionSources} />
+    </Field>
+  )
+}
+
+function ModularSection({ step, form, set, answers, setAnswer, optionSources, isMobile, requiredHint }: {
+  step: StepConfig
+  form: FormData
+  set: (k: keyof FormData, v: unknown) => void
+  answers: Record<string, string | string[]>
+  setAnswer: (key: string, val: string | string[]) => void
+  optionSources: OptionSources
+  isMobile?: boolean
+  requiredHint?: boolean
+}) {
+  const visible = step.fields.filter(f => f.visible)
+
+  // Group consecutive `half` fields into two-column rows (greedy pairing).
+  const rows: FieldConfig[][] = []
+  for (let i = 0; i < visible.length; i++) {
+    const f = visible[i]
+    const canPair = !isMobile && (f.width ?? 'full') === 'half' && !isFullBleed(f)
+    const next = visible[i + 1]
+    const nextCanPair = next && !isMobile && (next.width ?? 'full') === 'half' && !isFullBleed(next)
+    if (canPair && nextCanPair) {
+      rows.push([f, next])
+      i++
+    } else {
+      rows.push([f])
+    }
+  }
+
+  const cellProps = { form, set, answers, setAnswer, optionSources }
+
+  return (
+    <>
+      {requiredHint && (
+        <p style={{ fontSize: '0.72rem', opacity: 0.4, textAlign: 'right', marginBottom: '1rem', marginTop: '-0.5rem' }}>
+          <span style={{ color: '#ff8a8a' }}>*</span> required
+        </p>
+      )}
+      {rows.map((row, i) =>
+        row.length === 2 ? (
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            {row.map(f => <FieldCell key={f.key} field={f} {...cellProps} />)}
           </div>
-        ) : fl.visible('instagram') ? (
-          <Field label={fl.label('instagram')} optional={!fl.required('instagram')}><Input value={form.instagram} onChange={v => set('instagram', v)} placeholder={fl.desc('instagram') ?? '@handle'} /></Field>
         ) : (
-          <Field label={fl.label('location')} optional={!fl.required('location')}><Input value={form.location} onChange={v => set('location', v)} placeholder="City, region, or 'the void'" /></Field>
+          <FieldCell key={row[0].key} field={row[0]} {...cellProps} />
         )
       )}
-      <Field label={fl.label('emergency_contact')} required={fl.required('emergency_contact')} optional={!fl.required('emergency_contact')}>
-        <Input value={form.emergency_contact} onChange={v => set('emergency_contact', v)} placeholder={fl.desc('emergency_contact') ?? 'Name and phone number'} />
-      </Field>
-      <div style={{ display: 'grid', gridTemplateColumns: fl.visible('referral') ? cols2 : '1fr', gap: '1rem' }}>
-        {fl.visible('referral') && (
-          <Field label={fl.label('referral')} optional={!fl.required('referral')}><Input value={form.referral} onChange={v => set('referral', v)} placeholder="Name or how you found us" /></Field>
-        )}
-        <Field label={fl.label('camped_before')} required={fl.required('camped_before')} optional={!fl.required('camped_before')}>
-          <RadioGroup options={['Yes', 'No']} value={form.camped_before} onChange={v => set('camped_before', v)} />
-        </Field>
-      </div>
-      {fl.visible('avatar_url') && (
-        <>
-          <Divider label={`${fl.label('avatar_url')}${fl.required('avatar_url') ? ' *' : ''}`} />
-          {fl.desc('avatar_url') && (
-            <p style={{ fontSize: '0.85rem', lineHeight: 1.8, opacity: 0.5, marginBottom: '1.25rem' }}>
-              Please upload a photo for the Many Hands Photo Board. A photo where people can reasonably tell it's you is appreciated.
-            </p>
-          )}
-          <PhotoUpload value={form.avatar_url} onChange={url => set('avatar_url', url)} />
-        </>
-      )}
-    </>
-  )
-}
-
-function SectionII({ form, set, fl, isMobile }: { form: FormData; set: (k: keyof FormData, v: unknown) => void; fl: FlHelper; isMobile?: boolean }) {
-  const cols2 = isMobile ? '1fr' : '1fr 1fr'
-  const showAny = fl.visible('about_you') || fl.visible('special_skills') || fl.visible('find_at_camp')
-  return (
-    <>
-      {showAny && (
-        <p style={{ fontSize: '0.9rem', lineHeight: 1.8, opacity: 0.5, marginBottom: '2rem', fontStyle: 'italic' }}>
-          These questions help us get to know you and create your official Many Hands Registry entry.
-        </p>
-      )}
-      {fl.visible('about_you') && (
-        <Field label={fl.label('about_you')} optional={!fl.required('about_you')}>
-          <Textarea value={form.about_you} onChange={v => set('about_you', v)} placeholder="Share the projects, ideas, pursuits, or obsessions lighting you up right now." />
-        </Field>
-      )}
-      {fl.visible('special_skills') && (
-        <Field label={fl.label('special_skills')} optional={!fl.required('special_skills')}>
-          {fl.desc('special_skills') && <p style={{ fontSize: '0.8rem', opacity: 0.4, margin: '0 0 0.5rem', fontStyle: 'italic' }}>{fl.desc('special_skills')}</p>}
-          <Textarea value={form.special_skills} onChange={v => set('special_skills', v)} placeholder="Your answer…" />
-        </Field>
-      )}
-      {fl.visible('find_at_camp') && (
-        <Field label={fl.label('find_at_camp')} optional={!fl.required('find_at_camp')}>
-          {fl.desc('find_at_camp') && <p style={{ fontSize: '0.8rem', opacity: 0.4, margin: '0 0 0.5rem', fontStyle: 'italic' }}>{fl.desc('find_at_camp')}</p>}
-          <Textarea value={form.find_at_camp} onChange={v => set('find_at_camp', v)} placeholder="Your answer…" />
-        </Field>
-      )}
-      {showAny && <Divider />}
-      <div style={{ display: 'grid', gridTemplateColumns: fl.visible('onboarding_status') && !isMobile ? '1fr 1fr' : '1fr', gap: '2rem' }}>
-        <Field label={fl.label('community_acceptance')} required={fl.required('community_acceptance')}>
-          <RadioGroup options={['Yes', 'Not Yet', "It's Complicated"]} value={form.community_acceptance} onChange={v => set('community_acceptance', v)} />
-        </Field>
-        {fl.visible('onboarding_status') && (
-          <Field label={fl.label('onboarding_status')} optional={!fl.required('onboarding_status')}>
-            <RadioGroup
-              options={['Emerging', 'Stable', 'Elevated', 'Classified', 'Other']}
-              value={form.onboarding_status}
-              onChange={v => set('onboarding_status', v)}
-            />
-            {form.onboarding_status === 'Other' && (
-              <div style={{ marginTop: '0.5rem' }}>
-                <Input value={form.onboarding_status_other} onChange={v => set('onboarding_status_other', v)} placeholder="Tell us more…" />
-              </div>
-            )}
-          </Field>
-        )}
-      </div>
-    </>
-  )
-}
-
-function SectionIII({ form, set, fl, isMobile, attendanceOptions }: { form: FormData; set: (k: keyof FormData, v: unknown) => void; fl: FlHelper; isMobile?: boolean; attendanceOptions: string[] }) {
-  const cols2 = isMobile ? '1fr' : '1fr 1fr'
-  const showDates = fl.visible('arrival_date') || fl.visible('departure_date')
-  const showVehicle = fl.visible('vehicle') || fl.visible('structures')
-  return (
-    <>
-      <Field label={fl.label('attendance')} required={fl.required('attendance')}>
-        <RadioGroup
-          options={attendanceOptions}
-          value={form.attendance}
-          onChange={v => set('attendance', v)}
-        />
-      </Field>
-      {showDates && (
-        <>
-          <Divider />
-          <div style={{ display: 'grid', gridTemplateColumns: cols2, gap: '1rem' }}>
-            {fl.visible('arrival_date') && <Field label={fl.label('arrival_date')} optional={!fl.required('arrival_date')}><Input value={form.arrival_date} onChange={v => set('arrival_date', v)} type="date" /></Field>}
-            {fl.visible('departure_date') && <Field label={fl.label('departure_date')} optional={!fl.required('departure_date')}><Input value={form.departure_date} onChange={v => set('departure_date', v)} type="date" /></Field>}
-          </div>
-        </>
-      )}
-      {showVehicle && (
-        <>
-          {fl.visible('vehicle') && <Field label={fl.label('vehicle')} optional={!fl.required('vehicle')}><Input value={form.vehicle} onChange={v => set('vehicle', v)} placeholder={fl.desc('vehicle') ?? 'Make, model, passengers, cargo capacity'} /></Field>}
-          {fl.visible('structures') && <Field label={fl.label('structures')} optional={!fl.required('structures')}><Input value={form.structures} onChange={v => set('structures', v)} placeholder={fl.desc('structures') ?? 'Tents, shade structures, etc.'} /></Field>}
-        </>
-      )}
-      {fl.visible('rideshare') && (
-        <>
-          <Divider label="Rideshare" />
-          <Field label={fl.label('rideshare')} optional={!fl.required('rideshare')}>
-            <RadioGroup
-              options={['I need a ride', 'I can offer a ride', "I'm sorted", 'Not sure yet']}
-              value={form.rideshare}
-              onChange={v => set('rideshare', v)}
-            />
-          </Field>
-        </>
-      )}
-    </>
-  )
-}
-
-function SectionIV({ form, set, fl, contributionTypes }: { form: FormData; set: (k: keyof FormData, v: unknown) => void; fl: FlHelper; contributionTypes: ContributionType[] }) {
-  return (
-    <>
-      {fl.visible('dept_interests') && (
-        <>
-          <Field label={fl.label('dept_interests')} optional={!fl.required('dept_interests')}>
-            <CheckboxGroup options={DEPT_OPTIONS} value={form.department_interests} onChange={v => set('department_interests', v)} />
-          </Field>
-          <Divider />
-        </>
-      )}
-      {fl.visible('leadership_interest') && (
-        <>
-          <Field label={fl.label('leadership_interest')} optional={!fl.required('leadership_interest')}>
-            <RadioGroup options={['Yes', 'Maybe', 'Not this year']} value={form.leadership_interest} onChange={v => set('leadership_interest', v)} />
-          </Field>
-          <Divider label="Communal Responsibilities" />
-        </>
-      )}
-      {!fl.visible('leadership_interest') && <Divider label="Communal Responsibilities" />}
-      {fl.visible('setup_preference') && (
-        <Field label={fl.label('setup_preference')} optional={!fl.required('setup_preference')}>
-          <CheckboxGroup options={contributionTypes.map(t => t.value)} value={form.setup_preference} onChange={v => set('setup_preference', v as string[])} />
-        </Field>
-      )}
-      {fl.visible('setup_limitations') && (
-        <Field label={fl.label('setup_limitations')} optional={!fl.required('setup_limitations')}>
-          <CheckboxGroup
-            options={['None', 'Unable to participate in setup', 'Unable to participate in teardown', 'Unable to participate in either', 'Prefer to discuss privately']}
-            value={form.setup_limitations}
-            onChange={v => set('setup_limitations', v as string[])}
-          />
-        </Field>
-      )}
-      {fl.visible('setup_notes') && (
-        <>
-          <Divider />
-          <Field label={fl.label('setup_notes')} optional={!fl.required('setup_notes')}>
-            <Textarea value={form.setup_notes} onChange={v => set('setup_notes', v)} placeholder="Your answer…" maxLength={800} />
-          </Field>
-        </>
-      )}
-    </>
-  )
-}
-
-function SectionV({ form, set, agreementItems }: { form: FormData; set: (k: keyof FormData, v: unknown) => void; agreementItems: string[] }) {
-  const allChecked = form.acknowledgements.length === agreementItems.length
-  return (
-    <>
-      <p style={{ fontSize: '0.85rem', lineHeight: 1.8, opacity: 0.5, marginBottom: '2rem' }}>
-        Please acknowledge the following. All items are required to complete your application.
-      </p>
-      <CheckboxGroup
-        options={agreementItems}
-        value={form.acknowledgements}
-        onChange={v => set('acknowledgements', v as string[])}
-      />
-      {!allChecked && form.acknowledgements.length > 0 && (
-        <p style={{ fontSize: '0.78rem', color: '#C8A848', opacity: 0.5, marginTop: '1rem', fontStyle: 'italic' }}>
-          {agreementItems.length - form.acknowledgements.length} item{agreementItems.length - form.acknowledgements.length !== 1 ? 's' : ''} remaining
-        </p>
-      )}
-    </>
-  )
-}
-
-function SectionVI({ form, set, fl }: { form: FormData; set: (k: keyof FormData, v: unknown) => void; fl: FlHelper }) {
-  return (
-    <>
-      <p style={{ fontSize: '0.95rem', lineHeight: 1.8, opacity: 0.55, marginBottom: '2rem', fontStyle: 'italic' }}>
-        Before we proceed, there is one final matter that requires your attention.
-      </p>
-      <Field label={fl.label('shrimp_relationship')} optional={!fl.required('shrimp_relationship')}>
-        <Textarea value={form.shrimp_relationship} onChange={v => set('shrimp_relationship', v)} placeholder="Reflect carefully. There are no wrong answers. There are, however, better ones." maxLength={500} />
-      </Field>
-    </>
-  )
-}
-
-// ── Custom section (admin-added steps) ───────────────────────────────────────
-
-function CustomSection({ step, answers, setAnswer }: {
-  step: StepConfig
-  answers: Record<string, string | string[]>
-  setAnswer: (key: string, val: string | string[]) => void
-}) {
-  return (
-    <>
-      {step.fields.filter(f => f.visible).map(field => (
-        <Field key={field.key} label={field.label} optional={!field.required}>
-          {field.description && (
-            <p style={{ fontSize: '0.8rem', opacity: 0.4, margin: '0 0 0.5rem', fontStyle: 'italic' }}>{field.description}</p>
-          )}
-          {(!field.type || field.type === 'text') && (
-            <Input value={(answers[field.key] as string) ?? ''} onChange={v => setAnswer(field.key, v)} placeholder="Your answer…" />
-          )}
-          {field.type === 'textarea' && (
-            <Textarea value={(answers[field.key] as string) ?? ''} onChange={v => setAnswer(field.key, v)} placeholder="Your answer…" />
-          )}
-          {field.type === 'radio' && field.options && (
-            <RadioGroup options={field.options} value={(answers[field.key] as string) ?? ''} onChange={v => setAnswer(field.key, v)} />
-          )}
-          {field.type === 'checkbox' && field.options && (
-            <CheckboxGroup options={field.options} value={(answers[field.key] as string[]) ?? []} onChange={v => setAnswer(field.key, v as string[])} />
-          )}
-        </Field>
-      ))}
-    </>
-  )
-}
-
-// ── Extra custom fields appended to built-in sections ────────────────────────
-
-function CustomFieldsAppendix({ fields, answers, setAnswer }: {
-  fields: FieldConfig[]
-  answers: Record<string, string | string[]>
-  setAnswer: (key: string, val: string | string[]) => void
-}) {
-  if (fields.length === 0) return null
-  return (
-    <>
-      <Divider />
-      {fields.map(field => (
-        <Field key={field.key} label={field.label} optional={!field.required}>
-          {field.description && (
-            <p style={{ fontSize: '0.8rem', opacity: 0.4, margin: '0 0 0.5rem', fontStyle: 'italic' }}>{field.description}</p>
-          )}
-          {(!field.type || field.type === 'text') && (
-            <Input value={(answers[field.key] as string) ?? ''} onChange={v => setAnswer(field.key, v)} placeholder="Your answer…" />
-          )}
-          {field.type === 'textarea' && (
-            <Textarea value={(answers[field.key] as string) ?? ''} onChange={v => setAnswer(field.key, v)} placeholder="Your answer…" />
-          )}
-          {field.type === 'radio' && field.options && (
-            <RadioGroup options={field.options} value={(answers[field.key] as string) ?? ''} onChange={v => setAnswer(field.key, v)} />
-          )}
-          {field.type === 'checkbox' && field.options && (
-            <CheckboxGroup options={field.options} value={(answers[field.key] as string[]) ?? []} onChange={v => setAnswer(field.key, v as string[])} />
-          )}
-        </Field>
-      ))}
     </>
   )
 }
 
 // ── Main wizard ───────────────────────────────────────────────────────────────
 
-export function ApplyWizard({ userEmail, formConfig, agreementItems, attendanceOptions, contributionTypes }: {
+export function ApplyWizard({ userEmail, formConfig, agreementItems, attendanceOptions, contributionTypes, initialStep = 0 }: {
   userEmail: string
   formConfig: MemberFormConfig
   agreementItems?: string[]
   attendanceOptions?: string[]
   contributionTypes?: ContributionType[]
+  // Dev/preview only: forces the starting step so a given section can be
+  // server-rendered for verification. Real /apply usage leaves this at 0.
+  initialStep?: number
 }) {
   const resolvedAgreementItems = agreementItems ?? AGREEMENT_ITEMS_FALLBACK
   const resolvedAttendanceOptions = attendanceOptions ?? ['Camping on site', 'Staying nearby but participating', 'Mostly visiting socially', 'Still figuring it out']
   const resolvedContributionTypes = contributionTypes ?? DEFAULT_CONTRIBUTION_TYPES
+  // Runtime option sources for descriptor-driven fields (keyed by field key).
+  const optionSources: OptionSources = {
+    attendance: resolvedAttendanceOptions,
+    dept_interests: DEPT_OPTIONS,
+    setup_preference: resolvedContributionTypes.map(t => t.value),
+    acknowledgements: resolvedAgreementItems,
+  }
   const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']
   const steps = formConfig.steps.filter(s => s.visible)
   const lastStep = steps.length - 1
 
-  const [step, setStep] = useState(0)
+  const [step, setStep] = useState(initialStep)
   const [form, setFormState] = useState<FormData>({ ...BLANK, email: userEmail })
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -729,10 +826,12 @@ export function ApplyWizard({ userEmail, formConfig, agreementItems, attendanceO
     const flBasic = makeFlHelper(formConfig, 'basic')
 
     if (currentStepKey === 'basic') {
-      const needPhone = flBasic.required('phone')
-      const needEmergency = flBasic.required('emergency_contact')
-      const needCamped = flBasic.required('camped_before')
-      const needAvatar = flBasic.required('avatar_url')
+      // A field only blocks if it's both visible and required (admins can now
+      // hide Phone-adjacent fields like Emergency Contact / Photo).
+      const needPhone = flBasic.visible('phone') && flBasic.required('phone')
+      const needEmergency = flBasic.visible('emergency_contact') && flBasic.required('emergency_contact')
+      const needCamped = flBasic.visible('camped_before') && flBasic.required('camped_before')
+      const needAvatar = flBasic.visible('avatar_url') && flBasic.required('avatar_url')
       return !!(
         form.first_name.trim() &&
         form.last_name.trim() &&
@@ -743,9 +842,23 @@ export function ApplyWizard({ userEmail, formConfig, agreementItems, attendanceO
         (!needAvatar || form.avatar_url)
       )
     }
-    if (currentStepKey === 'registry') return !!(form.community_acceptance)
-    if (currentStepKey === 'plans') return !!(form.attendance)
-    if (currentStepKey === 'agreement') return form.acknowledgements.length === resolvedAgreementItems.length
+    // These built-in gates only apply when the field is still visible + required
+    // (admins can now hide or make any of them optional).
+    if (currentStepKey === 'registry') {
+      const fl = makeFlHelper(formConfig, 'registry')
+      return !(fl.visible('community_acceptance') && fl.required('community_acceptance')) || !!form.community_acceptance
+    }
+    if (currentStepKey === 'plans') {
+      const fl = makeFlHelper(formConfig, 'plans')
+      return !(fl.visible('attendance') && fl.required('attendance')) || !!form.attendance
+    }
+    if (currentStepKey === 'agreement') {
+      const fl = makeFlHelper(formConfig, 'agreement')
+      if (!(fl.visible('acknowledgements') && fl.required('acknowledgements'))) return true
+      const ackField = formConfig.steps.find(s => s.key === 'agreement')?.fields.find(f => f.key === 'acknowledgements')
+      const clauses = ackField?.options?.length ? ackField.options : resolvedAgreementItems
+      return form.acknowledgements.length === clauses.length
+    }
     // Custom steps: check required fields have answers
     const currentStep = steps[step]
     if (currentStep?.isCustom) {
@@ -753,6 +866,8 @@ export function ApplyWizard({ userEmail, formConfig, agreementItems, attendanceO
         .filter(f => f.visible && f.required)
         .every(f => {
           const val = form.custom_answers[f.key]
+          // Agreement fields require every clause to be checked.
+          if (f.type === 'agreement') return Array.isArray(val) && val.length === (f.options?.length ?? 0)
           return Array.isArray(val) ? val.length > 0 : !!(val as string)?.trim()
         })
     }
@@ -780,8 +895,6 @@ export function ApplyWizard({ userEmail, formConfig, agreementItems, attendanceO
     }
     setSubmitting(false)
   }
-
-  const milestone = MILESTONE_FOR_KEY[steps[step]?.key ?? 'basic'] ?? 0
 
   if (submitted) {
     return (
@@ -892,56 +1005,49 @@ export function ApplyWizard({ userEmail, formConfig, agreementItems, attendanceO
         <p style={{ fontSize: '0.8rem', color: CREAM, opacity: 0.4, margin: 0, letterSpacing: '0.05em' }}>{steps[step].subtitle}</p>
       </div>
 
-      {/* Milestone track */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: '2.5rem' }}>
-        {MILESTONES.map((label, i) => {
-          const done = i < milestone
-          const active = i === milestone
-          return (
-            <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                {i > 0 && <div style={{ flex: 1, height: '1px', background: done ? 'rgba(200,168,72,0.45)' : 'rgba(200,168,72,0.12)' }} />}
-                <div style={{
-                  width: '20px', height: '20px', borderRadius: '50%', flexShrink: 0,
-                  border: `${active ? 2 : 1.5}px solid ${done ? 'rgba(200,168,72,0.6)' : active ? GOLD : 'rgba(200,168,72,0.2)'}`,
-                  background: done ? 'rgba(200,168,72,0.18)' : active ? 'rgba(200,168,72,0.12)' : 'transparent',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  transition: 'all 0.3s',
-                }}>
-                  {done && <span style={{ fontSize: '0.55rem', color: GOLD, opacity: 0.8 }}>✓</span>}
-                  {active && <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: GOLD }} />}
+      {/* Section progress — one node per visible section (numeral below), advances with the step */}
+      {steps.length > 1 && (
+        <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: '2.5rem' }}>
+          {steps.map((s, i) => {
+            const done = i < step
+            const active = i === step
+            return (
+              <div key={s.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                  {i > 0 && <div style={{ flex: 1, height: '1px', background: i <= step ? 'rgba(200,168,72,0.45)' : 'rgba(200,168,72,0.12)' }} />}
+                  <div style={{
+                    width: '20px', height: '20px', borderRadius: '50%', flexShrink: 0,
+                    border: `${active ? 2 : 1.5}px solid ${done ? 'rgba(200,168,72,0.6)' : active ? GOLD : 'rgba(200,168,72,0.2)'}`,
+                    background: done ? 'rgba(200,168,72,0.18)' : active ? 'rgba(200,168,72,0.12)' : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.3s',
+                  }}>
+                    {done && <span style={{ fontSize: '0.55rem', color: GOLD, opacity: 0.85 }}>✓</span>}
+                    {active && <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: GOLD }} />}
+                  </div>
+                  {i < steps.length - 1 && <div style={{ flex: 1, height: '1px', background: i < step ? 'rgba(200,168,72,0.45)' : 'rgba(200,168,72,0.12)' }} />}
                 </div>
-                {i < MILESTONES.length - 1 && <div style={{ flex: 1, height: '1px', background: done ? 'rgba(200,168,72,0.35)' : 'rgba(200,168,72,0.12)' }} />}
+                <p style={{ fontSize: '0.6rem', letterSpacing: '0.1em', color: GOLD, opacity: active ? 0.9 : done ? 0.5 : 0.3, margin: '0.45rem 0 0' }}>
+                  {ROMAN[i] ?? String(i + 1)}
+                </p>
               </div>
-              <p style={{ fontSize: '0.55rem', letterSpacing: '0.03em', color: GOLD, opacity: active ? 0.9 : done ? 0.5 : 0.25, textAlign: 'center', lineHeight: 1.4, whiteSpace: 'pre-line', margin: '0.5rem 0 0', maxWidth: '70px' }}>
-                {label}
-              </p>
-            </div>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* Form content */}
       <div style={{ marginBottom: '3rem' }}>
-        {steps[step]?.key === 'basic'     && <SectionI   form={form} set={set} fl={makeFlHelper(formConfig, 'basic')}     isMobile={isMobile} />}
-        {steps[step]?.key === 'registry'  && <SectionII  form={form} set={set} fl={makeFlHelper(formConfig, 'registry')} isMobile={isMobile} />}
-        {steps[step]?.key === 'plans'     && <SectionIII form={form} set={set} fl={makeFlHelper(formConfig, 'plans')}     isMobile={isMobile} attendanceOptions={resolvedAttendanceOptions} />}
-        {steps[step]?.key === 'roles'     && <SectionIV  form={form} set={set} fl={makeFlHelper(formConfig, 'roles')} contributionTypes={resolvedContributionTypes} />}
-        {steps[step]?.key === 'agreement' && <SectionV   form={form} set={set} agreementItems={resolvedAgreementItems} />}
-        {steps[step]?.key === 'shrimp'    && <SectionVI  form={form} set={set} fl={makeFlHelper(formConfig, 'shrimp')} />}
-        {steps[step]?.isCustom && (
-          <CustomSection
+        {/* Modular (config-driven) sections + all custom steps */}
+        {steps[step] && (MODULAR_STEP_KEYS.includes(steps[step].key) || steps[step].isCustom) && (
+          <ModularSection
             step={steps[step]}
+            form={form}
+            set={set}
             answers={form.custom_answers}
             setAnswer={(k, v) => set('custom_answers', { ...form.custom_answers, [k]: v })}
-          />
-        )}
-        {/* Admin-added custom fields appended to built-in sections */}
-        {!steps[step]?.isCustom && (
-          <CustomFieldsAppendix
-            fields={(steps[step]?.fields ?? []).filter((f: FieldConfig) => f.isCustom && f.visible)}
-            answers={form.custom_answers}
-            setAnswer={(k, v) => set('custom_answers', { ...form.custom_answers, [k]: v })}
+            optionSources={optionSources}
+            isMobile={isMobile}
+            requiredHint={steps[step].key === 'basic'}
           />
         )}
       </div>

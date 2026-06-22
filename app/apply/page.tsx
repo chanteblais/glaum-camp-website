@@ -2,7 +2,7 @@ import { auth, currentUser, clerkClient } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { mergeMemberConfig, mergeVolunteerConfig } from '@/lib/form-config'
-import { DEFAULT_AGREEMENT_ITEMS, DEFAULT_ATTENDANCE_OPTIONS } from '@/lib/site-config'
+import { DEFAULT_AGREEMENT_ITEMS, DEFAULT_ATTENDANCE_OPTIONS, parseTrackCopy } from '@/lib/site-config'
 import { parseContributionTypes } from '@/lib/application-options'
 import { ApplyWizard } from './ApplyWizard'
 import { TrackPicker } from './TrackPicker'
@@ -33,6 +33,7 @@ export default async function ApplyPage({ searchParams }: { searchParams: { trac
       'member_acknowledgements',
       'member_attendance_options',
       'community_contribution_types',
+      'config_track_picker',
     ]),
   ])
 
@@ -51,6 +52,7 @@ export default async function ApplyPage({ searchParams }: { searchParams: { trac
 
   const memberConfig = mergeMemberConfig(memberRaw)
   const volunteerConfig = mergeVolunteerConfig(volunteerRaw)
+  const trackCopy = parseTrackCopy(configMap['config_track_picker'])
 
   const memberOpen = memberConfig.open
   const volunteerOpen = volunteerConfig.open
@@ -76,7 +78,7 @@ export default async function ApplyPage({ searchParams }: { searchParams: { trac
     return <ClosedPage message="Applications to Glåüm are not currently open. Check back soon." />
   }
 
-  return <TrackPicker hideMember={!memberOpen && !isAdmin} hideVolunteer={!volunteerOpen && !isAdmin} />
+  return <TrackPicker hideMember={!memberOpen && !isAdmin} hideVolunteer={!volunteerOpen && !isAdmin} copy={trackCopy} />
 }
 
 function ClosedPage({ message }: { message: string }) {

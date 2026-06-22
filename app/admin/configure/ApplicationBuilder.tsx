@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import type { MemberFormConfig, VolunteerFormConfig, StepConfig, FieldConfig } from '@/lib/form-config'
+import { mergeMemberConfig } from '@/lib/form-config'
 import type { ContributionType } from '@/lib/application-options'
 import { DEFAULT_CONTRIBUTION_TYPES } from '@/lib/application-options'
+import { DEFAULT_TRACK_COPY, type TrackCopy } from '@/lib/site-config'
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 
@@ -16,6 +18,10 @@ const LAVENDER = '#D9B3FF'
 // Section numerals shown in the builder — mirror the applicant-facing wizard,
 // which numbers visible sections by position (ApplyWizard ROMAN).
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']
+
+// Built-in steps whose fields are rendered by the config-driven ModularSection
+// on the live form (all of them). Keep in sync with ApplyWizard.tsx.
+const MODULAR_STEP_KEYS = ['basic', 'registry', 'plans', 'roles', 'agreement', 'shrimp']
 
 // ── Toggle ────────────────────────────────────────────────────────────────────
 
@@ -80,13 +86,82 @@ function EyeBtn({ visible, disabled, onChange }: { visible: boolean; disabled?: 
 // ── Field row ─────────────────────────────────────────────────────────────────
 
 const FIELD_TYPE_LABELS: Record<string, string> = {
-  text: 'Short text', textarea: 'Long text', radio: 'Single choice', checkbox: 'Multiple choice',
+  text: 'Short text', textarea: 'Long text', radio: 'Single choice', checkbox: 'Multiple choice', file: 'File upload', agreement: 'Agreement',
+}
+
+// Layout element row (divider / paragraph) — editable caption/text, reorder,
+// show-hide, and delete (custom only).
+function ElementRow({
+  field, saving, onLabelChange, onDescChange, onToggleVisible,
+  onMoveUp, onMoveDown, isFirst, isLast, onDelete,
+}: {
+  field: FieldConfig
+  saving: boolean
+  onLabelChange: (v: string) => void
+  onDescChange: (v: string) => void
+  onToggleVisible: () => void
+  onMoveUp?: () => void
+  onMoveDown?: () => void
+  isFirst?: boolean
+  isLast?: boolean
+  onDelete?: () => void
+}) {
+  const isDivider = field.element === 'divider'
+  return (
+    <div style={{
+      borderRadius: '0.5rem',
+      background: 'rgba(210,57,248,0.04)',
+      border: '1px dashed rgba(210,57,248,0.2)',
+      opacity: field.visible ? 1 : 0.4,
+      display: 'flex', alignItems: 'flex-start', gap: '0.75rem', padding: '0.55rem 0.85rem',
+    }}>
+      <span style={{ fontSize: '0.55rem', letterSpacing: '0.12em', color: PURPLE, opacity: 0.7, fontWeight: 700, flexShrink: 0, marginTop: '0.35rem', width: '4.5rem' }}>
+        {isDivider ? 'DIVIDER' : 'TEXT'}
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {isDivider ? (
+          <input
+            value={field.label}
+            onChange={e => onLabelChange(e.target.value)}
+            placeholder="Optional caption (blank = plain line)"
+            style={{ width: '100%', boxSizing: 'border-box', background: 'transparent', border: 'none', borderBottom: '1px solid rgba(210,57,248,0.2)', color: CREAM, fontSize: '0.8rem', outline: 'none', padding: '0.1rem 0', fontFamily: 'inherit' }}
+          />
+        ) : (
+          <>
+            <textarea
+              value={field.description ?? ''}
+              onChange={e => onDescChange(e.target.value)}
+              placeholder="Text shown to applicants…"
+              rows={5}
+              style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(0,0,0,0.15)', border: '1px solid rgba(210,57,248,0.15)', borderRadius: '0.4rem', color: CREAM, fontSize: '0.8rem', outline: 'none', padding: '0.5rem 0.6rem', fontFamily: 'inherit', lineHeight: 1.6, resize: 'vertical' }}
+            />
+            <p style={{ fontSize: '0.62rem', opacity: 0.4, margin: '0.35rem 0 0', lineHeight: 1.5 }}>
+              Blank line = new paragraph · lines starting with <code>*</code> or <code>✦</code> = bullets · <code>[text](url)</code> or a bare link = clickable · <code>**bold**</code>
+            </p>
+          </>
+        )}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
+        <EyeBtn visible={field.visible} disabled={saving} onChange={onToggleVisible} />
+        {onMoveUp && onMoveDown && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.1rem' }}>
+            <button onClick={onMoveUp} disabled={isFirst || saving} title="Move up" style={{ background: 'none', border: 'none', cursor: isFirst ? 'default' : 'pointer', color: CREAM, opacity: isFirst ? 0.15 : 0.45, padding: '0.1rem', fontSize: '0.7rem' }}>↑</button>
+            <button onClick={onMoveDown} disabled={isLast || saving} title="Move down" style={{ background: 'none', border: 'none', cursor: isLast ? 'default' : 'pointer', color: CREAM, opacity: isLast ? 0.15 : 0.45, padding: '0.1rem', fontSize: '0.7rem' }}>↓</button>
+          </div>
+        )}
+        {onDelete && (
+          <button onClick={onDelete} disabled={saving} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ff8a8a', opacity: 0.5, padding: '0.1rem', fontSize: '0.85rem', lineHeight: 1 }}>✕</button>
+        )}
+      </div>
+    </div>
+  )
 }
 
 function FieldRow({
   field, saving,
   onToggleVisible, onToggleRequired, onLabelChange, onDescChange,
-  onTypeChange, onOptionsChange, onDelete,
+  onOptionsChange, onDelete,
+  onMoveUp, onMoveDown, isFirst, isLast, onToggleWidth,
 }: {
   field: FieldConfig
   saving: boolean
@@ -94,11 +169,62 @@ function FieldRow({
   onToggleRequired: () => void
   onLabelChange: (v: string) => void
   onDescChange: (v: string) => void
-  onTypeChange?: (t: string) => void
   onOptionsChange?: (opts: string[]) => void
   onDelete?: () => void
+  // Reorder + width controls (provided only for modular sections)
+  onMoveUp?: () => void
+  onMoveDown?: () => void
+  isFirst?: boolean
+  isLast?: boolean
+  onToggleWidth?: () => void
 }) {
-  const showOptions = field.isCustom && (field.type === 'radio' || field.type === 'checkbox')
+  const showOptions = (field.isCustom && (field.type === 'radio' || field.type === 'checkbox')) || field.type === 'agreement'
+  const isAgreement = field.type === 'agreement'
+  const isHalf = (field.width ?? 'full') === 'half'
+
+  // Locked core field — always present, not deletable/hideable/reorderable here.
+  // Its Required status is editable only when canChangeRequired (e.g. Photo).
+  if (field.locked) {
+    return (
+      <div style={{
+        borderRadius: '0.5rem',
+        background: 'rgba(200,168,72,0.04)',
+        border: '1px solid rgba(200,168,72,0.12)',
+        display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.65rem 0.85rem',
+      }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0, opacity: 0.55 }}>
+          <rect x="3" y="11" width="18" height="11" rx="2" />
+          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+        </svg>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ color: CREAM, fontSize: '0.85rem', opacity: 0.9 }}>{field.label}</span>
+          {field.description && (
+            <p style={{ fontSize: '0.72rem', opacity: 0.4, margin: '0.1rem 0 0', fontStyle: 'italic' }}>{field.description}</p>
+          )}
+        </div>
+        <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: GOLD, opacity: 0.5, fontWeight: 700, flexShrink: 0 }}>CORE</span>
+        {field.canChangeRequired ? (
+          <button
+            onClick={onToggleRequired}
+            disabled={saving}
+            style={{
+              flexShrink: 0,
+              padding: '0.2rem 0.55rem', borderRadius: '9999px',
+              fontSize: '0.65rem', letterSpacing: '0.08em',
+              border: `1px solid ${field.required ? 'rgba(255,138,138,0.4)' : 'rgba(200,168,72,0.2)'}`,
+              color: field.required ? '#ff8a8a' : CREAM,
+              background: field.required ? 'rgba(255,138,138,0.08)' : 'transparent',
+              cursor: saving ? 'not-allowed' : 'pointer', transition: 'all 0.15s',
+            }}
+          >
+            {field.required ? 'REQUIRED' : 'OPTIONAL'}
+          </button>
+        ) : (
+          <span style={{ flexShrink: 0, padding: '0.2rem 0.55rem', borderRadius: '9999px', fontSize: '0.65rem', letterSpacing: '0.08em', border: '1px solid rgba(255,138,138,0.2)', color: '#ff8a8a', opacity: 0.5 }}>REQUIRED</span>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div style={{
@@ -109,11 +235,7 @@ function FieldRow({
       transition: 'opacity 0.2s',
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', padding: '0.65rem 0.85rem' }}>
-        {field.canHide ? (
-          <EyeBtn visible={field.visible} disabled={saving} onChange={onToggleVisible} />
-        ) : (
-          <div style={{ width: '16px', flexShrink: 0 }} />
-        )}
+        <EyeBtn visible={field.visible} disabled={saving} onChange={onToggleVisible} />
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <input
@@ -141,54 +263,60 @@ function FieldRow({
             onFocus={e => { e.currentTarget.style.borderBottomColor = 'rgba(210,57,248,0.3)' }}
             onBlur={e => { e.currentTarget.style.borderBottomColor = 'transparent' }}
           />
-          {field.isCustom && onTypeChange && (
-            <select
-              value={field.type ?? 'text'}
-              onChange={e => onTypeChange(e.target.value)}
-              style={{
-                marginTop: '0.35rem',
-                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(200,168,72,0.2)',
-                borderRadius: '0.3rem', color: CREAM, fontSize: '0.68rem',
-                padding: '0.15rem 0.4rem', cursor: 'pointer', outline: 'none',
-              }}
-            >
-              {Object.entries(FIELD_TYPE_LABELS).map(([val, label]) => (
-                <option key={val} value={val}>{label}</option>
-              ))}
-            </select>
+          {field.isCustom && (
+            <span style={{ display: 'inline-block', marginTop: '0.35rem', fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: PURPLE, opacity: 0.5, fontWeight: 700 }}>
+              {FIELD_TYPE_LABELS[field.type ?? 'text'] ?? 'Field'}
+            </span>
           )}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
-          {!field.canHide && !field.isCustom && (
-            <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: GOLD, opacity: 0.5, fontWeight: 700 }}>CORE</span>
-          )}
-          {field.canChangeRequired ? (
+          {onToggleWidth && (
             <button
-              onClick={onToggleRequired}
+              onClick={onToggleWidth}
               disabled={saving}
+              title={isHalf ? 'Half width — click for full width' : 'Full width — click for half width'}
               style={{
-                padding: '0.2rem 0.55rem', borderRadius: '9999px',
-                fontSize: '0.65rem', letterSpacing: '0.08em',
-                border: `1px solid ${field.required ? 'rgba(255,138,138,0.4)' : 'rgba(200,168,72,0.2)'}`,
-                color: field.required ? '#ff8a8a' : CREAM,
-                background: field.required ? 'rgba(255,138,138,0.08)' : 'transparent',
-                cursor: saving ? 'not-allowed' : 'pointer', transition: 'all 0.15s',
+                padding: '0.2rem 0.5rem', borderRadius: '0.4rem',
+                fontSize: '0.62rem', letterSpacing: '0.06em', fontWeight: 700,
+                border: `1px solid ${isHalf ? 'rgba(210,57,248,0.4)' : 'rgba(200,168,72,0.2)'}`,
+                color: isHalf ? PURPLE : CREAM,
+                background: isHalf ? 'rgba(210,57,248,0.08)' : 'transparent',
+                cursor: saving ? 'not-allowed' : 'pointer', opacity: isHalf ? 1 : 0.55,
               }}
-            >
-              {field.required ? 'REQUIRED' : 'OPTIONAL'}
-            </button>
-          ) : (
-            <span style={{
+            >{isHalf ? '½' : '▭'}</button>
+          )}
+          {onMoveUp && onMoveDown && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.1rem' }}>
+              <button
+                onClick={onMoveUp}
+                disabled={isFirst || saving}
+                title="Move up"
+                style={{ background: 'none', border: 'none', cursor: isFirst ? 'default' : 'pointer', color: CREAM, opacity: isFirst ? 0.15 : 0.45, padding: '0.1rem', fontSize: '0.7rem' }}
+              >↑</button>
+              <button
+                onClick={onMoveDown}
+                disabled={isLast || saving}
+                title="Move down"
+                style={{ background: 'none', border: 'none', cursor: isLast ? 'default' : 'pointer', color: CREAM, opacity: isLast ? 0.15 : 0.45, padding: '0.1rem', fontSize: '0.7rem' }}
+              >↓</button>
+            </div>
+          )}
+          <button
+            onClick={onToggleRequired}
+            disabled={saving}
+            style={{
               padding: '0.2rem 0.55rem', borderRadius: '9999px',
               fontSize: '0.65rem', letterSpacing: '0.08em',
-              border: `1px solid ${field.required ? 'rgba(255,138,138,0.2)' : 'rgba(200,168,72,0.1)'}`,
-              color: field.required ? '#ff8a8a' : CREAM, opacity: 0.4,
-            }}>
-              {field.required ? 'REQUIRED' : 'OPTIONAL'}
-            </span>
-          )}
-          {field.isCustom && onDelete && (
+              border: `1px solid ${field.required ? 'rgba(255,138,138,0.4)' : 'rgba(200,168,72,0.2)'}`,
+              color: field.required ? '#ff8a8a' : CREAM,
+              background: field.required ? 'rgba(255,138,138,0.08)' : 'transparent',
+              cursor: saving ? 'not-allowed' : 'pointer', transition: 'all 0.15s',
+            }}
+          >
+            {field.required ? 'REQUIRED' : 'OPTIONAL'}
+          </button>
+          {onDelete && (
             <button
               onClick={onDelete}
               disabled={saving}
@@ -205,39 +333,50 @@ function FieldRow({
 
       {/* Options editor for radio/checkbox custom fields */}
       {showOptions && onOptionsChange && (
-        <div style={{ padding: '0 0.85rem 0.75rem 2.5rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+        <div style={{ padding: '0 0.85rem 0.75rem 2.5rem', display: 'flex', flexDirection: 'column', gap: isAgreement ? '0.45rem' : '0.3rem' }}>
           {(field.options ?? []).map((opt, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <span style={{ color: GOLD, opacity: 0.4, fontSize: '0.7rem' }}>○</span>
-              <input
-                value={opt}
-                onChange={e => {
-                  const next = [...(field.options ?? [])]
-                  next[i] = e.target.value
-                  onOptionsChange(next)
-                }}
-                style={{
-                  flex: 1, background: 'transparent', border: 'none',
-                  borderBottom: '1px solid rgba(200,168,72,0.15)',
-                  color: CREAM, fontSize: '0.78rem', outline: 'none', padding: '0.05rem 0',
-                  fontFamily: 'inherit',
-                }}
-              />
+            <div key={i} style={{ display: 'flex', alignItems: isAgreement ? 'flex-start' : 'center', gap: '0.4rem' }}>
+              <span style={{ color: GOLD, opacity: 0.4, fontSize: '0.7rem', marginTop: isAgreement ? '0.4rem' : 0 }}>{isAgreement ? '☐' : '○'}</span>
+              {isAgreement ? (
+                <textarea
+                  value={opt}
+                  onChange={e => { const next = [...(field.options ?? [])]; next[i] = e.target.value; onOptionsChange(next) }}
+                  rows={2}
+                  placeholder="Clause to acknowledge…"
+                  style={{
+                    flex: 1, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(200,168,72,0.15)',
+                    borderRadius: '0.35rem', color: CREAM, fontSize: '0.78rem', outline: 'none',
+                    padding: '0.35rem 0.5rem', fontFamily: 'inherit', lineHeight: 1.5, resize: 'vertical',
+                  }}
+                />
+              ) : (
+                <input
+                  value={opt}
+                  onChange={e => { const next = [...(field.options ?? [])]; next[i] = e.target.value; onOptionsChange(next) }}
+                  style={{
+                    flex: 1, background: 'transparent', border: 'none',
+                    borderBottom: '1px solid rgba(200,168,72,0.15)',
+                    color: CREAM, fontSize: '0.78rem', outline: 'none', padding: '0.05rem 0',
+                    fontFamily: 'inherit',
+                  }}
+                />
+              )}
               <button
                 onClick={() => onOptionsChange((field.options ?? []).filter((_, j) => j !== i))}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ff8a8a', opacity: 0.4, fontSize: '0.75rem', padding: 0 }}
+                title="Remove"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ff8a8a', opacity: 0.4, fontSize: '0.75rem', padding: 0, marginTop: isAgreement ? '0.35rem' : 0 }}
               >✕</button>
             </div>
           ))}
           <button
-            onClick={() => onOptionsChange([...(field.options ?? []), 'New option'])}
+            onClick={() => onOptionsChange([...(field.options ?? []), isAgreement ? 'I agree to…' : 'New option'])}
             style={{
               marginTop: '0.2rem', background: 'none', border: '1px dashed rgba(200,168,72,0.2)',
               borderRadius: '0.3rem', color: GOLD, opacity: 0.55,
               fontSize: '0.68rem', padding: '0.2rem 0.5rem', cursor: 'pointer',
               alignSelf: 'flex-start',
             }}
-          >+ Add option</button>
+          >+ Add {isAgreement ? 'clause' : 'option'}</button>
         </div>
       )}
     </div>
@@ -247,9 +386,10 @@ function FieldRow({
 // ── Step section ──────────────────────────────────────────────────────────────
 
 function StepSection({
-  step, index, total, displayNum, expanded, saving, dirty,
+  step, index, total, displayNum, expanded, saving,
   onToggleExpand, onToggleVisible, onMoveUp, onMoveDown,
   onTitleChange, onSubtitleChange, onFieldChange, onDelete, onAddField, onDeleteField,
+  fieldsModular, onMoveField, onToggleFieldWidth, onAddElement,
 }: {
   step: StepConfig
   index: number
@@ -257,7 +397,6 @@ function StepSection({
   displayNum: string
   expanded: boolean
   saving: boolean
-  dirty: boolean
   onToggleExpand: () => void
   onToggleVisible: () => void
   onMoveUp: () => void
@@ -268,6 +407,12 @@ function StepSection({
   onDelete: () => void
   onAddField: (type: string) => void
   onDeleteField: (fieldKey: string) => void
+  // When true, fields can be reordered + width-toggled (section is rendered by
+  // the modular renderer on the live form).
+  fieldsModular?: boolean
+  onMoveField?: (fieldKey: string, dir: -1 | 1) => void
+  onToggleFieldWidth?: (fieldKey: string) => void
+  onAddElement?: (element: 'divider' | 'paragraph') => void
 }) {
   return (
     <div style={{
@@ -343,38 +488,64 @@ function StepSection({
               fontSize: '0.7rem',
             }}
           >↓</button>
-          <button
-            onClick={onDelete}
-            disabled={saving}
-            title="Delete section"
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: '#ff8a8a', opacity: 0.45, padding: '0.1rem 0.3rem',
-              fontSize: '0.75rem', lineHeight: 1,
-            }}
-          >✕</button>
+          {step.key !== 'basic' && (
+            <button
+              onClick={onDelete}
+              disabled={saving}
+              title="Delete section"
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: '#ff8a8a', opacity: 0.45, padding: '0.1rem 0.3rem',
+                fontSize: '0.75rem', lineHeight: 1,
+              }}
+            >✕</button>
+          )}
         </div>
       </div>
 
       {/* Fields */}
       {expanded && (
         <div style={{ padding: '0 1rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-          {step.fields.map(field => (
-            <FieldRow
-              key={field.key}
-              field={field}
-              saving={saving}
-              onToggleVisible={() => onFieldChange(field.key, { visible: !field.visible })}
-              onToggleRequired={() => onFieldChange(field.key, { required: !field.required })}
-              onLabelChange={v => onFieldChange(field.key, { label: v })}
-              onDescChange={v => onFieldChange(field.key, { description: v })}
-              onTypeChange={field.isCustom ? t => onFieldChange(field.key, { type: t as FieldConfig['type'], options: (t === 'radio' || t === 'checkbox') ? (field.options ?? ['Option 1', 'Option 2']) : undefined }) : undefined}
-              onOptionsChange={field.isCustom ? opts => onFieldChange(field.key, { options: opts }) : undefined}
-              onDelete={field.isCustom ? () => onDeleteField(field.key) : undefined}
-            />
-          ))}
+          {step.fields.map((field, fIdx) => {
+            // Only the ends pin the arrows; non-locked fields may move past
+            // locked core fields (which can't be grabbed directly themselves).
+            const pinUp = fIdx === 0
+            const pinDown = fIdx === step.fields.length - 1
+            return field.element ? (
+              <ElementRow
+                key={field.key}
+                field={field}
+                saving={saving}
+                onLabelChange={v => onFieldChange(field.key, { label: v })}
+                onDescChange={v => onFieldChange(field.key, { description: v })}
+                onToggleVisible={() => onFieldChange(field.key, { visible: !field.visible })}
+                onMoveUp={fieldsModular && onMoveField ? () => onMoveField(field.key, -1) : undefined}
+                onMoveDown={fieldsModular && onMoveField ? () => onMoveField(field.key, 1) : undefined}
+                isFirst={pinUp}
+                isLast={pinDown}
+                onDelete={() => onDeleteField(field.key)}
+              />
+            ) : (
+              <FieldRow
+                key={field.key}
+                field={field}
+                saving={saving}
+                onToggleVisible={() => onFieldChange(field.key, { visible: !field.visible })}
+                onToggleRequired={() => onFieldChange(field.key, { required: !field.required })}
+                onLabelChange={v => onFieldChange(field.key, { label: v })}
+                onDescChange={v => onFieldChange(field.key, { description: v })}
+                onOptionsChange={(field.isCustom || field.type === 'agreement') ? opts => onFieldChange(field.key, { options: opts }) : undefined}
+                onMoveUp={fieldsModular && onMoveField ? () => onMoveField(field.key, -1) : undefined}
+                onMoveDown={fieldsModular && onMoveField ? () => onMoveField(field.key, 1) : undefined}
+                isFirst={pinUp}
+                isLast={pinDown}
+                onToggleWidth={fieldsModular && onToggleFieldWidth ? () => onToggleFieldWidth(field.key) : undefined}
+                onDelete={!field.locked ? () => onDeleteField(field.key) : undefined}
+              />
+            )
+          })}
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
-              {(['text', 'textarea', 'radio', 'checkbox'] as const).map(type => (
+              {(['text', 'textarea', 'radio', 'checkbox', 'file', 'agreement'] as const).map(type => (
                 <button
                   key={type}
                   onClick={() => onAddField(type)}
@@ -388,6 +559,20 @@ function StepSection({
                   }}
                 >+ {FIELD_TYPE_LABELS[type]}</button>
               ))}
+              {fieldsModular && onAddElement && (['divider', 'paragraph'] as const).map(el => (
+                <button
+                  key={el}
+                  onClick={() => onAddElement(el)}
+                  disabled={saving}
+                  style={{
+                    padding: '0.3rem 0.75rem', borderRadius: '9999px',
+                    border: '1px dashed rgba(200,168,72,0.3)',
+                    background: 'transparent', color: GOLD,
+                    fontSize: '0.7rem', cursor: 'pointer', opacity: 0.6,
+                    transition: 'opacity 0.15s',
+                  }}
+                >+ {el === 'divider' ? 'Divider' : 'Text block'}</button>
+              ))}
             </div>
         </div>
       )}
@@ -396,6 +581,33 @@ function StepSection({
 }
 
 // ── Status banner ─────────────────────────────────────────────────────────────
+
+// Editor for an apply-page track card's title + description ("How would you like
+// to join?" — Camp Member / Volunteer cards).
+function TrackCardEditor({ heading, title, desc, onTitleChange, onDescChange, saving }: {
+  heading: string; title: string; desc: string
+  onTitleChange: (v: string) => void; onDescChange: (v: string) => void; saving: boolean
+}) {
+  return (
+    <div style={{ border: '1px solid rgba(200,168,72,0.15)', borderRadius: '0.75rem', background: 'rgba(200,168,72,0.02)', padding: '1rem', marginBottom: '1.5rem' }}>
+      <p style={{ fontSize: '0.62rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: LAVENDER, opacity: 0.55, margin: '0 0 0.75rem' }}>{heading}</p>
+      <input
+        value={title}
+        onChange={e => onTitleChange(e.target.value)}
+        placeholder="Card title"
+        disabled={saving}
+        style={{ width: '100%', boxSizing: 'border-box', background: 'transparent', border: 'none', borderBottom: '1px solid rgba(200,168,72,0.2)', color: GOLD, fontSize: '0.95rem', outline: 'none', padding: '0 0 0.3rem', marginBottom: '0.7rem', fontFamily: 'inherit' }}
+      />
+      <textarea
+        value={desc}
+        onChange={e => onDescChange(e.target.value)}
+        placeholder="Card description shown on the apply page"
+        rows={2}
+        style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(200,168,72,0.15)', borderRadius: '0.4rem', color: CREAM, fontSize: '0.82rem', outline: 'none', padding: '0.45rem 0.6rem', fontFamily: 'inherit', lineHeight: 1.6, resize: 'vertical' }}
+      />
+    </div>
+  )
+}
 
 function StatusBanner({ open, saving, onToggle }: { open: boolean; saving: boolean; onToggle: () => void }) {
   return (
@@ -424,25 +636,38 @@ export function ApplicationBuilder({
   memberConfig: initialMember,
   volunteerConfig: initialVolunteer,
   contributionTypes: initialContribTypes,
+  trackCopy: initialTrackCopy,
 }: {
   memberConfig: MemberFormConfig
   volunteerConfig: VolunteerFormConfig
   contributionTypes?: ContributionType[]
+  trackCopy?: TrackCopy
 }) {
   const [memberConfig, setMemberConfig] = useState<MemberFormConfig>(initialMember)
   const [volunteerConfig, setVolunteerConfig] = useState<VolunteerFormConfig>(initialVolunteer)
   const [contribTypes, setContribTypes] = useState<ContributionType[]>(initialContribTypes ?? DEFAULT_CONTRIBUTION_TYPES)
+  const [trackCopy, setTrackCopy] = useState<TrackCopy>(initialTrackCopy ?? DEFAULT_TRACK_COPY)
   const [saving, setSaving] = useState(false)
-  const [dirty, setDirty] = useState(false)
-  const [saveMsg, setSaveMsg] = useState<string | null>(null)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'member' | 'volunteer' | 'contributions'>('member')
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set())
 
+  // Pending debounced text-edit save + the value it will persist.
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingSave = useRef<{ key: SaveKey; value: object | ContributionType[] } | null>(null)
+
   // ── Patch helper ──
 
-  const patch = useCallback(async (key: 'config_member_form' | 'config_volunteer_form' | 'community_contribution_types', value: object | ContributionType[]) => {
+  type SaveKey = 'config_member_form' | 'config_volunteer_form' | 'community_contribution_types' | 'config_track_picker'
+
+  const patch = useCallback(async (key: SaveKey, value: object | ContributionType[]) => {
+    // An immediate (structural) save supersedes any pending debounced one.
+    if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null }
+    pendingSave.current = null
     setSaving(true)
-    setSaveMsg(null)
+    setSaveStatus('saving')
+    setSaveError(null)
     try {
       const res = await fetch('/api/admin/page-content', {
         method: 'PATCH',
@@ -450,17 +675,41 @@ export function ApplicationBuilder({
         body: JSON.stringify({ [key]: JSON.stringify(value) }),
       })
       if (!res.ok) {
-        const d = await res.json()
-        setSaveMsg(d.error ?? 'Save failed')
+        const d = await res.json().catch(() => ({}))
+        setSaveError(d.error ?? 'Save failed')
+        setSaveStatus('error')
       } else {
-        setSaveMsg('Saved')
-        setDirty(false)
-        setTimeout(() => setSaveMsg(null), 2000)
+        setSaveStatus('saved')
       }
     } catch {
-      setSaveMsg('Network error')
+      setSaveError('Network error')
+      setSaveStatus('error')
     }
     setSaving(false)
+  }, [])
+
+  // Debounced autosave for text edits (typing a label/description/title). Shows
+  // "Saving…" immediately, then persists once typing pauses.
+  const queueSave = useCallback((key: SaveKey, value: object | ContributionType[]) => {
+    pendingSave.current = { key, value }
+    setSaveStatus('saving')
+    setSaveError(null)
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => {
+      saveTimer.current = null
+      if (pendingSave.current) patch(pendingSave.current.key, pendingSave.current.value)
+    }, 700)
+  }, [patch])
+
+  // Flush a pending save on unmount so a quick edit + navigate away isn't lost.
+  useEffect(() => () => {
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current)
+      if (pendingSave.current) {
+        const { key, value } = pendingSave.current
+        navigator.sendBeacon?.('/api/admin/page-content', new Blob([JSON.stringify({ [key]: JSON.stringify(value) })], { type: 'application/json' }))
+      }
+    }
   }, [])
 
   // ── Member helpers ──
@@ -476,7 +725,7 @@ export function ApplicationBuilder({
     const next = { ...memberConfig, steps }
     setMemberConfig(next)
     if (autosave) patch('config_member_form', next)
-    else setDirty(true)
+    else queueSave('config_member_form', next)
   }
 
   function moveMemberStep(index: number, dir: -1 | 1) {
@@ -484,6 +733,39 @@ export function ApplicationBuilder({
     const target = index + dir
     if (target < 0 || target >= steps.length) return
     ;[steps[index], steps[target]] = [steps[target], steps[index]]
+    const next = { ...memberConfig, steps }
+    setMemberConfig(next)
+    patch('config_member_form', next)
+  }
+
+  function moveMemberField(stepKey: string, fieldKey: string, dir: -1 | 1) {
+    const steps = memberConfig.steps.map(s => {
+      if (s.key !== stepKey) return s
+      const fields = [...s.fields]
+      const idx = fields.findIndex(f => f.key === fieldKey)
+      const target = idx + dir
+      if (idx < 0 || target < 0 || target >= fields.length) return s
+      // Locked core fields can't be grabbed directly, but other fields may move
+      // past them (the locked field shifts by one, keeping its relative order).
+      if (fields[idx].locked) return s
+      ;[fields[idx], fields[target]] = [fields[target], fields[idx]]
+      return { ...s, fields }
+    })
+    const next = { ...memberConfig, steps }
+    setMemberConfig(next)
+    patch('config_member_form', next)
+  }
+
+  function toggleMemberFieldWidth(stepKey: string, fieldKey: string) {
+    const steps = memberConfig.steps.map(s => {
+      if (s.key !== stepKey) return s
+      const fields = s.fields.map(f =>
+        f.key === fieldKey
+          ? ({ ...f, width: ((f.width ?? 'full') === 'half' ? 'full' : 'half') } as FieldConfig)
+          : f
+      )
+      return { ...s, fields }
+    })
     const next = { ...memberConfig, steps }
     setMemberConfig(next)
     patch('config_member_form', next)
@@ -498,7 +780,7 @@ export function ApplicationBuilder({
     const next = { ...memberConfig, steps }
     setMemberConfig(next)
     if (autosave) patch('config_member_form', next)
-    else setDirty(true)
+    else queueSave('config_member_form', next)
   }
 
   // ── Delete / add step ──
@@ -536,12 +818,41 @@ export function ApplicationBuilder({
       canHide: true, canChangeRequired: true,
       isCustom: true,
       type: type as FieldConfig['type'],
-      options: (type === 'radio' || type === 'checkbox') ? ['Option 1', 'Option 2'] : undefined,
+      options: (type === 'radio' || type === 'checkbox') ? ['Option 1', 'Option 2']
+        : type === 'agreement' ? ['I agree to…']
+        : undefined,
     }
     const next = {
       ...memberConfig,
       steps: memberConfig.steps.map(s =>
         s.key === stepKey ? { ...s, fields: [...s.fields, newField] } : s
+      ),
+    }
+    setMemberConfig(next)
+    patch('config_member_form', next)
+  }
+
+  function handleResetMemberForm() {
+    if (!window.confirm('Reset the member application form to its default sections and fields? Custom fields, text blocks, deletions, and layout changes will be lost. (The open/closed status is kept.)')) return
+    const fresh = mergeMemberConfig({ open: memberConfig.open })
+    setMemberConfig(fresh)
+    setExpandedSteps(new Set())
+    patch('config_member_form', fresh)
+  }
+
+  function handleAddElement(stepKey: string, element: 'divider' | 'paragraph') {
+    const newEl: FieldConfig = {
+      key: `el_${Date.now()}`,
+      element,
+      label: '',
+      description: element === 'paragraph' ? 'New text block' : undefined,
+      visible: true, required: false, canHide: true, canChangeRequired: false,
+      isCustom: true,
+    }
+    const next = {
+      ...memberConfig,
+      steps: memberConfig.steps.map(s =>
+        s.key === stepKey ? { ...s, fields: [...s.fields, newEl] } : s
       ),
     }
     setMemberConfig(next)
@@ -572,10 +883,16 @@ export function ApplicationBuilder({
     const next = { ...volunteerConfig, fields }
     setVolunteerConfig(next)
     if (autosave) patch('config_volunteer_form', next)
-    else setDirty(true)
+    else queueSave('config_volunteer_form', next)
   }
 
   // ── Explicit save ──
+
+  function setTrackCopyField(key: keyof TrackCopy, value: string) {
+    const next = { ...trackCopy, [key]: value }
+    setTrackCopy(next)
+    queueSave('config_track_picker', next)
+  }
 
   function handleSave() {
     if (activeTab === 'member') patch('config_member_form', memberConfig)
@@ -614,33 +931,42 @@ export function ApplicationBuilder({
           <a href="/admin" style={{ fontSize: '0.8rem', letterSpacing: '0.1em', color: GOLD, textDecoration: 'none', opacity: 0.6 }}>
             ← Back to admin
           </a>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            {saveMsg && (
-              <span style={{
-                fontSize: '0.72rem', letterSpacing: '0.1em',
-                color: saveMsg === 'Saved' ? '#7dcf8e' : '#ff8a8a',
-                opacity: 0.85,
-              }}>
-                {saveMsg === 'Saved' ? '✓ Saved' : saveMsg}
-              </span>
-            )}
-            {dirty && (
+        </div>
+
+        {/* Floating save indicator — always visible, even scrolled down */}
+        <div style={{
+          position: 'fixed', top: '1rem', right: '1rem', zIndex: 50,
+          display: 'flex', alignItems: 'center', gap: '0.5rem',
+          padding: '0.45rem 0.9rem', borderRadius: '9999px',
+          background: 'rgba(20,10,30,0.82)', backdropFilter: 'blur(6px)',
+          border: `1px solid ${saveStatus === 'error' ? 'rgba(255,138,138,0.4)' : saveStatus === 'saving' ? 'rgba(200,168,72,0.35)' : 'rgba(125,207,142,0.3)'}`,
+          fontSize: '0.72rem', letterSpacing: '0.04em', boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+          transition: 'border-color 0.2s',
+        }}>
+          {saveStatus === 'error' ? (
+            <>
+              <span style={{ color: '#ff8a8a' }}>⚠ Couldn&apos;t save{saveError ? ` — ${saveError}` : ''}</span>
               <button
                 onClick={handleSave}
                 disabled={saving}
                 style={{
-                  padding: '0.45rem 1.25rem', borderRadius: '9999px',
-                  border: 'none',
-                  background: saving ? 'rgba(200,168,72,0.2)' : 'linear-gradient(135deg, #C8A848, #A8882A)',
-                  color: saving ? GOLD : '#1A0A00',
-                  fontSize: '0.78rem', letterSpacing: '0.08em', fontWeight: 600,
-                  cursor: saving ? 'not-allowed' : 'pointer',
+                  padding: '0.25rem 0.8rem', borderRadius: '9999px', border: 'none',
+                  background: 'linear-gradient(135deg, #C8A848, #A8882A)', color: '#1A0A00',
+                  fontSize: '0.7rem', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer',
                 }}
-              >
-                {saving ? 'Saving…' : 'Save changes'}
-              </button>
-            )}
-          </div>
+              >Retry</button>
+            </>
+          ) : saveStatus === 'saving' ? (
+            <span style={{ color: GOLD, opacity: 0.9, display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: GOLD, display: 'inline-block' }} />
+              Saving…
+            </span>
+          ) : (
+            <span style={{ color: '#7dcf8e', opacity: saveStatus === 'saved' ? 0.95 : 0.6, display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#7dcf8e', display: 'inline-block' }} />
+              All changes saved
+            </span>
+          )}
         </div>
 
         <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(1.6rem, 4vw, 2.2rem)', color: GOLD, textAlign: 'center', marginBottom: '2rem', letterSpacing: '0.08em' }}>
@@ -659,6 +985,15 @@ export function ApplicationBuilder({
           <div>
             <StatusBanner open={memberConfig.open} saving={saving} onToggle={toggleMemberOpen} />
 
+            <TrackCardEditor
+              heading="Apply-page card · Camp Member"
+              title={trackCopy.memberTitle}
+              desc={trackCopy.memberDesc}
+              onTitleChange={v => setTrackCopyField('memberTitle', v)}
+              onDescChange={v => setTrackCopyField('memberDesc', v)}
+              saving={saving}
+            />
+
             {memberConfig.steps.map((step, idx) => (
               <StepSection
                 key={step.key}
@@ -672,7 +1007,6 @@ export function ApplicationBuilder({
                 }
                 expanded={expandedSteps.has(step.key)}
                 saving={saving}
-                dirty={dirty}
                 onToggleExpand={() => setExpandedSteps(prev => {
                   const next = new Set(prev)
                   if (next.has(step.key)) next.delete(step.key)
@@ -685,12 +1019,18 @@ export function ApplicationBuilder({
                 onTitleChange={v => setMemberStep(step.key, { title: v })}
                 onSubtitleChange={v => setMemberStep(step.key, { subtitle: v })}
                 onFieldChange={(fieldKey, fp) => {
-                  const isStructural = 'visible' in fp || 'required' in fp || 'type' in fp || 'options' in fp
+                  // Toggles/type save immediately; typed text (label/description/
+                  // options) debounces via queueSave.
+                  const isStructural = 'visible' in fp || 'required' in fp || 'type' in fp
                   setMemberField(step.key, fieldKey, fp, isStructural)
                 }}
                 onDelete={() => handleDeleteStep(step.key)}
                 onAddField={type => handleAddField(step.key, type)}
                 onDeleteField={fieldKey => handleDeleteField(step.key, fieldKey)}
+                fieldsModular={MODULAR_STEP_KEYS.includes(step.key) || !!step.isCustom}
+                onMoveField={(fieldKey, dir) => moveMemberField(step.key, fieldKey, dir)}
+                onToggleFieldWidth={fieldKey => toggleMemberFieldWidth(step.key, fieldKey)}
+                onAddElement={element => handleAddElement(step.key, element)}
               />
             ))}
 
@@ -707,7 +1047,7 @@ export function ApplicationBuilder({
               }}
             >+ Add section</button>
 
-            <div style={{ textAlign: 'center', marginTop: '0.5rem' }}>
+            <div style={{ textAlign: 'center', marginTop: '0.5rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
               <a
                 href="/apply?track=member&admin_preview=1"
                 target="_blank"
@@ -722,6 +1062,17 @@ export function ApplicationBuilder({
               >
                 Test this application →
               </a>
+              <button
+                onClick={handleResetMemberForm}
+                disabled={saving}
+                style={{
+                  background: 'none', border: 'none', cursor: saving ? 'not-allowed' : 'pointer',
+                  color: CREAM, opacity: 0.4, fontSize: '0.75rem', letterSpacing: '0.06em',
+                  textDecoration: 'underline', textUnderlineOffset: '3px',
+                }}
+              >
+                Reset to defaults
+              </button>
             </div>
           </div>
         )}
@@ -730,6 +1081,15 @@ export function ApplicationBuilder({
         {activeTab === 'volunteer' && (
           <div>
             <StatusBanner open={volunteerConfig.open} saving={saving} onToggle={toggleVolunteerOpen} />
+
+            <TrackCardEditor
+              heading="Apply-page card · Volunteer"
+              title={trackCopy.volunteerTitle}
+              desc={trackCopy.volunteerDesc}
+              onTitleChange={v => setTrackCopyField('volunteerTitle', v)}
+              onDescChange={v => setTrackCopyField('volunteerDesc', v)}
+              saving={saving}
+            />
 
             <div style={{
               border: '1px solid rgba(200,168,72,0.15)', borderRadius: '0.75rem',
@@ -798,7 +1158,7 @@ export function ApplicationBuilder({
                     onChange={e => {
                       const next = contribTypes.map((t, i) => i === idx ? { ...t, icon: e.target.value } : t)
                       setContribTypes(next)
-                      setDirty(true)
+                      queueSave('community_contribution_types', next)
                     }}
                     placeholder="⚒️"
                     style={{
@@ -816,7 +1176,7 @@ export function ApplicationBuilder({
                       onChange={e => {
                         const next = contribTypes.map((t, i) => i === idx ? { ...t, value: e.target.value } : t)
                         setContribTypes(next)
-                        setDirty(true)
+                        queueSave('community_contribution_types', next)
                       }}
                       placeholder="Name (e.g. Setup)"
                       style={{
@@ -832,7 +1192,7 @@ export function ApplicationBuilder({
                       onChange={e => {
                         const next = contribTypes.map((t, i) => i === idx ? { ...t, description: e.target.value } : t)
                         setContribTypes(next)
-                        setDirty(true)
+                        queueSave('community_contribution_types', next)
                       }}
                       placeholder="Short description shown in commitments card…"
                       style={{
@@ -850,7 +1210,7 @@ export function ApplicationBuilder({
                         onChange={e => {
                           const next = contribTypes.map((t, i) => i === idx ? { ...t, autoForDeptKeyword: e.target.value || null } : t)
                           setContribTypes(next)
-                          setDirty(true)
+                          queueSave('community_contribution_types', next)
                         }}
                         placeholder="keyword (optional)"
                         style={{
@@ -871,7 +1231,7 @@ export function ApplicationBuilder({
                         const next = [...contribTypes]
                         ;[next[idx - 1], next[idx]] = [next[idx], next[idx - 1]]
                         setContribTypes(next)
-                        setDirty(true)
+                        queueSave('community_contribution_types', next)
                       }}
                       disabled={idx === 0}
                       title="Move up"
@@ -883,7 +1243,7 @@ export function ApplicationBuilder({
                         const next = [...contribTypes]
                         ;[next[idx], next[idx + 1]] = [next[idx + 1], next[idx]]
                         setContribTypes(next)
-                        setDirty(true)
+                        queueSave('community_contribution_types', next)
                       }}
                       disabled={idx === contribTypes.length - 1}
                       title="Move down"
@@ -892,8 +1252,9 @@ export function ApplicationBuilder({
                     <button
                       onClick={() => {
                         if (!window.confirm(`Remove "${ct.value}"? Existing member data using this value won't be changed.`)) return
-                        setContribTypes(contribTypes.filter((_, i) => i !== idx))
-                        setDirty(true)
+                        const next = contribTypes.filter((_, i) => i !== idx)
+                        setContribTypes(next)
+                        queueSave('community_contribution_types', next)
                       }}
                       title="Remove"
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ff8a8a', opacity: 0.45, fontSize: '0.8rem', padding: '0.1rem', marginTop: '0.15rem' }}
@@ -905,8 +1266,9 @@ export function ApplicationBuilder({
 
             <button
               onClick={() => {
-                setContribTypes([...contribTypes, { value: 'New Type', icon: '✦', description: '', autoForDeptKeyword: null }])
-                setDirty(true)
+                const next = [...contribTypes, { value: 'New Type', icon: '✦', description: '', autoForDeptKeyword: null }]
+                setContribTypes(next)
+                queueSave('community_contribution_types', next)
               }}
               style={{
                 width: '100%', padding: '0.65rem',

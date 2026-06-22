@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { AdminActions } from '../AdminActions'
 import { RemoveMemberButton } from '../RemoveMemberButton'
 import { MemberSignupCard } from '../MemberSignupCard'
+import { mergeMemberConfig } from '@/lib/form-config'
 
 export default async function ApplicationDetailPage({ params }: { params: { id: string } }) {
   const { userId } = await auth()
@@ -63,6 +64,38 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
   const submitted = new Date(app.submitted_at).toLocaleDateString('en-CA', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   })
+
+  // Answers to admin-added custom fields are stored in custom_answers keyed by
+  // field key. Pull the form config to resolve human labels + field types, and
+  // present them in form order (orphaned keys from deleted fields shown last).
+  const customAnswers: Record<string, string | string[]> = app.custom_answers ?? {}
+  const orderedCustom: { key: string; label: string; type?: string; value: string | string[]; other?: string }[] = []
+  const hasValue = (v: string | string[]) => Array.isArray(v) ? v.length > 0 : !!String(v ?? '').trim()
+  if (Object.keys(customAnswers).some(k => hasValue(customAnswers[k]))) {
+    const { data: cfgRow } = await supabaseAdmin
+      .from('page_content').select('value').eq('key', 'config_member_form').maybeSingle()
+    let raw: object = {}
+    try { if (cfgRow?.value) raw = JSON.parse(cfgRow.value) } catch { /* defaults */ }
+    const cfg = mergeMemberConfig(raw)
+    const seen = new Set<string>()
+    for (const step of cfg.steps) {
+      for (const f of step.fields) {
+        if (f.isCustom && !f.element && hasValue(customAnswers[f.key])) {
+          // Companion "Other" free-text answer lives under `<key>__other`.
+          const otherText = customAnswers[f.key + '__other']
+          orderedCustom.push({
+            key: f.key, label: f.label, type: f.type, value: customAnswers[f.key],
+            other: typeof otherText === 'string' && otherText.trim() ? otherText : undefined,
+          })
+          seen.add(f.key)
+          seen.add(f.key + '__other')
+        }
+      }
+    }
+    for (const [k, v] of Object.entries(customAnswers)) {
+      if (!seen.has(k) && hasValue(v) && !k.endsWith('__other')) orderedCustom.push({ key: k, label: k, value: v })
+    }
+  }
 
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1 }}>
@@ -242,6 +275,17 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
           </>
         )}
 
+        {orderedCustom.length > 0 && (
+          <>
+            <Divider />
+            <Section title="Additional Responses">
+              {orderedCustom.map(a => (
+                <CustomAnswer key={a.key} label={a.label} value={a.value} type={a.type} other={a.other} />
+              ))}
+            </Section>
+          </>
+        )}
+
         {/* Actions at bottom too */}
         {app.status === 'pending' && (
           <>
@@ -267,6 +311,45 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
         )}
 
       </div>
+    </div>
+  )
+}
+
+function fileNameFromUrl(url: string): string {
+  try {
+    const seg = decodeURIComponent(url.split('?')[0].split('/').pop() ?? '')
+    return seg.replace(/^\d{10,}-/, '') || 'Attachment'
+  } catch {
+    return 'Attachment'
+  }
+}
+
+function CustomAnswer({ label, value, type, other }: { label: string; value: string | string[]; type?: string; other?: string }) {
+  const isFile = type === 'file' || (typeof value === 'string' && /^https?:\/\//.test(value) && value.includes('/application-files/'))
+  return (
+    <div style={{ padding: '1rem 1.25rem', border: '1px solid rgba(200,168,72,0.1)', borderRadius: '0.5rem', background: 'rgba(255,255,255,0.02)', marginBottom: '1rem' }}>
+      <p style={{ fontSize: '0.65rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, marginBottom: '0.5rem' }}>{label}</p>
+      {isFile && typeof value === 'string' ? (
+        <a href={value} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: '#C8A848', fontSize: '0.9rem', textDecoration: 'none' }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+          </svg>
+          <span style={{ textDecoration: 'underline', textUnderlineOffset: '2px' }}>{fileNameFromUrl(value)}</span>
+        </a>
+      ) : Array.isArray(value) ? (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+          {value.map(v => (
+            <span key={v} style={{ padding: '0.25rem 0.75rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.2)', fontSize: '0.8rem', opacity: 0.8 }}>{v}</span>
+          ))}
+        </div>
+      ) : (
+        <p style={{ fontSize: '0.9rem', opacity: 0.8, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{value}</p>
+      )}
+      {other && (
+        <p style={{ fontSize: '0.85rem', opacity: 0.7, marginTop: '0.5rem' }}>
+          <span style={{ color: '#C8A848', opacity: 0.7 }}>Other:</span> {other}
+        </p>
+      )}
     </div>
   )
 }

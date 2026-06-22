@@ -1,6 +1,10 @@
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type FieldType = 'text' | 'textarea' | 'radio' | 'checkbox'
+import { DEFAULT_AGREEMENT_ITEMS } from './site-config'
+
+// 'agreement' = a checklist of statements/clauses the applicant must acknowledge
+// (all required when the field is required), like the Many Hands Agreement.
+export type FieldType = 'text' | 'textarea' | 'radio' | 'checkbox' | 'file' | 'agreement'
 
 export type FieldConfig = {
   key: string
@@ -10,6 +14,18 @@ export type FieldConfig = {
   required: boolean
   canHide: boolean
   canChangeRequired: boolean
+  // Layout width within its section. Consecutive 'half' fields pair into a
+  // two-column row; an unpaired 'half' renders full width. Defaults to 'full'.
+  width?: 'half' | 'full'
+  // Non-input layout elements that live in the field list and reorder like
+  // fields. 'divider' renders a horizontal rule (its `label` is the optional
+  // caption); 'paragraph' renders body copy from its `description`. When unset
+  // the entry is a normal input field.
+  element?: 'divider' | 'paragraph'
+  // Core fields that back NOT NULL columns the rest of the app depends on
+  // (identity, display names, contact). Always present + required; the builder
+  // renders them read-only and they can't be hidden, reordered, or deleted.
+  locked?: boolean
   // admin-added fields only
   isCustom?: boolean
   type?: FieldType
@@ -50,18 +66,18 @@ export const DEFAULT_MEMBER_CONFIG: MemberFormConfig = {
       visible: true,
       canHide: false,
       fields: [
-        { key: 'first_name',       label: 'First Name',                          visible: true, required: true,  canHide: false, canChangeRequired: false },
-        { key: 'last_name',        label: 'Last Name',                           visible: true, required: true,  canHide: false, canChangeRequired: false },
-        { key: 'preferred_name',   label: 'Preferred Name',                      visible: true, required: false, canHide: true,  canChangeRequired: false },
-        { key: 'pronouns',         label: 'Pronouns',                            visible: true, required: false, canHide: true,  canChangeRequired: false },
-        { key: 'email',            label: 'Email',                               visible: true, required: true,  canHide: false, canChangeRequired: false },
-        { key: 'phone',            label: 'Phone Number',                        visible: true, required: true,  canHide: false, canChangeRequired: true  },
-        { key: 'instagram',        label: 'Instagram',       description: '@handle',                            visible: true, required: false, canHide: true,  canChangeRequired: false },
-        { key: 'location',         label: 'Where are you travelling from?',      visible: true, required: false, canHide: true,  canChangeRequired: false },
-        { key: 'emergency_contact',label: 'Emergency Contact', description: 'Name and phone number',           visible: true, required: true,  canHide: false, canChangeRequired: true  },
-        { key: 'referral',         label: 'Who referred you to Glåüm?',          visible: true, required: false, canHide: true,  canChangeRequired: false },
-        { key: 'camped_before',    label: 'Have you camped with Glåüm before?',  visible: true, required: true,  canHide: false, canChangeRequired: true  },
-        { key: 'avatar_url',       label: 'Photo', description: 'For the Many Hands Photo Board',              visible: true, required: true,  canHide: false, canChangeRequired: true  },
+        { key: 'first_name',       label: 'First Name',                          visible: true, required: true,  canHide: false, canChangeRequired: false, width: 'half', locked: true },
+        { key: 'last_name',        label: 'Last Name',                           visible: true, required: true,  canHide: false, canChangeRequired: false, width: 'half', locked: true },
+        { key: 'preferred_name',   label: 'Preferred Name',                      visible: true, required: false, canHide: true,  canChangeRequired: false, width: 'half' },
+        { key: 'pronouns',         label: 'Pronouns',                            visible: true, required: false, canHide: true,  canChangeRequired: false, width: 'half' },
+        { key: 'email',            label: 'Email',                               visible: true, required: true,  canHide: false, canChangeRequired: false, width: 'half', locked: true },
+        { key: 'phone',            label: 'Phone Number',                        visible: true, required: true,  canHide: false, canChangeRequired: false, width: 'half', locked: true },
+        { key: 'instagram',        label: 'Instagram',       description: '@handle',                            visible: true, required: false, canHide: true,  canChangeRequired: false, width: 'half' },
+        { key: 'location',         label: 'Where are you travelling from?',      visible: true, required: false, canHide: true,  canChangeRequired: false, width: 'half' },
+        { key: 'emergency_contact',label: 'Emergency Contact', description: 'Name and phone number',           visible: true, required: true,  canHide: true,  canChangeRequired: true,  width: 'full' },
+        { key: 'referral',         label: 'Who referred you to Glåüm?',          visible: true, required: false, canHide: true,  canChangeRequired: false, width: 'half' },
+        { key: 'camped_before',    label: 'Have you camped with Glåüm before?',  visible: true, required: true,  canHide: true,  canChangeRequired: true,  width: 'half' },
+        { key: 'avatar_url',       label: 'Photo', description: 'For the Many Hands Photo Board',              visible: true, required: true,  canHide: false, canChangeRequired: true,  width: 'full', locked: true },
       ],
     },
     {
@@ -72,11 +88,13 @@ export const DEFAULT_MEMBER_CONFIG: MemberFormConfig = {
       visible: true,
       canHide: false,
       fields: [
-        { key: 'about_you',         label: 'What are you currently excited about?',                              visible: true, required: false, canHide: true,  canChangeRequired: false },
-        { key: 'special_skills',    label: 'What special skills do you possess?', description: 'What might be useful at camp.', visible: true, required: false, canHide: true, canChangeRequired: false },
-        { key: 'find_at_camp',      label: 'If we encountered you at camp, what would we find you doing?', description: 'Picture a typical Glåüm moment.', visible: true, required: false, canHide: true, canChangeRequired: false },
-        { key: 'community_acceptance', label: 'Have you accepted Glåüm into your heart?',  visible: true, required: true,  canHide: false, canChangeRequired: false },
-        { key: 'onboarding_status',    label: 'Current Attunement Status',                 visible: true, required: false, canHide: true,  canChangeRequired: false },
+        { key: 'el_registry_intro', element: 'paragraph', label: 'Intro text', description: 'These questions help us get to know you and create your official Many Hands Registry entry.', visible: true, required: false, canHide: true, canChangeRequired: false },
+        { key: 'about_you',         label: 'What are you currently excited about?',                              visible: true, required: false, canHide: true,  canChangeRequired: false, width: 'full' },
+        { key: 'special_skills',    label: 'What special skills do you possess?', description: 'What might be useful at camp.', visible: true, required: false, canHide: true, canChangeRequired: false, width: 'full' },
+        { key: 'find_at_camp',      label: 'If we encountered you at camp, what would we find you doing?', description: 'Picture a typical Glåüm moment.', visible: true, required: false, canHide: true, canChangeRequired: false, width: 'full' },
+        { key: 'el_registry_div', element: 'divider', label: '', visible: true, required: false, canHide: true, canChangeRequired: false },
+        { key: 'community_acceptance', label: 'Have you accepted Glåüm into your heart?',  visible: true, required: true,  canHide: true,  canChangeRequired: true,  width: 'half' },
+        { key: 'onboarding_status',    label: 'Current Attunement Status',                 visible: true, required: false, canHide: true,  canChangeRequired: false, width: 'half' },
       ],
     },
     {
@@ -87,12 +105,14 @@ export const DEFAULT_MEMBER_CONFIG: MemberFormConfig = {
       visible: true,
       canHide: false,
       fields: [
-        { key: 'attendance',     label: 'How do you plan to participate this year?',  visible: true, required: true,  canHide: false, canChangeRequired: false },
-        { key: 'arrival_date',   label: 'Approximate Arrival Date',                   visible: true, required: false, canHide: true,  canChangeRequired: false },
-        { key: 'departure_date', label: 'Approximate Departure Date',                 visible: true, required: false, canHide: true,  canChangeRequired: false },
-        { key: 'vehicle',        label: 'Vehicle Information', description: 'Make, model, passengers, cargo capacity', visible: true, required: false, canHide: true, canChangeRequired: false },
-        { key: 'structures',     label: 'Bringing Any Structures?', description: 'Tents, shade structures, etc.',      visible: true, required: false, canHide: true, canChangeRequired: false },
-        { key: 'rideshare',      label: 'Rideshare Status',                            visible: true, required: false, canHide: true,  canChangeRequired: false },
+        { key: 'attendance',     label: 'How do you plan to participate this year?',  visible: true, required: true,  canHide: true,  canChangeRequired: true,  width: 'full' },
+        { key: 'el_plans_div1',  element: 'divider', label: '', visible: true, required: false, canHide: true, canChangeRequired: false },
+        { key: 'arrival_date',   label: 'Approximate Arrival Date',                   visible: true, required: false, canHide: true,  canChangeRequired: false, width: 'half' },
+        { key: 'departure_date', label: 'Approximate Departure Date',                 visible: true, required: false, canHide: true,  canChangeRequired: false, width: 'half' },
+        { key: 'vehicle',        label: 'Vehicle Information', description: 'Make, model, passengers, cargo capacity', visible: true, required: false, canHide: true, canChangeRequired: false, width: 'full' },
+        { key: 'structures',     label: 'Bringing Any Structures?', description: 'Tents, shade structures, etc.',      visible: true, required: false, canHide: true, canChangeRequired: false, width: 'full' },
+        { key: 'el_plans_rideshare', element: 'divider', label: 'Rideshare', visible: true, required: false, canHide: true, canChangeRequired: false },
+        { key: 'rideshare',      label: 'Rideshare Status',                            visible: true, required: false, canHide: true,  canChangeRequired: false, width: 'full' },
       ],
     },
     {
@@ -103,11 +123,14 @@ export const DEFAULT_MEMBER_CONFIG: MemberFormConfig = {
       visible: true,
       canHide: false,
       fields: [
-        { key: 'dept_interests',       label: 'Which departments interest you?',          visible: true, required: false, canHide: true,  canChangeRequired: false },
-        { key: 'leadership_interest',  label: 'Are you interested in a leadership role?', visible: true, required: false, canHide: true,  canChangeRequired: true  },
-        { key: 'setup_preference',     label: 'Communal Responsibilities', description: 'Setup, teardown, or decor preference', visible: true, required: false, canHide: true, canChangeRequired: false },
-        { key: 'setup_limitations',    label: 'Setup/Teardown Limitations',               visible: true, required: false, canHide: true,  canChangeRequired: false },
-        { key: 'setup_notes',          label: 'What brings you to Glåüm this year?',      visible: true, required: false, canHide: true,  canChangeRequired: false },
+        { key: 'dept_interests',       label: 'Which departments interest you?',          visible: true, required: false, canHide: true,  canChangeRequired: true, width: 'full' },
+        { key: 'el_roles_div1',        element: 'divider', label: '', visible: true, required: false, canHide: true, canChangeRequired: false },
+        { key: 'leadership_interest',  label: 'Are you interested in a leadership role?', visible: true, required: false, canHide: true,  canChangeRequired: true, width: 'full' },
+        { key: 'el_roles_communal',    element: 'divider', label: 'Communal Responsibilities', visible: true, required: false, canHide: true, canChangeRequired: false },
+        { key: 'setup_preference',     label: 'Communal Responsibilities', description: 'Setup, teardown, or decor preference', visible: true, required: false, canHide: true, canChangeRequired: true, width: 'full' },
+        { key: 'setup_limitations',    label: 'Setup/Teardown Limitations',               visible: true, required: false, canHide: true,  canChangeRequired: true, width: 'full' },
+        { key: 'el_roles_div2',        element: 'divider', label: '', visible: true, required: false, canHide: true, canChangeRequired: false },
+        { key: 'setup_notes',          label: 'What brings you to Glåüm this year?',      visible: true, required: false, canHide: true,  canChangeRequired: true, width: 'full' },
       ],
     },
     {
@@ -118,7 +141,8 @@ export const DEFAULT_MEMBER_CONFIG: MemberFormConfig = {
       visible: true,
       canHide: false,
       fields: [
-        { key: 'acknowledgements', label: 'The Many Hands Agreement', description: 'All items must be acknowledged', visible: true, required: true, canHide: false, canChangeRequired: false },
+        { key: 'el_agreement_intro', element: 'paragraph', label: 'Intro text', description: 'Please acknowledge the following. All items are required to complete your application.', visible: true, required: false, canHide: true, canChangeRequired: false },
+        { key: 'acknowledgements', label: 'The Many Hands Agreement', description: 'All items must be acknowledged', visible: true, required: true, canHide: true, canChangeRequired: true, width: 'full', type: 'agreement', options: DEFAULT_AGREEMENT_ITEMS },
       ],
     },
     {
@@ -129,7 +153,8 @@ export const DEFAULT_MEMBER_CONFIG: MemberFormConfig = {
       visible: true,
       canHide: true,
       fields: [
-        { key: 'shrimp_relationship', label: 'What is your relationship to shrimp?', visible: true, required: false, canHide: true, canChangeRequired: false },
+        { key: 'el_shrimp_intro', element: 'paragraph', label: 'Intro text', description: 'Before we proceed, there is one final matter that requires your attention.', visible: true, required: false, canHide: true, canChangeRequired: false },
+        { key: 'shrimp_relationship', label: 'What is your relationship to shrimp?', visible: true, required: false, canHide: true, canChangeRequired: false, width: 'full' },
       ],
     },
   ],
@@ -155,30 +180,47 @@ export const DEFAULT_VOLUNTEER_CONFIG: VolunteerFormConfig = {
 
 export function mergeMemberConfig(saved: Partial<MemberFormConfig>): MemberFormConfig {
   const open = saved.open !== undefined ? saved.open : DEFAULT_MEMBER_CONFIG.open
+  const defaultStepByKey = new Map(DEFAULT_MEMBER_CONFIG.steps.map(s => [s.key, s]))
 
-  const defaultKeys = new Set(DEFAULT_MEMBER_CONFIG.steps.map(s => s.key))
+  // Merge a built-in field's saved overrides onto its default definition.
+  // Locked core fields ignore saved overrides — except `required` when the
+  // field is allowed to toggle it (Photo, so admins can permit blank profiles).
+  const mergeBuiltIn = (defaultField: FieldConfig, savedField?: FieldConfig): FieldConfig => {
+    if (!savedField) return defaultField
+    if (defaultField.locked) {
+      return defaultField.canChangeRequired && savedField.required !== undefined
+        ? { ...defaultField, required: savedField.required }
+        : defaultField
+    }
+    return {
+      ...defaultField,
+      label:       savedField.label       !== undefined ? savedField.label       : defaultField.label,
+      description: savedField.description !== undefined ? savedField.description : defaultField.description,
+      visible:     savedField.visible     !== undefined ? savedField.visible     : defaultField.visible,
+      required:    savedField.required    !== undefined ? savedField.required    : defaultField.required,
+      width:       savedField.width       !== undefined ? savedField.width       : defaultField.width,
+      options:     savedField.options     !== undefined ? savedField.options     : defaultField.options,
+    }
+  }
 
-  // Merge saved overrides into default steps (preserves order of saved config if present)
-  const savedOrder = saved.steps?.map(s => s.key).filter(k => defaultKeys.has(k)) ?? DEFAULT_MEMBER_CONFIG.steps.map(s => s.key)
-
-  const steps = savedOrder.map(key => {
-    const defaultStep = DEFAULT_MEMBER_CONFIG.steps.find(s => s.key === key)!
-    const savedStep = saved.steps?.find(s => s.key === key)
-    // Built-in fields merged with saved overrides; admin-added fields appended at end
-    const builtInFields = defaultStep.fields.map(defaultField => {
-      const savedField = savedStep?.fields?.find(f => f.key === defaultField.key)
-      if (!savedField) return defaultField
-      return {
-        ...defaultField,
-        label:       savedField.label       !== undefined ? savedField.label       : defaultField.label,
-        description: savedField.description !== undefined ? savedField.description : defaultField.description,
-        visible:     savedField.visible     !== undefined ? savedField.visible     : defaultField.visible,
-        required:    savedField.required    !== undefined ? savedField.required    : defaultField.required,
-      }
-    })
-    const builtInKeys = new Set(defaultStep.fields.map(f => f.key))
-    const adminFields = (savedStep?.fields ?? []).filter(f => !builtInKeys.has(f.key))
-    const fields = [...builtInFields, ...adminFields]
+  // Merge one default (built-in) step with its saved overrides.
+  const mergeDefaultStep = (defaultStep: StepConfig, savedStep?: StepConfig): StepConfig => {
+    const defaultByKey = new Map(defaultStep.fields.map(f => [f.key, f]))
+    const savedFields = savedStep?.fields
+    let fields: FieldConfig[]
+    if (savedFields) {
+      // Honour saved field ORDER. Built-in fields merged with defaults; admin
+      // fields kept as-is. Deleted non-core built-ins stay deleted; only locked
+      // core fields are re-injected (safety net for the 4 NOT NULL columns).
+      const seen = new Set(savedFields.map(f => f.key))
+      const ordered = savedFields.map(f =>
+        defaultByKey.has(f.key) ? mergeBuiltIn(defaultByKey.get(f.key)!, f) : f
+      )
+      const missingCore = defaultStep.fields.filter(f => !seen.has(f.key) && f.locked)
+      fields = [...ordered, ...missingCore]
+    } else {
+      fields = defaultStep.fields
+    }
     if (!savedStep) return { ...defaultStep, fields }
     return {
       ...defaultStep,
@@ -187,12 +229,23 @@ export function mergeMemberConfig(saved: Partial<MemberFormConfig>): MemberFormC
       visible:  savedStep.visible  !== undefined ? savedStep.visible  : defaultStep.visible,
       fields,
     }
+  }
+
+  // No saved config → full defaults.
+  if (!saved.steps) {
+    return { open, steps: DEFAULT_MEMBER_CONFIG.steps.map(s => mergeDefaultStep(s)) }
+  }
+
+  // Preserve the saved order of ALL steps (default + custom), so admin section
+  // reordering — including custom sections moved above built-in ones — persists.
+  // Built-in steps merge with their defaults; custom steps kept as-is. Deleted
+  // built-in steps stay deleted (config is the source of truth).
+  const steps = saved.steps.map(savedStep => {
+    const defaultStep = defaultStepByKey.get(savedStep.key)
+    return defaultStep ? mergeDefaultStep(defaultStep, savedStep) : savedStep
   })
 
-  // Append custom steps (not in defaults) — preserved as-is from saved config
-  const customSteps: StepConfig[] = (saved.steps ?? []).filter(s => !defaultKeys.has(s.key))
-
-  return { open, steps: [...steps, ...customSteps] }
+  return { open, steps }
 }
 
 export function mergeVolunteerConfig(saved: Partial<VolunteerFormConfig>): VolunteerFormConfig {

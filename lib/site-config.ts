@@ -38,3 +38,29 @@ export const DEFAULT_MEMBERSHIP_TYPE_OPTIONS: string[] = [
   'Mostly visiting socially',
   'Not sure yet',
 ]
+
+// Copy for the apply-page track picker ("How would you like to join?") cards.
+// Store an override as JSON in page_content key "config_track_picker".
+export type TrackCopy = {
+  memberTitle: string
+  memberDesc: string
+  volunteerTitle: string
+  volunteerDesc: string
+}
+
+export const DEFAULT_TRACK_COPY: TrackCopy = {
+  memberTitle: 'Camp Member',
+  memberDesc: `Apply for full membership — fill out an application and join the community as a ${SITE_NAME} member.`,
+  volunteerTitle: 'Volunteer',
+  volunteerDesc: 'Sign up as a volunteer — help with setup, teardown, or other roles without a full membership application.',
+}
+
+export function parseTrackCopy(raw?: string | null): TrackCopy {
+  if (!raw) return DEFAULT_TRACK_COPY
+  try {
+    const o = JSON.parse(raw)
+    return { ...DEFAULT_TRACK_COPY, ...o }
+  } catch {
+    return DEFAULT_TRACK_COPY
+  }
+}

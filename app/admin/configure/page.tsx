@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { mergeMemberConfig, mergeVolunteerConfig } from '@/lib/form-config'
 import { parseContributionTypes } from '@/lib/application-options'
+import { parseTrackCopy } from '@/lib/site-config'
 import { ApplicationBuilder } from './ApplicationBuilder'
 
 export default async function ConfigurePage() {
@@ -16,7 +17,7 @@ export default async function ConfigurePage() {
   const { data: configRows } = await supabaseAdmin
     .from('page_content')
     .select('key, value')
-    .in('key', ['config_member_form', 'config_volunteer_form', 'community_contribution_types'])
+    .in('key', ['config_member_form', 'config_volunteer_form', 'community_contribution_types', 'config_track_picker'])
 
   const configMap = Object.fromEntries((configRows ?? []).map(r => [r.key, r.value]))
 
@@ -34,6 +35,7 @@ export default async function ConfigurePage() {
   const memberConfig = mergeMemberConfig(memberRaw)
   const volunteerConfig = mergeVolunteerConfig(volunteerRaw)
   const contributionTypes = parseContributionTypes(configMap['community_contribution_types'])
+  const trackCopy = parseTrackCopy(configMap['config_track_picker'])
 
-  return <ApplicationBuilder memberConfig={memberConfig} volunteerConfig={volunteerConfig} contributionTypes={contributionTypes} />
+  return <ApplicationBuilder memberConfig={memberConfig} volunteerConfig={volunteerConfig} contributionTypes={contributionTypes} trackCopy={trackCopy} />
 }

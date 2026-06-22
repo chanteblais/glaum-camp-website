@@ -148,7 +148,7 @@ Sign-out flow:
 - **`overflow-x: hidden`** on `html`/`body` to prevent mobile horizontal scroll
 - **Camp signups join** — always fetch `applications` and `camp_signups` separately and join in JS; Supabase can't resolve the FK via nested select
 - **Lazy Supabase client** — `lib/supabase.ts` uses Proxy to avoid build-time env var errors
-- **Form config system** — `lib/form-config.ts` defines `MemberFormConfig` and `VolunteerFormConfig` types, default step/field definitions, and `mergeMemberConfig`/`mergeVolunteerConfig` helpers. Configs are fetched from `page_content` as JSON and merged with defaults on every request. Custom steps and admin-added fields survive the merge; built-in fields are updated with saved overrides only (label, description, visible, required). The Application Builder (`/admin/configure`) writes to `page_content` via `PATCH /api/admin/page-content`.
+- **Form config system** — `lib/form-config.ts` defines `MemberFormConfig` and `VolunteerFormConfig` types, default step/field definitions, and `mergeMemberConfig`/`mergeVolunteerConfig` helpers. Configs are fetched from `page_content` as JSON and merged with defaults on every request. The member merge **preserves the saved order of all sections** (built-in + custom — a custom section can be first), merges built-in field overrides (label, description, visible, required, width, options), keeps custom fields/elements as-is, and re-injects only missing *locked* core fields (deleted non-core fields stay deleted; "Reset to defaults" restores). Field types: text/textarea/radio/checkbox/file/agreement, plus divider & text-block elements. The Application Builder (`/admin/configure`) writes to `page_content` via `PATCH /api/admin/page-content`; everything autosaves (debounced).
 
 ---
 

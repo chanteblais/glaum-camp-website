@@ -243,24 +243,22 @@ Sections (collapsible via `CollapsibleSection`):
 
 Reached via the "Configure Applications →" link on the admin dashboard.
 
+**The member application is fully modular** — every section and field (built-in or admin-added) can be reordered, edited, resized, hidden, and (non-core) deleted. Config is the source of truth: deletions stick; "Reset to defaults" restores.
+
 **Tab: Camp Member Application**
 - Open/closed toggle — hides the form from new applicants when closed
-- 6 collapsible step sections (Basic Information → Shrimp), plus any custom sections
-- Per step: editable title and subtitle, visibility toggle (canHide steps only), ↑↓ reorder, ✕ delete
-- Per field: visibility toggle (canHide fields only), inline label editor, inline description editor, REQUIRED/OPTIONAL badge (clickable where allowed), CORE badge for non-hideable built-in fields
-- Admin-added fields: type selector (Short text / Long text / Single choice / Multiple choice), options editor for choice fields, ✕ delete
-- "+ Add field" buttons at the bottom of every expanded step
-- "+ Add section" button at the bottom of the step list — creates a fully custom step
+- Collapsible step sections (built-in: Basic Information, Many Hands Registry, What If Plans, Participation & Roles, The Many Hands Agreement, Shrimp) plus any custom sections. Per section: editable title/subtitle, hide, ↑↓ reorder (a custom section can sit **anywhere**, including first), ✕ delete (Basic Information can't be deleted).
+- Per field: hide (eye), inline label + description editors, **REQUIRED/OPTIONAL** toggle, **½ / ▭ width** toggle (consecutive halves pair into a two-column row), **↑↓ reorder** (non-locked fields can move past locked ones), ✕ delete. A small read-only type tag shows each custom field's type.
+- **Field types:** Short text, Long text, Single choice, Multiple choice (choice fields auto-reveal a fill-in when an option named "Other" is selected), **File upload**, **Agreement** (a checklist of clauses — all required when the field is required). Plus **Divider** and **Text block** layout elements (text blocks render markdown-lite: blank-line paragraphs, `*`/`✦` bullets, `[text](url)`/bare links, `**bold**`).
+- **Locked core fields:** First/Last Name, Email, Phone (always present + required, read-only in the builder); Photo is also locked but its Required is toggleable (so admins can allow blank profiles). These are the only NOT-NULL-backed fields.
+- "+ Short text / Long text / Single choice / Multiple choice / File upload / Agreement / Divider / Text block" buttons at the bottom of every expanded step; "+ Add section" below the step list.
+- **Apply-page card editor** — each tab has a title + description editor for the `/apply` TrackPicker card (Camp Member card on the Member tab, Volunteer card on the Volunteer tab), stored in `page_content.config_track_picker`.
 
-**Tab: Volunteer Signup**
-- Open/closed toggle
-- Flat field list with same controls as above
+**Tab: Volunteer Signup** — open/closed toggle + flat field list with the same per-field controls.
 
-**Saving:**
-- Visibility toggles, required toggles, field additions/deletions, and step reordering → auto-save immediately
-- Label and description edits → accumulated and saved via explicit "Save changes" button
+**Saving:** Everything **auto-saves**. Toggles/reorder/width/add/delete save immediately; typed text (labels, descriptions, options/clauses, titles) debounce-saves ~0.7s after you stop typing. A floating top-right status pill shows **Saving… / All changes saved / error + Retry**.
 
-**Config storage:** Full config stored as JSON in `page_content` under `config_member_form` and `config_volunteer_form`. Fetched and merged with defaults on every page load — custom steps/fields survive the merge, built-in steps are updated with saved overrides.
+**Config storage:** JSON in `page_content` under `config_member_form` and `config_volunteer_form`. `mergeMemberConfig` (in `lib/form-config.ts`) reconciles saved config with defaults: it **preserves the saved order of all sections** (built-in + custom), merges built-in field overrides, keeps custom fields as-is, and only re-injects missing *locked* fields (deleted non-core fields stay deleted). Agreement clauses and most option lists now live in the field's `options` in the config (not the legacy `member_acknowledgements` key, which is still read as a fallback).
 
 **Test link:** "Test this application →" opens `/apply?track=member&admin_preview=1` to preview the form live as an admin.
 
@@ -278,15 +276,17 @@ Reached via the "Configure Applications →" link on the admin dashboard.
 Sections:
 - **Header** — avatar, name, status pill, submitted date
 - **Approve / Reject controls** (`AdminActions`) — visible for pending applications
+- **Remove member** (`RemoveMemberButton`) — visible for approved applications. Soft-removes: sets `status = 'cancelled'` with a reason, deletes the member's `camp_signups` (frees their role + shift), and notifies them (in-app + email). Reversible by re-approving.
 - **Role & Shift** (`MemberSignupCard`) — shown when the member has a `clerk_user_id`:
   - Displays current role (department, role name, commitment level, approval status) and shift (title, time, day)
   - **"Approve role"** button — appears when `role_approval_status === 'pending'`; calls `PATCH /api/admin/role-requests/[clerkUserId]`
   - **"Remove role"** button — clears `role_id` + `role_approval_status` from `camp_signups` via `PATCH /api/admin/signups/[clerkUserId]` with `{ clear_role: true }`
   - **"Remove shift"** button — clears `schedule_event_id` via the same endpoint with `{ clear_shift: true }`
   - Confirmation dialog shown before any removal; UI updates optimistically after success
-- **Full application fields** — all submitted answers grouped by section
+- **Full application fields** — all submitted built-in answers grouped by section
+- **Additional Responses** — answers to admin-added custom fields, with labels resolved from the form config (orphaned/deleted-field answers shown by key). File-upload answers render as download links; "Other" fill-ins shown as an "Other: …" line. Answers to the built-in Many Hands Agreement still show in their own Acknowledgements section.
 
-**Key files:** `app/admin/[id]/page.tsx`, `app/admin/MemberSignupCard.tsx`  
+**Key files:** `app/admin/[id]/page.tsx`, `app/admin/MemberSignupCard.tsx`, `app/admin/RemoveMemberButton.tsx`  
 **API:** `PATCH /api/admin/signups/[userId]` — accepts `{ clear_role: true }` or `{ clear_shift: true }`
 
 ---
