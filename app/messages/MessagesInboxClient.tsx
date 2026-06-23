@@ -5,13 +5,24 @@ import { supabaseResizedUrl } from '@/lib/supabase-image'
 import type { MemberOption } from './page'
 
 type Conversation = {
-  otherUserId: string
+  kind: 'direct' | 'group'
+  otherUserId?: string        // direct
+  groupId?: string            // group
   displayName: string
-  avatarUrl: string | null
-  lastMessage: string
-  lastMessageAt: string
+  avatarUrl: string | null    // direct
+  icon?: string | null        // group
+  lastMessage: string | null
+  lastMessageAt: string | null
   lastMessageFromMe: boolean
   unreadCount: number
+}
+
+// Where a conversation row links, and a stable key for it.
+function convHref(c: Conversation) {
+  return c.kind === 'group' ? `/messages/g/${c.groupId}` : `/messages/${c.otherUserId}`
+}
+function convKey(c: Conversation) {
+  return c.kind === 'group' ? `g:${c.groupId}` : `d:${c.otherUserId}`
 }
 
 function timeAgo(iso: string) {
@@ -31,6 +42,9 @@ function timeAgo(iso: string) {
 // - Incoming, all read → "Read"
 // - Outgoing last message → "Sent"
 function ReadStatus({ conv }: { conv: Conversation }) {
+  // No status for an empty group thread (nothing sent/received yet).
+  if (conv.lastMessageAt == null) return null
+
   let label: string
   let color: string
   let unread = false
@@ -62,7 +76,7 @@ function ReadStatus({ conv }: { conv: Conversation }) {
   )
 }
 
-function Avatar({ avatarUrl, displayName, size = 44 }: { avatarUrl: string | null; displayName: string; size?: number }) {
+function Avatar({ avatarUrl, displayName, size = 44, icon }: { avatarUrl: string | null; displayName: string; size?: number; icon?: string | null }) {
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%', flexShrink: 0,
@@ -70,7 +84,10 @@ function Avatar({ avatarUrl, displayName, size = 44 }: { avatarUrl: string | nul
       background: 'rgba(200,168,72,0.08)',
       overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
-      {avatarUrl ? (
+      {icon !== undefined ? (
+        // Group: show its icon glyph (falls back to ✦).
+        <span aria-hidden="true" style={{ fontSize: size * 0.45 }}>{icon || '✦'}</span>
+      ) : avatarUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={supabaseResizedUrl(avatarUrl, size * 2) ?? ''} alt={`${displayName}'s avatar`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       ) : (
@@ -186,10 +203,19 @@ function NewMessageModal({ members, onClose }: { members: MemberOption[]; onClos
   )
 }
 
+type Filter = 'all' | 'direct' | 'group'
+
 export function MessagesInboxClient({ currentUserId, members }: { currentUserId: string; members: MemberOption[] }) {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [loading, setLoading] = useState(true)
   const [showNewMessage, setShowNewMessage] = useState(false)
+  const [filter, setFilter] = useState<Filter>('all')
+
+  const hasGroups = conversations.some(c => c.kind === 'group')
+  const hasDirect = conversations.some(c => c.kind === 'direct')
+  const visible = conversations.filter(c => filter === 'all' || c.kind === filter)
+  const groupUnread = conversations.filter(c => c.kind === 'group').reduce((n, c) => n + c.unreadCount, 0)
+  const directUnread = conversations.filter(c => c.kind === 'direct').reduce((n, c) => n + c.unreadCount, 0)
 
   // Deep-link: /messages?to=<userId> (e.g. from an email "Read & reply" link)
   // jumps straight into that conversation thread.
@@ -240,6 +266,39 @@ export function MessagesInboxClient({ currentUserId, members }: { currentUserId:
         </button>
       </div>
 
+      {/* Filter: All / Direct / Groups (only when there's a mix worth filtering) */}
+      {!loading && hasGroups && hasDirect && (
+        <div role="tablist" aria-label="Filter conversations" style={{ display: 'flex', gap: '0.4rem', marginBottom: '1.25rem' }}>
+          {([['all', 'All'], ['direct', 'Direct'], ['group', 'Groups']] as [Filter, string][]).map(([val, label]) => {
+            const active = filter === val
+            const badge = val === 'group' ? groupUnread : val === 'direct' ? directUnread : groupUnread + directUnread
+            return (
+              <button
+                key={val}
+                role="tab"
+                aria-selected={active}
+                onClick={() => setFilter(val)}
+                style={{
+                  padding: '0.4rem 0.9rem', borderRadius: '9999px',
+                  border: `1px solid ${active ? 'rgba(210,57,248,0.5)' : 'rgba(200,168,72,0.2)'}`,
+                  background: active ? 'rgba(210,57,248,0.15)' : 'transparent',
+                  color: active ? '#D239F8' : '#F3EDE6', opacity: active ? 1 : 0.6,
+                  fontSize: '0.75rem', fontFamily: 'TokyoDreams, serif', letterSpacing: '0.06em',
+                  cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                }}
+              >
+                {label}
+                {badge > 0 && (
+                  <span aria-hidden="true" style={{ minWidth: '16px', height: '16px', borderRadius: '9999px', background: '#D239F8', color: '#fff', fontSize: '0.6rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>
+                    {badge > 9 ? '9+' : badge}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       {/* Conversation list */}
       {loading ? (
         <p role="status" aria-live="polite" style={{ textAlign: 'center', opacity: 0.4, fontStyle: 'italic', fontSize: '0.9rem' }}>Loading…</p>
@@ -261,13 +320,17 @@ export function MessagesInboxClient({ currentUserId, members }: { currentUserId:
             Start a conversation →
           </button>
         </div>
+      ) : visible.length === 0 ? (
+        <p style={{ textAlign: 'center', padding: '2.5rem 0', fontSize: '0.9rem', opacity: 0.4, fontStyle: 'italic' }}>
+          {filter === 'group' ? 'No group threads yet.' : 'No direct messages yet.'}
+        </p>
       ) : (
         <ul role="list" aria-label="Conversations" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-          {conversations.map(conv => (
-          <li key={conv.otherUserId} role="listitem">
+          {visible.map(conv => (
+          <li key={convKey(conv)} role="listitem">
           <a
-            href={`/messages/${conv.otherUserId}`}
-            aria-label={`Conversation with ${conv.displayName}${conv.unreadCount > 0 ? `, ${conv.unreadCount} unread message${conv.unreadCount === 1 ? '' : 's'}` : conv.lastMessageFromMe ? ', last message sent by you' : ', read'}`}
+            href={convHref(conv)}
+            aria-label={`${conv.kind === 'group' ? 'Group thread' : 'Conversation'}: ${conv.displayName}${conv.unreadCount > 0 ? `, ${conv.unreadCount} unread message${conv.unreadCount === 1 ? '' : 's'}` : conv.lastMessageAt == null ? ', no messages yet' : conv.lastMessageFromMe ? ', last message sent by you' : ', read'}`}
             style={{
               display: 'flex', alignItems: 'center', gap: '1rem',
               padding: '1rem 1.25rem',
@@ -281,23 +344,28 @@ export function MessagesInboxClient({ currentUserId, members }: { currentUserId:
             onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(200,168,72,0.35)'; e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
             onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(200,168,72,0.12)'; e.currentTarget.style.background = 'rgba(255,255,255,0.03)' }}
           >
-            <Avatar avatarUrl={conv.avatarUrl} displayName={conv.displayName} size={44} />
+            <Avatar avatarUrl={conv.avatarUrl} displayName={conv.displayName} size={44} icon={conv.kind === 'group' ? (conv.icon ?? null) : undefined} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.2rem' }}>
                 <span style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1rem', color: conv.unreadCount > 0 ? '#C8A848' : '#F3EDE6', opacity: conv.unreadCount > 0 ? 1 : 0.85 }}>
                   {conv.displayName}
                 </span>
-                <span style={{ fontSize: '0.7rem', opacity: 0.35, flexShrink: 0, marginLeft: '0.75rem' }}>
-                  {timeAgo(conv.lastMessageAt)}
-                </span>
+                {conv.lastMessageAt && (
+                  <span style={{ fontSize: '0.7rem', opacity: 0.35, flexShrink: 0, marginLeft: '0.75rem' }}>
+                    {timeAgo(conv.lastMessageAt)}
+                  </span>
+                )}
               </div>
               <p style={{
                 margin: 0, fontSize: '0.82rem',
                 opacity: conv.unreadCount > 0 ? 0.75 : 0.4,
                 fontWeight: conv.unreadCount > 0 ? 600 : 400,
+                fontStyle: conv.lastMessage == null ? 'italic' : 'normal',
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               }}>
-                {conv.lastMessageFromMe ? 'You: ' : ''}{conv.lastMessage}
+                {conv.lastMessage == null
+                  ? (conv.kind === 'group' ? 'No messages yet — start the conversation' : '')
+                  : `${conv.lastMessageFromMe ? 'You: ' : ''}${conv.lastMessage}`}
               </p>
               {/* Read / unread status */}
               <div style={{ marginTop: '0.3rem' }}>

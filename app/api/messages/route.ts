@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth, currentUser, clerkClient } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getNotificationPreferences } from '@/lib/notification-prefs'
+import { getMyConversations, getOrCreateDirectConversation } from '@/lib/conversations'
 import { sendNewMessageEmail } from '@/lib/send-email'
 
 export const dynamic = 'force-dynamic'
@@ -9,51 +10,60 @@ export const dynamic = 'force-dynamic'
 // Don't email more than once per this window for an ongoing conversation.
 const EMAIL_THROTTLE_MS = 30 * 60 * 1000 // 30 minutes
 
-// GET /api/messages — inbox: one row per conversation, most recent message
+// GET /api/messages — inbox: one row per conversation, most recent message.
+// Backed by the conversations model. Direct conversations appear only once they
+// have messages (legacy behavior); group conversations always appear for groups
+// the member belongs to, so an empty group still has an entry point.
 export async function GET() {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // All messages involving this user
-  const { data, error } = await supabaseAdmin
+  let convs
+  try {
+    convs = await getMyConversations(userId)
+  } catch {
+    return NextResponse.json({ conversations: [] })
+  }
+  if (!convs.length) return NextResponse.json({ conversations: [] })
+
+  const convById = new Map(convs.map(c => [c.conversationId, c]))
+
+  // All messages across my conversations, newest first.
+  const { data: msgs } = await supabaseAdmin
     .from('messages')
-    .select('id, sender_clerk_id, recipient_clerk_id, body, read_at, created_at, sender_name')
-    .or(`sender_clerk_id.eq.${userId},recipient_clerk_id.eq.${userId}`)
+    .select('conversation_id, sender_clerk_id, body, created_at, sender_name')
+    .in('conversation_id', convs.map(c => c.conversationId))
     .order('created_at', { ascending: false })
 
-  if (error) {
-    if (error.code === '42P01') return NextResponse.json({ conversations: [] })
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  // Group into conversations keyed by the other party's clerk_user_id
-  const convMap = new Map<string, {
-    otherUserId: string
-    otherName: string | null   // snapshot from the other party's most recent message
-    lastMessage: typeof data[0]
-    unreadCount: number
-  }>()
-
-  for (const msg of data ?? []) {
-    const otherId = msg.sender_clerk_id === userId ? msg.recipient_clerk_id : msg.sender_clerk_id
-    if (!convMap.has(otherId)) {
-      convMap.set(otherId, { otherUserId: otherId, otherName: null, lastMessage: msg, unreadCount: 0 })
+  // Per-conversation summary (last message + unread + other-party snapshot name).
+  type Summary = { lastBody: string; lastAt: string; lastFromMe: boolean; unread: number; otherName: string | null }
+  const sumByConv = new Map<string, Summary>()
+  for (const m of msgs ?? []) {
+    const conv = convById.get(m.conversation_id)
+    if (!conv) continue
+    let s = sumByConv.get(m.conversation_id)
+    if (!s) {
+      // Newest-first, so the first message seen is the conversation's last.
+      s = { lastBody: m.body, lastAt: m.created_at, lastFromMe: m.sender_clerk_id === userId, unread: 0, otherName: null }
+      sumByConv.set(m.conversation_id, s)
     }
-    // Messages are newest-first, so the first one the other party sent gives their
-    // latest snapshot name — used as a fallback when their profile is gone.
-    const conv = convMap.get(otherId)!
-    if (msg.sender_clerk_id === otherId && !conv.otherName) {
-      conv.otherName = msg.sender_name ?? null
+    if (conv.type === 'direct' && m.sender_clerk_id === conv.otherUserId && !s.otherName) {
+      s.otherName = m.sender_name ?? null
     }
-    if (msg.recipient_clerk_id === userId && !msg.read_at) {
-      conv.unreadCount++
+    if (m.sender_clerk_id !== userId) {
+      if (!conv.lastReadAt || new Date(m.created_at) > new Date(conv.lastReadAt)) s.unread++
     }
   }
 
-  const conversations = Array.from(convMap.values())
+  // Group names/icons.
+  const groupIds = convs.filter(c => c.type === 'group' && c.groupId).map(c => c.groupId as string)
+  const { data: groupRows } = groupIds.length
+    ? await supabaseAdmin.from('groups').select('id, name, icon').in('id', groupIds)
+    : { data: [] }
+  const groupById = new Map((groupRows ?? []).map(g => [g.id, g]))
 
-  // Fetch profile info for all other users in one query
-  const otherIds = conversations.map(c => c.otherUserId)
+  // Profiles for the other party in each direct conversation.
+  const otherIds = convs.filter(c => c.type === 'direct' && c.otherUserId).map(c => c.otherUserId as string)
   const { data: profiles } = otherIds.length
     ? await supabaseAdmin
         .from('applications')
@@ -61,18 +71,47 @@ export async function GET() {
         .in('clerk_user_id', otherIds)
         .eq('status', 'approved')
     : { data: [] }
+  const profileMap = new Map((profiles ?? []).map(p => [p.clerk_user_id, p]))
 
-  const profileMap = Object.fromEntries((profiles ?? []).map(p => [p.clerk_user_id, p]))
+  const rows = convs.map(conv => {
+    const s = sumByConv.get(conv.conversationId)
+    if (conv.type === 'group') {
+      const g = conv.groupId ? groupById.get(conv.groupId) : null
+      return {
+        kind: 'group' as const,
+        groupId: conv.groupId,
+        displayName: g?.name ?? 'Group',
+        icon: g?.icon ?? null,
+        avatarUrl: null,
+        lastMessage: s?.lastBody ?? null,
+        lastMessageAt: s?.lastAt ?? null,
+        lastMessageFromMe: s?.lastFromMe ?? false,
+        unreadCount: s?.unread ?? 0,
+      }
+    }
+    const prof = conv.otherUserId ? profileMap.get(conv.otherUserId) : null
+    return {
+      kind: 'direct' as const,
+      otherUserId: conv.otherUserId,
+      displayName: prof?.preferred_name || prof?.first_name || s?.otherName || 'Member',
+      avatarUrl: prof?.avatar_url ?? null,
+      icon: null,
+      lastMessage: s?.lastBody ?? null,
+      lastMessageAt: s?.lastAt ?? null,
+      lastMessageFromMe: s?.lastFromMe ?? false,
+      unreadCount: s?.unread ?? 0,
+    }
+  })
 
-  const result = conversations.map(c => ({
-    otherUserId: c.otherUserId,
-    displayName: profileMap[c.otherUserId]?.preferred_name || profileMap[c.otherUserId]?.first_name || c.otherName || 'Member',
-    avatarUrl: profileMap[c.otherUserId]?.avatar_url ?? null,
-    lastMessage: c.lastMessage.body,
-    lastMessageAt: c.lastMessage.created_at,
-    lastMessageFromMe: c.lastMessage.sender_clerk_id === userId,
-    unreadCount: c.unreadCount,
-  }))
+  // Direct conversations with no messages don't show; groups always do.
+  const result = rows
+    .filter(r => r.kind === 'group' || r.lastMessageAt != null)
+    .sort((a, b) => {
+      if (a.lastMessageAt && b.lastMessageAt) return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()
+      if (a.lastMessageAt) return -1
+      if (b.lastMessageAt) return 1
+      return a.displayName.localeCompare(b.displayName)
+    })
 
   return NextResponse.json({ conversations: result }, { headers: { 'Cache-Control': 'no-store' } })
 }
@@ -114,9 +153,13 @@ export async function POST(req: Request) {
   const user = await currentUser()
   const senderName = senderApp?.preferred_name || senderApp?.first_name || user?.firstName || 'A member'
 
+  // Attach to the direct conversation (resolve-or-create), so the message lives in
+  // the conversations model. recipient_clerk_id is still set for DMs (legacy reads).
+  const conversationId = await getOrCreateDirectConversation(userId, recipientId)
+
   const { data: message, error } = await supabaseAdmin
     .from('messages')
-    .insert({ sender_clerk_id: userId, recipient_clerk_id: recipientId, body: body.trim(), sender_name: senderName })
+    .insert({ conversation_id: conversationId, sender_clerk_id: userId, recipient_clerk_id: recipientId, body: body.trim(), sender_name: senderName })
     .select()
     .single()
 

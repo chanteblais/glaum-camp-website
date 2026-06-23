@@ -51,6 +51,7 @@ Configurable widgets (order, visibility, and width controlled by admin via the p
 | Widget ID | Default label | Content |
 |---|---|---|
 | `announcements` | Announcements | Visible, non-expired admin announcements; pinned first. Hidden if empty |
+| `shoutouts` | Shoutouts | Member-posted shoutouts (newest first). Approved members post via a "✦ Share a shoutout" button at the bottom that opens an inline composer; authors and admins can delete (✕). See **Shoutouts** under Supporting Features |
 | `polls` | Polls | Active, non-expired admin polls. Members vote inline; results shown after voting |
 | `events` | Upcoming Gatherings | Pre-camp + at-camp `schedule_events` in the next 14 days. "View full schedule →" links to `/schedule` |
 | `spotlight` | Meet a Member | Left: rotating member spotlight (cycles every minute). Right: Upcoming Gatherings list |
@@ -63,7 +64,7 @@ Fixed bottom section (always present):
 
 **Dashboard layout** is stored as `dashboard_layout` JSON in `page_content`:
 ```json
-{ "order": ["announcements","polls","events","spotlight","activity"], "hidden": [], "widths": {} }
+{ "order": ["announcements","shoutouts","polls","events","spotlight","activity"], "hidden": [], "widths": {} }
 ```
 
 Admin-only: **"✎ Edit Page"** floating button (bottom-right). Clicking enters inline edit mode:
@@ -140,7 +141,7 @@ Collects name, contact info, pronouns, photo, signup intent, days available, and
 
 Sections:
 - **Header row** — avatar (260px circle, gold border), centered via `1fr auto 1fr` grid, with role badge overlaid (`transform: translate(-40px, -28px)`). Gear icon (⚙) sits next to the display name and opens `ProfileSettings`.
-- **Attunement Status** (`AttunementStatus.tsx`) — parchment card with checklist. **Fully admin-managed** (Admin → Manage → Attunement Tasks, `AttunementTasksManager.tsx`); the list lives in `page_content.config_attunement_tasks` (JSON), parsed by `parseAttunementTasks` in `lib/site-config.ts`. Each task has a `requirement` that auto-completes it; the done/action logic is computed in `app/profile/page.tsx`. Card is hidden if no enabled tasks. Requirement types (`ATTUNEMENT_REQUIREMENTS`):
+- **Attunement Status** (`AttunementStatus.tsx`) — parchment card with checklist. **Fully admin-managed** (Admin → Manage → Attunement Tasks, `AttunementTasksManager.tsx`); the list lives in `page_content.config_attunement_tasks` (JSON), parsed by `parseAttunementTasks` in `lib/site-config.ts`. Each task has a `requirement` that auto-completes it; the filtering + done/action logic lives in `buildAttunementChecklist` (`lib/attunement.ts`), the **single source of truth shared by both `app/profile/page.tsx` (the checklist) and `app/page.tsx` (the home dashboard's "outstanding tasks" banner)** so their counts stay in sync. It honours each task's `enabled` flag and drops the `shift` task while shift signup is closed. Card is hidden if no enabled tasks. Requirement types (`ATTUNEMENT_REQUIREMENTS`):
   - `role` — `campSignup.role_id` set & non-pending; links to `/signup`
   - `shift` — `campSignup.schedule_event_id` set; links to `/signup`
   - `contribution` — done when the member is in ≥1 **group** (`contributions` is now derived from group membership, not `setup_preference`); status-only (groups are admin-assigned, so it's not clickable). Admins can relabel this task (e.g. "Group Assigned").
@@ -193,6 +194,7 @@ Linked from nav as "Many Hands".
 - **"✉ New Message" button** (top-right) opens a searchable member picker modal — lists all approved members, filterable by name, click to navigate to their thread
 - Empty state shows "Start a conversation →" which also opens the picker
 - Conversations fetched from `/api/messages`; member profiles enriched server-side
+- **Deleted members:** conversations with a member whose application was removed still appear. Their name falls back to the `messages.sender_name` snapshot (see Message Thread + `database.md`), or "Member" if none.
 
 ---
 
@@ -208,6 +210,7 @@ Linked from nav as "Many Hands".
 - Polls for new messages every 12 seconds
 - Auto-scrolls to bottom on new messages
 - Messages from the other person are marked read on page load (via `GET /api/messages/[userId]`)
+- **Deleted/inactive other member:** if their application is gone, the page no longer 404s — it renders the thread **read-only** (only when message history exists; otherwise still 404). The header shows their snapshot name (`messages.sender_name`, or "Former member") with a "No longer active" note and is **not** linked to `/members/[id]`; the composer is replaced with a "can't reply" notice (matching `POST /api/messages`, which rejects non-approved recipients). Sender names are snapshotted onto each message at send time so history survives deletion (migration `032`).
 
 ---
 
@@ -307,6 +310,29 @@ Sections:
 ---
 
 ## Supporting Features
+
+### Shoutouts
+
+Member-posted shoutouts shown on the home-page member dashboard (the `shoutouts` widget). A lightweight, member-driven complement to admin Announcements.
+
+**Member experience:**
+- The widget shows the shoutout feed (newest first): author avatar, name, time-ago, and body.
+- Approved members post via a **"✦ Share a shoutout"** button pinned at the bottom; it opens an inline composer (avatar + textarea, 250-char limit with counter, Cancel / Post). On success the composer collapses and the new shoutout appears at the top.
+- A member can **delete their own** shoutout via the ✕ on it; **admins can delete any**.
+- Author avatars are joined in JS from `applications` at render time (no FK), so they stay current.
+
+**Data + auth:**
+- Table `shoutouts` (migration `031`): `clerk_user_id`, `author_name` (display-name snapshot), `body` (1–250 chars, DB CHECK), `visible` (reserved for moderation), `created_at`.
+- Posting requires an **approved** member (same check as role suggestions). Delete is allowed for the **author or an admin**.
+
+**API routes:**
+- `GET /api/shoutouts` — list visible shoutouts (authenticated)
+- `POST /api/shoutouts` — post a shoutout (approved members)
+- `DELETE /api/shoutouts/[id]` — delete a shoutout (author or admin)
+
+**Key files:** `app/ShoutoutWidget.tsx`, `app/api/shoutouts/route.ts`, `app/api/shoutouts/[id]/route.ts`, wired into `app/page.tsx` (widget map) and `app/HomePageEditor.tsx` (layout label).
+
+---
 
 ### Polls
 
