@@ -5,6 +5,7 @@ import { CommitmentsSection } from '@/app/profile/CommitmentsSection'
 import { Header } from '@/components/Header'
 import { supabaseResizedUrl } from '@/lib/supabase-image'
 import { getMemberGroups, groupCommitmentMeta } from '@/lib/groups'
+import { getBadgeVersion } from '@/lib/badge-version'
 
 export default async function MemberPage({ params }: { params: { id: string } }) {
   const { userId } = await auth()
@@ -55,6 +56,7 @@ export default async function MemberPage({ params }: { params: { id: string } })
   const displayName = member.preferred_name || member.first_name || 'Member'
   const badgeRoleName = roleInfo?.name ?? null
   const badgeDeptName = roleInfo?.departments?.name ?? null
+  const badgeVersion = await getBadgeVersion()
 
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
@@ -81,7 +83,7 @@ export default async function MemberPage({ params }: { params: { id: string } })
               {badgeRoleName && badgeDeptName ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={`/api/badge?role=${encodeURIComponent(badgeRoleName)}&dept=${encodeURIComponent(badgeDeptName)}`}
+                  src={`/api/badge?role=${encodeURIComponent(badgeRoleName)}&dept=${encodeURIComponent(badgeDeptName)}&v=${badgeVersion}`}
                   alt={`${displayName}'s ${badgeRoleName} role badge`}
                   width={175}
                   height={203}

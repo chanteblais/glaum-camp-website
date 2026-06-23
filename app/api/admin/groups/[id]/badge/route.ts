@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { normalizeBadgeImage } from '@/lib/badge-image'
 
 const ALLOWED_TYPES = ['image/png', 'image/webp', 'image/svg+xml', 'image/jpeg', 'image/gif']
 const MAX_BYTES = 5 * 1024 * 1024 // 5 MB
@@ -29,13 +30,23 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: 'File must be under 5 MB' }, { status: 400 })
   }
 
-  const ext = file.type === 'image/svg+xml' ? 'svg' : file.type.split('/')[1].replace('jpeg', 'jpg')
-  const path = `${params.id}/badge.${ext}`
-  const buffer = Buffer.from(await file.arrayBuffer())
+  const original = Buffer.from(await file.arrayBuffer())
+
+  // Normalize every upload onto the standard frame so all badges render at the
+  // same size (see lib/badge-image.ts). On failure, fall back to the raw file
+  // rather than blocking the upload. Output is always PNG.
+  let buffer: Buffer = original
+  try {
+    buffer = await normalizeBadgeImage(original)
+  } catch (err) {
+    console.error('[group badge normalize]', err)
+  }
+
+  const path = `${params.id}/badge.png`
 
   const { error: uploadError } = await supabaseAdmin.storage
     .from(BUCKET)
-    .upload(path, buffer, { contentType: file.type, upsert: true })
+    .upload(path, buffer, { contentType: 'image/png', upsert: true })
 
   if (uploadError) {
     console.error('[group badge upload]', uploadError)

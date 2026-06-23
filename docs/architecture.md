@@ -76,6 +76,7 @@ Sign-out flow:
 | `/api/apply` | POST | Submit application |
 | `/api/volunteer` | POST | Submit volunteer signup |
 | `/api/signup` | GET/POST | Fetch departments/roles/shifts + upsert member role+shift selection. Sets `role_approval_status = 'pending'` for roles with `requires_approval = true`. Preserves existing approval status on shift-only updates. |
+| `/api/groups/membership` | GET/POST | Self-service opt-in groups for the current member. GET lists the groups offered by the member form's visible `group_select` fields (unset list = all) + the member's joined state; POST `{ group_id, joined }` joins (`source='application'`) or leaves. Powers the **Your Contributions** section on `/signup`. |
 | `/api/profile/application` | PATCH | Update profile fields |
 | `/api/profile/avatar` | POST | Upload avatar to Supabase Storage |
 | `/api/profile/cancel` | POST | Cancel own application |
@@ -97,7 +98,7 @@ Sign-out flow:
 
 | Route | Method | Purpose |
 |---|---|---|
-| `/api/admin/[id]/approve` | POST | Approve application |
+| `/api/admin/[id]/approve` | POST | Approve application (sets status, in-app notification, approval email). Returns `emailWarning` when the email send fails so the admin UI can surface it — the approval itself still succeeds. |
 | `/api/admin/[id]/reject` | POST | Reject application |
 | `/api/admin/departments` | GET/POST | List / create departments |
 | `/api/admin/departments/[id]` | PATCH/DELETE | Update / delete department |
@@ -106,6 +107,7 @@ Sign-out flow:
 | `/api/admin/groups` | GET/POST | List (with member counts) / create groups |
 | `/api/admin/groups/[id]` | PATCH/DELETE | Update / delete group |
 | `/api/admin/groups/[id]/members` | GET/POST/DELETE | Group roster / add member / remove member (`?clerk_user_id=`) |
+| `/api/admin/groups/[id]/badge` | POST/DELETE | Upload / clear a group's badge image (`group-badges` bucket; sets `groups.badge_image`). Mirrors the avatar route. |
 | `/api/admin/schedule` | GET/POST | List / create schedule events |
 | `/api/admin/schedule/[id]` | PATCH/DELETE | Update / delete event |
 | `/api/admin/schedule/icon` | POST | Upload custom event icon |
@@ -129,24 +131,18 @@ Sign-out flow:
 
 ## Storage Buckets (Supabase)
 
-| Bucket | Contents | Access |
-|---|---|---|
-| `avatars` | Member profile photos | Public |
-| `schedule-icons` | Custom schedule event icons | Public (must be set) |
+See [database.md → Storage Buckets](database.md#storage-buckets) for the canonical list (`avatars`, `schedule-icons`, `application-files`, `group-badges`) and which migration creates each.
 
 ---
 
 ## Badge Generation
 
-`/api/badge` is a Next.js OG image route using `next/og` (Node.js runtime).
+`/api/badge` is a Next.js OG image route (`next/og`, Node.js runtime) that composites role + department text over `public/badge_base.png`.
 
-- Takes `?role=` and `?dept=` query params
-- Base image: `public/badge_base.png` (365×424), rendered at 2× for crispness
-- Text zones: dept name above gold divider (~top: 135px), role name below (~top: 258px)
-- Role name renders one word per line; dept name wraps normally
-- Font size auto-scales via `fitFontSize()` — min 11px
-- Cache: `public, max-age=86400`
-- Displayed at 175×203px with `transform: translate(-40px, -28px)` + `drop-shadow`
+- Query params: `?role=` and `?dept=`.
+- Role name renders one word per line; dept name wraps normally; font size auto-scales (`fitFontSize()`) to fit.
+- Cached for a day (`max-age=86400`).
+- Exact image dimensions, text-zone offsets, and the profile display transform live in the route + the profile/member layouts — read them there rather than trusting numbers copied here.
 
 ---
 

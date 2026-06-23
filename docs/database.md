@@ -1,6 +1,6 @@
 # Database Schema
 
-All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations in `supabase-migrations/` document incremental changes (latest: `029`). Confirm `025` (column renames), and `029` (the `application-files` bucket) are applied before relying on those features.
+All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations in `supabase-migrations/` document incremental changes (latest: `034`). Confirm `025` (column renames), `029` (the `application-files` bucket), `033` (group messaging), and `034` (group badge images + `group-badges` bucket) are applied before relying on those features.
 
 ---
 
@@ -115,13 +115,16 @@ Individual camp roles within a department.
 
 Configurable groups members belong to (e.g. Setup, Teardown, Decor). Added in migration `030`. **Replaced** the old contribution-types (`setup_preference`) mechanism: members are admin-assigned via Admin → Groups. Applicants can also opt in if an admin adds a **Group selection** field (`type: 'group_select'`) to the member application in the Application Builder. Each such field carries its own configurable list of offered groups in `FieldConfig.options` (group ids; **unset = all groups**, picked via a checklist in the builder). Picks write to `group_choices` → `group_members` (source `'application'`) on submit; `/api/apply` independently re-validates choices against the visible group_select fields' configured ids. Member-facing "contributions" (profile Commitments, attunement task, personal-schedule filtering, members directory) and the admin overview/registry now read group membership via `lib/groups.ts` (`getMemberGroups`, `getGroupNamesByUser`).
 
+**Post-approval self-service:** approved members can join/leave the same offered groups after the fact via the **Your Contributions** section on `/signup` (Participate), backed by `GET/POST /api/groups/membership` (which derives the selectable set from the form's `group_select` fields — the legacy `apply_selectable` column is *not* used). **Badge images:** an optional per-group `badge_image` (migration `034`) renders scattered beside the role badge on the member profile (`app/profile/ContributionBadges.tsx`); admins upload it in the Groups edit modal.
+
 | Column | Type | Notes |
 |---|---|---|
 | `id` | UUID PK | |
 | `name` | TEXT NOT NULL | |
 | `description` | TEXT | Shown to applicants when the group is offered by a Group selection field |
 | `icon` | TEXT | Emoji |
-| `apply_selectable` | BOOL | **Legacy/unused.** Which groups appear on the application is now controlled per-field by the **Group selection** field's `options` (see below), not this column. |
+| `badge_image` | TEXT | Optional public URL of a patch-style badge image (in the `group-badges` bucket). Added in migration `034`. Rendered scattered beside the role badge on the member profile; admin-uploaded via the Groups edit modal (`POST/DELETE /api/admin/groups/[id]/badge`). |
+| `apply_selectable` | BOOL | **Legacy/unused.** Which groups appear on the application (and in member self-service) is now controlled per-field by the **Group selection** field's `options` (see below), not this column. |
 | `sort_order` | INT | |
 | `join_policy` | TEXT | Governance, added in `033`. `'admin_assigned'` (default — admin manages membership; today's crews), `'open'` (anyone joins), or `'request'` (ask a lead). Self-join UI is **Phase 6**; column exists. |
 | `visibility` | TEXT | Added in `033`. `'listed'` (default — discoverable; contents members-only) or `'hidden'` (invite/admin-add only). Used by the join dropdown (**Phase 6**). |
@@ -175,11 +178,7 @@ Public camp schedule entries.
 | `event_date` | DATE | Actual calendar date. Used to filter Upcoming Gatherings to next 14 days. NULL = always show |
 | `event_category` | TEXT | `'at_camp'` (default) / `'pre_camp'` — splits dashboard into separate sections |
 
-**Color coding by `event_type`:**
-- `null` → purple
-- `'all_hands'` → teal
-- `'camp_tending'` → gold/amber
-- `'service'` → purple/pink
+`event_type` drives event color coding — see [design-system.md → Event Type Colors](design-system.md#event-type-colors).
 
 ---
 
@@ -378,6 +377,7 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `avatars` | Member profile photos (uploaded via `AvatarUpload`; also the application Photo field → `/api/profile/avatar`) | Public |
 | `schedule-icons` | Custom icons for schedule events | Public (must be configured) |
 | `application-files` | Attachments for admin-added **File upload** application fields (`/api/apply/file`) | Public — **must be created** (migration `029`, or create in the Supabase dashboard like `avatars`) |
+| `group-badges` | Per-group badge images (`/api/admin/groups/[id]/badge` → `groups.badge_image`) | Public — **must be created** (migration `034`, or create in the Supabase dashboard like `avatars`) |
 
 ---
 
@@ -415,6 +415,7 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `031_shoutouts.sql` | `shoutouts` table — member-posted shoutouts on the home dashboard. **Must be applied** before the Shoutouts widget works. |
 | `032_message_sender_name.sql` | `sender_name` column on `messages` (snapshot of sender display name) + backfill from current application names. Lets conversations survive sender deletion. |
 | `033_conversations.sql` | **Group messaging.** Adds `conversations` + `conversation_participants` tables; `messages.conversation_id` + `parent_message_id` (and makes `recipient_clerk_id` nullable); group governance columns (`join_policy`/`visibility` on `groups`, `role` on `group_members`). Backfills a conversation per group and per existing DM pair (preserving read state). Additive + idempotent; **must be applied** before group messaging works. |
+| `034_group_badge_image.sql` | `badge_image` column on `groups` + public `group-badges` storage bucket and read policy. Additive + idempotent; **must be applied** before group badges render (the profile + Groups admin select `badge_image`). |
 
 ---
 

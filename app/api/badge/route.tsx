@@ -2,27 +2,37 @@ import { ImageResponse } from 'next/og'
 import { NextRequest } from 'next/server'
 import { readFile } from 'fs/promises'
 import path from 'path'
+import { BADGE_BASE_PATH, getBadgeBaseMtime } from '@/lib/badge-version'
 
 export const runtime = 'nodejs'
 
-// Module-level cache: file buffers are read once per server instance
+// Module-level cache: file buffers are read once per server instance. The badge
+// buffer is re-read when badge_base.png changes (mtime check) so a swapped base
+// image picks up without a server restart.
 let _badgeBuffer: Buffer | null = null
+let _badgeMtime = -1
 let _fontBuffer: Buffer | null = null
 
 async function getAssets(): Promise<{ badgeBuffer: Buffer; fontBuffer: Buffer }> {
-  if (!_badgeBuffer || !_fontBuffer) {
-    ;[_badgeBuffer, _fontBuffer] = await Promise.all([
-      readFile(path.join(process.cwd(), 'public/badge_base.png')),
-      readFile(path.join(process.cwd(), 'public/fonts/TokyoDreams.otf')),
-    ])
+  const mtime = await getBadgeBaseMtime()
+  if (!_badgeBuffer || mtime !== _badgeMtime) {
+    _badgeBuffer = await readFile(BADGE_BASE_PATH)
+    _badgeMtime = mtime
+    renderCache.clear() // base art changed — drop stale rendered badges
   }
-  return { badgeBuffer: _badgeBuffer!, fontBuffer: _fontBuffer! }
+  if (!_fontBuffer) {
+    _fontBuffer = await readFile(path.join(process.cwd(), 'public/fonts/TokyoDreams.otf'))
+  }
+  return { badgeBuffer: _badgeBuffer, fontBuffer: _fontBuffer }
 }
 
 // Per-role+dept rendered image cache (avoids re-running Satori for the same combo)
 const renderCache = new Map<string, Buffer>()
 
-// Render at 2× for crisp text when downscaled for display
+// Render at 2× for crisp text when downscaled for display.
+// W/H must match the badge_base.png art aspect ratio (currently 365x424) — the
+// art is drawn with fixed dimensions and no aspect preservation, so a frame
+// that doesn't match the art's ratio stretches/warps it.
 const SCALE = 2
 const W = 365 * SCALE
 const H = 424 * SCALE
@@ -77,13 +87,15 @@ export async function GET(req: NextRequest) {
   const role = searchParams.get('role') ?? ''
   const dept = searchParams.get('dept') ?? ''
 
+  // getAssets() first: re-reads the base and clears the render cache if the art
+  // changed, so the lookup below never returns a badge built on stale art.
+  const { badgeBuffer, fontBuffer } = await getAssets()
+
   const cacheKey = `${role}__${dept}`
   const cached = renderCache.get(cacheKey)
   if (cached) {
     return new Response(cached.buffer as ArrayBuffer, { headers: CACHE_HEADERS })
   }
-
-  const { badgeBuffer, fontBuffer } = await getAssets()
   const badgeDataUrl = `data:image/png;base64,${badgeBuffer.toString('base64')}`
 
   // Dept zone: 1x width=255, height=125 rendered but use 105 for fitting to guarantee breathing room

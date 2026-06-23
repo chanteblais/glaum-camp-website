@@ -16,6 +16,7 @@ import { AttunementStatus } from './AttunementStatus'
 import { getMemberGroups, groupCommitmentMeta } from '@/lib/groups'
 import { ContributionBadges } from './ContributionBadges'
 import { buildAttunementChecklist } from '@/lib/attunement'
+import { getBadgeVersion } from '@/lib/badge-version'
 
 export default async function ProfilePage() {
   const { userId } = await auth()
@@ -57,6 +58,7 @@ export default async function ProfilePage() {
   const badgeRoleName = roleInfo?.name ?? null
   const badgeDeptName = roleInfo?.departments?.name ?? null
   const badgeDeptIcon = roleInfo?.departments?.icon ?? null
+  const badgeVersion = await getBadgeVersion()
 
   // Groups the member belongs to (replaces the old setup_preference "contributions").
   // `contributions` = group names; `groupMeta` carries each group's icon/description
@@ -134,7 +136,7 @@ export default async function ProfilePage() {
                 {application?.status === 'approved' && badgeRoleName ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={`/api/badge?role=${encodeURIComponent(badgeRoleName)}&dept=${encodeURIComponent(badgeDeptName ?? '')}`}
+                    src={`/api/badge?role=${encodeURIComponent(badgeRoleName)}&dept=${encodeURIComponent(badgeDeptName ?? '')}&v=${badgeVersion}`}
                     alt={`${badgeRoleName} badge`}
                     width={175}
                     height={203}

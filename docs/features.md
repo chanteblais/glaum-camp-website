@@ -60,7 +60,7 @@ Configurable widgets (order, visibility, and width controlled by admin via the p
 Fixed bottom section (always present):
 - **Role & Shift + Many Hands** — quick-link grid to `/signup` and `/members`
 
-**Widget layout:** widgets render in a `display: flex; flex-wrap: wrap; gap: 1.25rem` container. Each widget is `flex: 0 0 100%` (full width) by default, or `flex: 0 0 calc(50% - 0.625rem)` (half width) when configured. Two consecutive half-width widgets sit side by side. On mobile (≤ 680px) all widgets revert to full width.
+**Widget layout:** widgets wrap in a flex row; each is full-width by default or half-width when configured (two consecutive halves pair side by side). All revert to full width on mobile.
 
 **Dashboard layout** is stored as `dashboard_layout` JSON in `page_content`:
 ```json
@@ -140,7 +140,7 @@ Collects name, contact info, pronouns, photo, signup intent, days available, and
 **What:** The member's personal hub.
 
 Sections:
-- **Header row** — avatar (260px circle, gold border), centered via `1fr auto 1fr` grid, with role badge overlaid (`transform: translate(-40px, -28px)`). Gear icon (⚙) sits next to the display name and opens `ProfileSettings`.
+- **Header row** — avatar centered via the `profile-badge-row` (`1fr auto 1fr`) grid, with the role ("designation") badge in the left cell and the member's **group badges scattered in the right cell** (`ContributionBadges.tsx` — scatter is seeded deterministically per group id, so positions are stable across renders and match server/client, no hydration drift; approved members only). Gear icon (⚙) next to the name opens `ProfileSettings`.
 - **Attunement Status** (`AttunementStatus.tsx`) — parchment card with checklist. **Fully admin-managed** (Admin → Manage → Attunement Tasks, `AttunementTasksManager.tsx`); the list lives in `page_content.config_attunement_tasks` (JSON), parsed by `parseAttunementTasks` in `lib/site-config.ts`. Each task has a `requirement` that auto-completes it; the filtering + done/action logic lives in `buildAttunementChecklist` (`lib/attunement.ts`), the **single source of truth shared by both `app/profile/page.tsx` (the checklist) and `app/page.tsx` (the home dashboard's "outstanding tasks" banner)** so their counts stay in sync. It honours each task's `enabled` flag and drops the `shift` task while shift signup is closed. Card is hidden if no enabled tasks. Requirement types (`ATTUNEMENT_REQUIREMENTS`):
   - `role` — `campSignup.role_id` set & non-pending; links to `/signup`
   - `shift` — `campSignup.schedule_event_id` set; links to `/signup`
@@ -149,7 +149,7 @@ Sections:
   - `approved` — always done on this page (reassuring first step)
   - Default list (when key absent) mirrors the original five hardcoded items, so behaviour is unchanged until an admin edits it.
 - **Signup Section** (`SignupSection.tsx`) — role/shift picker for approved members. Has "Suggest a role" button that opens `SuggestRoleModal`
-- **Commitments** (`CommitmentsSection.tsx`) — shows the member's **groups** (tagged `GROUP`), plus selected role + shift. Group name/icon/description come from the member's `group_members`→`groups` (via `getMemberGroups` in `lib/groups.ts`). `showManageLink` prop controls the "Manage commitments →" footer link — only `true` on `/profile`, not on member-view pages.
+- **Commitments** (`CommitmentsSection.tsx`) — rows in order **Designation (role) → Groups (tagged `GROUP`) → Shift**. Group name/icon/description come from the member's `group_members`→`groups` (via `getMemberGroups` in `lib/groups.ts`). `showManageLink` prop controls the "Manage commitments →" footer link — only `true` on `/profile`, where it points to `/signup` (Participate); not shown on member-view pages.
 - **Personal Schedule** (`PersonalScheduleCalendar.tsx`) — events relevant to the member: `schedule_events.contribution_type` matched against the member's **group names**. "View full calendar →" links to `/schedule`.
 - **Settings** — gear icon (next to name) opens `ProfileSettings` modal (edit profile fields, avatar). Groups are admin-assigned, so they are **not** edited here.
 
@@ -164,9 +164,9 @@ Max page width: `1100px`. Layout uses CSS classes (`profile-main-grid`, `profile
 **Who:** Approved members only (redirects others to `/profile`)  
 **What:** Grid of approved member cards.
 
-Each card shows: circular avatar (80px, gold border `#6F491F`), display name, and role name if assigned and approved (gold small-caps). Members without an avatar show a `✦` glyph (Tokyo Dreams, gold) rather than an initial.
+Each card shows: circular avatar (gold border), display name, and role name if assigned and approved (gold small-caps). Members without an avatar show a `✦` glyph rather than an initial.
 
-The role text is always rendered (invisible via `opacity: 0` when absent) so every card has the same natural content height. The grid uses `grid-auto-rows: 1fr` and the `<a>` element uses `display: flex; height: 100%` with `flex: 1` on the inner card div, ensuring all cards are the same height across every row.
+**Equal-height cards (load-bearing):** the role text is always rendered (just hidden when absent) and the grid/flex setup forces uniform card heights across rows. Don't "clean up" the empty role line — it's intentional, removing it makes rows ragged.
 
 Linked from nav as "Many Hands".
 
@@ -399,6 +399,8 @@ Members pick a role via `SignupSection` on `/profile`. The selection is submitte
 
 **Admin approval:** via `PATCH /api/admin/role-requests/[clerkUserId]` with `{ decision: 'approved' | 'rejected' }`. Approval sets `role_approval_status = 'approved'`. Rejection sets `role_id = null` and clears the status. Both send a `user_notifications` row to the member.
 
+The dedicated **Participate** page (`/signup`) hosts `SignupSection` (role + shift) and, below it, the **Your Contributions** group opt-in (`GroupCommitments` — see [Groups](#groups)). The Commitments card's "Manage commitments →" link points here.
+
 **Key file:** `app/api/signup/route.ts`
 
 ### Role Suggestion Flow
@@ -419,13 +421,18 @@ Every group also has a **message thread** for coordination — see [Group Thread
 **Admin — `Admin → Groups` (`GroupsManager.tsx`):**
 - Create / edit / delete / reorder groups (name, description, icon).
 - Expand a group to see its **roster** and **assign members** (searchable picker of approved members) or remove them. Each membership records a `source` (`admin` or `application`).
-- API: `/api/admin/groups` (GET/POST), `/api/admin/groups/[id]` (PATCH/DELETE), `/api/admin/groups/[id]/members` (GET roster / POST add / DELETE remove).
+- **Badge image** (optional): in the group **edit** modal, upload/replace/remove a patch-style image (`BadgeField` → `POST/DELETE /api/admin/groups/[id]/badge`, stored in the public `group-badges` bucket, written to `groups.badge_image`). A brand-new group must be saved first, then re-opened to add a badge.
+- API: `/api/admin/groups` (GET/POST), `/api/admin/groups/[id]` (PATCH/DELETE), `/api/admin/groups/[id]/members` (GET roster / POST add / DELETE remove), `/api/admin/groups/[id]/badge` (POST/DELETE badge image).
 
 **Applicant opt-in (optional):** admins can add a **Group selection** field (`group_select`) to the member application in the Application Builder. The field carries its own list of offered groups in `FieldConfig.options` (group ids; **unset = all groups**, chosen via a checklist in the builder). On submit, picks become `group_members` rows (`source = 'application'`); `/api/apply` re-validates choices against the visible `group_select` fields' configured ids. (The legacy per-group `apply_selectable` column is unused.)
 
+**Member self-service:** approved members can join/leave the same offered groups anytime via the **Your Contributions** section on `/signup` (`GroupCommitments.tsx` → `GET/POST /api/groups/membership`). The selectable set is derived from the form's visible `group_select` fields (same logic as `/api/apply`) — **not** `apply_selectable`. Toggling calls `router.refresh()` so the profile badges + Commitments card update. If no `group_select` field exists, the section shows "No opt-in groups are available right now."
+
+**Badge images on the profile:** a member's group badges (those with `badge_image`) render as a deterministically-scattered cluster in the right cell of the profile badge row, mirroring the role badge on the left (`app/profile/ContributionBadges.tsx`; positions seeded per group id → stable, no hydration drift; shown for approved members only).
+
 **Where group membership is read:** member Commitments card, the `contribution` attunement task, Personal Schedule filtering (`schedule_events.contribution_type` matched to group names), the members directory, and Admin Overview/Registry — all via `lib/groups.ts` (`getMemberGroups`, `getGroupNamesByUser`). `schedule_events.contribution_type` still holds a group name (e.g. `'Setup'`) to surface an event for that group's members.
 
-**Key files:** `app/admin/GroupsManager.tsx`, `app/api/admin/groups/`, `lib/groups.ts`.
+**Key files:** `app/admin/GroupsManager.tsx`, `app/profile/GroupCommitments.tsx`, `app/profile/ContributionBadges.tsx`, `app/api/admin/groups/`, `app/api/groups/membership/route.ts`, `lib/groups.ts`.
 
 ### Notifications
 

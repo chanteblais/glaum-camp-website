@@ -21,21 +21,7 @@ Defined in `tailwind.config.ts` under `theme.extend.colors.glaum` and used throu
 
 ### Background
 
-The site shell has a layered background applied via the `.site-shell` class:
-1. Base color: `#1A0A24` (ink)
-2. Radial gradient: purple glow at top center fading to transparent
-3. Linear gradient: subtle `#2A0A3A` mid-section
-4. Fixed dot grid: gold dots at 7% opacity, 24px spacing (applied via `::before` pseudo-element)
-
-```css
-.site-shell {
-  background-color: #1A0A24;
-  background-image:
-    radial-gradient(ellipse at center top, rgba(210,57,248,0.18) 0%, rgba(93,43,122,0.1) 50%, transparent 100%),
-    linear-gradient(180deg, #1A0A24 0%, #2A0A3A 60%, #1A0A24 100%);
-}
-/* Fixed dot grid via ::before */
-```
+The site shell (`.site-shell` in `globals.css`) layers, bottom to top: base ink color, a purple radial glow at top-center fading out, a subtle plum mid-section linear gradient, and a fixed gold dot-grid via `::before`. Exact gradient stops and opacities live in `globals.css`.
 
 ---
 
