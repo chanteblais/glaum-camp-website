@@ -14,6 +14,7 @@ import { PersonalSchedule } from './PersonalSchedule'
 import { RoleBadge } from './RoleBadge'
 import { AttunementStatus } from './AttunementStatus'
 import { getMemberGroups, groupCommitmentMeta } from '@/lib/groups'
+import { ContributionBadges } from './ContributionBadges'
 import { buildAttunementChecklist } from '@/lib/attunement'
 
 export default async function ProfilePage() {
@@ -145,7 +146,9 @@ export default async function ProfilePage() {
                 initialUrl={application?.avatar_url ?? volunteer?.avatar_url ?? null}
                 displayName={displayName}
               />
-              <div className="profile-badge-spacer" />
+              {application?.status === 'approved'
+                ? <ContributionBadges groups={memberGroups} />
+                : <div className="profile-badge-spacer" />}
             </div>
 
             {/* Name + meta */}

@@ -1,6 +1,6 @@
 import { supabaseAdmin } from './supabase'
 
-export type MemberGroup = { id: string; name: string; icon: string | null; description: string | null }
+export type MemberGroup = { id: string; name: string; icon: string | null; description: string | null; badge_image: string | null }
 
 // Fetch the groups a member belongs to (ordered by the group's sort_order).
 // Replaces the old `setup_preference`-derived "contributions" concept.
@@ -8,7 +8,7 @@ export async function getMemberGroups(clerkUserId: string | null | undefined): P
   if (!clerkUserId) return []
   const { data } = await supabaseAdmin
     .from('group_members')
-    .select('groups(id, name, icon, description, sort_order)')
+    .select('groups(id, name, icon, description, badge_image, sort_order)')
     .eq('clerk_user_id', clerkUserId)
 
   type GroupRow = MemberGroup & { sort_order: number }
@@ -16,7 +16,7 @@ export async function getMemberGroups(clerkUserId: string | null | undefined): P
     .map(r => r.groups as unknown as GroupRow | null)
     .filter((g): g is GroupRow => !!g)
     .sort((a, b) => a.sort_order - b.sort_order)
-    .map(({ id, name, icon, description }) => ({ id, name, icon, description }))
+    .map(({ id, name, icon, description, badge_image }) => ({ id, name, icon, description, badge_image }))
 }
 
 // Map of clerk_user_id → group names they belong to. For admin roster/overview

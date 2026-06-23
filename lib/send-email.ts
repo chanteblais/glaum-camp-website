@@ -9,14 +9,24 @@ const FROM = process.env.RESEND_FROM || 'Glåüm Camp <onboarding@resend.dev>'
 
 const APP_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://glaum.camp').replace(/\/$/, '')
 
-export async function sendAdminEmail(to: string, subject: string, html: string) {
+export type SendResult = { ok: boolean; error?: string }
+
+export async function sendAdminEmail(to: string, subject: string, html: string): Promise<SendResult> {
   const { error } = await resend.emails.send({ from: FROM, to, subject, html: wrap(html) })
-  if (error) console.error('[sendAdminEmail]', error)
+  if (error) {
+    console.error('[sendAdminEmail]', error)
+    return { ok: false, error: error.message }
+  }
+  return { ok: true }
 }
 
-export async function sendUserEmail(to: string, subject: string, html: string) {
+export async function sendUserEmail(to: string, subject: string, html: string): Promise<SendResult> {
   const { error } = await resend.emails.send({ from: FROM, to, subject, html: wrap(html) })
-  if (error) console.error('[sendUserEmail]', error)
+  if (error) {
+    console.error('[sendUserEmail]', error)
+    return { ok: false, error: error.message }
+  }
+  return { ok: true }
 }
 
 /**

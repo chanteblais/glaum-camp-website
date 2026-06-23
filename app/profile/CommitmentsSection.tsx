@@ -115,27 +115,7 @@ export function CommitmentsSection({ contributions, role, dept, shift, roleAppro
 
       {/* Rows */}
       <div className="commitments-rows">
-        {/* Contributions */}
-        {contributions.map((c, i) => {
-          const meta = metaByValue[c] ?? { icon: '✦', desc: null }
-          return (
-            <div key={c}>
-              <Row
-                circleContent={<span style={{ fontSize: compact ? '1.1rem' : '1.4rem', lineHeight: 1 }}>{meta.icon}</span>}
-                title={c}
-                description={meta.desc}
-                tag="GROUP"
-                iconSize={iconSize}
-                compact={compact}
-              />
-              {(i < contributions.length - 1 || role || shift) && (
-                <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.3), transparent)' }} />
-              )}
-            </div>
-          )
-        })}
-
-        {/* Role */}
+        {/* Role / Designation — shown first */}
         {role && (
           <div>
             <Row
@@ -152,9 +132,31 @@ export function CommitmentsSection({ contributions, role, dept, shift, roleAppro
               iconSize={iconSize}
               compact={compact}
             />
-            {shift && <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.3), transparent)' }} />}
+            {(contributions.length > 0 || shift) && (
+              <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.3), transparent)' }} />
+            )}
           </div>
         )}
+
+        {/* Contributions */}
+        {contributions.map((c, i) => {
+          const meta = metaByValue[c] ?? { icon: '✦', desc: null }
+          return (
+            <div key={c}>
+              <Row
+                circleContent={<span style={{ fontSize: compact ? '1.1rem' : '1.4rem', lineHeight: 1 }}>{meta.icon}</span>}
+                title={c}
+                description={meta.desc}
+                tag="GROUP"
+                iconSize={iconSize}
+                compact={compact}
+              />
+              {(i < contributions.length - 1 || shift) && (
+                <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.3), transparent)' }} />
+              )}
+            </div>
+          )
+        })}
 
         {/* Shift */}
         {shift && (
@@ -176,7 +178,7 @@ export function CommitmentsSection({ contributions, role, dept, shift, roleAppro
       {/* Footer */}
       {showManageLink && (
         <div style={{ padding: '0.65rem 1.5rem' }}>
-          <a href="/apply" style={{ fontSize: '0.78rem', color: '#C8A848', opacity: 0.85, textDecoration: 'none', letterSpacing: '0.04em' }}>
+          <a href="/signup" style={{ fontSize: '0.78rem', color: '#C8A848', opacity: 0.85, textDecoration: 'none', letterSpacing: '0.04em' }}>
             Manage commitments →
           </a>
         </div>

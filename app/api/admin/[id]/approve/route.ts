@@ -37,6 +37,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   // Notify the applicant
+  let emailWarning: string | undefined
   if (application?.clerk_user_id) {
     const displayName = application.preferred_name || application.first_name || 'Camper'
     const message = `Welcome to Glåüm, ${displayName}! Your application has been approved. 🎉`
@@ -49,13 +50,19 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const clerkUser = await client.users.getUser(application.clerk_user_id)
     const email = clerkUser.emailAddresses[0]?.emailAddress
     if (email) {
-      await sendUserEmail(
+      const result = await sendUserEmail(
         email,
         'Your Glåüm application has been approved!',
         `<p>Hi ${displayName},</p><p>Great news — your application to Glåüm has been approved! Head to your <a href="https://glaum.camp/profile">profile</a> to choose your role and shift.</p><p>See you at camp ✦</p>`,
       )
+      // Approval itself succeeded (status + in-app notification); only the
+      // email failed. Surface it so the admin knows to follow up manually
+      // instead of assuming the member was emailed.
+      if (!result.ok) emailWarning = `Application approved, but the email to ${email} failed to send: ${result.error}`
+    } else {
+      emailWarning = 'Application approved, but no email address was found for this member.'
     }
   }
 
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true, emailWarning })
 }

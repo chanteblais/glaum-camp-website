@@ -9,7 +9,9 @@ export function AdminActions({ id, email, redirectAfter }: { id: string; email: 
 
   const handleApprove = async () => {
     setLoading('approve')
-    await fetch(`/api/admin/${id}/approve`, { method: 'POST' })
+    const res = await fetch(`/api/admin/${id}/approve`, { method: 'POST' })
+    const data = await res.json().catch(() => ({}))
+    if (data?.emailWarning) alert(`⚠️ ${data.emailWarning}`)
     if (redirectAfter) router.push(redirectAfter)
     else router.refresh()
     setLoading(null)

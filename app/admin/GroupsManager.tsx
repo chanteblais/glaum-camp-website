@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 
 type Group = {
   id: string
   name: string
   description: string | null
   icon: string | null
+  badge_image: string | null
   apply_selectable: boolean
   sort_order: number
   member_count: number
@@ -53,10 +54,71 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   )
 }
 
+// ── Badge image upload ──────────────────────────────────────────────────────
+// Optional per-group badge image, rendered scattered on the member profile.
+// Uploads immediately (persists server-side) and reports the new URL upward so
+// the group row stays in sync.
+
+function BadgeField({ groupId, initial, onChange }: {
+  groupId: string
+  initial: string | null
+  onChange: (url: string | null) => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [preview, setPreview] = useState<string | null>(initial)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  async function upload(file: File) {
+    setBusy(true); setErr(null)
+    const fd = new FormData()
+    fd.append('badge', file)
+    const res = await fetch(`/api/admin/groups/${groupId}/badge`, { method: 'POST', body: fd })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) { setErr(data.error ?? 'Upload failed'); setBusy(false); return }
+    setPreview(data.badge_image)
+    onChange(data.badge_image)
+    setBusy(false)
+  }
+
+  async function remove() {
+    setBusy(true); setErr(null)
+    const res = await fetch(`/api/admin/groups/${groupId}/badge`, { method: 'DELETE' })
+    if (res.ok) { setPreview(null); onChange(null) }
+    setBusy(false)
+    if (inputRef.current) inputRef.current.value = ''
+  }
+
+  return (
+    <Field label="Badge image (optional)" hint="A patch-style image shown scattered on members' profiles. PNG with transparency works best.">
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+        <div style={{ width: 64, height: 64, flexShrink: 0, borderRadius: '0.5rem', border: '1px solid rgba(200,168,72,0.2)', background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+          {preview
+            ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            : <span style={{ fontSize: '0.6rem', opacity: 0.35, textAlign: 'center' }}>none</span>}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+          <button type="button" onClick={() => inputRef.current?.click()} disabled={busy} style={{ padding: '0.4rem 0.9rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.3)', background: 'transparent', color: '#FFFACD', cursor: busy ? 'wait' : 'pointer', fontSize: '0.78rem', opacity: busy ? 0.5 : 1 }}>
+            {busy ? 'Uploading…' : preview ? 'Replace image' : 'Upload image'}
+          </button>
+          {preview && (
+            <button type="button" onClick={remove} disabled={busy} style={{ padding: '0.3rem 0.9rem', borderRadius: '9999px', border: '1px solid rgba(255,80,80,0.2)', background: 'transparent', color: '#ff8a8a', cursor: 'pointer', fontSize: '0.72rem', opacity: 0.8 }}>
+              Remove
+            </button>
+          )}
+        </div>
+        <input ref={inputRef} type="file" accept="image/png,image/webp,image/svg+xml,image/jpeg,image/gif" style={{ display: 'none' }}
+          onChange={e => { const f = e.target.files?.[0]; if (f) upload(f) }} />
+      </div>
+      {err && <p style={{ color: '#ff8a8a', fontSize: '0.75rem', marginTop: '0.4rem' }}>{err}</p>}
+    </Field>
+  )
+}
+
 // ── Group Modal ───────────────────────────────────────────────────────────────
 
 function GroupModal({
-  initial, isNew, onSave, onClose, saving, error,
+  initial, isNew, onSave, onClose, saving, error, groupId, initialBadge, onBadgeChange,
 }: {
   initial: GroupForm
   isNew: boolean
@@ -64,6 +126,9 @@ function GroupModal({
   onClose: () => void
   saving: boolean
   error: string | null
+  groupId?: string
+  initialBadge?: string | null
+  onBadgeChange?: (url: string | null) => void
 }) {
   const [form, setForm] = useState(initial)
   const set = (k: keyof GroupForm, v: string) => setForm(f => ({ ...f, [k]: v }))
@@ -84,6 +149,11 @@ function GroupModal({
         <Field label="Icon (optional — emoji)">
           <input style={inputStyle} value={form.icon} onChange={e => set('icon', e.target.value)} placeholder="e.g. ⚒️" />
         </Field>
+        {groupId
+          ? <BadgeField groupId={groupId} initial={initialBadge ?? null} onChange={url => onBadgeChange?.(url)} />
+          : <p style={{ fontSize: '0.72rem', opacity: 0.4, lineHeight: 1.5, marginBottom: '1rem' }}>
+              Save the group first, then re-open it to add a badge image.
+            </p>}
         <p style={{ fontSize: '0.72rem', opacity: 0.4, lineHeight: 1.5, marginBottom: '1.25rem' }}>
           To let applicants opt into groups, add a <strong style={{ opacity: 0.8 }}>Group selection</strong> field in the Application Builder and choose which groups it offers.
         </p>
@@ -342,7 +412,20 @@ export function GroupsManager({ members }: { members: AssignableMember[] }) {
       </button>
 
       {creating && <GroupModal isNew initial={{ name: '', description: '', icon: '' }} onSave={handleCreate} onClose={() => setCreating(false)} saving={saving} error={error} />}
-      {editing && <GroupModal isNew={false} initial={{ name: editing.name, description: editing.description ?? '', icon: editing.icon ?? '' }} onSave={(f) => handleUpdate(editing, f)} onClose={() => setEditing(null)} saving={saving} error={error} />}
+      {editing && <GroupModal
+        isNew={false}
+        initial={{ name: editing.name, description: editing.description ?? '', icon: editing.icon ?? '' }}
+        onSave={(f) => handleUpdate(editing, f)}
+        onClose={() => setEditing(null)}
+        saving={saving}
+        error={error}
+        groupId={editing.id}
+        initialBadge={editing.badge_image}
+        onBadgeChange={(url) => {
+          setEditing(g => g ? { ...g, badge_image: url } : g)
+          setGroups(prev => prev.map(g => g.id === editing.id ? { ...g, badge_image: url } : g))
+        }}
+      />}
     </div>
   )
 }

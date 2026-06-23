@@ -1,0 +1,116 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+
+type OptInGroup = {
+  id: string
+  name: string
+  description: string | null
+  icon: string | null
+  badge_image: string | null
+  joined: boolean
+}
+
+const GOLD = '#C8A848'
+
+export function GroupCommitments() {
+  const router = useRouter()
+  const [groups, setGroups] = useState<OptInGroup[] | null>(null)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/groups/membership')
+      .then(r => r.json())
+      .then(d => setGroups(d.groups ?? []))
+      .catch(() => setGroups([]))
+  }, [])
+
+  async function toggle(g: OptInGroup) {
+    const next = !g.joined
+    setBusyId(g.id)
+    setError(null)
+    // Optimistic
+    setGroups(prev => prev?.map(x => x.id === g.id ? { ...x, joined: next } : x) ?? prev)
+
+    const res = await fetch('/api/groups/membership', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ group_id: g.id, joined: next }),
+    })
+
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      setError(d.error ?? 'Could not update. Try again.')
+      // Revert
+      setGroups(prev => prev?.map(x => x.id === g.id ? { ...x, joined: g.joined } : x) ?? prev)
+    } else {
+      // Refresh server components (profile badges, commitments card) on next nav.
+      router.refresh()
+    }
+    setBusyId(null)
+  }
+
+  if (groups === null) {
+    return <p style={{ fontSize: '0.85rem', opacity: 0.4 }}>Loading…</p>
+  }
+  if (groups.length === 0) {
+    return (
+      <p style={{ fontSize: '0.85rem', opacity: 0.45, fontStyle: 'italic' }}>
+        No opt-in groups are available right now.
+      </p>
+    )
+  }
+
+  return (
+    <div>
+      {error && <p style={{ color: '#ff8a8a', fontSize: '0.8rem', marginBottom: '0.75rem' }}>{error}</p>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        {groups.map(g => {
+          const busy = busyId === g.id
+          return (
+            <button
+              key={g.id}
+              onClick={() => toggle(g)}
+              disabled={busy}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '1rem', textAlign: 'left', width: '100%',
+                padding: '1rem 1.25rem', borderRadius: '0.85rem', cursor: busy ? 'wait' : 'pointer',
+                border: `1px solid ${g.joined ? 'rgba(210,57,248,0.45)' : 'rgba(200,168,72,0.18)'}`,
+                background: g.joined ? 'rgba(210,57,248,0.08)' : 'rgba(255,255,255,0.02)',
+                transition: 'border-color 0.15s, background 0.15s', opacity: busy ? 0.6 : 1,
+              }}
+            >
+              {/* Badge / icon */}
+              <div style={{ width: 48, height: 48, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {g.badge_image
+                  ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={g.badge_image} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                  : <span style={{ fontSize: '1.5rem' }}>{g.icon || '✦'}</span>}
+              </div>
+
+              {/* Name + description */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: 0, fontSize: '0.95rem', color: '#F3EDE6', fontWeight: 600 }}>{g.name}</p>
+                {g.description && (
+                  <p style={{ margin: '0.2rem 0 0', fontSize: '0.78rem', opacity: 0.5, lineHeight: 1.5 }}>{g.description}</p>
+                )}
+              </div>
+
+              {/* Toggle pill */}
+              <span style={{
+                flexShrink: 0, fontSize: '0.7rem', letterSpacing: '0.08em', padding: '0.35rem 0.85rem',
+                borderRadius: '9999px', whiteSpace: 'nowrap',
+                border: `1px solid ${g.joined ? 'rgba(210,57,248,0.5)' : 'rgba(200,168,72,0.3)'}`,
+                color: g.joined ? '#D239F8' : GOLD,
+                background: g.joined ? 'rgba(210,57,248,0.12)' : 'transparent',
+              }}>
+                {g.joined ? '✓ Joined' : '+ Join'}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}

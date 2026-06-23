@@ -20,6 +20,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (body.name !== undefined) update.name = body.name
     if (body.description !== undefined) update.description = body.description
     if (body.icon !== undefined) update.icon = body.icon === '' ? null : body.icon
+    if (body.badge_image !== undefined) update.badge_image = body.badge_image === '' ? null : body.badge_image
     if (body.apply_selectable !== undefined) update.apply_selectable = !!body.apply_selectable
     if (body.sort_order !== undefined) update.sort_order = body.sort_order
 
