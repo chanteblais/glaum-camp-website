@@ -17,7 +17,7 @@ export async function GET() {
   // All messages involving this user
   const { data, error } = await supabaseAdmin
     .from('messages')
-    .select('id, sender_clerk_id, recipient_clerk_id, body, read_at, created_at')
+    .select('id, sender_clerk_id, recipient_clerk_id, body, read_at, created_at, sender_name')
     .or(`sender_clerk_id.eq.${userId},recipient_clerk_id.eq.${userId}`)
     .order('created_at', { ascending: false })
 
@@ -29,6 +29,7 @@ export async function GET() {
   // Group into conversations keyed by the other party's clerk_user_id
   const convMap = new Map<string, {
     otherUserId: string
+    otherName: string | null   // snapshot from the other party's most recent message
     lastMessage: typeof data[0]
     unreadCount: number
   }>()
@@ -36,10 +37,16 @@ export async function GET() {
   for (const msg of data ?? []) {
     const otherId = msg.sender_clerk_id === userId ? msg.recipient_clerk_id : msg.sender_clerk_id
     if (!convMap.has(otherId)) {
-      convMap.set(otherId, { otherUserId: otherId, lastMessage: msg, unreadCount: 0 })
+      convMap.set(otherId, { otherUserId: otherId, otherName: null, lastMessage: msg, unreadCount: 0 })
+    }
+    // Messages are newest-first, so the first one the other party sent gives their
+    // latest snapshot name — used as a fallback when their profile is gone.
+    const conv = convMap.get(otherId)!
+    if (msg.sender_clerk_id === otherId && !conv.otherName) {
+      conv.otherName = msg.sender_name ?? null
     }
     if (msg.recipient_clerk_id === userId && !msg.read_at) {
-      convMap.get(otherId)!.unreadCount++
+      conv.unreadCount++
     }
   }
 
@@ -59,7 +66,7 @@ export async function GET() {
 
   const result = conversations.map(c => ({
     otherUserId: c.otherUserId,
-    displayName: profileMap[c.otherUserId]?.preferred_name || profileMap[c.otherUserId]?.first_name || 'Member',
+    displayName: profileMap[c.otherUserId]?.preferred_name || profileMap[c.otherUserId]?.first_name || c.otherName || 'Member',
     avatarUrl: profileMap[c.otherUserId]?.avatar_url ?? null,
     lastMessage: c.lastMessage.body,
     lastMessageAt: c.lastMessage.created_at,
@@ -96,17 +103,26 @@ export async function POST(req: Request) {
 
   if (!recipient) return NextResponse.json({ error: 'Recipient not found' }, { status: 404 })
 
+  // Snapshot the sender's display name onto the message so the conversation stays
+  // readable even if the sender's application is later deleted. Prefer the
+  // application name (what's shown elsewhere), falling back to Clerk's first name.
+  const { data: senderApp } = await supabaseAdmin
+    .from('applications')
+    .select('preferred_name, first_name')
+    .eq('clerk_user_id', userId)
+    .maybeSingle()
+  const user = await currentUser()
+  const senderName = senderApp?.preferred_name || senderApp?.first_name || user?.firstName || 'A member'
+
   const { data: message, error } = await supabaseAdmin
     .from('messages')
-    .insert({ sender_clerk_id: userId, recipient_clerk_id: recipientId, body: body.trim() })
+    .insert({ sender_clerk_id: userId, recipient_clerk_id: recipientId, body: body.trim(), sender_name: senderName })
     .select()
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // In-app notification (always)
-  const user = await currentUser()
-  const senderName = user?.firstName ?? 'A member'
   await supabaseAdmin.from('user_notifications').insert({
     clerk_user_id: recipientId,
     event_type: 'new_message',

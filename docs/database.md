@@ -119,7 +119,7 @@ Configurable groups members belong to (e.g. Setup, Teardown, Decor). Added in mi
 |---|---|---|
 | `id` | UUID PK | |
 | `name` | TEXT NOT NULL | |
-| `description` | TEXT | Shown to applicants when `apply_selectable` is on |
+| `description` | TEXT | Shown to applicants when the group is offered by a Group selection field |
 | `icon` | TEXT | Emoji |
 | `apply_selectable` | BOOL | **Legacy/unused.** Which groups appear on the application is now controlled per-field by the **Group selection** field's `options` (see below), not this column. |
 | `sort_order` | INT | |
@@ -141,7 +141,7 @@ One row per member assigned to a group. Added in migration `030`.
 | `source` | TEXT | How they joined: `'admin'` (assigned) or `'application'` (opted in on apply form). Default `'admin'` |
 | `created_at` | TIMESTAMPTZ | |
 
-**Unique constraint:** `(group_id, clerk_user_id)`. Adds use upsert with `ignoreDuplicates`. Roster API: `/api/admin/groups/[id]/members` (GET roster enriched from `applications`, POST add, DELETE remove via `?clerk_user_id=`). Application opt-ins are inserted in `/api/apply` for groups flagged `apply_selectable`.
+**Unique constraint:** `(group_id, clerk_user_id)`. Adds use upsert with `ignoreDuplicates`. Roster API: `/api/admin/groups/[id]/members` (GET roster enriched from `applications`, POST add, DELETE remove via `?clerk_user_id=`). Application opt-ins are inserted in `/api/apply`, validated against the offered group ids of the visible `group_select` fields in the saved member-form config.
 
 ---
 
@@ -164,7 +164,7 @@ Public camp schedule entries.
 | `capacity` | INT | |
 | `event_type` | TEXT | `null` (general) / `'all_hands'` / `'camp_tending'` / `'service'` |
 | `sort_order` | INT | |
-| `contribution_type` | TEXT | `'Setup'` / `'Teardown'` / `'Decor'` — shows event on personal schedule for matching members |
+| `contribution_type` | TEXT | A **group name** (e.g. `'Setup'` / `'Teardown'` / `'Decor'`) — shows the event on the personal schedule of members in that group (matched by group name in `lib/groups.ts`) |
 | `event_date` | DATE | Actual calendar date. Used to filter Upcoming Gatherings to next 14 days. NULL = always show |
 | `event_category` | TEXT | `'at_camp'` (default) / `'pre_camp'` — splits dashboard into separate sections |
 
@@ -258,7 +258,7 @@ Admin-editable copy for the homepage. One row per key.
 - `config_member_form` — JSON blob (`MemberFormConfig`) for the camp member application. Set by Application Builder. `mergeMemberConfig` (in `lib/form-config.ts`) reconciles it with defaults on every load: preserves the saved order of **all** sections (built-in + custom, so a custom section can be first), merges built-in field overrides, keeps custom fields/elements as-is, and re-injects only missing *locked* core fields. Field option lists and **agreement clauses** now live in each field's `options` here (editable in the builder).
 - `config_volunteer_form` — JSON blob (`VolunteerFormConfig`) for the volunteer signup. Same pattern (flat field list, no custom sections).
 - `config_track_picker` — JSON `{ memberTitle, memberDesc, volunteerTitle, volunteerDesc }` for the `/apply` TrackPicker cards. Edited in the Application Builder (Member/Volunteer tabs). Falls back to `DEFAULT_TRACK_COPY` in `lib/site-config.ts`.
-- `dashboard_layout` — JSON blob controlling the member dashboard widget layout. Shape: `{ order: string[], hidden: string[], widths: Record<string, 'half' | 'full'> }`. Managed by the inline page editor. Widget IDs: `announcements`, `polls`, `events`, `spotlight`, `activity`.
+- `dashboard_layout` — JSON blob controlling the member dashboard widget layout. Shape: `{ order: string[], hidden: string[], widths: Record<string, 'half' | 'full'> }`. Managed by the inline page editor. Widget IDs: `announcements`, `shoutouts`, `polls`, `events`, `spotlight`, `activity`.
 - `member_acknowledgements` — JSON array of strings. **Legacy** source for the Many Hands Agreement clauses — now superseded by the `acknowledgements` field's `options` in `config_member_form` (the Agreement field type, edited in the builder). Still read as a fallback when that field has no options. Falls back to `DEFAULT_AGREEMENT_ITEMS` in `lib/site-config.ts`.
 - `member_attendance_options` — JSON array of strings. Radio options for the attendance question in the application form. Falls back to `DEFAULT_ATTENDANCE_OPTIONS` in `lib/site-config.ts`.
 - `member_membership_types` — JSON array of strings. Options for the membership type dropdown in profile settings. Falls back to `MEMBERSHIP_TYPE_OPTIONS` in `lib/application-options.ts`.
@@ -278,12 +278,30 @@ Direct messages between approved camp members. Added in migration `022`.
 | `sender_clerk_id` | TEXT NOT NULL | Sender's Clerk user ID |
 | `recipient_clerk_id` | TEXT NOT NULL | Recipient's Clerk user ID |
 | `body` | TEXT NOT NULL | Message content. Max 2,000 chars (DB-enforced CHECK) |
+| `sender_name` | TEXT | Snapshot of the sender's display name (`preferred_name`/`first_name`) at send time. Added in migration `032`. Lets a thread keep a readable name after the sender's application is deleted; used as a fallback by the inbox + thread when no profile resolves. |
 | `read_at` | TIMESTAMPTZ | NULL = unread |
 | `created_at` | TIMESTAMPTZ NOT NULL | Defaults to NOW() |
 
 Indexed on `(recipient_clerk_id, created_at DESC)` and `(sender_clerk_id, created_at DESC)` for fast inbox + thread queries.
 
 **Privacy:** messages are private — only sender and recipient can access them. Admins have no read access. No FK to `applications` — join in JS using `clerk_user_id`.
+
+---
+
+### `shoutouts`
+
+Member-posted shoutouts shown on the home-page member dashboard (the `shoutouts` widget). Added in migration `031`.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `clerk_user_id` | TEXT NOT NULL | Author identity (join to `applications` in JS for avatar; no FK) |
+| `author_name` | TEXT NOT NULL | Display name snapshot at post time (preferred/first name) |
+| `body` | TEXT NOT NULL | Post content. 1–250 chars (DB-enforced CHECK) |
+| `visible` | BOOL | Reserved for future moderation. Default `true` |
+| `created_at` | TIMESTAMPTZ | Defaults to NOW() |
+
+**Who can post:** any approved member (`POST /api/shoutouts`). **Who can delete:** the author or an admin (`DELETE /api/shoutouts/[id]`). The widget (`app/ShoutoutWidget.tsx`) is part of the admin-configurable `dashboard_layout` (widget id `shoutouts`), so it can be reordered/hidden/widened like the others. Avatars are joined in JS from `applications` by `clerk_user_id` at render time (so they stay current).
 
 ---
 
@@ -352,6 +370,8 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `028_event_rsvps.sql` | `event_rsvps` table |
 | `029_application_files_bucket.sql` | Public `application-files` storage bucket + read policy (for File-upload fields). **Must be applied** (or create the bucket manually). |
 | `030_groups.sql` | `groups` + `group_members` tables. Backfills groups from distinct `setup_preference` values and memberships from approved members' selections. **Must be applied** before the Groups feature works. Idempotent. |
+| `031_shoutouts.sql` | `shoutouts` table — member-posted shoutouts on the home dashboard. **Must be applied** before the Shoutouts widget works. |
+| `032_message_sender_name.sql` | `sender_name` column on `messages` (snapshot of sender display name) + backfill from current application names. Lets conversations survive sender deletion. |
 
 ---
 

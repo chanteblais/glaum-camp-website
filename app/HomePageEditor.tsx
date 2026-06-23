@@ -7,6 +7,7 @@ type Content = Record<string, string>
 
 const WIDGET_LABELS: Record<string, string> = {
   announcements: 'Announcements',
+  shoutouts:     'Shoutouts',
   polls:         'Polls',
   events:        'Gatherings',
   spotlight:     'Meet a Member',

@@ -18,6 +18,7 @@ type Props = {
   displayName: string
   avatarUrl: string | null
   pronouns: string | null
+  recipientActive?: boolean
 }
 
 const MAX_CHARS = 2000
@@ -31,7 +32,7 @@ function formatTime(iso: string) {
   return d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric', ...(isThisYear ? {} : { year: 'numeric' }), hour: 'numeric', minute: '2-digit' })
 }
 
-export function ThreadClient({ currentUserId, recipientId, displayName, avatarUrl, pronouns }: Props) {
+export function ThreadClient({ currentUserId, recipientId, displayName, avatarUrl, pronouns, recipientActive = true }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
   const [body, setBody] = useState('')
@@ -140,29 +141,43 @@ export function ThreadClient({ currentUserId, recipientId, displayName, avatarUr
         <a href="/messages" aria-label="Back to all messages" style={{ color: '#C8A848', opacity: 0.5, textDecoration: 'none', fontSize: '0.8rem', letterSpacing: '0.08em', flexShrink: 0 }}>
           <span aria-hidden="true">←</span>
         </a>
-        <a
-          href={`/members/${recipientId}`}
-          aria-label={`View ${displayName}'s profile`}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', textDecoration: 'none', color: 'inherit' }}
-        >
-          <div style={{
-            width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
-            border: '1px solid rgba(111,73,31,0.7)',
-            background: 'rgba(200,168,72,0.08)',
-            overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            {avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={avatarUrl} alt={`${displayName}'s avatar`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            ) : (
-              <span aria-hidden="true" style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1rem', color: '#C8A848', opacity: 0.6 }}>{initials}</span>
-            )}
-          </div>
-          <div>
-            <p style={{ margin: 0, fontFamily: 'TokyoDreams, serif', fontSize: '1.05rem', color: '#C8A848' }}>{displayName}</p>
-            {pronouns && <p style={{ margin: 0, fontSize: '0.7rem', opacity: 0.4 }}>{pronouns}</p>}
-          </div>
-        </a>
+        {(() => {
+          const inner = (
+            <>
+              <div style={{
+                width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
+                border: '1px solid rgba(111,73,31,0.7)',
+                background: 'rgba(200,168,72,0.08)',
+                overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                {avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={avatarUrl} alt={`${displayName}'s avatar`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <span aria-hidden="true" style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1rem', color: '#C8A848', opacity: 0.6 }}>{initials}</span>
+                )}
+              </div>
+              <div>
+                <p style={{ margin: 0, fontFamily: 'TokyoDreams, serif', fontSize: '1.05rem', color: '#C8A848' }}>{displayName}</p>
+                {recipientActive
+                  ? pronouns && <p style={{ margin: 0, fontSize: '0.7rem', opacity: 0.4 }}>{pronouns}</p>
+                  : <p style={{ margin: 0, fontSize: '0.7rem', opacity: 0.4, fontStyle: 'italic' }}>No longer active</p>}
+              </div>
+            </>
+          )
+          // No profile to link to once the member is gone.
+          return recipientActive ? (
+            <a
+              href={`/members/${recipientId}`}
+              aria-label={`View ${displayName}'s profile`}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', textDecoration: 'none', color: 'inherit' }}
+            >
+              {inner}
+            </a>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>{inner}</div>
+          )
+        })()}
       </div>
 
       {/* Messages */}
@@ -240,7 +255,22 @@ export function ThreadClient({ currentUserId, recipientId, displayName, avatarUr
         <div ref={bottomRef} />
       </div>
 
-      {/* Compose */}
+      {/* Compose — or a notice when the other member is no longer active */}
+      {!recipientActive ? (
+        <div style={{
+          padding: '1.1rem 1.5rem 2rem',
+          borderTop: '1px solid rgba(200,168,72,0.12)',
+          position: 'sticky',
+          bottom: 0,
+          background: 'rgba(26,10,36,0.92)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+        }}>
+          <p style={{ textAlign: 'center', fontSize: '0.8rem', opacity: 0.45, fontStyle: 'italic', margin: 0 }}>
+            This member is no longer active. You can read this conversation but can&rsquo;t reply.
+          </p>
+        </div>
+      ) : (
       <div style={{
         padding: '0.85rem 1.5rem 2rem',
         borderTop: '1px solid rgba(200,168,72,0.12)',
@@ -332,6 +362,7 @@ export function ThreadClient({ currentUserId, recipientId, displayName, avatarUr
           Enter to send · Shift+Enter for new line
         </p>
       </div>
+      )}
     </div>
   )
 }

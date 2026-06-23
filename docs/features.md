@@ -143,14 +143,14 @@ Sections:
 - **Attunement Status** (`AttunementStatus.tsx`) — parchment card with checklist. **Fully admin-managed** (Admin → Manage → Attunement Tasks, `AttunementTasksManager.tsx`); the list lives in `page_content.config_attunement_tasks` (JSON), parsed by `parseAttunementTasks` in `lib/site-config.ts`. Each task has a `requirement` that auto-completes it; the done/action logic is computed in `app/profile/page.tsx`. Card is hidden if no enabled tasks. Requirement types (`ATTUNEMENT_REQUIREMENTS`):
   - `role` — `campSignup.role_id` set & non-pending; links to `/signup`
   - `shift` — `campSignup.schedule_event_id` set; links to `/signup`
-  - `contribution` — `contributions.length > 0`; clicking opens ProfileSettings to contributions field
+  - `contribution` — done when the member is in ≥1 **group** (`contributions` is now derived from group membership, not `setup_preference`); status-only (groups are admin-assigned, so it's not clickable). Admins can relabel this task (e.g. "Group Assigned").
   - `photo` — checks `avatar_url`; opens ProfileSettings photo
   - `approved` — always done on this page (reassuring first step)
   - Default list (when key absent) mirrors the original five hardcoded items, so behaviour is unchanged until an admin edits it.
 - **Signup Section** (`SignupSection.tsx`) — role/shift picker for approved members. Has "Suggest a role" button that opens `SuggestRoleModal`
-- **Commitments** (`CommitmentsSection.tsx`) — shows selected role + shift. `showManageLink` prop controls the "Manage commitments →" footer link — only `true` on `/profile`, not on member-view pages.
-- **Personal Schedule** (`PersonalScheduleCalendar.tsx`) — events relevant to the member based on their `setup_preference` and `contribution_type` matching. "View full calendar →" links to `/schedule`.
-- **Settings** — gear icon (next to name) opens `ProfileSettings` modal (edit profile fields, contributions, avatar)
+- **Commitments** (`CommitmentsSection.tsx`) — shows the member's **groups** (tagged `GROUP`), plus selected role + shift. Group name/icon/description come from the member's `group_members`→`groups` (via `getMemberGroups` in `lib/groups.ts`). `showManageLink` prop controls the "Manage commitments →" footer link — only `true` on `/profile`, not on member-view pages.
+- **Personal Schedule** (`PersonalScheduleCalendar.tsx`) — events relevant to the member: `schedule_events.contribution_type` matched against the member's **group names**. "View full calendar →" links to `/schedule`.
+- **Settings** — gear icon (next to name) opens `ProfileSettings` modal (edit profile fields, avatar). Groups are admin-assigned, so they are **not** edited here.
 
 Max page width: `1100px`. Layout uses CSS classes (`profile-main-grid`, `profile-info-grid`, `profile-badge-row`) for responsive behavior.
 
@@ -300,7 +300,7 @@ Sections:
 Sections:
 - **Participation** — approved member count, signup completion, active volunteer count, members list (expandable)
 - **Shift Hours** — total committed, confirmed, pending, volunteer hours
-- **Setup & Teardown** — Setup / Teardown / Decor team member pills; limitations count; unassigned count
+- **Setup & Teardown** — Setup / Teardown / Decor team member pills (derived from **group membership** by group name, via `getGroupNamesByUser`); limitations count; "unassigned" = members in no group
 - **Rideshare** — breakdown by rideshare intent
 - **Poll Results** — all polls with bar chart per option (vote count + percentage). Leading option highlighted in gold. Shows Hidden/Closed badges. Hidden if no polls exist.
 
@@ -369,15 +369,20 @@ Members pick a role via `SignupSection` on `/profile`. The selection is submitte
 5. Approve → finds/creates dept (case-insensitive), creates role, notifies member via `user_notifications`
 6. Reject → notifies member via `user_notifications`
 
-### Contributions / Setup Preference
+### Groups
 
-Members select setup preferences during application (`setup_preference TEXT[]`):
-- `'Setup'` — pre-event setup crew
-- `'Teardown'` — post-event teardown crew
-- `'Decor'` — decoration crew (auto-added if member's role is in the Decor department)
-- `'Other'` — other contributions
+Configurable groups members belong to (e.g. Setup, Teardown, Decor). **Replaced** the old contribution-types/`setup_preference` mechanism (migration `030`; see [database.md](database.md) for the `groups` + `group_members` tables).
 
-`schedule_events.contribution_type` links events to these preferences. Matching events appear on the member's Personal Schedule.
+**Admin — `Admin → Groups` (`GroupsManager.tsx`):**
+- Create / edit / delete / reorder groups (name, description, icon).
+- Expand a group to see its **roster** and **assign members** (searchable picker of approved members) or remove them. Each membership records a `source` (`admin` or `application`).
+- API: `/api/admin/groups` (GET/POST), `/api/admin/groups/[id]` (PATCH/DELETE), `/api/admin/groups/[id]/members` (GET roster / POST add / DELETE remove).
+
+**Applicant opt-in (optional):** admins can add a **Group selection** field (`group_select`) to the member application in the Application Builder. The field carries its own list of offered groups in `FieldConfig.options` (group ids; **unset = all groups**, chosen via a checklist in the builder). On submit, picks become `group_members` rows (`source = 'application'`); `/api/apply` re-validates choices against the visible `group_select` fields' configured ids. (The legacy per-group `apply_selectable` column is unused.)
+
+**Where group membership is read:** member Commitments card, the `contribution` attunement task, Personal Schedule filtering (`schedule_events.contribution_type` matched to group names), the members directory, and Admin Overview/Registry — all via `lib/groups.ts` (`getMemberGroups`, `getGroupNamesByUser`). `schedule_events.contribution_type` still holds a group name (e.g. `'Setup'`) to surface an event for that group's members.
+
+**Key files:** `app/admin/GroupsManager.tsx`, `app/api/admin/groups/`, `lib/groups.ts`.
 
 ### Notifications
 

@@ -6,11 +6,13 @@ import { Section, Kicker, GoldDivider } from '@/components/Section'
 import { ScheduleSection } from '@/components/ScheduleSection'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getMemberGroups } from '@/lib/groups'
+import { buildAttunementChecklist } from '@/lib/attunement'
 
 import { HomePageEditor } from './HomePageEditor'
 import { supabaseResizedUrl } from '@/lib/supabase-image'
 import { PollWidget } from './PollWidget'
 import { SpotlightWidget, type SpotlightMember } from './SpotlightWidget'
+import { ShoutoutWidget, type Shoutout } from './ShoutoutWidget'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,6 +42,7 @@ export default async function Home() {
   let announcements: Announcement[] = []
   type PollRow = { id: string; question: string; options: string[]; allow_multiple: boolean; expires_at: string | null; initialCounts: number[]; initialUserVotes: number[] }
   let polls: PollRow[] = []
+  let shoutouts: Shoutout[] = []
 let isAdmin = false
 
   if (userId) {
@@ -59,7 +62,7 @@ let isAdmin = false
     application = appRaw?.status === 'cancelled' ? null : appRaw ?? null
 
     if (application?.status === 'approved') {
-      const [signupResult, eventsResult, spotlightResult, announcementsResult, pollsResult, pollVotesResult] = await Promise.all([
+      const [signupResult, eventsResult, spotlightResult, announcementsResult, pollsResult, pollVotesResult, shoutoutsResult] = await Promise.all([
         supabaseAdmin
           .from('camp_signups')
           .select('role_id, schedule_event_id, role_approval_status, roles(name, description, purpose, department_id, departments(name, icon)), schedule_events(title, day, time, icon_type)')
@@ -99,12 +102,30 @@ let isAdmin = false
           .from('poll_votes')
           .select('poll_id, option_index')
           .eq('clerk_user_id', userId),
+        supabaseAdmin
+          .from('shoutouts')
+          .select('id, clerk_user_id, author_name, body, created_at')
+          .eq('visible', true)
+          .order('created_at', { ascending: false })
+          .limit(50),
       ])
 
       campSignup = signupResult.data ?? null
       upcomingEvents = (eventsResult.data ?? []) as typeof upcomingEvents
       spotlightPool = spotlightResult.data ?? []
       announcements = (announcementsResult.data ?? []) as Announcement[]
+
+      // Enrich shoutouts with each author's current avatar (no FK — join in JS).
+      const shoutoutRows = (shoutoutsResult.data ?? []) as Omit<Shoutout, 'avatar_url'>[]
+      if (shoutoutRows.length > 0) {
+        const authorIds = Array.from(new Set(shoutoutRows.map(s => s.clerk_user_id)))
+        const { data: authorRows } = await supabaseAdmin
+          .from('applications')
+          .select('clerk_user_id, avatar_url')
+          .in('clerk_user_id', authorIds)
+        const avatarMap = Object.fromEntries((authorRows ?? []).map(a => [a.clerk_user_id, a.avatar_url]))
+        shoutouts = shoutoutRows.map(s => ({ ...s, avatar_url: avatarMap[s.clerk_user_id] ?? null }))
+      }
 
       const rawPolls = (pollsResult.data ?? []) as { id: string; question: string; options: string[]; allow_multiple: boolean; expires_at: string | null }[]
       const userVoteRows = (pollVotesResult.data ?? []) as { poll_id: string; option_index: number }[]
@@ -168,7 +189,7 @@ let isAdmin = false
   const c = (key: string, fallback: string) => pageContent[key] ?? fallback
 
   // ── Dashboard layout (admin-configurable widget order) ────────
-  const DEFAULT_WIDGET_ORDER = ['announcements', 'polls', 'events', 'spotlight', 'activity']
+  const DEFAULT_WIDGET_ORDER = ['announcements', 'shoutouts', 'polls', 'events', 'spotlight', 'activity']
   let dashLayout: { order: string[]; hidden: string[]; widths?: Record<string, string> } = { order: DEFAULT_WIDGET_ORDER, hidden: [] }
   try {
     if (pageContent['dashboard_layout']) dashLayout = JSON.parse(pageContent['dashboard_layout'])
@@ -192,13 +213,15 @@ let isAdmin = false
 
   const displayName = (application?.preferred_name as string | null) ?? (application?.first_name as string | null) ?? userFirstName ?? 'Welcome'
 
-  const attunementTasks = [
-    { id: 'approved',     label: 'Application Approved',  done: true },
-    { id: 'photo',        label: 'Photo Uploaded',         done: !!(application?.avatar_url),  href: '/profile' },
-    { id: 'contribution', label: 'Contribution Selected',  done: contributions.length > 0,      href: '/profile' },
-    { id: 'role',         label: 'Role Selected',          done: !!campSignup?.role_id && campSignup?.role_approval_status !== 'pending', href: '/signup' },
-    { id: 'shift',        label: 'Shift Assigned',         done: !!campSignup?.schedule_event_id, href: '/signup' },
-  ]
+  // Attunement checklist — shared with the profile page via buildAttunementChecklist
+  // so the home banner's outstanding count always matches the profile checklist.
+  const attunementTasks = buildAttunementChecklist(pageContent['config_attunement_tasks'], {
+    hasPhoto: !!application?.avatar_url,
+    hasContribution: contributions.length > 0,
+    roleDone: !!campSignup?.role_id && campSignup?.role_approval_status !== 'pending',
+    hasShift: !!campSignup?.schedule_event_id,
+    shiftSignupOpen: pageContent['config_shift_signup_open'] !== 'false',
+  })
   const allAttuned = attunementTasks.every(t => t.done)
 
   const hour = new Date().getHours()
@@ -393,6 +416,16 @@ let isAdmin = false
                     </div>
                   </div>
                 ) : null,
+
+                shoutouts: (
+                  <ShoutoutWidget
+                    initialShoutouts={shoutouts}
+                    currentUserId={userId}
+                    currentUserAvatar={(application?.avatar_url as string | null) ?? null}
+                    isApproved={isApproved}
+                    isAdmin={isAdmin}
+                  />
+                ),
 
                 polls: <PollWidget polls={polls} />,
 

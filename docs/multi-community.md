@@ -22,7 +22,7 @@ Glåüm is the first community on the platform.
 - Application form questions, steps, and agreement text
 - Role departments and role names
 - Schedule structure and event categories
-- Terminology (what this platform calls "attunement", "shifts", "contributions", etc.)
+- Terminology (what this platform calls "attunement", "shifts", "groups", etc.)
 - Member-facing copy throughout the site
 - Badge design and font
 

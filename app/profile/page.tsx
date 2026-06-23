@@ -14,7 +14,7 @@ import { PersonalSchedule } from './PersonalSchedule'
 import { RoleBadge } from './RoleBadge'
 import { AttunementStatus } from './AttunementStatus'
 import { getMemberGroups, groupCommitmentMeta } from '@/lib/groups'
-import { parseAttunementTasks } from '@/lib/site-config'
+import { buildAttunementChecklist } from '@/lib/attunement'
 
 export default async function ProfilePage() {
   const { userId } = await auth()
@@ -71,28 +71,14 @@ export default async function ProfilePage() {
     .select('key, value')
     .in('key', ['config_attunement_tasks', 'config_shift_signup_open'])
   const attuneConfig = Object.fromEntries((attuneConfigRows ?? []).map(r => [r.key, r.value]))
-  const shiftSignupOpen = attuneConfig['config_shift_signup_open'] !== 'false'
-  const roleDone = !!campSignup?.role_id && campSignup?.role_approval_status !== 'pending'
-  const attunementTasks = parseAttunementTasks(attuneConfig['config_attunement_tasks'])
-    // Drop shift tasks while shift signup is closed — they can't be completed yet.
-    .filter(t => t.enabled && (t.requirement !== 'shift' || shiftSignupOpen))
-    .map(t => {
-      switch (t.requirement) {
-        case 'photo':
-          return { id: t.id, label: t.label, done: !!application?.avatar_url, section: 'photo' as const }
-        case 'contribution':
-          // Group membership is admin-assigned now, so this is status-only (not
-          // a clickable self-serve action). Admins can relabel it in Attunement Tasks.
-          return { id: t.id, label: t.label, done: contributions.length > 0 }
-        case 'role':
-          return { id: t.id, label: t.label, done: roleDone, href: '/signup' }
-        case 'shift':
-          return { id: t.id, label: t.label, done: !!campSignup?.schedule_event_id, href: '/signup' }
-        case 'approved':
-        default:
-          return { id: t.id, label: t.label, done: true }
-      }
-    })
+  // Shared with the home dashboard banner via buildAttunementChecklist — keep both in sync.
+  const attunementTasks = buildAttunementChecklist(attuneConfig['config_attunement_tasks'], {
+    hasPhoto: !!application?.avatar_url,
+    hasContribution: contributions.length > 0,
+    roleDone: !!campSignup?.role_id && campSignup?.role_approval_status !== 'pending',
+    hasShift: !!campSignup?.schedule_event_id,
+    shiftSignupOpen: attuneConfig['config_shift_signup_open'] !== 'false',
+  })
 
   // Link clerk_user_id for approved applications found by email
   if (application?.status === 'approved' && !application.clerk_user_id) {

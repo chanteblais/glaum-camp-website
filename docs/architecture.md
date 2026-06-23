@@ -79,6 +79,8 @@ Sign-out flow:
 | `/api/profile/avatar` | POST | Upload avatar to Supabase Storage |
 | `/api/profile/cancel` | POST | Cancel own application |
 | `/api/role-suggestions` | POST | Submit a dept/role suggestion |
+| `/api/shoutouts` | GET/POST | List visible shoutouts / post one (approved members) |
+| `/api/shoutouts/[id]` | DELETE | Delete a shoutout (author or admin only) |
 | `/api/notifications` | GET/PATCH | Fetch + mark-read user notifications |
 | `/api/messages` | GET/POST | Fetch inbox conversations / send a message |
 | `/api/messages/[userId]` | GET | Fetch thread with a specific member (marks messages read) |
@@ -97,6 +99,9 @@ Sign-out flow:
 | `/api/admin/departments/[id]` | PATCH/DELETE | Update / delete department |
 | `/api/admin/roles` | GET/POST | List / create roles |
 | `/api/admin/roles/[id]` | PATCH/DELETE | Update / delete role |
+| `/api/admin/groups` | GET/POST | List (with member counts) / create groups |
+| `/api/admin/groups/[id]` | PATCH/DELETE | Update / delete group |
+| `/api/admin/groups/[id]/members` | GET/POST/DELETE | Group roster / add member / remove member (`?clerk_user_id=`) |
 | `/api/admin/schedule` | GET/POST | List / create schedule events |
 | `/api/admin/schedule/[id]` | PATCH/DELETE | Update / delete event |
 | `/api/admin/schedule/icon` | POST | Upload custom event icon |
@@ -148,7 +153,7 @@ Sign-out flow:
 - **`overflow-x: hidden`** on `html`/`body` to prevent mobile horizontal scroll
 - **Camp signups join** — always fetch `applications` and `camp_signups` separately and join in JS; Supabase can't resolve the FK via nested select
 - **Lazy Supabase client** — `lib/supabase.ts` uses Proxy to avoid build-time env var errors
-- **Form config system** — `lib/form-config.ts` defines `MemberFormConfig` and `VolunteerFormConfig` types, default step/field definitions, and `mergeMemberConfig`/`mergeVolunteerConfig` helpers. Configs are fetched from `page_content` as JSON and merged with defaults on every request. The member merge **preserves the saved order of all sections** (built-in + custom — a custom section can be first), merges built-in field overrides (label, description, visible, required, width, options), keeps custom fields/elements as-is, and re-injects only missing *locked* core fields (deleted non-core fields stay deleted; "Reset to defaults" restores). Field types: text/textarea/radio/checkbox/file/agreement, plus divider & text-block elements. The Application Builder (`/admin/configure`) writes to `page_content` via `PATCH /api/admin/page-content`; everything autosaves (debounced).
+- **Form config system** — `lib/form-config.ts` defines `MemberFormConfig` and `VolunteerFormConfig` types, default step/field definitions, and `mergeMemberConfig`/`mergeVolunteerConfig` helpers. Configs are fetched from `page_content` as JSON and merged with defaults on every request. The member merge **preserves the saved order of all sections** (built-in + custom — a custom section can be first), merges built-in field overrides (label, description, visible, required, width, options), keeps custom fields/elements as-is, and re-injects only missing *locked* core fields (deleted non-core fields stay deleted; "Reset to defaults" restores). Field types: text/textarea/radio/checkbox/file/agreement/group_select, plus divider & text-block elements. (`group_select` is member-form only — a checklist of Groups the applicant can opt into; the field's `options` hold the offered group ids, unset = all.) The Application Builder (`/admin/configure`) writes to `page_content` via `PATCH /api/admin/page-content`; everything autosaves (debounced).
 
 ---
 

@@ -47,8 +47,9 @@ flowchart TD
         PROFILE --> ATUNE["Attunement checklist"]
 
         ATUNE --> UPLOAD["① Upload photo"]
-        ATUNE --> CONTRIB["② Select contributions
-        Setup / Teardown / Decor / Other"]
+        ATUNE --> GROUP["② Group membership
+        (admin-assigned; or applicant
+        opt-in via a Group selection field)"]
         ATUNE --> PICK_ROLE["③ Pick a role"]
         ATUNE --> PICK_SHIFT["④ Pick a shift"]
 
@@ -62,7 +63,7 @@ flowchart TD
         SUGG_REVIEW -- Reject --> SUGG_REJ["Member notified 🔔"]
 
         PROFILE --> PERSONAL_SCHED["Personal schedule
-        (events matching contributions)"]
+        (events matching the member's groups)"]
         PROFILE --> SETTINGS["Edit profile settings
         (gear icon)"]
         PROFILE --> DIR["Member directory
