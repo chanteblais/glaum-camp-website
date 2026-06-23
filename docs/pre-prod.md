@@ -19,6 +19,8 @@ Things to sort before going live.
 
 - [ ] Confirm migration `017_role_suggestions.sql` has been applied to the production Supabase project.
 - [ ] Apply migration `018_page_content.sql` to create the `page_content` table with default homepage copy.
+- [ ] Apply migration `031_shoutouts.sql` (creates the `shoutouts` table) — required before the Shoutouts dashboard widget works.
+- [ ] Apply migration `032_message_sender_name.sql` (adds `messages.sender_name` + backfill). **Apply this before or together with the deploy** — the message-send path now writes `sender_name`, so deploying the code ahead of the column will break sending messages.
 - [ ] Confirm storage buckets `avatars` and `schedule-icons` are set to **public** in the production project.
 
 ## Environment variables (Vercel)

@@ -20,12 +20,12 @@ Paste at the start of a new Claude session. Deliberately short; the detailed doc
 - Inline `<style>` with attribute selectors must use `dangerouslySetInnerHTML` (avoids hydration mismatch).
 
 ## Key files
-- `app/page.tsx` — homepage (marketing + member dashboard) · `app/HomePageEditor.tsx` — inline page editor
+- `app/page.tsx` — homepage (marketing + member dashboard) · `app/HomePageEditor.tsx` — inline page editor · `app/ShoutoutWidget.tsx` — member shoutouts dashboard widget
 - `app/apply/page.tsx`, `apply/ApplyWizard.tsx` — config-driven member application · `apply/TrackPicker.tsx` — member/volunteer chooser
 - `app/admin/configure/ApplicationBuilder.tsx` — the form builder · `lib/form-config.ts` — form config types, defaults, `mergeMemberConfig`
 - `app/admin/page.tsx` + `admin/*` managers · `app/admin/[id]/page.tsx` — application detail (incl. Additional Responses)
 - `app/profile/`, `app/members/`, `app/messages/`
-- `lib/supabase.ts` · `lib/site-config.ts` (defaults + `page_content` parsers) · `lib/notify-admin.ts` · `lib/send-email.ts`
+- `lib/supabase.ts` · `lib/site-config.ts` (defaults + `page_content` parsers) · `lib/attunement.ts` (`buildAttunementChecklist` — shared by home dashboard + profile) · `lib/notify-admin.ts` · `lib/send-email.ts`
 - `api/admin/page-content/route.ts` — GET/PATCH for all `page_content` keys (form configs, homepage copy, dashboard layout)
 
 ## Application form — fully modular (recent focus; full spec in `docs/features.md`)

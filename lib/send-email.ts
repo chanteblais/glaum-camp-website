@@ -53,6 +53,41 @@ export async function sendNewMessageEmail(opts: {
   await sendUserEmail(to, `${senderName} messaged you on Glåüm`, html)
 }
 
+/**
+ * Notify a member they were @mentioned in a group thread. Links straight into
+ * the group's thread. Sent even when group threads are otherwise quiet — a
+ * mention is a deliberate, targeted signal.
+ */
+export async function sendGroupMentionEmail(opts: {
+  to: string
+  recipientName: string
+  senderName: string
+  groupName: string
+  groupId: string
+  preview: string
+}) {
+  const { to, recipientName, senderName, groupName, groupId, preview } = opts
+  const threadUrl = `${APP_URL}/messages/g/${encodeURIComponent(groupId)}`
+  const prefsUrl = `${APP_URL}/profile#notifications`
+  const safePreview = escapeHtml(preview).slice(0, 280)
+
+  const html = `
+    <p>Hi ${escapeHtml(recipientName)},</p>
+    <p><strong style="color:#C8A848">${escapeHtml(senderName)}</strong> mentioned you in <strong>${escapeHtml(groupName)}</strong> on Glåüm:</p>
+    <blockquote style="margin:18px 0;padding:12px 16px;border-left:3px solid #C8A848;background:rgba(200,168,72,0.06);color:#3a2b14;font-style:italic;border-radius:6px">
+      ${safePreview}${preview.length > 280 ? '…' : ''}
+    </blockquote>
+    <p style="margin:24px 0">
+      <a href="${threadUrl}" style="display:inline-block;background:#C8A848;color:#1A0A24;text-decoration:none;padding:11px 22px;border-radius:8px;font-weight:bold">View the thread ✦</a>
+    </p>
+    <p style="font-size:12px;color:#8a8a8a;margin-top:28px">
+      You're receiving this because you were mentioned and have message email notifications turned on.
+      <a href="${prefsUrl}" style="color:#8a8a8a">Manage your notification preferences</a>.
+    </p>`
+
+  await sendUserEmail(to, `${senderName} mentioned you in ${groupName}`, html)
+}
+
 // ── Helpers ───────────────────────────────────────────────────────
 
 function escapeHtml(s: string): string {
