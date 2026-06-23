@@ -123,7 +123,11 @@ Configurable groups members belong to (e.g. Setup, Teardown, Decor). Added in mi
 | `icon` | TEXT | Emoji |
 | `apply_selectable` | BOOL | **Legacy/unused.** Which groups appear on the application is now controlled per-field by the **Group selection** field's `options` (see below), not this column. |
 | `sort_order` | INT | |
+| `join_policy` | TEXT | Governance, added in `033`. `'admin_assigned'` (default — admin manages membership; today's crews), `'open'` (anyone joins), or `'request'` (ask a lead). Self-join UI is **Phase 6**; column exists. |
+| `visibility` | TEXT | Added in `033`. `'listed'` (default — discoverable; contents members-only) or `'hidden'` (invite/admin-add only). Used by the join dropdown (**Phase 6**). |
 | `created_at` | TIMESTAMPTZ | |
+
+Each group also gets a message **thread** — one `conversations` row (`type='group'`, `group_id` set), created on group creation (`POST /api/admin/groups`) and backfilled for existing groups by migration `033`. See [group-messaging.md](group-messaging.md) and the Group Threads feature.
 
 Managed via Admin → **Groups** (`GroupsManager.tsx`). API: `/api/admin/groups` (GET/POST), `/api/admin/groups/[id]` (PATCH/DELETE).
 
@@ -139,9 +143,12 @@ One row per member assigned to a group. Added in migration `030`.
 | `group_id` | UUID FK → `groups.id` ON DELETE CASCADE | |
 | `clerk_user_id` | TEXT NOT NULL | Member identity (join to `applications` in JS, no FK) |
 | `source` | TEXT | How they joined: `'admin'` (assigned) or `'application'` (opted in on apply form). Default `'admin'` |
+| `role` | TEXT | `'member'` (default) or `'lead'`. Added in `033` for a future leads feature; **unused in v1** (any member can post). |
 | `created_at` | TIMESTAMPTZ | |
 
 **Unique constraint:** `(group_id, clerk_user_id)`. Adds use upsert with `ignoreDuplicates`. Roster API: `/api/admin/groups/[id]/members` (GET roster enriched from `applications`, POST add, DELETE remove via `?clerk_user_id=`). Application opt-ins are inserted in `/api/apply`, validated against the offered group ids of the visible `group_select` fields in the saved member-form config.
+
+This table is the **source of truth for group thread access** — group messaging derives "which groups can I see/post in" directly from `group_members`, so adding/removing a member here immediately changes their inbox with no extra wiring.
 
 ---
 
@@ -216,9 +223,9 @@ Bell notifications shown to individual members.
 |---|---|---|
 | `id` | UUID PK | |
 | `clerk_user_id` | TEXT | Recipient |
-| `event_type` | TEXT | |
+| `event_type` | TEXT | e.g. `application_approved`/`_rejected`, `role_suggestion_*`, `role_request_*`, `volunteer_approved`, `new_message`, `group_mention`. `UserNotificationBell` maps each to a deep link. |
 | `message` | TEXT | |
-| `details` | JSONB | |
+| `details` | JSONB | Event payload, e.g. `{ senderId }` for `new_message`, `{ groupId, messageId }` for `group_mention` |
 | `created_at` | TIMESTAMPTZ | |
 | `read_at` | TIMESTAMPTZ | NULL = unread |
 
@@ -270,21 +277,56 @@ Admin-editable copy for the homepage. One row per key.
 
 ### `messages`
 
-Direct messages between approved camp members. Added in migration `022`.
+Messages in both **direct (1:1)** and **group** threads. Originally 1:1 only (migration `022`); migration `033` attached every message to a `conversation` and added reply support (group messaging — see [group-messaging.md](group-messaging.md)).
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | UUID PK | Auto-generated |
+| `conversation_id` | UUID FK → `conversations.id` ON DELETE CASCADE | The thread this message belongs to. Added in `033`; backfilled for existing DMs. |
 | `sender_clerk_id` | TEXT NOT NULL | Sender's Clerk user ID |
-| `recipient_clerk_id` | TEXT NOT NULL | Recipient's Clerk user ID |
+| `recipient_clerk_id` | TEXT | The other party in a **direct** message. **Now nullable** (`033`) — NULL for group messages. Vestigial; kept for legacy DM reads, dropped in a later cleanup. |
+| `parent_message_id` | UUID FK → `messages.id` ON DELETE CASCADE | Reply support (`033`). NULL = top-level; set = a reply in that message's thread. **One level only** — replies can't have replies (enforced in the group POST route). Used by group threads. |
 | `body` | TEXT NOT NULL | Message content. Max 2,000 chars (DB-enforced CHECK) |
 | `sender_name` | TEXT | Snapshot of the sender's display name (`preferred_name`/`first_name`) at send time. Added in migration `032`. Lets a thread keep a readable name after the sender's application is deleted; used as a fallback by the inbox + thread when no profile resolves. |
-| `read_at` | TIMESTAMPTZ | NULL = unread |
+| `read_at` | TIMESTAMPTZ | **DM-era column.** Per-message read flag for 1:1. Read state is now tracked per-participant on `conversation_participants.last_read_at` (groups can't use a single row-level flag); the DM thread derives `read`/`read_at` from the recipient's `last_read_at`. |
 | `created_at` | TIMESTAMPTZ NOT NULL | Defaults to NOW() |
 
-Indexed on `(recipient_clerk_id, created_at DESC)` and `(sender_clerk_id, created_at DESC)` for fast inbox + thread queries.
+Indexed on `(conversation_id, created_at)`, plus the original `(recipient_clerk_id, …)` / `(sender_clerk_id, …)` indexes.
 
-**Privacy:** messages are private — only sender and recipient can access them. Admins have no read access. No FK to `applications` — join in JS using `clerk_user_id`.
+**Privacy:** direct messages are private to the two parties; group messages are visible to group members only. Admins have no special read access. No FK to `applications` — join in JS using `clerk_user_id`.
+
+---
+
+### `conversations`
+
+One row per thread. A **direct** conversation is a 2-participant DM; a **group** conversation is bound to a group. Added in migration `033`.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `type` | TEXT NOT NULL | `'direct'` or `'group'` (CHECK) |
+| `group_id` | UUID FK → `groups.id` ON DELETE CASCADE | Set iff `type='group'` (one conversation per group — unique partial index). Deleting a group cascades its thread away. |
+| `direct_key` | TEXT | Set iff `type='direct'` — the two clerk ids sorted + joined (`"a\|b"`), unique partial index. Maps each unordered DM pair to exactly one conversation (idempotency + resolve-or-create). |
+| `created_at` | TIMESTAMPTZ NOT NULL | |
+
+CHECK constraints keep `group_id`/`direct_key` consistent with `type`. Helpers in `lib/conversations.ts` (`getOrCreateDirectConversation`, `findGroupConversation`/`getOrCreateGroupConversation`, `getMyConversations`, `getUnreadCount`).
+
+---
+
+### `conversation_participants`
+
+Per-user state in a conversation. For **direct** conversations both parties get a row (created with the conversation). For **group** conversations these rows are a **lazily-created cache** — group *membership* is derived from `group_members` (the source of truth), and a participant row is created on first read/post to hold the read cursor. Added in migration `033`.
+
+| Column | Type | Notes |
+|---|---|---|
+| `conversation_id` | UUID FK → `conversations.id` ON DELETE CASCADE | PK part |
+| `clerk_user_id` | TEXT NOT NULL | PK part |
+| `last_read_at` | TIMESTAMPTZ | Read cursor. A message is unread for me if `created_at > last_read_at` and I'm not the sender. Advanced by the `…/read` routes. |
+| `muted` | BOOL | Per-thread mute. Column exists; **no UI yet** (Phase 6). Default `false`. |
+| `email_opt_in` | BOOL | Opt in to email for all activity in this thread. Group threads are quiet by default, so `false`. Column exists; **no UI yet** (Phase 6). |
+| `joined_at` | TIMESTAMPTZ NOT NULL | |
+
+**Primary key:** `(conversation_id, clerk_user_id)`.
 
 ---
 
@@ -372,6 +414,7 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `030_groups.sql` | `groups` + `group_members` tables. Backfills groups from distinct `setup_preference` values and memberships from approved members' selections. **Must be applied** before the Groups feature works. Idempotent. |
 | `031_shoutouts.sql` | `shoutouts` table — member-posted shoutouts on the home dashboard. **Must be applied** before the Shoutouts widget works. |
 | `032_message_sender_name.sql` | `sender_name` column on `messages` (snapshot of sender display name) + backfill from current application names. Lets conversations survive sender deletion. |
+| `033_conversations.sql` | **Group messaging.** Adds `conversations` + `conversation_participants` tables; `messages.conversation_id` + `parent_message_id` (and makes `recipient_clerk_id` nullable); group governance columns (`join_policy`/`visibility` on `groups`, `role` on `group_members`). Backfills a conversation per group and per existing DM pair (preserving read state). Additive + idempotent; **must be applied** before group messaging works. |
 
 ---
 

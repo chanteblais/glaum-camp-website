@@ -1,11 +1,35 @@
 # Group Messaging — Design
 
-Status: **approved design, not yet built** (2026-06-22). No code written yet; this is the
-spec we react to and build from.
+Status: **Phases 1–5 built** (2026-06-22); **Phase 6 (governance) pending**. This doc is the
+original design plus an "Implementation notes" section recording where the build diverged from
+the plan. Migration `033` is applied.
 
 Goal: let groups (crews like Setup/Teardown/Decor, plus member-created interest groups)
 coordinate inside the portal, so it becomes the central place to run group responsibilities
 instead of scattered group texts.
+
+## Implementation notes (deltas from the design below)
+
+The shipped build follows this design; a few details were refined during implementation:
+
+- **`conversations.direct_key`** — added a sorted `"a|b"` clerk-id column (unique partial index)
+  so each DM pair maps to one conversation; this is how DMs resolve-or-create idempotently.
+- **Group membership is derived from `group_members`, not synced into participants.** Rather than
+  keeping `conversation_participants` in lockstep on every membership change, the inbox/unread
+  derive "which groups am I in" from `group_members` (source of truth), and a participant row is
+  created **lazily** on first read/post to hold `last_read_at`. Net effect: adding/removing a
+  group member needs no messaging wiring — only group *creation* makes the conversation.
+- **Replies are group-thread only.** DMs stay linear (one-level replies in a 1:1 would be odd).
+- **`@mention` parsing is server-side** against current member display names (the composer
+  autocomplete just inserts the exact name), so mentions in replies notify too. Mention →
+  in-app `user_notifications` row (`group_mention`) **and** email; gated by `email_new_message`,
+  throttled 30 min/group.
+- **Quiet default, simply.** Ordinary group posts create no emails or notification rows at all —
+  the unread badge is the signal. Per-conversation `email_opt_in` (get *all* a thread's emails)
+  is deferred to Phase 6; `@mention` already pierces the quiet without it.
+- **Inbox filter** (All / Direct / Groups, per-tab unread badges) was added so group threads
+  don't get buried — not in the original plan but a small, natural addition.
+- Code: `lib/conversations.ts`; `app/api/messages/g/[groupId]/{route,read}`; `app/messages/g/[groupId]/{page,GroupThreadClient}`; inbox changes in `app/api/messages/route.ts` + `MessagesInboxClient.tsx`; `sendGroupMentionEmail` in `lib/send-email.ts`; `group_mention` link in `UserNotificationBell`.
 
 ## Decisions already made
 
@@ -185,18 +209,18 @@ per-conversation `email_opt_in` + mention model is the primary lever.
 
 ## Phased build order
 
-1. **Schema + backfill** — conversations/participants, `messages.conversation_id` +
+1. ✅ **Schema + backfill** — conversations/participants, `messages.conversation_id` +
    `parent_message_id`, group governance columns, auto-create group conversations, DM backfill.
-   No behavior change yet.
-2. **Switch DMs to conversations** — rewrite inbox/thread/unread/send through the new model;
-   read state via `last_read_at`. Verify DMs behave exactly as before. (De-risks the model on a
-   known surface before groups exist.)
-3. **Group threads, read-only-ish** — surface each group's conversation in the inbox; let
-   members post/read flat messages. Quiet-by-default notifications.
-4. **Replies** — `parent_message_id` UI (collapsible one-level threads).
-5. **`@mention`** — autocomplete + mention-driven email.
-6. **Join/leave + governance** — `join_policy`/`visibility`, joinable dropdown, admin controls.
-7. **(Later)** leads (`role`), `request` join policy, home teaser widget, digests.
+   No behavior change yet. (Migration `033`.)
+2. ✅ **Switch DMs to conversations** — rewrite inbox/thread/unread/send through the new model;
+   read state via `last_read_at`. DMs behave as before.
+3. ✅ **Group threads** — surface each group's conversation in the inbox; members post/read flat
+   messages. Quiet-by-default notifications.
+4. ✅ **Replies** — `parent_message_id` UI (collapsible one-level threads).
+5. ✅ **`@mention`** — autocomplete + mention-driven email. (Plus the inbox All/Direct/Groups filter.)
+6. ⏭️ **Join/leave + governance** — `join_policy`/`visibility`, joinable dropdown, admin controls,
+   per-conversation mute / email-opt-in toggles (`muted`/`email_opt_in` columns exist).
+7. ⏭️ **(Later)** leads (`role`), `request` join policy, home teaser widget, digests.
 
 ## Open questions / deferred
 

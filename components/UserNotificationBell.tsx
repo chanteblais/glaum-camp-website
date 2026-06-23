@@ -164,6 +164,10 @@ export function UserNotificationBell() {
                       const senderId = (n.details as Record<string,string> | null)?.senderId
                       return senderId ? { href: `/messages/${senderId}`, label: 'View message →' } : { href: '/messages', label: 'View messages →' }
                     }
+                    case 'group_mention': {
+                      const groupId = (n.details as Record<string,string> | null)?.groupId
+                      return groupId ? { href: `/messages/g/${groupId}`, label: 'View thread →' } : { href: '/messages', label: 'View messages →' }
+                    }
                     default: return null
                   }
                 })()

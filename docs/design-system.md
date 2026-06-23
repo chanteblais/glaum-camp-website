@@ -126,7 +126,7 @@ Most content cards use a parchment aesthetic:
 
 - Two variants: `NotificationBell` (admin) and `UserNotificationBell` (members)
 - Shows unread count badge when > 0
-- `UserNotificationBell` handles `new_message` event type — links directly to the sender's thread
+- `UserNotificationBell` deep-links per event type — `new_message` → the sender's DM thread, `group_mention` → the group thread (`/messages/g/[groupId]`)
 
 ### Messages Nav Link
 

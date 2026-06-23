@@ -53,8 +53,9 @@ Sign-out flow:
 /profile                 Logged-in member profile + role/shift picker
 /members                 Member directory (approved members only)
 /members/[id]            Individual member view
-/messages                Member messaging inbox
-/messages/[userId]       Conversation thread with a specific member
+/messages                Member messaging inbox (DMs + group threads, filterable)
+/messages/[userId]       Direct-message thread with a specific member
+/messages/g/[groupId]    Group thread (members of that group only)
 /schedule                Full public camp schedule (accessible to approved members)
 /sign-in                 Clerk sign-in (catch-all route)
 /sign-out                Sign-out redirect page
@@ -82,9 +83,12 @@ Sign-out flow:
 | `/api/shoutouts` | GET/POST | List visible shoutouts / post one (approved members) |
 | `/api/shoutouts/[id]` | DELETE | Delete a shoutout (author or admin only) |
 | `/api/notifications` | GET/PATCH | Fetch + mark-read user notifications |
-| `/api/messages` | GET/POST | Fetch inbox conversations / send a message |
-| `/api/messages/[userId]` | GET | Fetch thread with a specific member (marks messages read) |
-| `/api/messages/unread` | GET | Unread message count for nav badge |
+| `/api/messages` | GET/POST | Inbox (direct + group conversations) / send a DM. Backed by the conversations model (`lib/conversations.ts`). |
+| `/api/messages/[userId]` | GET | Direct thread with a member |
+| `/api/messages/[userId]/read` | POST | Mark a direct thread read (advances my `last_read_at`) |
+| `/api/messages/g/[groupId]` | GET/POST | Group thread fetch / post (members-only). POST parses `@mentions` → in-app notification + throttled email. |
+| `/api/messages/g/[groupId]/read` | POST | Mark a group thread read |
+| `/api/messages/unread` | GET | Unread count (direct + group) for the nav badge |
 | `/api/nav-auth` | GET | Lightweight auth check for nav (returns `isSignedIn`, `isApproved`, name, email, avatarUrl) |
 | `/api/sign-out` | POST | Sign out |
 | `/api/badge` | GET | Generate role badge PNG (OG image) |

@@ -188,13 +188,14 @@ Linked from nav as "Many Hands".
 ### Messages (`/messages`)
 
 **Who:** Approved members  
-**What:** Inbox listing all conversations, most recent first.
+**What:** Inbox listing **direct conversations and group threads** together, most recent first.
 
-- Each row shows avatar, display name, last message preview, timestamp, and unread count badge
-- **"✉ New Message" button** (top-right) opens a searchable member picker modal — lists all approved members, filterable by name, click to navigate to their thread
-- Empty state shows "Start a conversation →" which also opens the picker
-- Conversations fetched from `/api/messages`; member profiles enriched server-side
-- **Deleted members:** conversations with a member whose application was removed still appear. Their name falls back to the `messages.sender_name` snapshot (see Message Thread + `database.md`), or "Member" if none.
+- Each row shows an avatar (or the **group's icon** for group threads), display name, last message preview, timestamp, and unread count badge. Group rows link to `/messages/g/[groupId]`; DM rows to `/messages/[userId]`.
+- **Filter tabs — All / Direct / Groups** (shown only when you have both kinds), each with its own unread badge so groups don't get buried under DMs.
+- **Group threads always appear** for groups you belong to — even with no messages yet (an entry point: "No messages yet — start the conversation"). Direct conversations appear only once they have messages.
+- **"✉ New Message" button** (top-right) opens a searchable member picker modal for **DMs** — group threads you're already in show up automatically (joining new groups is admin-assigned today; self-join is Phase 6).
+- Conversations come from `/api/messages`, backed by the conversations model (`lib/conversations.ts`); group membership is derived from `group_members`, profiles/group names enriched server-side.
+- **Deleted members:** DM conversations with a member whose application was removed still appear; their name falls back to the `messages.sender_name` snapshot, or "Member" if none.
 
 ---
 
@@ -211,6 +212,20 @@ Linked from nav as "Many Hands".
 - Auto-scrolls to bottom on new messages
 - Messages from the other person are marked read on page load (via `GET /api/messages/[userId]`)
 - **Deleted/inactive other member:** if their application is gone, the page no longer 404s — it renders the thread **read-only** (only when message history exists; otherwise still 404). The header shows their snapshot name (`messages.sender_name`, or "Former member") with a "No longer active" note and is **not** linked to `/members/[id]`; the composer is replaced with a "can't reply" notice (matching `POST /api/messages`, which rejects non-approved recipients). Sender names are snapshotted onto each message at send time so history survives deletion (migration `032`).
+
+---
+
+### Group Thread (`/messages/g/[groupId]`)
+
+**Who:** Members of that group (non-members are redirected to `/messages`; the API returns 403)  
+**What:** A shared thread for a group to coordinate. Every group has one (group messaging — full design in [group-messaging.md](group-messaging.md)).
+
+- Sticky header: back arrow, the group's icon + name. Flat, chronological message list with sender name + avatar; consecutive messages from the same sender are grouped.
+- **Replies (one level, Slack-style):** each top-level message shows **💬 N replies** (or **↳ Reply**) that expands a collapsible reply thread inline with its own composer. Replies never nest further — enforced both in the UI and in `POST /api/messages/g/[groupId]` (a reply's parent must be a top-level message in the same conversation).
+- **`@mention`:** typing `@` in the composer opens a member autocomplete (arrow/Enter/Tab/Esc, caret-aware). On send, the server matches `@Name` against current member display names (so mentions typed in replies notify too), creating an in-app notification **and** an email to the mentioned member.
+- **Quiet by default:** ordinary posts create **no emails or notification-feed rows** — the unread badge is the only signal. `@mentions` are the deliberate exception (email gated by the recipient's `email_new_message` pref, throttled 30 min per group).
+- Polls every 12s; marks read on view (advances `last_read_at`); auto-scrolls only on new *top-level* messages so reading a thread isn't interrupted.
+- Per-thread **mute / email-opt-in** controls and **join/leave** are Phase 6 (columns exist).
 
 ---
 
@@ -398,6 +413,8 @@ Members pick a role via `SignupSection` on `/profile`. The selection is submitte
 ### Groups
 
 Configurable groups members belong to (e.g. Setup, Teardown, Decor). **Replaced** the old contribution-types/`setup_preference` mechanism (migration `030`; see [database.md](database.md) for the `groups` + `group_members` tables).
+
+Every group also has a **message thread** for coordination — see [Group Thread](#group-thread-messagesggroupid) above and [group-messaging.md](group-messaging.md). Migration `033` added governance columns (`join_policy`, `visibility`, `group_members.role`); self-join, visibility, and leads are Phase 6.
 
 **Admin — `Admin → Groups` (`GroupsManager.tsx`):**
 - Create / edit / delete / reorder groups (name, description, icon).

@@ -24,8 +24,8 @@ Paste at the start of a new Claude session. Deliberately short; the detailed doc
 - `app/apply/page.tsx`, `apply/ApplyWizard.tsx` — config-driven member application · `apply/TrackPicker.tsx` — member/volunteer chooser
 - `app/admin/configure/ApplicationBuilder.tsx` — the form builder · `lib/form-config.ts` — form config types, defaults, `mergeMemberConfig`
 - `app/admin/page.tsx` + `admin/*` managers · `app/admin/[id]/page.tsx` — application detail (incl. Additional Responses)
-- `app/profile/`, `app/members/`, `app/messages/`
-- `lib/supabase.ts` · `lib/site-config.ts` (defaults + `page_content` parsers) · `lib/attunement.ts` (`buildAttunementChecklist` — shared by home dashboard + profile) · `lib/notify-admin.ts` · `lib/send-email.ts`
+- `app/profile/`, `app/members/`, `app/messages/` (inbox + DM thread `[userId]` + group thread `g/[groupId]`)
+- `lib/supabase.ts` · `lib/site-config.ts` (defaults + `page_content` parsers) · `lib/attunement.ts` (`buildAttunementChecklist` — shared by home dashboard + profile) · `lib/notify-admin.ts` · `lib/send-email.ts` · `lib/conversations.ts` (conversations model backing DMs + group threads)
 - `api/admin/page-content/route.ts` — GET/PATCH for all `page_content` keys (form configs, homepage copy, dashboard layout)
 
 ## Application form — fully modular (recent focus; full spec in `docs/features.md`)
@@ -33,6 +33,8 @@ Admins build the member application in **Admin → Application Builder** (`/admi
 
 ## Groups (replaced contribution-types / `setup_preference`)
 Admin-configurable groups (e.g. Setup/Teardown/Decor) in **Admin → Groups** (`GroupsManager.tsx`): create/reorder, assign members, view rosters. Tables `groups` + `group_members` (migration `030`). Members are admin-assigned; applicants can also opt in via a `group_select` form field. Member-facing "contributions" (Commitments card, attunement task, personal-schedule filtering, overview/registry) read group membership via `lib/groups.ts`. Full spec in `docs/features.md` → Groups.
+
+**Group messaging (migration `033`, Phases 1–5 built; Phase 6 = join/leave + mute/opt-in + leads):** every group has a thread in the `/messages` inbox (filterable All/Direct/Groups), with one-level replies and `@mention` email. DMs + group threads share the `conversations`/`conversation_participants` model (`lib/conversations.ts`); group access derives from `group_members`. Full spec in `docs/group-messaging.md`.
 
 ## Design system (brief; full in `docs/design-system.md`)
 Ink `#1A0A24` background · Gold `#C8A848` headings/links/dividers · Purple `#D239F8` accent · Cream `#F3EDE6` body text. Display font TokyoDreams (`.font-tokyo`), body Libre Baskerville. Badge: `public/badge_base.png` rendered 2× via `next/og`.
