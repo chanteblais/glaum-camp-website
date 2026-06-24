@@ -114,6 +114,23 @@ export function GroupThreadClient({ currentUserId, groupId, groupName, groupIcon
   const caretToRestore = useRef<number | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // Close the bell menu on an outside click or Escape. (A fixed overlay doesn't
+  // work here — the header's backdrop-filter traps `position: fixed` to the header.)
+  useEffect(() => {
+    if (!menuOpen) return
+    const onDown = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [menuOpen])
 
   const mentionMatches = useMemo(() => {
     if (!mention) return []
@@ -387,27 +404,36 @@ export function GroupThreadClient({ currentUserId, groupId, groupName, groupIcon
         </div>
 
         {/* Thread options */}
-        <div style={{ marginLeft: 'auto', position: 'relative' }}>
+        <div ref={menuRef} style={{ marginLeft: 'auto', position: 'relative' }}>
           <button
             onClick={() => setMenuOpen(o => !o)}
-            aria-label="Thread options"
+            aria-label={muted ? 'Muted — notification settings' : 'Notification settings'}
+            title={muted ? 'Muted — notification settings' : 'Notification settings'}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
-            style={{ background: 'none', border: 'none', color: '#C8A848', opacity: 0.6, cursor: 'pointer', fontSize: '1.4rem', lineHeight: 1, padding: '0.1rem 0.45rem' }}
+            style={{ background: 'none', border: 'none', color: muted ? '#F3EDE6' : '#C8A848', opacity: muted ? 0.5 : 0.8, cursor: 'pointer', lineHeight: 0, padding: '0.25rem 0.4rem', display: 'flex', alignItems: 'center' }}
           >
-            <span aria-hidden="true">⋯</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              {muted && <line x1="3" y1="3" x2="21" y2="21" />}
+            </svg>
           </button>
           {menuOpen && (
-            <>
-              <div onClick={() => setMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 20 }} />
-              <div role="menu" style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, minWidth: '230px', background: 'rgba(22,8,34,0.98)', border: '1px solid rgba(200,168,72,0.25)', borderRadius: '0.7rem', boxShadow: '0 12px 32px rgba(0,0,0,0.5)', overflow: 'hidden', zIndex: 21 }}>
+            <div role="menu" style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, minWidth: '230px', background: 'rgba(22,8,34,0.98)', border: '1px solid rgba(200,168,72,0.25)', borderRadius: '0.7rem', boxShadow: '0 12px 32px rgba(0,0,0,0.5)', overflow: 'hidden', zIndex: 21 }}>
                 <button role="menuitemcheckbox" aria-checked={muted} onClick={toggleMute} style={menuItemStyle}>
-                  <span>{muted ? '🔔 Unmute' : '🔕 Mute'}</span>
-                  <span style={{ opacity: 0.4, fontSize: '0.68rem' }}>{muted ? 'show badge' : 'no badge'}</span>
+                  <span style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                    <span>Mute this group</span>
+                    <span style={{ fontSize: '0.66rem', opacity: 0.4 }}>Stop showing an unread badge</span>
+                  </span>
+                  <span aria-hidden="true" style={{ fontSize: '1rem', color: muted ? '#D239F8' : '#F3EDE6', opacity: muted ? 0.95 : 0.4 }}>{muted ? '☑' : '☐'}</span>
                 </button>
                 <button role="menuitemcheckbox" aria-checked={emailOptIn} onClick={toggleEmail} style={{ ...menuItemStyle, borderTop: '1px solid rgba(200,168,72,0.1)' }}>
-                  <span>Email me about this group</span>
-                  <span aria-hidden="true" style={{ color: emailOptIn ? '#D239F8' : '#F3EDE6', opacity: emailOptIn ? 0.9 : 0.4 }}>{emailOptIn ? '☑' : '☐'}</span>
+                  <span style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                    <span>Email me about this group</span>
+                    <span style={{ fontSize: '0.66rem', opacity: 0.4 }}>Get an email when there&rsquo;s activity</span>
+                  </span>
+                  <span aria-hidden="true" style={{ fontSize: '1rem', color: emailOptIn ? '#D239F8' : '#F3EDE6', opacity: emailOptIn ? 0.95 : 0.4 }}>{emailOptIn ? '☑' : '☐'}</span>
                 </button>
                 {canLeave && (
                   <button role="menuitem" onClick={() => { setMenuOpen(false); leaveGroup() }} disabled={leaving} style={{ ...menuItemStyle, color: '#ff8a8a', borderTop: '1px solid rgba(200,168,72,0.12)' }}>
@@ -415,7 +441,6 @@ export function GroupThreadClient({ currentUserId, groupId, groupName, groupIcon
                   </button>
                 )}
               </div>
-            </>
           )}
         </div>
       </div>
