@@ -1,6 +1,7 @@
 # Group Messaging — Design
 
-Status: **Phases 1–5 built** (2026-06-22); **Phase 6 (governance) pending**. This doc is the
+Status: **Phases 1–6 built** (2026-06-22). Remaining: leads (`group_members.role`), the
+`request` join policy, the home "latest from your groups" teaser, and digests. This doc is the
 original design plus an "Implementation notes" section recording where the build diverged from
 the plan. Migration `033` is applied.
 
@@ -25,10 +26,15 @@ The shipped build follows this design; a few details were refined during impleme
   in-app `user_notifications` row (`group_mention`) **and** email; gated by `email_new_message`,
   throttled 30 min/group.
 - **Quiet default, simply.** Ordinary group posts create no emails or notification rows at all —
-  the unread badge is the signal. Per-conversation `email_opt_in` (get *all* a thread's emails)
-  is deferred to Phase 6; `@mention` already pierces the quiet without it.
+  the unread badge is the signal. `@mention` pierces the quiet; per-conversation `email_opt_in`
+  (get *all* a thread's emails) shipped in Phase 6 (see specifics below).
 - **Inbox filter** (All / Direct / Groups, per-tab unread badges) was added so group threads
   don't get buried — not in the original plan but a small, natural addition.
+- **Phase 6 specifics:** self-join records `group_members.source = 'self'`; leaving an open group
+  also deletes the member's `conversation_participants` row so read/mute state doesn't linger.
+  **Mute** = excluded from the unread badge (mentions still notify). **email_opt_in** fan-out is
+  throttled **per conversation** (only fires when the thread was quiet for the window), so a
+  burst yields one nudge, not per-message email — no per-recipient tracking needed.
 - Code: `lib/conversations.ts`; `app/api/messages/g/[groupId]/{route,read}`; `app/messages/g/[groupId]/{page,GroupThreadClient}`; inbox changes in `app/api/messages/route.ts` + `MessagesInboxClient.tsx`; `sendGroupMentionEmail` in `lib/send-email.ts`; `group_mention` link in `UserNotificationBell`.
 
 ## Decisions already made
@@ -218,8 +224,9 @@ per-conversation `email_opt_in` + mention model is the primary lever.
    messages. Quiet-by-default notifications.
 4. ✅ **Replies** — `parent_message_id` UI (collapsible one-level threads).
 5. ✅ **`@mention`** — autocomplete + mention-driven email. (Plus the inbox All/Direct/Groups filter.)
-6. ⏭️ **Join/leave + governance** — `join_policy`/`visibility`, joinable dropdown, admin controls,
-   per-conversation mute / email-opt-in toggles (`muted`/`email_opt_in` columns exist).
+6. ✅ **Join/leave + governance** — admin `join_policy`/`visibility` controls; member self-join via
+   Messages → Find a group + leave (open groups only); per-thread mute / email-opt-in via the
+   group thread overflow menu.
 7. ⏭️ **(Later)** leads (`role`), `request` join policy, home teaser widget, digests.
 
 ## Open questions / deferred
@@ -227,8 +234,8 @@ per-conversation `email_opt_in` + mention model is the primary lever.
 - **Leads** — exact powers, and whether `request` join policy ships with them.
 - **History on join** — joiners see full prior thread history (simplest; assumed yes). Revisit
   if any group is sensitive.
-- **Leaving admin-assigned groups** — 403 with "ask an admin" vs a request-to-leave that pings
-  admin. Leaning 403 for v1.
+- **Leaving admin-assigned groups** — ✅ resolved: `POST /api/groups/[id]/leave` returns 403
+  ("ask an admin to remove you") for non-open groups.
 - **Sprawl control** — archive/merge for dead member-created groups; auto-hide inactive. Design
   aware, build later.
 - **Multi-community** — conversations/participants are keyed by clerk id; when the platform goes

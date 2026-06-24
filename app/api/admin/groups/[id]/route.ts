@@ -23,6 +23,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (body.badge_image !== undefined) update.badge_image = body.badge_image === '' ? null : body.badge_image
     if (body.apply_selectable !== undefined) update.apply_selectable = !!body.apply_selectable
     if (body.sort_order !== undefined) update.sort_order = body.sort_order
+    if (body.join_policy !== undefined) update.join_policy = body.join_policy
+    if (body.visibility !== undefined) update.visibility = body.visibility
 
     const { data, error } = await supabaseAdmin
       .from('groups')

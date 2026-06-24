@@ -15,7 +15,7 @@ async function requireAdmin() {
 export async function GET() {
   const { data: groups, error } = await supabaseAdmin
     .from('groups')
-    .select('id, name, description, icon, badge_image, apply_selectable, sort_order')
+    .select('id, name, description, icon, badge_image, apply_selectable, sort_order, join_policy, visibility')
     .order('sort_order', { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   if (!(await requireAdmin())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await req.json()
-  const { name, description, icon, apply_selectable, sort_order } = body
+  const { name, description, icon, apply_selectable, sort_order, join_policy, visibility } = body
 
   if (!name) return NextResponse.json({ error: 'name is required' }, { status: 400 })
 
@@ -48,6 +48,8 @@ export async function POST(req: NextRequest) {
       icon: icon ?? null,
       apply_selectable: !!apply_selectable,
       sort_order: sort_order ?? 0,
+      ...(join_policy ? { join_policy } : {}),
+      ...(visibility ? { visibility } : {}),
     })
     .select()
     .single()

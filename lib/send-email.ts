@@ -2,12 +2,13 @@ import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
-// Once the sender domain is verified in the Resend dashboard, set
-// RESEND_FROM (e.g. "Glåüm Camp <notifications@glaum.camp>") in the env.
-// Until then we fall back to Resend's shared sandbox sender.
+// Sender is RESEND_FROM (e.g. "Glåüm Camp <notifications@glaum.ca>"); the
+// domain must be verified in the Resend dashboard. If unset we fall back to
+// Resend's shared sandbox sender. Note: the verified email domain (glaum.ca)
+// is distinct from the site domain (camp.glaum.ca, see NEXT_PUBLIC_SITE_URL).
 const FROM = process.env.RESEND_FROM || 'Glåüm Camp <onboarding@resend.dev>'
 
-const APP_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://glaum.camp').replace(/\/$/, '')
+export const APP_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://camp.glaum.ca').replace(/\/$/, '')
 
 export type SendResult = { ok: boolean; error?: string }
 
@@ -96,6 +97,41 @@ export async function sendGroupMentionEmail(opts: {
     </p>`
 
   await sendUserEmail(to, `${senderName} mentioned you in ${groupName}`, html)
+}
+
+/**
+ * Notify a member who opted into email for a group thread that there's new
+ * activity. Sent at most once per quiet period (throttled in the route), so it
+ * behaves like a "the thread is active again" nudge rather than per-message spam.
+ */
+export async function sendGroupActivityEmail(opts: {
+  to: string
+  recipientName: string
+  senderName: string
+  groupName: string
+  groupId: string
+  preview: string
+}) {
+  const { to, recipientName, senderName, groupName, groupId, preview } = opts
+  const threadUrl = `${APP_URL}/messages/g/${encodeURIComponent(groupId)}`
+  const prefsUrl = `${APP_URL}/profile#notifications`
+  const safePreview = escapeHtml(preview).slice(0, 280)
+
+  const html = `
+    <p>Hi ${escapeHtml(recipientName)},</p>
+    <p>New activity in <strong style="color:#C8A848">${escapeHtml(groupName)}</strong> on Glåüm:</p>
+    <blockquote style="margin:18px 0;padding:12px 16px;border-left:3px solid #C8A848;background:rgba(200,168,72,0.06);color:#3a2b14;font-style:italic;border-radius:6px">
+      <strong>${escapeHtml(senderName)}:</strong> ${safePreview}${preview.length > 280 ? '…' : ''}
+    </blockquote>
+    <p style="margin:24px 0">
+      <a href="${threadUrl}" style="display:inline-block;background:#C8A848;color:#1A0A24;text-decoration:none;padding:11px 22px;border-radius:8px;font-weight:bold">Open the thread ✦</a>
+    </p>
+    <p style="font-size:12px;color:#8a8a8a;margin-top:28px">
+      You're receiving this because you turned on email for this group. Open the thread to mute or turn it off, or
+      <a href="${prefsUrl}" style="color:#8a8a8a">manage your notification preferences</a>.
+    </p>`
+
+  await sendUserEmail(to, `New activity in ${groupName}`, html)
 }
 
 // ── Helpers ───────────────────────────────────────────────────────

@@ -116,8 +116,35 @@ export type MyConversation = {
   conversationId: string
   type: 'direct' | 'group'
   lastReadAt: string | null
+  muted: boolean
   groupId?: string
   otherUserId?: string // direct only
+}
+
+// Read/write a participant's per-conversation prefs (mute / email opt-in). The
+// upsert only touches the supplied keys, so it never clobbers last_read_at.
+export async function setParticipantPrefs(
+  conversationId: string,
+  userId: string,
+  prefs: { muted?: boolean; email_opt_in?: boolean },
+): Promise<void> {
+  await supabaseAdmin.from('conversation_participants').upsert(
+    { conversation_id: conversationId, clerk_user_id: userId, ...prefs },
+    { onConflict: 'conversation_id,clerk_user_id' },
+  )
+}
+
+export async function getParticipantPrefs(
+  conversationId: string,
+  userId: string,
+): Promise<{ muted: boolean; email_opt_in: boolean }> {
+  const { data } = await supabaseAdmin
+    .from('conversation_participants')
+    .select('muted, email_opt_in')
+    .eq('conversation_id', conversationId)
+    .eq('clerk_user_id', userId)
+    .maybeSingle()
+  return { muted: data?.muted ?? false, email_opt_in: data?.email_opt_in ?? false }
 }
 
 // Every conversation the user takes part in, with their read cursor.
@@ -127,10 +154,11 @@ export type MyConversation = {
 export async function getMyConversations(userId: string): Promise<MyConversation[]> {
   const { data: parts, error } = await supabaseAdmin
     .from('conversation_participants')
-    .select('conversation_id, last_read_at')
+    .select('conversation_id, last_read_at, muted')
     .eq('clerk_user_id', userId)
   if (error && error.code !== '42P01') throw error
   const lastReadByConv = new Map((parts ?? []).map(p => [p.conversation_id, p.last_read_at as string | null]))
+  const mutedByConv = new Map((parts ?? []).map(p => [p.conversation_id, !!p.muted]))
 
   const result: MyConversation[] = []
 
@@ -151,7 +179,7 @@ export async function getMyConversations(userId: string): Promise<MyConversation
         .neq('clerk_user_id', userId)
       const otherByConv = new Map((others ?? []).map(o => [o.conversation_id, o.clerk_user_id]))
       for (const id of directIds) {
-        result.push({ conversationId: id, type: 'direct', lastReadAt: lastReadByConv.get(id) ?? null, otherUserId: otherByConv.get(id) })
+        result.push({ conversationId: id, type: 'direct', lastReadAt: lastReadByConv.get(id) ?? null, muted: mutedByConv.get(id) ?? false, otherUserId: otherByConv.get(id) })
       }
     }
   }
@@ -169,7 +197,7 @@ export async function getMyConversations(userId: string): Promise<MyConversation
       .eq('type', 'group')
       .in('group_id', groupIds)
     for (const gc of groupConvs ?? []) {
-      result.push({ conversationId: gc.id, type: 'group', lastReadAt: lastReadByConv.get(gc.id) ?? null, groupId: gc.group_id as string })
+      result.push({ conversationId: gc.id, type: 'group', lastReadAt: lastReadByConv.get(gc.id) ?? null, muted: mutedByConv.get(gc.id) ?? false, groupId: gc.group_id as string })
     }
   }
 
@@ -179,7 +207,7 @@ export async function getMyConversations(userId: string): Promise<MyConversation
 // Total unread across all of a user's conversations (direct + group): messages they
 // didn't send, created after their per-conversation read cursor.
 export async function getUnreadCount(userId: string): Promise<number> {
-  const convs = await getMyConversations(userId)
+  const convs = (await getMyConversations(userId)).filter(c => !c.muted) // muted threads don't badge
   if (!convs.length) return 0
 
   const lastReadByConv = new Map(convs.map(c => [c.conversationId, c.lastReadAt]))

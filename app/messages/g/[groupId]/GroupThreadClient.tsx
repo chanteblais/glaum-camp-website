@@ -21,6 +21,13 @@ type Props = {
   groupName: string
   groupIcon: string | null
   members: Member[]
+  canLeave: boolean
+  initialMuted: boolean
+  initialEmailOptIn: boolean
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 // Find an in-progress @mention immediately before the caret, e.g. "hey @ja|".
@@ -58,7 +65,7 @@ function Avatar({ url, name, size = 30 }: { url: string | null; name: string; si
   )
 }
 
-function MessageBubble({ msg, isMe, showSender, avatarSize = 30 }: { msg: GroupMessage; isMe: boolean; showSender: boolean; avatarSize?: number }) {
+function MessageBubble({ msg, isMe, showSender, avatarSize = 30, renderBody }: { msg: GroupMessage; isMe: boolean; showSender: boolean; avatarSize?: number; renderBody: (body: string) => React.ReactNode }) {
   return (
     <div style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', gap: '0.55rem', marginBottom: '0.35rem' }}>
       {!isMe && (
@@ -81,16 +88,20 @@ function MessageBubble({ msg, isMe, showSender, avatarSize = 30 }: { msg: GroupM
             wordBreak: 'break-word', whiteSpace: 'pre-wrap',
           }}
         >
-          {msg.body}
+          {renderBody(msg.body)}
         </div>
       </div>
     </div>
   )
 }
 
-export function GroupThreadClient({ currentUserId, groupId, groupName, groupIcon, members }: Props) {
+export function GroupThreadClient({ currentUserId, groupId, groupName, groupIcon, members, canLeave, initialMuted, initialEmailOptIn }: Props) {
   const [messages, setMessages] = useState<GroupMessage[]>([])
   const [loading, setLoading] = useState(true)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [muted, setMuted] = useState(initialMuted)
+  const [emailOptIn, setEmailOptIn] = useState(initialEmailOptIn)
+  const [leaving, setLeaving] = useState(false)
   const [body, setBody] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -107,8 +118,60 @@ export function GroupThreadClient({ currentUserId, groupId, groupName, groupIcon
   const mentionMatches = useMemo(() => {
     if (!mention) return []
     const q = mention.query.toLowerCase()
-    return members.filter(m => m.displayName.toLowerCase().includes(q)).slice(0, 6)
-  }, [mention, members])
+    return members.filter(m => m.userId !== currentUserId && m.displayName.toLowerCase().includes(q)).slice(0, 6)
+  }, [mention, members, currentUserId])
+
+  // Highlight @mentions of group members in message bodies (linked to their profile;
+  // a mention of you is styled distinctly). Matches member display names — the same
+  // basis the server uses to decide who actually got notified.
+  const memberByName = useMemo(() => {
+    const map = new Map<string, Member>()
+    for (const m of members) if (m.displayName) map.set(m.displayName.toLowerCase(), m)
+    return map
+  }, [members])
+
+  const mentionRegex = useMemo(() => {
+    const names = members.map(m => m.displayName).filter(Boolean).sort((a, b) => b.length - a.length)
+    if (!names.length) return null
+    return new RegExp(`@(${names.map(escapeRegExp).join('|')})(?![\\w])`, 'gi')
+  }, [members])
+
+  const renderBody = useCallback((body: string): React.ReactNode => {
+    if (!mentionRegex) return body
+    const out: React.ReactNode[] = []
+    let last = 0
+    mentionRegex.lastIndex = 0
+    let m: RegExpExecArray | null
+    while ((m = mentionRegex.exec(body)) !== null) {
+      const start = m.index
+      if (start > last) out.push(body.slice(last, start))
+      const mem = memberByName.get(m[1].toLowerCase())
+      if (mem) {
+        const isSelf = mem.userId === currentUserId
+        out.push(
+          <a
+            key={start}
+            href={`/members/${mem.userId}`}
+            title={`View ${mem.displayName}'s profile`}
+            style={{
+              color: isSelf ? '#FFF1C2' : '#F8DBFF',
+              background: isSelf ? 'rgba(200,168,72,0.45)' : 'rgba(210,57,248,0.42)',
+              border: `1px solid ${isSelf ? 'rgba(200,168,72,0.4)' : 'rgba(210,57,248,0.4)'}`,
+              borderRadius: '0.35rem', padding: '0.05rem 0.3rem', fontWeight: 700,
+              textDecoration: 'none', whiteSpace: 'nowrap',
+            }}
+          >
+            {m[0]}
+          </a>,
+        )
+      } else {
+        out.push(m[0])
+      }
+      last = start + m[0].length
+    }
+    if (last < body.length) out.push(body.slice(last))
+    return out
+  }, [mentionRegex, memberByName, currentUserId])
 
   const topLevel = useMemo(() => messages.filter(m => !m.parent_message_id), [messages])
   const repliesByParent = useMemo(() => {
@@ -160,6 +223,45 @@ export function GroupThreadClient({ currentUserId, groupId, groupName, groupIcon
       else next.add(id)
       return next
     })
+  }
+
+  const savePref = async (patch: { muted?: boolean; email_opt_in?: boolean }) => {
+    try {
+      await fetch(`/api/messages/g/${groupId}/me`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      })
+      // Mute changes the unread badge — nudge it to refresh.
+      window.dispatchEvent(new Event('glaum:messages-read'))
+    } catch {
+      // Best-effort.
+    }
+  }
+
+  const toggleMute = () => { const v = !muted; setMuted(v); savePref({ muted: v }) }
+  const toggleEmail = () => { const v = !emailOptIn; setEmailOptIn(v); savePref({ email_opt_in: v }) }
+
+  const leaveGroup = async () => {
+    if (leaving) return
+    if (!confirm(`Leave ${groupName}? You'll stop seeing this thread.`)) return
+    setLeaving(true)
+    try {
+      const res = await fetch(`/api/groups/${groupId}/leave`, { method: 'POST' })
+      if (res.ok) { window.location.href = '/messages'; return }
+      const d = await res.json().catch(() => ({}))
+      alert(d.error ?? 'Could not leave the group.')
+    } catch {
+      alert('Something went wrong.')
+    }
+    setLeaving(false)
+  }
+
+  const menuItemStyle: React.CSSProperties = {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem',
+    width: '100%', padding: '0.65rem 0.9rem', textAlign: 'left',
+    background: 'transparent', border: 'none', cursor: 'pointer',
+    color: '#F3EDE6', fontSize: '0.82rem', fontFamily: 'var(--font-libre-baskerville), Georgia, serif',
   }
 
   // Composer change → update text and re-detect an in-progress @mention.
@@ -281,7 +383,40 @@ export function GroupThreadClient({ currentUserId, groupId, groupName, groupIcon
         </div>
         <div>
           <p style={{ margin: 0, fontFamily: 'TokyoDreams, serif', fontSize: '1.05rem', color: '#C8A848' }}>{groupName}</p>
-          <p style={{ margin: 0, fontSize: '0.7rem', opacity: 0.4 }}>Group thread</p>
+          <p style={{ margin: 0, fontSize: '0.7rem', opacity: 0.4 }}>Group thread{muted ? ' · Muted' : ''}</p>
+        </div>
+
+        {/* Thread options */}
+        <div style={{ marginLeft: 'auto', position: 'relative' }}>
+          <button
+            onClick={() => setMenuOpen(o => !o)}
+            aria-label="Thread options"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            style={{ background: 'none', border: 'none', color: '#C8A848', opacity: 0.6, cursor: 'pointer', fontSize: '1.4rem', lineHeight: 1, padding: '0.1rem 0.45rem' }}
+          >
+            <span aria-hidden="true">⋯</span>
+          </button>
+          {menuOpen && (
+            <>
+              <div onClick={() => setMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 20 }} />
+              <div role="menu" style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, minWidth: '230px', background: 'rgba(22,8,34,0.98)', border: '1px solid rgba(200,168,72,0.25)', borderRadius: '0.7rem', boxShadow: '0 12px 32px rgba(0,0,0,0.5)', overflow: 'hidden', zIndex: 21 }}>
+                <button role="menuitemcheckbox" aria-checked={muted} onClick={toggleMute} style={menuItemStyle}>
+                  <span>{muted ? '🔔 Unmute' : '🔕 Mute'}</span>
+                  <span style={{ opacity: 0.4, fontSize: '0.68rem' }}>{muted ? 'show badge' : 'no badge'}</span>
+                </button>
+                <button role="menuitemcheckbox" aria-checked={emailOptIn} onClick={toggleEmail} style={{ ...menuItemStyle, borderTop: '1px solid rgba(200,168,72,0.1)' }}>
+                  <span>Email me about this group</span>
+                  <span aria-hidden="true" style={{ color: emailOptIn ? '#D239F8' : '#F3EDE6', opacity: emailOptIn ? 0.9 : 0.4 }}>{emailOptIn ? '☑' : '☐'}</span>
+                </button>
+                {canLeave && (
+                  <button role="menuitem" onClick={() => { setMenuOpen(false); leaveGroup() }} disabled={leaving} style={{ ...menuItemStyle, color: '#ff8a8a', borderTop: '1px solid rgba(200,168,72,0.12)' }}>
+                    {leaving ? 'Leaving…' : 'Leave group'}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -314,7 +449,7 @@ export function GroupThreadClient({ currentUserId, groupId, groupName, groupIcon
                 </p>
               )}
 
-              <MessageBubble msg={msg} isMe={isMe} showSender={startsRun} />
+              <MessageBubble msg={msg} isMe={isMe} showSender={startsRun} renderBody={renderBody} />
 
               {/* Reply affordance */}
               <div style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', paddingLeft: isMe ? 0 : '0.55rem', marginBottom: '0.15rem' }}>
@@ -342,7 +477,7 @@ export function GroupThreadClient({ currentUserId, groupId, groupName, groupIcon
                     const rIsMe = r.sender_clerk_id === currentUserId
                     const rPrev = ri > 0 ? replies[ri - 1] : null
                     const rStartsRun = !rPrev || rPrev.sender_clerk_id !== r.sender_clerk_id
-                    return <MessageBubble key={r.id} msg={r} isMe={rIsMe} showSender={rStartsRun} avatarSize={24} />
+                    return <MessageBubble key={r.id} msg={r} isMe={rIsMe} showSender={rStartsRun} avatarSize={24} renderBody={renderBody} />
                   })}
 
                   {/* Reply composer */}

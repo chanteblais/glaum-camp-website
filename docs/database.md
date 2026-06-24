@@ -126,8 +126,8 @@ Configurable groups members belong to (e.g. Setup, Teardown, Decor). Added in mi
 | `badge_image` | TEXT | Optional public URL of a patch-style badge image (in the `group-badges` bucket). Added in migration `034`. Rendered scattered beside the role badge on the member profile; admin-uploaded via the Groups edit modal (`POST/DELETE /api/admin/groups/[id]/badge`). |
 | `apply_selectable` | BOOL | **Legacy/unused.** Which groups appear on the application (and in member self-service) is now controlled per-field by the **Group selection** field's `options` (see below), not this column. |
 | `sort_order` | INT | |
-| `join_policy` | TEXT | Governance, added in `033`. `'admin_assigned'` (default — admin manages membership; today's crews), `'open'` (anyone joins), or `'request'` (ask a lead). Self-join UI is **Phase 6**; column exists. |
-| `visibility` | TEXT | Added in `033`. `'listed'` (default — discoverable; contents members-only) or `'hidden'` (invite/admin-add only). Used by the join dropdown (**Phase 6**). |
+| `join_policy` | TEXT | Governance, added in `033`. `'admin_assigned'` (default — admin manages membership; today's crews) or `'open'` (members self-join/leave). (`'request'` is reserved for when leads exist.) Set in GroupsManager; `open` enables self-join via **Messages → Find a group** (`/api/groups/[id]/join` · `/leave`). |
+| `visibility` | TEXT | Added in `033`. `'listed'` (default — open groups appear in the Find-a-group picker) or `'hidden'` (invite/admin-add only, not discoverable). Set in GroupsManager. |
 | `created_at` | TIMESTAMPTZ | |
 
 Each group also gets a message **thread** — one `conversations` row (`type='group'`, `group_id` set), created on group creation (`POST /api/admin/groups`) and backfilled for existing groups by migration `033`. See [group-messaging.md](group-messaging.md) and the Group Threads feature.
@@ -321,8 +321,8 @@ Per-user state in a conversation. For **direct** conversations both parties get 
 | `conversation_id` | UUID FK → `conversations.id` ON DELETE CASCADE | PK part |
 | `clerk_user_id` | TEXT NOT NULL | PK part |
 | `last_read_at` | TIMESTAMPTZ | Read cursor. A message is unread for me if `created_at > last_read_at` and I'm not the sender. Advanced by the `…/read` routes. |
-| `muted` | BOOL | Per-thread mute. Column exists; **no UI yet** (Phase 6). Default `false`. |
-| `email_opt_in` | BOOL | Opt in to email for all activity in this thread. Group threads are quiet by default, so `false`. Column exists; **no UI yet** (Phase 6). |
+| `muted` | BOOL | Per-thread mute, toggled from the group thread's overflow menu (`PATCH …/me`). Muted threads don't contribute to the unread badge. Default `false`. |
+| `email_opt_in` | BOOL | Opt in to email for **all** activity in this thread (group thread overflow menu). Group threads are quiet by default, so `false`; when on, the post route emails the member, throttled per quiet period. |
 | `joined_at` | TIMESTAMPTZ NOT NULL | |
 
 **Primary key:** `(conversation_id, clerk_user_id)`.

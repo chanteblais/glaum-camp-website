@@ -10,6 +10,8 @@ type Group = {
   badge_image: string | null
   apply_selectable: boolean
   sort_order: number
+  join_policy: string
+  visibility: string
   member_count: number
 }
 
@@ -30,7 +32,13 @@ export type AssignableMember = {
   email: string
 }
 
-type GroupForm = { name: string; description: string; icon: string }
+type GroupForm = { name: string; description: string; icon: string; join_policy: string; visibility: string }
+
+const selectStyle: React.CSSProperties = {
+  width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(200,168,72,0.2)',
+  borderRadius: '0.5rem', padding: '0.55rem 0.85rem', color: '#F3EDE6', fontSize: '0.85rem',
+  fontFamily: 'var(--font-libre-baskerville), Georgia, serif', outline: 'none', boxSizing: 'border-box',
+}
 
 const GOLD = '#C8A848'
 
@@ -148,6 +156,18 @@ function GroupModal({
         </Field>
         <Field label="Icon (optional — emoji)">
           <input style={inputStyle} value={form.icon} onChange={e => set('icon', e.target.value)} placeholder="e.g. ⚒️" />
+        </Field>
+        <Field label="Who can join" hint="Admin-assigned: only admins manage members. Open: members can join/leave themselves from the Messages → Find a group picker.">
+          <select style={selectStyle} value={form.join_policy} onChange={e => set('join_policy', e.target.value)}>
+            <option value="admin_assigned">Admin-assigned (admins manage membership)</option>
+            <option value="open">Open (members can self-join &amp; leave)</option>
+          </select>
+        </Field>
+        <Field label="Visibility" hint="Listed: open groups appear in the Find-a-group picker. Hidden: invite/admin-add only, not discoverable.">
+          <select style={selectStyle} value={form.visibility} onChange={e => set('visibility', e.target.value)}>
+            <option value="listed">Listed (discoverable)</option>
+            <option value="hidden">Hidden (invite / admin-add only)</option>
+          </select>
         </Field>
         {groupId
           ? <BadgeField groupId={groupId} initial={initialBadge ?? null} onChange={url => onBadgeChange?.(url)} />
@@ -305,6 +325,12 @@ function GroupRow({
             <p style={{ fontSize: '0.77rem', opacity: 0.45, margin: '0.15rem 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{group.description}</p>
           )}
         </div>
+        {group.join_policy === 'open' && (
+          <span title="Members can self-join" style={{ fontSize: '0.6rem', color: '#7fd1a0', opacity: 0.85, border: '1px solid rgba(127,209,160,0.3)', borderRadius: '9999px', padding: '0.1rem 0.45rem', flexShrink: 0, letterSpacing: '0.05em' }}>OPEN</span>
+        )}
+        {group.visibility === 'hidden' && (
+          <span title="Not discoverable" style={{ fontSize: '0.6rem', color: GOLD, opacity: 0.5, border: '1px solid rgba(200,168,72,0.25)', borderRadius: '9999px', padding: '0.1rem 0.45rem', flexShrink: 0, letterSpacing: '0.05em' }}>HIDDEN</span>
+        )}
         <span style={{ fontSize: '0.72rem', color: GOLD, opacity: 0.5, flexShrink: 0 }}>
           {group.member_count} member{group.member_count !== 1 ? 's' : ''}
         </span>
@@ -411,10 +437,10 @@ export function GroupsManager({ members }: { members: AssignableMember[] }) {
         + Add group
       </button>
 
-      {creating && <GroupModal isNew initial={{ name: '', description: '', icon: '' }} onSave={handleCreate} onClose={() => setCreating(false)} saving={saving} error={error} />}
+      {creating && <GroupModal isNew initial={{ name: '', description: '', icon: '', join_policy: 'admin_assigned', visibility: 'listed' }} onSave={handleCreate} onClose={() => setCreating(false)} saving={saving} error={error} />}
       {editing && <GroupModal
         isNew={false}
-        initial={{ name: editing.name, description: editing.description ?? '', icon: editing.icon ?? '' }}
+        initial={{ name: editing.name, description: editing.description ?? '', icon: editing.icon ?? '', join_policy: editing.join_policy ?? 'admin_assigned', visibility: editing.visibility ?? 'listed' }}
         onSave={(f) => handleUpdate(editing, f)}
         onClose={() => setEditing(null)}
         saving={saving}

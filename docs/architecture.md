@@ -89,7 +89,11 @@ Sign-out flow:
 | `/api/messages/[userId]/read` | POST | Mark a direct thread read (advances my `last_read_at`) |
 | `/api/messages/g/[groupId]` | GET/POST | Group thread fetch / post (members-only). POST parses `@mentions` → in-app notification + throttled email. |
 | `/api/messages/g/[groupId]/read` | POST | Mark a group thread read |
-| `/api/messages/unread` | GET | Unread count (direct + group) for the nav badge |
+| `/api/messages/g/[groupId]/me` | PATCH | Set my per-thread prefs (`muted`, `email_opt_in`) |
+| `/api/messages/unread` | GET | Unread count (direct + group, excludes muted) for the nav badge |
+| `/api/groups/joinable` | GET | Open + listed groups I can self-join (Find-a-group picker) |
+| `/api/groups/[id]/join` | POST | Self-join an open group |
+| `/api/groups/[id]/leave` | POST | Leave an open group (admin-assigned groups → 403) |
 | `/api/nav-auth` | GET | Lightweight auth check for nav (returns `isSignedIn`, `isApproved`, name, email, avatarUrl) |
 | `/api/sign-out` | POST | Sign out |
 | `/api/badge` | GET | Generate role badge PNG (OG image) |

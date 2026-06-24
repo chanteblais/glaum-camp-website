@@ -193,7 +193,8 @@ Linked from nav as "Many Hands".
 - Each row shows an avatar (or the **group's icon** for group threads), display name, last message preview, timestamp, and unread count badge. Group rows link to `/messages/g/[groupId]`; DM rows to `/messages/[userId]`.
 - **Filter tabs — All / Direct / Groups** (shown only when you have both kinds), each with its own unread badge so groups don't get buried under DMs.
 - **Group threads always appear** for groups you belong to — even with no messages yet (an entry point: "No messages yet — start the conversation"). Direct conversations appear only once they have messages.
-- **"✉ New Message" button** (top-right) opens a searchable member picker modal for **DMs** — group threads you're already in show up automatically (joining new groups is admin-assigned today; self-join is Phase 6).
+- **"✉ New Message" button** (top-right) opens a searchable member picker modal for **DMs**. **"✦ Find a group"** (beside it) opens a picker of **open, listed** groups you can self-join (`/api/groups/joinable` → `/join`); admin-assigned groups still appear automatically once you're a member.
+- **Muted** group threads show a 🔕 and never badge.
 - Conversations come from `/api/messages`, backed by the conversations model (`lib/conversations.ts`); group membership is derived from `group_members`, profiles/group names enriched server-side.
 - **Deleted members:** DM conversations with a member whose application was removed still appear; their name falls back to the `messages.sender_name` snapshot, or "Member" if none.
 
@@ -222,10 +223,10 @@ Linked from nav as "Many Hands".
 
 - Sticky header: back arrow, the group's icon + name. Flat, chronological message list with sender name + avatar; consecutive messages from the same sender are grouped.
 - **Replies (one level, Slack-style):** each top-level message shows **💬 N replies** (or **↳ Reply**) that expands a collapsible reply thread inline with its own composer. Replies never nest further — enforced both in the UI and in `POST /api/messages/g/[groupId]` (a reply's parent must be a top-level message in the same conversation).
-- **`@mention`:** typing `@` in the composer opens a member autocomplete (arrow/Enter/Tab/Esc, caret-aware). On send, the server matches `@Name` against current member display names (so mentions typed in replies notify too), creating an in-app notification **and** an email to the mentioned member.
+- **`@mention`:** typing `@` in the composer opens a member autocomplete (arrow/Enter/Tab/Esc, caret-aware). On send, the server matches `@Name` against current member display names (so mentions typed in replies notify too), creating an in-app notification **and** an email to the mentioned member. In the rendered message, a recognized mention is shown as a colored pill **linked to that member's profile** (`/members/[id]`) — purple for others, gold when it's **you** — so a successful mention is visually confirmed (an `@name` that doesn't match a member stays plain text).
 - **Quiet by default:** ordinary posts create **no emails or notification-feed rows** — the unread badge is the only signal. `@mentions` are the deliberate exception (email gated by the recipient's `email_new_message` pref, throttled 30 min per group).
 - Polls every 12s; marks read on view (advances `last_read_at`); auto-scrolls only on new *top-level* messages so reading a thread isn't interrupted.
-- Per-thread **mute / email-opt-in** controls and **join/leave** are Phase 6 (columns exist).
+- **Overflow menu (⋯):** **Mute** (muted threads don't badge), **Email me about this group** (opt into a throttled activity email for every post), and — for **open** groups — **Leave group**. Backed by `PATCH /api/messages/g/[groupId]/me` and `POST /api/groups/[id]/leave`.
 
 ---
 
@@ -416,11 +417,12 @@ The dedicated **Participate** page (`/signup`) hosts `SignupSection` (role + shi
 
 Configurable groups members belong to (e.g. Setup, Teardown, Decor). **Replaced** the old contribution-types/`setup_preference` mechanism (migration `030`; see [database.md](database.md) for the `groups` + `group_members` tables).
 
-Every group also has a **message thread** for coordination — see [Group Thread](#group-thread-messagesggroupid) above and [group-messaging.md](group-messaging.md). Migration `033` added governance columns (`join_policy`, `visibility`, `group_members.role`); self-join, visibility, and leads are Phase 6.
+Every group also has a **message thread** for coordination — see [Group Thread](#group-thread-messagesggroupid) above and [group-messaging.md](group-messaging.md). Governance (`join_policy`, `visibility`) and member self-join/leave shipped in Phase 6; **leads** (`group_members.role`) and the `request` join policy are still to come.
 
 **Admin — `Admin → Groups` (`GroupsManager.tsx`):**
 - Create / edit / delete / reorder groups (name, description, icon).
-- Expand a group to see its **roster** and **assign members** (searchable picker of approved members) or remove them. Each membership records a `source` (`admin` or `application`).
+- **Who can join** — `admin_assigned` (admins manage membership; the default, for crews) or `open` (members self-join/leave). **Visibility** — `listed` (open groups appear in the member Find-a-group picker) or `hidden`. Open groups show an `OPEN` pill in the list.
+- Expand a group to see its **roster** and **assign members** (searchable picker of approved members) or remove them. Each membership records a `source` (`admin`, `application`, or `self` for self-join).
 - **Badge image** (optional): in the group **edit** modal, upload/replace/remove a patch-style image (`BadgeField` → `POST/DELETE /api/admin/groups/[id]/badge`, stored in the public `group-badges` bucket, written to `groups.badge_image`). A brand-new group must be saved first, then re-opened to add a badge.
 - API: `/api/admin/groups` (GET/POST), `/api/admin/groups/[id]` (PATCH/DELETE), `/api/admin/groups/[id]/members` (GET roster / POST add / DELETE remove), `/api/admin/groups/[id]/badge` (POST/DELETE badge image).
 

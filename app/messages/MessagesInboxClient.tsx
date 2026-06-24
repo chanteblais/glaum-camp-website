@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabaseResizedUrl } from '@/lib/supabase-image'
 import type { MemberOption } from './page'
 
@@ -11,6 +11,7 @@ type Conversation = {
   displayName: string
   avatarUrl: string | null    // direct
   icon?: string | null        // group
+  muted?: boolean
   lastMessage: string | null
   lastMessageAt: string | null
   lastMessageFromMe: boolean
@@ -203,12 +204,105 @@ function NewMessageModal({ members, onClose }: { members: MemberOption[]; onClos
   )
 }
 
+type JoinableGroup = { id: string; name: string; icon: string | null; description: string | null; member_count: number }
+
+function FindGroupModal({ onClose, onJoined }: { onClose: () => void; onJoined: () => void }) {
+  const [groups, setGroups] = useState<JoinableGroup[] | null>(null)
+  const [query, setQuery] = useState('')
+  const [joining, setJoining] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/groups/joinable', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(d => setGroups(d.groups ?? []))
+      .catch(() => setGroups([]))
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const filtered = (groups ?? []).filter(g => !query.trim() || g.name.toLowerCase().includes(query.toLowerCase()))
+
+  async function join(id: string) {
+    setJoining(id)
+    try {
+      const res = await fetch(`/api/groups/${id}/join`, { method: 'POST' })
+      if (res.ok) {
+        setGroups(prev => (prev ?? []).filter(g => g.id !== id))
+        onJoined()
+      }
+    } finally {
+      setJoining(null)
+    }
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="find-group-title"
+      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(10,4,18,0.75)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div style={{ width: '100%', maxWidth: '440px', background: 'rgba(22,8,34,0.98)', border: '1px solid rgba(200,168,72,0.2)', borderRadius: '1.1rem', boxShadow: '0 24px 64px rgba(0,0,0,0.6)', overflow: 'hidden' }}>
+        <div style={{ padding: '1.1rem 1.25rem 0.85rem', borderBottom: '1px solid rgba(200,168,72,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span id="find-group-title" style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1rem', color: '#C8A848' }}>Find a group</span>
+          <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', color: '#F3EDE6', opacity: 0.4, cursor: 'pointer', fontSize: '1.1rem', lineHeight: 1, padding: '0.1rem 0.3rem' }}><span aria-hidden="true">×</span></button>
+        </div>
+
+        <div style={{ padding: '0.75rem 1.25rem', borderBottom: '1px solid rgba(200,168,72,0.08)' }}>
+          <input
+            type="text"
+            placeholder="Search groups…"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            aria-label="Search groups"
+            style={{ width: '100%', padding: '0.55rem 0.75rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(200,168,72,0.18)', borderRadius: '0.6rem', color: '#F3EDE6', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'var(--font-libre-baskerville), Georgia, serif' }}
+          />
+        </div>
+
+        <div role="list" aria-label="Open groups" style={{ maxHeight: '360px', overflowY: 'auto' }}>
+          {groups === null ? (
+            <p role="status" style={{ padding: '1.5rem 1.25rem', fontSize: '0.85rem', opacity: 0.4, fontStyle: 'italic', margin: 0, textAlign: 'center' }}>Loading…</p>
+          ) : filtered.length === 0 ? (
+            <p role="status" style={{ padding: '1.5rem 1.25rem', fontSize: '0.85rem', opacity: 0.4, fontStyle: 'italic', margin: 0, textAlign: 'center' }}>
+              {query.trim() ? 'No matching groups.' : 'No open groups to join right now.'}
+            </p>
+          ) : (
+            filtered.map(g => (
+              <div key={g.id} role="listitem" style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', padding: '0.75rem 1.25rem', borderBottom: '1px solid rgba(200,168,72,0.06)' }}>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', flexShrink: 0, border: '1px solid rgba(111,73,31,0.7)', background: 'rgba(200,168,72,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>
+                  <span aria-hidden="true">{g.icon || '✦'}</span>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: 0, fontFamily: 'TokyoDreams, serif', fontSize: '0.92rem', color: '#F3EDE6', opacity: 0.9 }}>{g.name}</p>
+                  <p style={{ margin: 0, fontSize: '0.7rem', opacity: 0.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {g.description || `${g.member_count} member${g.member_count === 1 ? '' : 's'}`}
+                  </p>
+                </div>
+                <button
+                  onClick={() => join(g.id)}
+                  disabled={joining === g.id}
+                  style={{ flexShrink: 0, padding: '0.4rem 0.95rem', borderRadius: '9999px', border: '1px solid rgba(210,57,248,0.4)', background: 'rgba(210,57,248,0.15)', color: '#D239F8', fontSize: '0.75rem', fontFamily: 'TokyoDreams, serif', letterSpacing: '0.06em', cursor: joining === g.id ? 'default' : 'pointer', opacity: joining === g.id ? 0.5 : 1 }}
+                >
+                  {joining === g.id ? 'Joining…' : 'Join'}
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 type Filter = 'all' | 'direct' | 'group'
 
 export function MessagesInboxClient({ currentUserId, members }: { currentUserId: string; members: MemberOption[] }) {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [loading, setLoading] = useState(true)
   const [showNewMessage, setShowNewMessage] = useState(false)
+  const [showFindGroup, setShowFindGroup] = useState(false)
   const [filter, setFilter] = useState<Filter>('all')
 
   const hasGroups = conversations.some(c => c.kind === 'group')
@@ -227,8 +321,8 @@ export function MessagesInboxClient({ currentUserId, members }: { currentUserId:
     }
   }, [currentUserId])
 
-  useEffect(() => {
-    fetch('/api/messages')
+  const loadConversations = useCallback(() => {
+    return fetch('/api/messages')
       .then(r => r.json())
       .then(d => {
         setConversations(d.conversations ?? [])
@@ -237,10 +331,35 @@ export function MessagesInboxClient({ currentUserId, members }: { currentUserId:
       .catch(() => setLoading(false))
   }, [])
 
+  useEffect(() => { loadConversations() }, [loadConversations])
+
   return (
     <>
-      {/* New Message button */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.25rem' }}>
+      {/* Actions */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginBottom: '1.25rem' }}>
+        <button
+          onClick={() => setShowFindGroup(true)}
+          aria-label="Find a group to join"
+          aria-haspopup="dialog"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: '0.45rem',
+            padding: '0.5rem 1.1rem',
+            background: 'transparent',
+            border: '1px solid rgba(200,168,72,0.35)',
+            borderRadius: '9999px',
+            color: '#C8A848',
+            fontSize: '0.8rem',
+            fontFamily: 'TokyoDreams, serif',
+            letterSpacing: '0.08em',
+            cursor: 'pointer',
+            transition: 'all 0.15s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(200,168,72,0.1)'; e.currentTarget.style.borderColor = 'rgba(200,168,72,0.6)' }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'rgba(200,168,72,0.35)' }}
+        >
+          <span aria-hidden="true" style={{ fontSize: '0.9rem', lineHeight: 1 }}>✦</span>
+          Find a group
+        </button>
         <button
           onClick={() => setShowNewMessage(true)}
           aria-label="Start a new message"
@@ -349,6 +468,7 @@ export function MessagesInboxClient({ currentUserId, members }: { currentUserId:
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.2rem' }}>
                 <span style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1rem', color: conv.unreadCount > 0 ? '#C8A848' : '#F3EDE6', opacity: conv.unreadCount > 0 ? 1 : 0.85 }}>
                   {conv.displayName}
+                  {conv.muted && <span title="Muted" aria-label="muted" style={{ marginLeft: '0.4rem', fontSize: '0.7rem', opacity: 0.5 }}>🔕</span>}
                 </span>
                 {conv.lastMessageAt && (
                   <span style={{ fontSize: '0.7rem', opacity: 0.35, flexShrink: 0, marginLeft: '0.75rem' }}>
@@ -392,6 +512,11 @@ export function MessagesInboxClient({ currentUserId, members }: { currentUserId:
       {/* New Message modal */}
       {showNewMessage && (
         <NewMessageModal members={members} onClose={() => setShowNewMessage(false)} />
+      )}
+
+      {/* Find a group modal */}
+      {showFindGroup && (
+        <FindGroupModal onClose={() => setShowFindGroup(false)} onJoined={loadConversations} />
       )}
     </>
   )

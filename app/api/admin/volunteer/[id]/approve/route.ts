@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { sendUserEmail } from '@/lib/send-email'
+import { sendUserEmail, APP_URL } from '@/lib/send-email'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const { userId } = await auth()
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       await sendUserEmail(
         email,
         'Your Glåüm volunteer signup has been approved!',
-        `<p>Hi ${displayName},</p><p>You're in! Your volunteer signup for Glåüm has been approved. Head to your <a href="https://glaum.camp/profile">profile</a> to see next steps.</p><p>See you at camp ✦</p>`,
+        `<p>Hi ${displayName},</p><p>You're in! Your volunteer signup for Glåüm has been approved. Head to your <a href="${APP_URL}/profile">profile</a> to see next steps.</p><p>See you at camp ✦</p>`,
       )
     }
   }

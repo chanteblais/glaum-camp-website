@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server'
 import { redirect, notFound } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { Header } from '@/components/Header'
+import { findGroupConversation, getParticipantPrefs } from '@/lib/conversations'
 import { GroupThreadClient } from './GroupThreadClient'
 
 export default async function GroupThreadPage({ params }: { params: { groupId: string } }) {
@@ -19,7 +20,7 @@ export default async function GroupThreadPage({ params }: { params: { groupId: s
   // The group must exist…
   const { data: group } = await supabaseAdmin
     .from('groups')
-    .select('id, name, icon')
+    .select('id, name, icon, join_policy')
     .eq('id', params.groupId)
     .maybeSingle()
   if (!group) notFound()
@@ -32,13 +33,13 @@ export default async function GroupThreadPage({ params }: { params: { groupId: s
   const memberIds = (roster ?? []).map(r => r.clerk_user_id).filter(Boolean)
   if (!memberIds.includes(myId)) redirect('/messages')
 
-  // Members (for @mention autocomplete), excluding me.
-  const otherIds = memberIds.filter(id => id !== myId)
-  const { data: memberApps } = otherIds.length
+  // Members for @mention autocomplete + highlighting. Includes me so a mention of
+  // me renders highlighted too (the composer autocomplete filters me out).
+  const { data: memberApps } = memberIds.length
     ? await supabaseAdmin
         .from('applications')
         .select('clerk_user_id, first_name, preferred_name, avatar_url')
-        .in('clerk_user_id', otherIds)
+        .in('clerk_user_id', memberIds)
         .eq('status', 'approved')
     : { data: [] }
   const members = (memberApps ?? []).map(a => ({
@@ -46,6 +47,10 @@ export default async function GroupThreadPage({ params }: { params: { groupId: s
     displayName: a.preferred_name || a.first_name || 'Member',
     avatarUrl: a.avatar_url ?? null,
   }))
+
+  // My per-thread prefs (mute / email opt-in).
+  const convId = await findGroupConversation(group.id)
+  const prefs = convId ? await getParticipantPrefs(convId, myId) : { muted: false, email_opt_in: false }
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 1 }}>
@@ -58,6 +63,9 @@ export default async function GroupThreadPage({ params }: { params: { groupId: s
         groupName={group.name}
         groupIcon={group.icon}
         members={members}
+        canLeave={group.join_policy === 'open'}
+        initialMuted={prefs.muted}
+        initialEmailOptIn={prefs.email_opt_in}
       />
     </div>
   )

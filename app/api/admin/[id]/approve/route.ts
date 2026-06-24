@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { sendUserEmail } from '@/lib/send-email'
+import { sendUserEmail, APP_URL } from '@/lib/send-email'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const { userId } = await auth()
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       const result = await sendUserEmail(
         email,
         'Your Glåüm application has been approved!',
-        `<p>Hi ${displayName},</p><p>Great news — your application to Glåüm has been approved! Head to your <a href="https://glaum.camp/profile">profile</a> to choose your role and shift.</p><p>See you at camp ✦</p>`,
+        `<p>Hi ${displayName},</p><p>Great news — your application to Glåüm has been approved! Head to your <a href="${APP_URL}/profile">profile</a> to choose your role and shift.</p><p>See you at camp ✦</p>`,
       )
       // Approval itself succeeded (status + in-app notification); only the
       // email failed. Surface it so the admin knows to follow up manually

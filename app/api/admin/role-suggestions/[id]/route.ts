@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { sendUserEmail } from '@/lib/send-email'
+import { sendUserEmail, APP_URL } from '@/lib/send-email'
 
 async function requireAdmin() {
   const { userId } = await auth()
@@ -87,7 +87,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         await sendUserEmail(
           approvedEmail,
           'Your Glåüm role suggestion was approved!',
-          `<p>Great news! Your suggested role "${suggestion.role_name}" has been added to the ${suggestion.dept_name} department and is now available to select on your <a href="https://glaum.camp/profile">profile</a>.</p>`,
+          `<p>Great news! Your suggested role "${suggestion.role_name}" has been added to the ${suggestion.dept_name} department and is now available to select on your <a href="${APP_URL}/profile">profile</a>.</p>`,
         )
       }
     } else {

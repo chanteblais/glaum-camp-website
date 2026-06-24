@@ -75,6 +75,7 @@ export async function GET() {
 
   const rows = convs.map(conv => {
     const s = sumByConv.get(conv.conversationId)
+    const unreadCount = conv.muted ? 0 : (s?.unread ?? 0) // muted threads don't badge
     if (conv.type === 'group') {
       const g = conv.groupId ? groupById.get(conv.groupId) : null
       return {
@@ -83,10 +84,11 @@ export async function GET() {
         displayName: g?.name ?? 'Group',
         icon: g?.icon ?? null,
         avatarUrl: null,
+        muted: conv.muted,
         lastMessage: s?.lastBody ?? null,
         lastMessageAt: s?.lastAt ?? null,
         lastMessageFromMe: s?.lastFromMe ?? false,
-        unreadCount: s?.unread ?? 0,
+        unreadCount,
       }
     }
     const prof = conv.otherUserId ? profileMap.get(conv.otherUserId) : null
@@ -96,10 +98,11 @@ export async function GET() {
       displayName: prof?.preferred_name || prof?.first_name || s?.otherName || 'Member',
       avatarUrl: prof?.avatar_url ?? null,
       icon: null,
+      muted: conv.muted,
       lastMessage: s?.lastBody ?? null,
       lastMessageAt: s?.lastAt ?? null,
       lastMessageFromMe: s?.lastFromMe ?? false,
-      unreadCount: s?.unread ?? 0,
+      unreadCount,
     }
   })
 
