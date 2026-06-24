@@ -65,37 +65,71 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   })
 
-  // Answers to admin-added custom fields are stored in custom_answers keyed by
-  // field key. Pull the form config to resolve human labels + field types, and
-  // present them in form order (orphaned keys from deleted fields shown last).
+  // Render the application strictly from the member-form config so the review
+  // mirrors the live form: sections + fields in config order, honouring admin
+  // renames, hidden/deleted fields, width, and admin-added custom fields.
+  // Built-in fields read from their column; custom fields from `custom_answers`.
+  // Legacy columns no longer part of the form simply don't appear.
   const customAnswers: Record<string, string | string[]> = app.custom_answers ?? {}
-  const orderedCustom: { key: string; label: string; type?: string; value: string | string[]; other?: string }[] = []
-  const hasValue = (v: string | string[]) => Array.isArray(v) ? v.length > 0 : !!String(v ?? '').trim()
-  if (Object.keys(customAnswers).some(k => hasValue(customAnswers[k]))) {
-    const { data: cfgRow } = await supabaseAdmin
-      .from('page_content').select('value').eq('key', 'config_member_form').maybeSingle()
-    let raw: object = {}
-    try { if (cfgRow?.value) raw = JSON.parse(cfgRow.value) } catch { /* defaults */ }
-    const cfg = mergeMemberConfig(raw)
-    const seen = new Set<string>()
-    for (const step of cfg.steps) {
-      for (const f of step.fields) {
-        if (f.isCustom && !f.element && hasValue(customAnswers[f.key])) {
-          // Companion "Other" free-text answer lives under `<key>__other`.
-          const otherText = customAnswers[f.key + '__other']
-          orderedCustom.push({
-            key: f.key, label: f.label, type: f.type, value: customAnswers[f.key],
-            other: typeof otherText === 'string' && otherText.trim() ? otherText : undefined,
-          })
-          seen.add(f.key)
-          seen.add(f.key + '__other')
+  const { data: cfgRow } = await supabaseAdmin
+    .from('page_content').select('value').eq('key', 'config_member_form').maybeSingle()
+  let rawCfg: object = {}
+  try { if (cfgRow?.value) rawCfg = JSON.parse(cfgRow.value) } catch { /* defaults */ }
+  const cfg = mergeMemberConfig(rawCfg)
+
+  // The only built-in field key whose column name differs from the key.
+  const COLUMN_FOR: Record<string, string> = { dept_interests: 'department_interests' }
+  // Built-in fields that should render as long-form (multi-line) answers.
+  const LONG_KEYS = new Set(['about_you', 'special_skills', 'find_at_camp', 'setup_notes', 'shrimp_relationship'])
+
+  const hasValue = (v: unknown) => Array.isArray(v) ? v.length > 0 : !!String(v ?? '').trim()
+
+  const sections: { title: string; fields: RenderField[] }[] = []
+  const seen = new Set<string>()
+
+  for (const step of cfg.steps) {
+    if (!step.visible) continue
+    const rendered: RenderField[] = []
+    for (const f of step.fields) {
+      if (!f.visible || f.element) continue        // skip hidden + layout-only entries
+      if (f.type === 'group_select') continue      // group opt-in isn't stored as an answer
+      if (f.key === 'avatar_url') continue         // already shown in the header
+
+      let value: string | string[]
+      let other: string | undefined
+      if (f.isCustom) {
+        value = customAnswers[f.key]
+        const o = customAnswers[f.key + '__other']
+        other = typeof o === 'string' && o.trim() ? o : undefined
+        seen.add(f.key); seen.add(f.key + '__other')
+      } else {
+        value = (app as Record<string, any>)[COLUMN_FOR[f.key] ?? f.key]
+        if (f.key === 'onboarding_status') {
+          const o = app.onboarding_status_other
+          other = typeof o === 'string' && o.trim() ? o : undefined
         }
       }
+      if (!hasValue(value) && !other) continue
+
+      const isFile = f.type === 'file' ||
+        (typeof value === 'string' && /^https?:\/\//.test(value) && value.includes('/application-files/'))
+      rendered.push({
+        key: f.key, label: f.label, value: value ?? '',
+        long: f.type === 'textarea' || LONG_KEYS.has(f.key),
+        isFile, isAgreement: f.type === 'agreement', other,
+      })
     }
-    for (const [k, v] of Object.entries(customAnswers)) {
-      if (!seen.has(k) && hasValue(v) && !k.endsWith('__other')) orderedCustom.push({ key: k, label: k, value: v })
-    }
+    if (rendered.length > 0) sections.push({ title: step.title, fields: rendered })
   }
+
+  // Orphaned custom answers from since-deleted fields — surface them last so no
+  // submitted response is silently dropped.
+  const orphans: RenderField[] = []
+  for (const [k, v] of Object.entries(customAnswers)) {
+    if (seen.has(k) || k.endsWith('__other') || !hasValue(v)) continue
+    orphans.push({ key: k, label: k, value: v, long: typeof v === 'string', isFile: false, isAgreement: false })
+  }
+  if (orphans.length > 0) sections.push({ title: 'Additional Responses', fields: orphans })
 
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1 }}>
@@ -189,102 +223,15 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
           </>
         )}
 
-        {/* Sections */}
-        <Section title="Basic Info">
-          <Grid>
-            <Field label="First Name" value={app.first_name} />
-            <Field label="Last Name" value={app.last_name} />
-            {app.preferred_name && <Field label="Preferred Name" value={app.preferred_name} />}
-            {app.pronouns && <Field label="Pronouns" value={app.pronouns} />}
-            <Field label="Email" value={app.email} />
-            {app.phone && <Field label="Phone" value={app.phone} />}
-            {app.instagram && <Field label="Instagram" value={app.instagram} />}
-            {app.location && <Field label="Traveling From" value={app.location} />}
-            <Field label="Camped Before" value={app.camped_before} />
-          </Grid>
-        </Section>
-
-        <Divider />
-
-        <Section title="What If Plans">
-          <Grid>
-            <Field label="Attendance" value={app.attendance} />
-            <Field label="Membership Type" value={app.membership_type} />
-            {app.arrival_date && <Field label="Arrival" value={app.arrival_date} />}
-            {app.departure_date && <Field label="Departure" value={app.departure_date} />}
-            {app.vehicle && <Field label="Vehicle" value={app.vehicle} />}
-            {app.space_requirements && <Field label="Space Requirements" value={app.space_requirements} />}
-            {app.structures && <Field label="Structures" value={app.structures} />}
-            {app.rideshare && <Field label="Rideshare" value={app.rideshare} />}
-          </Grid>
-        </Section>
-
-        <Divider />
-
-        <Section title="Participation">
-          {app.setup_preference?.length > 0 && (
-            <div style={{ marginBottom: '1.5rem' }}>
-              <p style={{ fontSize: '0.7rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.6, marginBottom: '0.6rem' }}>Contributions</p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-                {app.setup_preference.map((c: string) => (
-                  <span key={c} style={{ padding: '0.25rem 0.75rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.2)', fontSize: '0.8rem', opacity: 0.8 }}>
-                    {c}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-          {app.energizing_participation && <LongField label="What feels energizing or meaningful" value={app.energizing_participation} />}
-        </Section>
-
-        <Divider />
-
-        <Section title="Capacity & Boundaries">
-          {app.support_needs && <LongField label="What helps you feel supported" value={app.support_needs} />}
-          {app.accessibility && <LongField label="Accessibility / considerations" value={app.accessibility} />}
-          {app.capacity && <LongField label="Realistic capacity" value={app.capacity} />}
-          {app.participation_style && <Field label="More likely to" value={app.participation_style} />}
-        </Section>
-
-        <Divider />
-
-        <Section title="Camp Culture">
-          {app.draws_to_community && <LongField label="What draws you to the community" value={app.draws_to_community} />}
-          {app.healthy_community && <LongField label="Healthy community means" value={app.healthy_community} />}
-        </Section>
-
-        {app.acknowledgements?.length > 0 && (
-          <>
-            <Divider />
-            <Section title="Acknowledgements">
-              <ul style={{ paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                {app.acknowledgements.map((a: string) => (
-                  <li key={a} style={{ fontSize: '0.875rem', opacity: 0.65, lineHeight: 1.5 }}>{a}</li>
-                ))}
-              </ul>
+        {/* Sections — driven entirely by the live member-form config */}
+        {sections.map((section, i) => (
+          <div key={section.title + i}>
+            {i > 0 && <Divider />}
+            <Section title={section.title}>
+              <FieldList fields={section.fields} />
             </Section>
-          </>
-        )}
-
-        {app.shrimp_relationship && (
-          <>
-            <Divider />
-            <Section title="Shrimp Relationship">
-              <LongField label="" value={app.shrimp_relationship} />
-            </Section>
-          </>
-        )}
-
-        {orderedCustom.length > 0 && (
-          <>
-            <Divider />
-            <Section title="Additional Responses">
-              {orderedCustom.map(a => (
-                <CustomAnswer key={a.key} label={a.label} value={a.value} type={a.type} other={a.other} />
-              ))}
-            </Section>
-          </>
-        )}
+          </div>
+        ))}
 
         {/* Actions at bottom too */}
         {app.status === 'pending' && (
@@ -324,11 +271,40 @@ function fileNameFromUrl(url: string): string {
   }
 }
 
-function CustomAnswer({ label, value, type, other }: { label: string; value: string | string[]; type?: string; other?: string }) {
-  const isFile = type === 'file' || (typeof value === 'string' && /^https?:\/\//.test(value) && value.includes('/application-files/'))
+type RenderField = {
+  key: string; label: string; value: string | string[]
+  long: boolean; isFile: boolean; isAgreement: boolean; other?: string
+}
+
+// Lay out a section's answers in config order: consecutive short fields pair
+// into a two-column grid; long/array/file/agreement answers render full width.
+function FieldList({ fields }: { fields: RenderField[] }) {
+  const out: React.ReactNode[] = []
+  let bucket: RenderField[] = []
+  const flush = () => {
+    if (bucket.length === 0) return
+    out.push(
+      <Grid key={`grid-${out.length}`}>
+        {bucket.map(f => <Field key={f.key} label={f.label} value={f.value as string} />)}
+      </Grid>
+    )
+    bucket = []
+  }
+  for (const f of fields) {
+    const isShort = !f.long && !f.isFile && !f.isAgreement && !Array.isArray(f.value)
+    if (isShort) { bucket.push(f); continue }
+    flush()
+    out.push(<FullAnswer key={f.key} f={f} />)
+  }
+  flush()
+  return <>{out}</>
+}
+
+function FullAnswer({ f }: { f: RenderField }) {
+  const { label, value, isFile, isAgreement, other } = f
   return (
     <div style={{ padding: '1rem 1.25rem', border: '1px solid rgba(200,168,72,0.1)', borderRadius: '0.5rem', background: 'rgba(255,255,255,0.02)', marginBottom: '1rem' }}>
-      <p style={{ fontSize: '0.65rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, marginBottom: '0.5rem' }}>{label}</p>
+      {label && <p style={{ fontSize: '0.65rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, marginBottom: '0.5rem' }}>{label}</p>}
       {isFile && typeof value === 'string' ? (
         <a href={value} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: '#C8A848', fontSize: '0.9rem', textDecoration: 'none' }}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
@@ -336,6 +312,10 @@ function CustomAnswer({ label, value, type, other }: { label: string; value: str
           </svg>
           <span style={{ textDecoration: 'underline', textUnderlineOffset: '2px' }}>{fileNameFromUrl(value)}</span>
         </a>
+      ) : isAgreement && Array.isArray(value) ? (
+        <ul style={{ paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', margin: 0 }}>
+          {value.map(v => <li key={v} style={{ fontSize: '0.875rem', opacity: 0.65, lineHeight: 1.5 }}>{v}</li>)}
+        </ul>
       ) : Array.isArray(value) ? (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
           {value.map(v => (
@@ -379,16 +359,6 @@ function Field({ label, value }: { label: string; value: string | null }) {
     <div style={{ padding: '0.75rem 1rem', border: '1px solid rgba(200,168,72,0.1)', borderRadius: '0.5rem', background: 'rgba(255,255,255,0.02)' }}>
       <p style={{ fontSize: '0.65rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, marginBottom: '0.3rem' }}>{label}</p>
       <p style={{ fontSize: '0.9rem', opacity: 0.85 }}>{value}</p>
-    </div>
-  )
-}
-
-function LongField({ label, value }: { label: string; value: string | null }) {
-  if (!value) return null
-  return (
-    <div style={{ padding: '1rem 1.25rem', border: '1px solid rgba(200,168,72,0.1)', borderRadius: '0.5rem', background: 'rgba(255,255,255,0.02)', marginBottom: '1rem' }}>
-      {label && <p style={{ fontSize: '0.65rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, marginBottom: '0.5rem' }}>{label}</p>}
-      <p style={{ fontSize: '0.9rem', opacity: 0.8, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{value}</p>
     </div>
   )
 }

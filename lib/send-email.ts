@@ -61,7 +61,7 @@ export async function sendNewMessageEmail(opts: {
       <a href="${prefsUrl}" style="color:#8a8a8a">Manage your notification preferences</a>.
     </p>`
 
-  await sendUserEmail(to, `${senderName} messaged you on Glåüm`, html)
+  return sendUserEmail(to, `${senderName} messaged you on Glåüm`, html)
 }
 
 /**

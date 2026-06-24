@@ -220,13 +220,21 @@ async function maybeSendMessageEmail(opts: {
     const email = recipientUser.emailAddresses[0]?.emailAddress
     if (!email) return
 
-    await sendNewMessageEmail({
+    const result = await sendNewMessageEmail({
       to: email,
       recipientName: opts.recipientName,
       senderName: opts.senderName,
       preview: opts.messageBody,
       senderId: opts.senderId,
     })
+
+    // Only stamp notified_at when Resend actually accepted the send. Marking it
+    // on failure would both hide the error and trip the throttle, silently
+    // suppressing retries for the next 30 minutes.
+    if (!result.ok) {
+      console.error('[messages] new-message email rejected by Resend:', result.error)
+      return
+    }
 
     // Mark this message as having triggered an email for throttling.
     await supabaseAdmin
