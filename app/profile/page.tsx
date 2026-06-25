@@ -11,12 +11,34 @@ import { SignupSection } from './SignupSection'
 import { CommitmentsSection } from './CommitmentsSection'
 import { TaskStatus } from './TaskStatus'
 import { PersonalSchedule } from './PersonalSchedule'
-import { RoleBadge } from './RoleBadge'
 import { AttunementStatus } from './AttunementStatus'
 import { getMemberGroups, groupCommitmentMeta } from '@/lib/groups'
-import { ContributionBadges } from './ContributionBadges'
 import { buildAttunementChecklist } from '@/lib/attunement'
-import { getBadgeVersion } from '@/lib/badge-version'
+import { buildMemberFacts } from '@/lib/member-facts'
+import { parseDistinctions, evaluateDistinctions } from '@/lib/distinctions'
+import { CabinetOfDistinctions } from './CabinetOfDistinctions'
+
+// ── Identity stat list (mirrors the mockup's right-column at-a-glance facts) ──
+function StatIcon({ name }: { name: 'calendar' | 'star' | 'shield' | 'hand' }) {
+  const common = { width: 15, height: 15, viewBox: '0 0 24 24', fill: 'none', stroke: '#C8A848', strokeWidth: 1.6, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, style: { opacity: 0.8, flexShrink: 0 } }
+  switch (name) {
+    case 'calendar': return <svg {...common}><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
+    case 'star':     return <svg {...common}><path d="M12 3l2.6 5.6 6 .6-4.5 4 1.3 6-5.4-3.1L7.6 19l1.3-6-4.5-4 6-.6z" /></svg>
+    case 'shield':   return <svg {...common}><path d="M12 3l7 3v5c0 4.4-3 7-7 8-4-1-7-3.6-7-8V6z" /></svg>
+    case 'hand':     return <svg {...common}><path d="M8 11V6.5a1.4 1.4 0 0 1 2.8 0V10M10.8 10V4.8a1.4 1.4 0 0 1 2.8 0V10M13.6 10V5.6a1.4 1.4 0 0 1 2.8 0V12M16.4 12V8a1.4 1.4 0 0 1 2.8 0v5a6 6 0 0 1-6 6 6 6 0 0 1-5.2-3l-2-3.4a1.5 1.5 0 0 1 2.5-1.7L8 13.5" /></svg>
+  }
+}
+
+function StatRow({ icon, label, value }: { icon: 'calendar' | 'star' | 'shield' | 'hand'; label: string; value: string | number }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', padding: '0.4rem 0', borderTop: '1px solid rgba(200,168,72,0.12)' }}>
+      <span style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', fontSize: '0.8rem', color: '#D8C7A0' }}>
+        <StatIcon name={icon} />{label}
+      </span>
+      <span style={{ fontSize: '0.8rem', color: '#C8A848', fontWeight: 500, whiteSpace: 'nowrap' }}>{value}</span>
+    </div>
+  )
+}
 
 export default async function ProfilePage() {
   const { userId } = await auth()
@@ -55,10 +77,7 @@ export default async function ProfilePage() {
   // Extract role + department + shift info
   const roleInfo = campSignup?.roles as { name?: string; description?: string | null; purpose?: string | null; departments?: { name?: string; icon?: string } | null } | null
   const shiftInfo = campSignup?.schedule_events as { title?: string; day?: string; time?: string; icon_type?: string } | null
-  const badgeRoleName = roleInfo?.name ?? null
-  const badgeDeptName = roleInfo?.departments?.name ?? null
-  const badgeDeptIcon = roleInfo?.departments?.icon ?? null
-  const badgeVersion = await getBadgeVersion()
+  const roleApproved = !!campSignup?.role_id && campSignup?.role_approval_status !== 'pending'
 
   // Groups the member belongs to (replaces the old setup_preference "contributions").
   // `contributions` = group names; `groupMeta` carries each group's icon/description
@@ -72,7 +91,7 @@ export default async function ProfilePage() {
   const { data: attuneConfigRows } = await supabaseAdmin
     .from('page_content')
     .select('key, value')
-    .in('key', ['config_attunement_tasks', 'config_shift_signup_open'])
+    .in('key', ['config_attunement_tasks', 'config_shift_signup_open', 'config_distinctions'])
   const attuneConfig = Object.fromEntries((attuneConfigRows ?? []).map(r => [r.key, r.value]))
   // Shared with the home dashboard banner via buildAttunementChecklist — keep both in sync.
   const attunementTasks = buildAttunementChecklist(attuneConfig['config_attunement_tasks'], {
@@ -82,6 +101,12 @@ export default async function ProfilePage() {
     hasShift: !!campSignup?.schedule_event_id,
     shiftSignupOpen: attuneConfig['config_shift_signup_open'] !== 'false',
   })
+
+  // Member facts → earned distinctions (Cabinet of Distinctions). Facts are
+  // derived from existing data; medals are never persisted — they're recomputed
+  // here from the admin-configured rules. See lib/member-facts.ts + lib/distinctions.ts.
+  const memberFacts = buildMemberFacts({ application, roleInfo, memberGroups, roleApproved })
+  const earnedDistinctions = evaluateDistinctions(memberFacts, parseDistinctions(attuneConfig['config_distinctions']))
 
   // Link clerk_user_id for approved applications found by email
   if (application?.status === 'approved' && !application.clerk_user_id) {
@@ -98,92 +123,170 @@ export default async function ProfilePage() {
     application?.preferred_name || application?.first_name ||
     user?.firstName || 'Welcome'
 
-  const kicker = application ? 'Member Profile' : volunteer ? 'Volunteer Profile' : null
+  const kicker = application ? 'Member' : volunteer ? 'Volunteer' : null
+
+  // ── Header pieces (alignment-neutral; the layout wrapper sets alignment) ──
+  const isApproved = application?.status === 'approved'
+  const commitmentCount = contributions.length + (shiftInfo ? 1 : 0)
+  const attunementDone = attunementTasks.length > 0 && attunementTasks.every(t => t.done)
+  const attunementRemaining = attunementTasks.filter(t => !t.done).length
+
+  const avatar = (
+    <AvatarUpload
+      initialUrl={application?.avatar_url ?? volunteer?.avatar_url ?? null}
+      displayName={displayName}
+      size={isApproved ? 340 : 260}
+    />
+  )
+
+  // Right column: name, status, secondary metadata.
+  const identityContent = (
+    <>
+      {kicker && (
+        <p style={{ fontSize: '0.65rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: '#D239F8', marginBottom: '0.3rem', opacity: 0.85 }}>
+          {kicker}
+        </p>
+      )}
+      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.15rem' }}>
+        <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(1.9rem, 4.5vw, 2.5rem)', color: '#C8A848', margin: 0, textShadow: '0 0 40px rgba(210,57,248,0.4)' }}>
+          {displayName}
+        </h1>
+        {application && (application.status === 'approved' || application.status === 'pending') && (
+          <ProfileSettings application={application} />
+        )}
+        {volunteer && volunteer.status === 'active' && !application && (
+          <VolunteerSettings volunteer={volunteer} />
+        )}
+      </div>
+      {application?.pronouns && (
+        <p style={{ fontSize: '0.85rem', opacity: 0.5, marginBottom: '0.1rem' }}>{application.pronouns}</p>
+      )}
+      <p style={{ fontSize: '0.8rem', opacity: 0.4, marginTop: '-0.1rem', marginBottom: '0' }}>{email}</p>
+      {isApproved && (
+        <div style={{ marginTop: '0.5rem' }}>
+          <span style={{ display: 'inline-block', padding: '0.4rem 1.4rem', borderRadius: '9999px', backgroundColor: 'rgba(210,57,248,0.15)', border: '1px solid rgba(210,57,248,0.3)', fontSize: '0.75rem', letterSpacing: '0.12em', color: '#D239F8' }}>
+            ✦ APPROVED CAMPER ✦
+          </span>
+        </div>
+      )}
+      {isApproved && (
+        <div style={{ marginTop: '1.1rem', maxWidth: '17rem', marginLeft: 'auto', marginRight: 'auto', textAlign: 'left' }}>
+          {memberFacts.joined_year != null && (
+            <StatRow icon="calendar" label="Member since" value={memberFacts.joined_year} />
+          )}
+          <StatRow icon="star" label="Active Commitments" value={commitmentCount} />
+          <StatRow icon="shield" label="Distinctions Earned" value={earnedDistinctions.length} />
+          {attunementTasks.length > 0 && (
+            <StatRow icon="hand" label="Attunement Status" value={attunementDone ? 'Fully Attuned' : `${attunementRemaining} left`} />
+          )}
+        </div>
+      )}
+    </>
+  )
+
+  // Left column: the prestigious designation (role + department). Approved only.
+  // Built to visually balance the Member Information column against the larger
+  // portrait — generous vertical rhythm + engraved ornamentation.
+  const designationContent = memberFacts.designation && (
+    <>
+      {/* Emblem — department glyph in a brass ring flanked by tiny sparkles */}
+      <div style={{ position: 'relative', width: '84px', height: '84px', margin: '0 auto 0.7rem' }}>
+        <span aria-hidden style={{ position: 'absolute', top: '-2px', left: '-11px', color: 'rgba(200,168,72,0.6)', fontSize: '0.65rem' }}>✦</span>
+        <span aria-hidden style={{ position: 'absolute', bottom: '2px', right: '-9px', color: 'rgba(200,168,72,0.42)', fontSize: '0.5rem' }}>✦</span>
+        <div style={{
+          width: '84px', height: '84px', borderRadius: '50%',
+          border: '1.5px solid #C8A848',
+          background: 'radial-gradient(circle at 42% 38%, rgba(200,168,72,0.18), rgba(8,0,18,0.85))',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 0 22px rgba(200,168,72,0.22), inset 0 0 0 1px rgba(255,249,232,0.1)',
+        }}>
+          {roleInfo?.departments?.icon && !roleInfo.departments.icon.startsWith('/')
+            ? <span style={{ fontSize: '2.1rem', lineHeight: 1 }}>{roleInfo.departments.icon}</span>
+            // eslint-disable-next-line @next/next/no-img-element
+            : <img src={roleInfo?.departments?.icon?.startsWith('/') ? roleInfo.departments.icon : '/handicon.png'} alt="" aria-hidden style={{ width: '58%', height: '58%', objectFit: 'contain', opacity: 0.85 }} />}
+        </div>
+      </div>
+      <p style={{ fontSize: '0.64rem', letterSpacing: '0.34em', textTransform: 'uppercase', color: '#D239F8', marginBottom: '0.35rem', opacity: 0.85 }}>
+        Designation
+      </p>
+      <h2 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(1.7rem, 3vw, 2.2rem)', color: '#C8A848', margin: '0 auto', maxWidth: '13rem', lineHeight: 1.05, textShadow: '0 0 30px rgba(210,57,248,0.35)' }}>
+        {memberFacts.designation}
+      </h2>
+      {/* Stylized divider under the designation — ── ✦ ── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', width: '68%', margin: '0.6rem auto 0.6rem' }}>
+        <span aria-hidden style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.65))' }} />
+        <span aria-hidden style={{ color: '#C8A848', fontSize: '0.6rem', opacity: 0.9, lineHeight: 1 }}>✦</span>
+        <span aria-hidden style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(200,168,72,0.65), transparent)' }} />
+      </div>
+      {(roleInfo?.purpose || roleInfo?.description) && (
+        <p style={{ fontSize: '0.95rem', color: '#C9B68F', opacity: 0.88, lineHeight: 1.45, margin: '0 auto 1.05rem', maxWidth: '15rem', fontFamily: 'var(--font-cormorant-garamond), serif', fontStyle: 'italic' }}>
+          {roleInfo.purpose || roleInfo.description}
+        </p>
+      )}
+      {memberFacts.department && (() => {
+        // Break "Department of X" onto two lines: "Department of" / "X".
+        const m = memberFacts.department.match(/^(department of)\s+(.+)$/i)
+        return (
+          <div>
+            <p style={{ fontSize: '0.72rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.72, lineHeight: 1.45 }}>
+              {m ? <>{m[1]}<br />{m[2]}</> : memberFacts.department}
+            </p>
+            {/* Decorative closing flourish — small and delicate */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', width: '12%', margin: '1.3rem auto 0' }}>
+              <span aria-hidden style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.5))' }} />
+              <span aria-hidden style={{ color: '#C8A848', fontSize: '0.32rem', opacity: 0.8, lineHeight: 1 }}>✦</span>
+              <span aria-hidden style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(200,168,72,0.5), transparent)' }} />
+            </div>
+          </div>
+        )
+      })()}
+    </>
+  )
 
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
       <Header />
       <style>{`
-        .profile-main-grid  { display: grid; grid-template-columns: 2fr 1fr; gap: 1.25rem; align-items: start; margin-bottom: 2.5rem; }
+        .profile-main-grid  { display: grid; grid-template-columns: 1.1fr 1fr; gap: 1.25rem; align-items: stretch; margin-bottom: 0.75rem; }
         .profile-info-grid  { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 2.5rem; }
-        .profile-badge-row  { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 1.5rem; margin-bottom: 1rem; }
-        .profile-badge-left { display: flex; justify-content: flex-end; }
-        @media (max-width: 560px) {
-          .profile-main-grid  { grid-template-columns: 1fr; }
-          .profile-info-grid  { grid-template-columns: 1fr; }
-          .profile-badge-row  { grid-template-columns: 1fr; justify-items: center; }
-          .profile-badge-left { justify-content: center; }
-          .profile-badge-spacer { display: none; }
+        /* Header: designation (left) · portrait (center, focal point) · identity (right). */
+        .profile-header-grid    { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 2.25rem; }
+        .profile-header-desig   { text-align: center; min-width: 0; }
+        .profile-header-id      { text-align: center; min-width: 0; }
+        /* Let the portrait feel slightly oversized — it can bleed past its grid cell. */
+        .profile-header-portrait{ display: flex; justify-content: center; }
+        @media (max-width: 768px) {
+          .profile-main-grid   { grid-template-columns: 1fr; }
+          .profile-info-grid   { grid-template-columns: 1fr; }
+          /* Stack: portrait → identity → designation, all centered. */
+          .profile-header-grid     { grid-template-columns: 1fr; justify-items: center; gap: 1.5rem; }
+          .profile-header-desig    { order: 3; }
+          .profile-header-id       { order: 2; }
+          .profile-header-portrait { order: 1; }
         }
       `}</style>
       <img src="/hands-left.svg" alt="" aria-hidden style={{ position: 'fixed', left: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
       <img src="/hands-right.svg" alt="" aria-hidden style={{ position: 'fixed', right: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
       <RememberSignedIn firstName={user?.firstName} email={email} />
-      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '6rem 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
+      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '5.5rem 1.5rem 3rem', position: 'relative', zIndex: 1 }}>
 
-        {/* Name header — shown for application and volunteer tracks */}
+        {/* Name header — shown for application and volunteer tracks. Approved members
+            with a designation get the 3-column registry header; everyone else gets a
+            centered portrait + identity. No medals here — honours live in the cabinet. */}
         {(application || volunteer) && (
-          <div style={{
-            marginBottom: '3rem',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-          }}>
-
-            {/* Badge + avatar row — badge left, avatar centered, spacer right */}
-            <div className="profile-badge-row">
-              <div className="profile-badge-left">
-                {application?.status === 'approved' && badgeRoleName ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={`/api/badge?role=${encodeURIComponent(badgeRoleName)}&dept=${encodeURIComponent(badgeDeptName ?? '')}&v=${badgeVersion}`}
-                    alt={`${badgeRoleName} badge`}
-                    width={175}
-                    height={203}
-                    style={{ display: 'block', transform: 'translate(-40px, -28px)', filter: 'drop-shadow(0 8px 24px rgba(0,0,0,0.6)) drop-shadow(0 2px 8px rgba(0,0,0,0.4))' }}
-                  />
-                ) : <div />}
+          <div style={{ marginBottom: '1rem' }}>
+            {designationContent ? (
+              <div className="profile-header-grid">
+                <div className="profile-header-desig">{designationContent}</div>
+                <div className="profile-header-portrait">{avatar}</div>
+                <div className="profile-header-id">{identityContent}</div>
               </div>
-              <AvatarUpload
-                initialUrl={application?.avatar_url ?? volunteer?.avatar_url ?? null}
-                displayName={displayName}
-              />
-              {application?.status === 'approved'
-                ? <ContributionBadges groups={memberGroups} />
-                : <div className="profile-badge-spacer" />}
-            </div>
-
-            {/* Name + meta */}
-            <div style={{ textAlign: 'center' }}>
-              {kicker && (
-                <p style={{ fontSize: '0.65rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: '#D239F8', marginBottom: '0.3rem', opacity: 0.85 }}>
-                  {kicker}
-                </p>
-              )}
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.15rem' }}>
-                <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 6vw, 3rem)', color: '#C8A848', margin: 0, textShadow: '0 0 40px rgba(210,57,248,0.4)' }}>
-                  {displayName}
-                </h1>
-                {application && (application.status === 'approved' || application.status === 'pending') && (
-                  <ProfileSettings application={application} />
-                )}
-                {volunteer && volunteer.status === 'active' && !application && (
-                  <VolunteerSettings volunteer={volunteer} />
-                )}
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem' }}>
+                {avatar}
+                <div style={{ textAlign: 'center' }}>{identityContent}</div>
               </div>
-              {application?.pronouns && (
-                <p style={{ fontSize: '0.85rem', opacity: 0.5, marginBottom: '0.1rem' }}>{application.pronouns}</p>
-              )}
-              <p style={{ fontSize: '0.8rem', opacity: 0.4, marginTop: '-0.1rem', marginBottom: '0' }}>{email}</p>
-              {application?.status === 'approved' && (
-                <div style={{ marginTop: '0.5rem' }}>
-                  <span style={{ display: 'inline-block', padding: '0.35rem 1.25rem', borderRadius: '9999px', backgroundColor: 'rgba(210,57,248,0.15)', border: '1px solid rgba(210,57,248,0.3)', fontSize: '0.75rem', letterSpacing: '0.12em', color: '#D239F8' }}>
-                    ✦ APPROVED CAMPER
-                  </span>
-                </div>
-              )}
-            </div>
-
+            )}
           </div>
         )}
 
@@ -306,10 +409,10 @@ export default async function ProfilePage() {
         {application && application.status === 'approved' && (
           <>
 
-            <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.35), transparent)', marginBottom: '2.5rem' }} />
-
             <div className="profile-main-grid">
               <CommitmentsSection
+                title="Active Commitments"
+                hideRole
                 contributions={contributions}
                 role={roleInfo ? { name: roleInfo.name ?? '', description: roleInfo.description ?? null, purpose: roleInfo.purpose ?? null } : null}
                 dept={roleInfo?.departments ? { name: roleInfo.departments.name ?? '', icon: roleInfo.departments.icon ?? null } : null}
@@ -318,10 +421,16 @@ export default async function ProfilePage() {
                 contributionTypes={groupMeta}
                 showManageLink
               />
-              <div>
+              <div style={{ height: '100%' }}>
                 {attunementTasks.length > 0 && <AttunementStatus tasks={attunementTasks} />}
               </div>
             </div>
+
+            {earnedDistinctions.length > 0 && (
+              <div style={{ marginBottom: '1.5rem' }}>
+                <CabinetOfDistinctions distinctions={earnedDistinctions} />
+              </div>
+            )}
             <div style={{ marginBottom: '1.5rem' }}>
               <a href="/signup" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 1.25rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.35)', background: 'rgba(200,168,72,0.06)', color: '#C8A848', textDecoration: 'none', fontSize: '0.82rem', letterSpacing: '0.06em' }}>
                 ✦ Choose / change your role & shift

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { useAuth, useUser } from '@clerk/nextjs'
 import { UserNotificationBell } from './UserNotificationBell'
 import { NotificationBell } from '@/app/admin/NotificationBell'
@@ -36,6 +37,12 @@ const memberNavLinks = [
 export function HeaderClient() {
   const { isLoaded, isSignedIn } = useAuth()
   const { user } = useUser()
+  const pathname = usePathname()
+  // Active when the path is the link itself or one of its sub-routes
+  // (e.g. /messages/g/123 keeps "Messages" lit). No nav link is '/', so
+  // the startsWith check can't over-match the home route.
+  const isActiveLink = (href: string) =>
+    pathname === href || pathname.startsWith(href + '/')
   const [mounted, setMounted] = useState(false)
   const [serverAuth, setServerAuth] = useState<NavAuthState | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
@@ -373,24 +380,57 @@ export function HeaderClient() {
         {/* Desktop nav */}
         {!isMobile && (
           <nav aria-label="Primary" style={{ display: 'flex', gap: '2rem', flex: 1, justifyContent: 'center' }}>
-            {activeNavLinks.map((link) => (
-              'badge' in link && link.badge ? (
-                <MessagesNavLink
-                  key={link.href}
-                  style={{ color: '#F3EDE6', textDecoration: 'none', fontSize: '0.85rem', letterSpacing: '0.08em', opacity: 0.8 }}
-                />
-              ) : (
-                <a
-                  key={link.href}
-                  href={link.href}
-                  style={{ color: '#F3EDE6', textDecoration: 'none', fontSize: '0.85rem', letterSpacing: '0.08em', opacity: 0.8, transition: 'opacity 0.2s, color 0.2s' }}
-                  onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = '#C8A848' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.8'; e.currentTarget.style.color = '#F3EDE6' }}
-                >
-                  {link.label}
-                </a>
+            {activeNavLinks.map((link) => {
+              const active = isActiveLink(link.href)
+              const linkStyle: React.CSSProperties = active
+                ? { color: '#C8A848', textDecoration: 'none', fontSize: '0.85rem', letterSpacing: '0.08em', opacity: 1, transition: 'opacity 0.2s, color 0.2s' }
+                : { color: '#F3EDE6', textDecoration: 'none', fontSize: '0.85rem', letterSpacing: '0.08em', opacity: 0.8, transition: 'opacity 0.2s, color 0.2s' }
+              return (
+                <span key={link.href} style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                  {'badge' in link && link.badge ? (
+                    <MessagesNavLink style={linkStyle} />
+                  ) : (
+                    <a
+                      href={link.href}
+                      aria-current={active ? 'page' : undefined}
+                      style={linkStyle}
+                      onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = '#C8A848' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.opacity = active ? '1' : '0.8'; e.currentTarget.style.color = active ? '#C8A848' : '#F3EDE6' }}
+                    >
+                      {link.label}
+                    </a>
+                  )}
+                  {active && (
+                    <span
+                      aria-hidden
+                      style={{
+                        position: 'absolute',
+                        left: '50%',
+                        bottom: '-12px',
+                        transform: 'translateX(-50%)',
+                        width: '100%',
+                        height: '1px',
+                        background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.7), transparent)',
+                      }}
+                    >
+                      <span
+                        style={{
+                          position: 'absolute',
+                          left: '50%',
+                          top: '50%',
+                          transform: 'translate(-50%, -50%)',
+                          width: '4px',
+                          height: '4px',
+                          borderRadius: '50%',
+                          background: '#C8A848',
+                          boxShadow: '0 0 6px rgba(200,168,72,0.9)',
+                        }}
+                      />
+                    </span>
+                  )}
+                </span>
               )
-            ))}
+            })}
           </nav>
         )}
 
@@ -446,18 +486,23 @@ export function HeaderClient() {
             </div>
           )}
 
-          {activeNavLinks.map((link) => (
-            'badge' in link && link.badge ? (
+          {activeNavLinks.map((link) => {
+            const active = isActiveLink(link.href)
+            // Lit gold + a left accent bar marks the current page in the mobile menu.
+            const itemStyle: React.CSSProperties = active
+              ? { ...mobileMenuLink, color: '#C8A848', paddingLeft: '0.75rem', borderLeft: '2px solid #C8A848' }
+              : mobileMenuLink
+            return 'badge' in link && link.badge ? (
               <MessagesNavLink
                 key={link.href}
-                style={{ ...mobileMenuLink, display: 'flex', alignItems: 'center' }}
+                style={{ ...itemStyle, display: 'flex', alignItems: 'center' }}
               />
             ) : (
-              <a key={link.href} href={link.href} onClick={() => setMenuOpen(false)} style={mobileMenuLink}>
+              <a key={link.href} href={link.href} aria-current={active ? 'page' : undefined} onClick={() => setMenuOpen(false)} style={itemStyle}>
                 {link.label}
               </a>
             )
-          ))}
+          })}
 
           {signedIn && (
             <>

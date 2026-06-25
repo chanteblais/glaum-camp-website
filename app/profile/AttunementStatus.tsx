@@ -37,6 +37,9 @@ export function AttunementStatus({ tasks }: Props) {
       boxShadow: '0 0 0 1px rgba(35,8,48,0.95), 0 0 22px rgba(185,72,205,0.18), inset 0 0 0 1px rgba(255,255,255,0.06)',
       position: 'relative',
       overflow: 'hidden',
+      height: '100%',
+      display: 'flex',
+      flexDirection: 'column',
     }}>
       <div aria-hidden style={{
         position: 'absolute',
@@ -62,6 +65,9 @@ export function AttunementStatus({ tasks }: Props) {
         color: '#2C1A0E',
         position: 'relative',
         zIndex: 1,
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
       }}>
         <div aria-hidden style={{
           position: 'absolute', inset: 0,
@@ -87,28 +93,23 @@ export function AttunementStatus({ tasks }: Props) {
           pointerEvents: 'none',
         }} />
 
-        {/* Header */}
+        {/* Header — ✦ ── ATTUNEMENT STATUS ── ✦ */}
         <div style={{
-          padding: '1rem 1.2rem 0.4rem',
+          padding: '1.3rem 1.2rem 0.5rem',
           position: 'relative',
           zIndex: 1,
-          display: 'grid',
-          gridTemplateColumns: '1.1rem 1fr 1.1rem',
+          display: 'flex',
           alignItems: 'center',
+          justifyContent: 'center',
           gap: '0.7rem',
         }}>
-          <span style={{
-            color: 'rgba(132,92,34,0.82)',
-            fontSize: '0.9rem',
-            textShadow: '0 1px 0 rgba(255,255,255,0.35)',
-            lineHeight: 1,
-          }}>
-            ✦
-          </span>
-          <p style={{ fontSize: '1rem', letterSpacing: '0.18em', fontWeight: 700, color: '#5A3A14', margin: 0, fontFamily: 'var(--font-cormorant-garamond), serif', textTransform: 'uppercase', WebkitTextStroke: '0.5px #5A3A14', textShadow: '0 1px 0 rgba(255,255,255,0.45)', textAlign: 'center' }}>
+          <span aria-hidden style={{ color: 'rgba(132,92,34,0.82)', fontSize: '0.78rem', lineHeight: 1, textShadow: '0 1px 0 rgba(255,255,255,0.35)' }}>✦</span>
+          <span aria-hidden style={{ width: '34px', height: '1px', background: 'linear-gradient(90deg, transparent, rgba(132,92,34,0.55))' }} />
+          <p style={{ fontSize: '1rem', letterSpacing: '0.18em', fontWeight: 700, color: '#5A3A14', margin: 0, fontFamily: 'var(--font-cormorant-garamond), serif', textTransform: 'uppercase', WebkitTextStroke: '0.5px #5A3A14', textShadow: '0 1px 0 rgba(255,255,255,0.45)', textAlign: 'center', whiteSpace: 'nowrap' }}>
             ATTUNEMENT STATUS
           </p>
-          <span style={{ fontSize: '0.78rem', color: '#7A5520', opacity: 0.7, lineHeight: 1, fontWeight: 400, textAlign: 'right' }}>⌃</span>
+          <span aria-hidden style={{ width: '34px', height: '1px', background: 'linear-gradient(90deg, rgba(132,92,34,0.55), transparent)' }} />
+          <span aria-hidden style={{ color: 'rgba(132,92,34,0.82)', fontSize: '0.78rem', lineHeight: 1, textShadow: '0 1px 0 rgba(255,255,255,0.35)' }}>✦</span>
         </div>
 
         <div style={{ padding: '0 1.35rem', position: 'relative', zIndex: 1 }}>
@@ -116,7 +117,8 @@ export function AttunementStatus({ tasks }: Props) {
         </div>
 
         {/* Task list */}
-        <div style={{ padding: '0.35rem 1.4rem 0.45rem', position: 'relative', zIndex: 1 }}>
+        <div style={{ padding: '0.5rem 1.6rem 0.55rem', position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
           {tasks.map(task => {
             const isActionable = !task.done && (task.section || task.href)
             return (
@@ -139,7 +141,7 @@ export function AttunementStatus({ tasks }: Props) {
                 }
               }
             }}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', padding: '0.42rem 0.4rem', cursor: isActionable ? 'pointer' : 'default', borderRadius: '0.4rem', transition: 'background 0.15s', background: 'transparent' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', padding: '0.42rem 0.4rem', cursor: isActionable ? 'pointer' : 'default', borderRadius: '0.4rem', transition: 'background 0.15s', background: 'transparent' }}
             onMouseEnter={e => { if (isActionable) e.currentTarget.style.background = 'rgba(122,85,32,0.1)' }}
             onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
           >
@@ -175,34 +177,48 @@ export function AttunementStatus({ tasks }: Props) {
             </div>
             )
           })}
+         </div>
         </div>
 
-        <div style={{ padding: '0 1.35rem', position: 'relative', zIndex: 1 }}>
+        <div style={{ padding: '0 1.35rem', position: 'relative', zIndex: 1, marginTop: 'auto' }}>
           <Divider />
         </div>
 
-        {/* Status footer */}
-        <div style={{ padding: '0.5rem 1.2rem 0.9rem', display: 'flex', gap: '0.75rem', alignItems: 'flex-start', position: 'relative', zIndex: 1 }}>
-          <img
-            src="/handicon.png"
-            alt=""
-            aria-hidden
-            style={{ width: '40px', height: '40px', flexShrink: 0, objectFit: 'contain', opacity: 0.78, filter: 'sepia(0.82) saturate(1.35) brightness(0.76)' }}
-          />
-          <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Status footer — hand emblem beside the verdict, centered as a unit */}
+        <div style={{ padding: '0.55rem 1.4rem 1.15rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1.1rem', position: 'relative', zIndex: 1 }}>
+          {/* Emblem: hand in a brass ring, flanked by tiny sparkles */}
+          <div style={{ position: 'relative', width: '62px', height: '62px', flexShrink: 0 }}>
+            <span aria-hidden style={{ position: 'absolute', top: '0', left: '-5px', color: 'rgba(132,92,34,0.55)', fontSize: '0.55rem' }}>✦</span>
+            <span aria-hidden style={{ position: 'absolute', bottom: '3px', right: '-3px', color: 'rgba(132,92,34,0.4)', fontSize: '0.45rem' }}>✦</span>
+            <div style={{
+              width: '62px', height: '62px', borderRadius: '50%',
+              border: '1.5px solid rgba(176,120,42,0.7)',
+              background: 'radial-gradient(circle at 42% 36%, rgba(255,249,232,0.9), rgba(232,204,158,0.55))',
+              boxShadow: 'inset 0 0 0 3px rgba(255,255,255,0.4), inset 0 0 14px rgba(176,120,42,0.25), 0 2px 6px rgba(112,62,20,0.18)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <img
+                src="/handicon.png"
+                alt=""
+                aria-hidden
+                style={{ width: '36px', height: '36px', objectFit: 'contain', opacity: 0.85, filter: 'sepia(0.82) saturate(1.35) brightness(0.72)' }}
+              />
+            </div>
+          </div>
+          <div>
             {allDone ? (
               <>
-                <p style={{ fontSize: '1.05rem', fontWeight: 700, letterSpacing: '0.08em', color: '#7A4E0E', margin: '0 0 0.15rem', textTransform: 'uppercase', fontFamily: 'var(--font-cormorant-garamond), serif', textShadow: '0 0 12px rgba(180,120,30,0.5), 0 1px 0 rgba(255,255,255,0.3)' }}>
+                <p style={{ fontSize: '1.2rem', fontWeight: 700, letterSpacing: '0.08em', color: '#7A4E0E', margin: '0 0 0.2rem', textTransform: 'uppercase', fontFamily: 'var(--font-cormorant-garamond), serif', textShadow: '0 0 12px rgba(180,120,30,0.5), 0 1px 0 rgba(255,255,255,0.3)' }}>
                   Fully Attuned
                 </p>
-                <p style={{ fontSize: '0.92rem', color: '#5C3D1A', margin: 0, fontFamily: 'var(--font-cormorant-garamond), serif', lineHeight: 1.4 }}>All preparations complete.</p>
+                <p style={{ fontSize: '0.95rem', color: '#5C3D1A', margin: 0, fontFamily: 'var(--font-cormorant-garamond), serif', lineHeight: 1.4 }}>All preparations complete.</p>
               </>
             ) : (
               <>
-                <p style={{ fontSize: '1.05rem', fontWeight: 700, letterSpacing: '0.08em', color: '#7A4E0E', margin: '0 0 0.15rem', textTransform: 'uppercase', fontFamily: 'var(--font-cormorant-garamond), serif', textShadow: '0 0 12px rgba(180,120,30,0.5), 0 1px 0 rgba(255,255,255,0.3)' }}>
-                  Status: {statusLabel}
+                <p style={{ fontSize: '1.2rem', fontWeight: 700, letterSpacing: '0.08em', color: '#7A4E0E', margin: '0 0 0.2rem', textTransform: 'uppercase', fontFamily: 'var(--font-cormorant-garamond), serif', textShadow: '0 0 12px rgba(180,120,30,0.5), 0 1px 0 rgba(255,255,255,0.3)' }}>
+                  {statusLabel}
                 </p>
-                <p style={{ fontSize: '0.92rem', fontWeight: 700, color: '#250838', margin: 0, fontFamily: 'var(--font-cormorant-garamond), serif', lineHeight: 1.4, textShadow: '0 0 8px rgba(150,40,220,0.4), 0 0 18px rgba(150,40,220,0.2), 0 1px 0 rgba(255,255,255,0.35)' }}>
+                <p style={{ fontSize: '0.95rem', fontWeight: 700, color: '#250838', margin: 0, fontFamily: 'var(--font-cormorant-garamond), serif', lineHeight: 1.4, textShadow: '0 0 8px rgba(150,40,220,0.4), 0 0 18px rgba(150,40,220,0.2), 0 1px 0 rgba(255,255,255,0.35)' }}>
                   {remaining} item{remaining !== 1 ? 's' : ''} require{remaining === 1 ? 's' : ''} attention
                 </p>
               </>

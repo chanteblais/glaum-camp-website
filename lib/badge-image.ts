@@ -1,7 +1,7 @@
 import sharp from 'sharp'
 
 // Group badges are rendered in a fixed square box with `object-fit: contain`
-// (see app/profile/ContributionBadges.tsx). If uploaded images have different
+// (e.g. the Cabinet of Distinctions medals). If uploaded images have different
 // frame sizes or medallion-to-frame ratios, they render at visibly different
 // sizes. To keep every badge consistent we normalize each upload onto a single
 // reference frame with the medallion scaled to a fixed target box.

@@ -12,6 +12,8 @@ type Props = {
   showManageLink?: boolean
   title?: string
   compact?: boolean
+  /** When true, omit the designation/role row (it lives in the profile header). */
+  hideRole?: boolean
 }
 
 const DAY_LABELS: Record<string, string> = {
@@ -25,6 +27,8 @@ const DAY_LABELS: Record<string, string> = {
 
 const TAG_STYLES: Record<string, { color: string; border: string; bg: string }> = {
   GROUP:        { color: '#c8a848', border: 'rgba(200,168,72,0.4)', bg: 'rgba(200,168,72,0.08)' },
+  TEAM:         { color: '#c8a848', border: 'rgba(200,168,72,0.4)', bg: 'rgba(200,168,72,0.08)' },
+  LEAD:         { color: '#D239F8', border: 'rgba(210,57,248,0.35)', bg: 'rgba(210,57,248,0.07)' },
   DESIGNATION:  { color: '#D239F8', border: 'rgba(210,57,248,0.35)', bg: 'rgba(210,57,248,0.07)' },
   SHIFT:        { color: '#7dcf8e', border: 'rgba(100,200,120,0.35)', bg: 'rgba(100,200,120,0.07)' },
 }
@@ -32,7 +36,7 @@ const TAG_STYLES: Record<string, { color: string; border: string; bg: string }> 
 function CircleIcon({ children, size = '56px' }: { children: React.ReactNode; size?: string }) {
   return (
     <div style={{
-      width: size, height: size, borderRadius: '50%', flexShrink: 0,
+      width: size, height: size, borderRadius: '50%', flexShrink: 0, overflow: 'hidden',
       border: '1.5px solid #C07C26',
       background: 'radial-gradient(circle at 42% 38%, rgba(200,168,72,0.14), rgba(8,0,18,0.85))',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -67,34 +71,55 @@ function Row({ circleContent, title, description, tag, iconSize, compact }: {
     <div className="commitments-row">
       <CircleIcon size={iconSize}>{circleContent}</CircleIcon>
       <div className="commitments-row-text">
-        <p style={{ fontSize: '0.88rem', fontWeight: 400, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#EDE0C8', margin: '0 0 0.15rem', lineHeight: 1.5 }}>
+        <p style={{ fontSize: '0.74rem', fontWeight: 400, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#EDE0C8', margin: '0 0 0.15rem', lineHeight: 1.45 }}>
           {title}
         </p>
         {description && !compact && (
-          <p style={{ fontSize: '0.75rem', color: '#B0947A', lineHeight: 1.55, margin: 0, whiteSpace: 'pre-line' }}>{description}</p>
+          <p style={{ fontSize: '0.66rem', color: '#B0947A', lineHeight: 1.5, margin: 0, whiteSpace: 'pre-line' }}>{description}</p>
         )}
         {description && compact && (
           <p style={{ fontSize: '0.72rem', color: '#B0947A', lineHeight: 1.4, margin: 0, whiteSpace: 'pre-line', opacity: 0.85 }}>{description}</p>
         )}
       </div>
       <Tag label={tag} />
+      <span aria-hidden style={{ color: '#C8A848', opacity: 0.4, fontSize: '1.2rem', lineHeight: 1, flexShrink: 0, marginLeft: '0.1rem' }}>›</span>
     </div>
   )
 }
 
-export function CommitmentsSection({ contributions, role, dept, shift, roleApprovalStatus, contributionTypes = DEFAULT_CONTRIBUTION_TYPES, showManageLink = false, title = 'Your Commitments', compact = false }: Props) {
+// Section header: ✦ ── TITLE ── ✦  — the ceremonial accent used across the
+// profile cards (mirrors the Attunement Status header treatment).
+function AccentHeader({ title, compact }: { title: string; compact?: boolean }) {
+  const spark = <span aria-hidden style={{ color: '#C8A848', fontSize: '0.7rem', opacity: 0.9, lineHeight: 1 }}>✦</span>
+  const line = (dir: 'l' | 'r') => (
+    <span aria-hidden style={{ width: '46px', height: '1px', flexShrink: 0, background: `linear-gradient(90deg, ${dir === 'l' ? 'transparent, rgba(200,168,72,0.6)' : 'rgba(200,168,72,0.6), transparent'})` }} />
+  )
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.8rem' }}>
+      {spark}{line('l')}
+      <p style={{ fontFamily: 'var(--font-cormorant-garamond), serif', fontSize: compact ? '0.92rem' : '1.05rem', fontWeight: 600, letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C8A848', margin: 0, textShadow: '0 0 18px rgba(200,168,72,0.35)', whiteSpace: 'nowrap' }}>
+        {title}
+      </p>
+      {line('r')}{spark}
+    </div>
+  )
+}
+
+export function CommitmentsSection({ contributions, role, dept, shift, roleApprovalStatus, contributionTypes = DEFAULT_CONTRIBUTION_TYPES, showManageLink = false, title = 'Your Commitments', compact = false, hideRole = false }: Props) {
   const metaByValue = Object.fromEntries(contributionTypes.map(t => [t.value, { icon: t.icon, desc: t.description }]))
-  const hasAnything = contributions.length > 0 || role || shift
+  // When the designation lives in the header, this card is groups + shift only.
+  const showRole = role && !hideRole
+  const hasAnything = contributions.length > 0 || showRole || shift
   if (!hasAnything) return null
 
   const isPending = roleApprovalStatus === 'pending'
-  const iconSize = compact ? '44px' : '56px'
-  const rowPad = compact ? '0.55rem 0' : '0.75rem 0'
+  const iconSize = compact ? '44px' : '52px'
+  const rowPad = compact ? '0.5rem 0' : '0.55rem 0'
   const rowGap = compact ? '0.75rem' : '1rem'
   const sidepad = compact ? '0 1.25rem' : '0 1.5rem'
 
   return (
-    <div style={{ border: '1.5px solid rgba(200,168,72,0.7)', borderRadius: '1rem', background: 'rgba(10,0,20,0.6)', overflow: 'hidden', boxShadow: '0 0 0 1px rgba(200,168,72,0.12), 0 0 24px rgba(200,168,72,0.08)' }}>
+    <div style={{ border: '1.5px solid rgba(200,168,72,0.7)', borderRadius: '1rem', background: 'rgba(10,0,20,0.6)', overflow: 'hidden', boxShadow: '0 0 0 1px rgba(200,168,72,0.12), 0 0 24px rgba(200,168,72,0.08)', height: '100%', display: 'flex', flexDirection: 'column' }}>
       <style>{`
         .commitments-rows { padding: ${sidepad}; }
         .commitments-row  { display: flex; align-items: center; gap: ${rowGap}; padding: ${rowPad}; }
@@ -106,17 +131,14 @@ export function CommitmentsSection({ contributions, role, dept, shift, roleAppro
         }
       `}</style>
       {/* Header */}
-      <div style={{ padding: compact ? '0.65rem 1.25rem 0.55rem' : '0.85rem 1.5rem 0.75rem', textAlign: 'center' }}>
-        <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: compact ? '1.1rem' : '1.35rem', color: '#C8A848', margin: compact ? '0 0 0.55rem' : '0 0 0.75rem', letterSpacing: '0.1em', textShadow: '0 0 20px rgba(200,168,72,0.4)' }}>
-          {title}
-        </p>
-        <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent 5%, rgba(200,168,72,0.5) 20%, rgba(200,168,72,0.5) 80%, transparent 95%)' }} />
+      <div style={{ padding: compact ? '0.8rem 1.25rem 0.6rem' : '1rem 1.5rem 0.8rem' }}>
+        <AccentHeader title={title} compact={compact} />
       </div>
 
       {/* Rows */}
       <div className="commitments-rows">
-        {/* Role / Designation — shown first */}
-        {role && (
+        {/* Role / Designation — shown first (hidden when it lives in the header) */}
+        {showRole && role && (
           <div>
             <Row
               circleContent={
@@ -141,10 +163,19 @@ export function CommitmentsSection({ contributions, role, dept, shift, roleAppro
         {/* Contributions */}
         {contributions.map((c, i) => {
           const meta = metaByValue[c] ?? { icon: '✦', desc: null }
+          const isImg = typeof meta.icon === 'string' && (meta.icon.startsWith('/') || meta.icon.startsWith('http'))
           return (
             <div key={c}>
               <Row
-                circleContent={<span style={{ fontSize: compact ? '1.1rem' : '1.4rem', lineHeight: 1 }}>{meta.icon}</span>}
+                circleContent={
+                  isImg
+                    // eslint-disable-next-line @next/next/no-img-element
+                    // Badge files are a wide 1536×1024 frame with the disc centered at
+                    // ~82% of the height; scale up so the disc fills the circle, and the
+                    // CircleIcon (overflow:hidden) clips the side margins.
+                    ? <img src={meta.icon} alt="" aria-hidden style={{ height: '124%', width: 'auto', maxWidth: 'none', display: 'block' }} />
+                    : <span style={{ fontSize: compact ? '1.1rem' : '1.4rem', lineHeight: 1 }}>{meta.icon}</span>
+                }
                 title={c}
                 description={meta.desc}
                 tag="GROUP"
@@ -177,9 +208,9 @@ export function CommitmentsSection({ contributions, role, dept, shift, roleAppro
 
       {/* Footer */}
       {showManageLink && (
-        <div style={{ padding: '0.65rem 1.5rem' }}>
-          <a href="/signup" style={{ fontSize: '0.78rem', color: '#C8A848', opacity: 0.85, textDecoration: 'none', letterSpacing: '0.04em' }}>
-            Manage commitments →
+        <div style={{ padding: '0.5rem 1.5rem 1rem', textAlign: 'center', marginTop: 'auto' }}>
+          <a href="/signup" style={{ fontFamily: 'var(--font-cormorant-garamond), serif', fontSize: '0.72rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.85, textDecoration: 'none', borderBottom: '1px solid rgba(200,168,72,0.35)', paddingBottom: '0.2rem' }}>
+            View all commitments ›
           </a>
         </div>
       )}

@@ -6,9 +6,11 @@ import { useRouter } from 'next/navigation'
 export function AvatarUpload({
   initialUrl,
   displayName,
+  size = 260,
 }: {
   initialUrl: string | null
   displayName: string
+  size?: number
 }) {
   const router = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -99,8 +101,8 @@ export function AvatarUpload({
         aria-busy={uploading}
         style={{
           position: 'relative',
-          width: '260px',
-          height: '260px',
+          width: `${size}px`,
+          height: `${size}px`,
           borderRadius: '50%',
           border: '3px solid #6F491F',
           boxShadow: '0 0 0 1px rgba(60,35,10,0.6), 0 0 20px rgba(111,73,31,0.25), 0 8px 32px rgba(0,0,0,0.55)',

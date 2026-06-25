@@ -178,6 +178,7 @@ export async function POST(req: Request) {
 
   // Email notification (best-effort, non-blocking semantics — awaited but guarded)
   await maybeSendMessageEmail({
+    messageId: message.id,
     senderId: userId,
     senderName,
     recipientId,
@@ -189,6 +190,7 @@ export async function POST(req: Request) {
 }
 
 async function maybeSendMessageEmail(opts: {
+  messageId: string
   senderId: string
   senderName: string
   recipientId: string
@@ -236,15 +238,11 @@ async function maybeSendMessageEmail(opts: {
       return
     }
 
-    // Mark this message as having triggered an email for throttling.
+    // Mark this exact message as having triggered an email for throttling.
     await supabaseAdmin
       .from('messages')
       .update({ notified_at: new Date().toISOString() })
-      .eq('sender_clerk_id', opts.senderId)
-      .eq('recipient_clerk_id', opts.recipientId)
-      .is('notified_at', null)
-      .order('created_at', { ascending: false })
-      .limit(1)
+      .eq('id', opts.messageId)
   } catch (err) {
     console.error('[messages] email notification failed:', err)
   }

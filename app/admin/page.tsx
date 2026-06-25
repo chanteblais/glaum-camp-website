@@ -18,8 +18,10 @@ import { DebugSection } from './DebugSection'
 import { PollsManager } from './PollsManager'
 import { AdminsManager } from './AdminsManager'
 import { AttunementTasksManager } from './AttunementTasksManager'
+import { DistinctionsManager } from './DistinctionsManager'
 import { ShiftSignupToggle } from './ShiftSignupToggle'
 import { parseAttunementTasks } from '@/lib/site-config'
+import { parseDistinctions } from '@/lib/distinctions'
 
 export default async function AdminPage() {
   const { userId } = await auth()
@@ -55,10 +57,21 @@ export default async function AdminPage() {
   const { data: configRows } = await supabaseAdmin
     .from('page_content')
     .select('key, value')
-    .in('key', ['config_attunement_tasks', 'config_shift_signup_open'])
+    .in('key', ['config_attunement_tasks', 'config_shift_signup_open', 'config_distinctions'])
   const configMap = Object.fromEntries((configRows ?? []).map(r => [r.key, r.value]))
   const attunementTasks = parseAttunementTasks(configMap['config_attunement_tasks'])
   const shiftSignupOpen = configMap['config_shift_signup_open'] !== 'false'
+  const distinctions = parseDistinctions(configMap['config_distinctions'])
+
+  // Group badge images — offered as medal art in the distinctions builder.
+  const { data: groupBadgeRows } = await supabaseAdmin
+    .from('groups')
+    .select('name, badge_image')
+    .not('badge_image', 'is', null)
+    .order('sort_order')
+  const groupBadgeOptions = (groupBadgeRows ?? [])
+    .filter(g => g.badge_image)
+    .map(g => ({ name: g.name as string, image: g.badge_image as string }))
 
   const { data: notifications, error: notificationsError } = await supabaseAdmin
     .from('admin_notifications')
@@ -251,6 +264,14 @@ export default async function AdminPage() {
           summary="Profile checklist items members complete"
         >
           <AttunementTasksManager initialTasks={attunementTasks} />
+        </CollapsibleSection>
+
+        {/* ── DISTINCTIONS ── */}
+        <CollapsibleSection
+          title="Distinctions"
+          summary="Earned medals in each member's Cabinet of Distinctions"
+        >
+          <DistinctionsManager initialDistinctions={distinctions} groupBadgeOptions={groupBadgeOptions} />
         </CollapsibleSection>
 
         {/* ── CONFIGURATION ── */}

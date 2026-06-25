@@ -1,4 +1,5 @@
 import { supabaseAdmin } from './supabase'
+import { DEFAULT_CONTRIBUTION_TYPES } from './application-options'
 
 export type MemberGroup = { id: string; name: string; icon: string | null; description: string | null; badge_image: string | null }
 
@@ -37,6 +38,18 @@ export async function getGroupNamesByUser(): Promise<Record<string, string[]>> {
 
 // Shape the member's groups as the icon/description metadata CommitmentsSection
 // expects (it keys icon/desc by the value shown, which is the group name).
+// When a group has no description of its own, fall back to the matching default
+// contribution one-liner (Setup/Teardown/Decor) so commitment rows still read as
+// a living description rather than a bare title.
 export function groupCommitmentMeta(groups: MemberGroup[]) {
-  return groups.map(g => ({ value: g.name, icon: g.icon ?? '✦', description: g.description ?? '' }))
+  return groups.map(g => {
+    const fallback = DEFAULT_CONTRIBUTION_TYPES.find(t => t.value.toLowerCase() === g.name.toLowerCase())
+    return {
+      value: g.name,
+      // Prefer the group's own emoji icon; fall back to its uploaded badge image,
+      // then to a plain mark. CommitmentsSection renders image-path values as <img>.
+      icon: g.icon || g.badge_image || '✦',
+      description: g.description || fallback?.description || '',
+    }
+  })
 }
