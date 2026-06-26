@@ -15,7 +15,7 @@ async function requireAdmin() {
 export async function GET() {
   const { data: groups, error } = await supabaseAdmin
     .from('groups')
-    .select('id, name, description, icon, badge_image, apply_selectable, sort_order, join_policy, visibility')
+    .select('id, name, description, icon, icon_image, apply_selectable, sort_order, join_policy, visibility')
     .order('sort_order', { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

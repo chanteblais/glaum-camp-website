@@ -13,7 +13,7 @@ const GOLD = '#C8A848'
 const PURPLE = '#D239F8'
 const CREAM = '#F3EDE6'
 
-export type GroupBadgeOption = { name: string; image: string }
+export type GroupIconOption = { name: string; image: string }
 
 const factType = (key: string): MemberFactType =>
   MEMBER_FACT_CATALOG.find(f => f.key === key)?.type ?? 'string'
@@ -43,10 +43,10 @@ const tinyLabel: React.CSSProperties = {
 
 export function DistinctionsManager({
   initialDistinctions,
-  groupBadgeOptions,
+  groupIconOptions,
 }: {
   initialDistinctions: DistinctionRule[]
-  groupBadgeOptions: GroupBadgeOption[]
+  groupIconOptions: GroupIconOption[]
 }) {
   const [rules, setRules] = useState<DistinctionRule[]>(initialDistinctions)
   const [saved, setSaved] = useState(false)
@@ -159,11 +159,11 @@ export function DistinctionsManager({
                   value={rule.image ?? ''}
                   onChange={e => patch(idx, { image: e.target.value || undefined })}
                   style={selectStyle}
-                  title="Reuse a group badge image"
+                  title="Reuse a group icon"
                 >
                   <option value="" style={{ background: '#1A0A24' }}>— use glyph —</option>
-                  {groupBadgeOptions.map(g => (
-                    <option key={g.image} value={g.image} style={{ background: '#1A0A24' }}>{g.name} badge</option>
+                  {groupIconOptions.map(g => (
+                    <option key={g.image} value={g.image} style={{ background: '#1A0A24' }}>{g.name} icon</option>
                   ))}
                 </select>
                 <input

@@ -170,10 +170,15 @@ export function CommitmentsSection({ contributions, role, dept, shift, roleAppro
                 circleContent={
                   isImg
                     // eslint-disable-next-line @next/next/no-img-element
-                    // Badge files are a wide 1536×1024 frame with the disc centered at
-                    // ~82% of the height; scale up so the disc fills the circle, and the
-                    // CircleIcon (overflow:hidden) clips the side margins.
-                    ? <img src={meta.icon} alt="" aria-hidden style={{ height: '124%', width: 'auto', maxWidth: 'none', display: 'block' }} />
+                    // Icon files are normalized by lib/icon-image.ts: the artwork is
+                    // trimmed tight, scaled to one uniform target box, and centered on a
+                    // 1536×1024 frame — so every icon arrives the same size with margin
+                    // around it. The CircleIcon clips to a *round* mask, so we size by
+                    // height and let the transparent side margins overflow and get clipped
+                    // by overflow:hidden. 74% fills the circle while leaving a clear gap so
+                    // even corner-heavy art (a tasseled cushion, a wide tent base) — which
+                    // pokes toward the round edge at its corners — stays comfortably inside.
+                    ? <img src={meta.icon} alt="" aria-hidden style={{ height: '74%', width: 'auto', maxWidth: 'none', display: 'block' }} />
                     : <span style={{ fontSize: compact ? '1.1rem' : '1.4rem', lineHeight: 1 }}>{meta.icon}</span>
                 }
                 title={c}

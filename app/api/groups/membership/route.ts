@@ -42,7 +42,7 @@ export async function GET() {
 
   const { data: groups, error } = await supabaseAdmin
     .from('groups')
-    .select('id, name, description, icon, badge_image, sort_order')
+    .select('id, name, description, icon, icon_image, sort_order')
     .order('sort_order', { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

@@ -1,7 +1,6 @@
 import { supabaseAdmin } from './supabase'
-import { DEFAULT_CONTRIBUTION_TYPES } from './application-options'
 
-export type MemberGroup = { id: string; name: string; icon: string | null; description: string | null; badge_image: string | null }
+export type MemberGroup = { id: string; name: string; icon: string | null; description: string | null; icon_image: string | null }
 
 // Fetch the groups a member belongs to (ordered by the group's sort_order).
 // Replaces the old `setup_preference`-derived "contributions" concept.
@@ -9,7 +8,7 @@ export async function getMemberGroups(clerkUserId: string | null | undefined): P
   if (!clerkUserId) return []
   const { data } = await supabaseAdmin
     .from('group_members')
-    .select('groups(id, name, icon, description, badge_image, sort_order)')
+    .select('groups(id, name, icon, description, icon_image, sort_order)')
     .eq('clerk_user_id', clerkUserId)
 
   type GroupRow = MemberGroup & { sort_order: number }
@@ -17,7 +16,7 @@ export async function getMemberGroups(clerkUserId: string | null | undefined): P
     .map(r => r.groups as unknown as GroupRow | null)
     .filter((g): g is GroupRow => !!g)
     .sort((a, b) => a.sort_order - b.sort_order)
-    .map(({ id, name, icon, description, badge_image }) => ({ id, name, icon, description, badge_image }))
+    .map(({ id, name, icon, description, icon_image }) => ({ id, name, icon, description, icon_image }))
 }
 
 // Map of clerk_user_id → group names they belong to. For admin roster/overview
@@ -38,18 +37,15 @@ export async function getGroupNamesByUser(): Promise<Record<string, string[]>> {
 
 // Shape the member's groups as the icon/description metadata CommitmentsSection
 // expects (it keys icon/desc by the value shown, which is the group name).
-// When a group has no description of its own, fall back to the matching default
-// contribution one-liner (Setup/Teardown/Decor) so commitment rows still read as
-// a living description rather than a bare title.
+// The description is the group's own admin-configured description (Admin → Groups)
+// — the single source of truth. When it's blank, the commitment row shows just the
+// title; we deliberately don't substitute a hardcoded default.
 export function groupCommitmentMeta(groups: MemberGroup[]) {
-  return groups.map(g => {
-    const fallback = DEFAULT_CONTRIBUTION_TYPES.find(t => t.value.toLowerCase() === g.name.toLowerCase())
-    return {
-      value: g.name,
-      // Prefer the group's own emoji icon; fall back to its uploaded badge image,
-      // then to a plain mark. CommitmentsSection renders image-path values as <img>.
-      icon: g.icon || g.badge_image || '✦',
-      description: g.description || fallback?.description || '',
-    }
-  })
+  return groups.map(g => ({
+    value: g.name,
+    // Prefer the group's own emoji icon; fall back to its uploaded icon image,
+    // then to a plain mark. CommitmentsSection renders image-path values as <img>.
+    icon: g.icon || g.icon_image || '✦',
+    description: g.description || '',
+  }))
 }

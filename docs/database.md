@@ -1,6 +1,6 @@
 # Database Schema
 
-All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations in `supabase-migrations/` document incremental changes (latest: `034`). Confirm `025` (column renames), `029` (the `application-files` bucket), `033` (group messaging), and `034` (group badge images + `group-badges` bucket) are applied before relying on those features.
+All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations in `supabase-migrations/` document incremental changes (latest: `035`). Confirm `025` (column renames), `029` (the `application-files` bucket), `033` (group messaging), `034` (group icon images + `group-badges` bucket), and `035` (rename `badge_image` → `icon_image`) are applied before relying on those features.
 
 ---
 
@@ -115,7 +115,7 @@ Individual camp roles within a department.
 
 Configurable groups members belong to (e.g. Setup, Teardown, Decor). Added in migration `030`. **Replaced** the old contribution-types (`setup_preference`) mechanism: members are admin-assigned via Admin → Groups. Applicants can also opt in if an admin adds a **Group selection** field (`type: 'group_select'`) to the member application in the Application Builder. Each such field carries its own configurable list of offered groups in `FieldConfig.options` (group ids; **unset = all groups**, picked via a checklist in the builder). Picks write to `group_choices` → `group_members` (source `'application'`) on submit; `/api/apply` independently re-validates choices against the visible group_select fields' configured ids. Member-facing "contributions" (profile Commitments, attunement task, personal-schedule filtering, members directory) and the admin overview/registry now read group membership via `lib/groups.ts` (`getMemberGroups`, `getGroupNamesByUser`).
 
-**Post-approval self-service:** approved members can join/leave the same offered groups after the fact via the **Your Contributions** section on `/signup` (Participate), backed by `GET/POST /api/groups/membership` (which derives the selectable set from the form's `group_select` fields — the legacy `apply_selectable` column is *not* used). **Badge images:** an optional per-group `badge_image` (migration `034`) renders scattered beside the role badge on the member profile (`app/profile/ContributionBadges.tsx`); admins upload it in the Groups edit modal.
+**Post-approval self-service:** approved members can join/leave the same offered groups after the fact via the **Your Contributions** section on `/signup` (Participate), backed by `GET/POST /api/groups/membership` (which derives the selectable set from the form's `group_select` fields — the legacy `apply_selectable` column is *not* used). **Icon images:** an optional per-group `icon_image` (migration `034`, renamed from `badge_image` in `035`) is the circle icon of the member's **Active Commitments** row on the profile (`CommitmentsSection.tsx` via `groupCommitmentMeta`), and can be reused as **distinction medal art**; admins upload it in the Groups edit modal.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -123,7 +123,7 @@ Configurable groups members belong to (e.g. Setup, Teardown, Decor). Added in mi
 | `name` | TEXT NOT NULL | |
 | `description` | TEXT | Shown to applicants when the group is offered by a Group selection field |
 | `icon` | TEXT | Emoji |
-| `badge_image` | TEXT | Optional public URL of a patch-style badge image (in the `group-badges` bucket). Added in migration `034`. Rendered scattered beside the role badge on the member profile; admin-uploaded via the Groups edit modal (`POST/DELETE /api/admin/groups/[id]/badge`). |
+| `icon_image` | TEXT | Optional public URL of a patch-style icon image (in the `group-badges` bucket — legacy bucket name). Added as `badge_image` in migration `034`, renamed to `icon_image` in `035`. Used as the circle icon of the member's Active Commitments row (`CommitmentsSection.tsx`) and reusable as distinction medal art; admin-uploaded via the Groups edit modal (`POST/DELETE /api/admin/groups/[id]/icon`). |
 | `apply_selectable` | BOOL | **Legacy/unused.** Which groups appear on the application (and in member self-service) is now controlled per-field by the **Group selection** field's `options` (see below), not this column. |
 | `sort_order` | INT | |
 | `join_policy` | TEXT | Governance, added in `033`. `'admin_assigned'` (default — admin manages membership; today's crews) or `'open'` (members self-join/leave). (`'request'` is reserved for when leads exist.) Set in GroupsManager; `open` enables self-join via **Messages → Find a group** (`/api/groups/[id]/join` · `/leave`). |
@@ -271,6 +271,7 @@ Admin-editable copy for the homepage. One row per key.
 - `community_contribution_types` — **Retired** in migration `030` (Groups replaced contribution types). No longer read; the Application Builder "Contribution Types" tab and the `setup_preference` application field were removed. Any existing row is orphaned/harmless. `parseContributionTypes`/`DEFAULT_CONTRIBUTION_TYPES` remain in `lib/application-options.ts` only as the `ContributionType` shape (`{ value, icon, description }`) reused for group commitment metadata.
 - `config_attunement_tasks` — JSON array of `AttunementTask` objects (`{ id, label, requirement, enabled }`) driving the profile **Attunement Status** checklist. `requirement` is one of `role | shift | contribution | photo | approved` and auto-completes the item (logic in `app/profile/page.tsx`). Managed via Admin → Manage → Attunement Tasks (`AttunementTasksManager.tsx`). Falls back to `DEFAULT_ATTUNEMENT_TASKS` in `lib/site-config.ts` (mirrors the original five items).
 - `config_shift_signup_open` — string `'true'`/`'false'` (defaults open when absent). When `'false'`, the `/signup` shift picker is hidden behind a "times not confirmed" notice, `/api/signup` POST rejects new/changed shift selections (cancelling an existing shift is still allowed), and any `shift`-requirement attunement task is hidden from the profile checklist (`app/profile/page.tsx`). Toggled via Admin → Manage → Schedule (`ShiftSignupToggle.tsx`). Read by `app/api/signup/route.ts` (returns `shiftSignupOpen` on GET).
+- `config_distinctions` — JSON array of `DistinctionRule` objects (`{ id, label, description?, image?, glyph?, yearFact?, conditions[], enabled }`) driving the profile **Cabinet of Distinctions**. Each rule's `conditions` (`{ fact, op, value }`, all must pass) are evaluated against derived member facts — **earned medals are never stored** (see [features.md](features.md#distinctions)). Managed via Admin → Distinctions (`DistinctionsManager.tsx`). Parsed/evaluated by `lib/distinctions.ts` (`parseDistinctions`/`evaluateDistinctions`); facts come from `lib/member-facts.ts` (`buildMemberFacts`). Falls back to `DEFAULT_DISTINCTIONS`.
 
 ---
 
@@ -377,7 +378,7 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `avatars` | Member profile photos (uploaded via `AvatarUpload`; also the application Photo field → `/api/profile/avatar`) | Public |
 | `schedule-icons` | Custom icons for schedule events | Public (must be configured) |
 | `application-files` | Attachments for admin-added **File upload** application fields (`/api/apply/file`) | Public — **must be created** (migration `029`, or create in the Supabase dashboard like `avatars`) |
-| `group-badges` | Per-group badge images (`/api/admin/groups/[id]/badge` → `groups.badge_image`) | Public — **must be created** (migration `034`, or create in the Supabase dashboard like `avatars`) |
+| `group-badges` | Per-group icon images (`/api/admin/groups/[id]/icon` → `groups.icon_image`) | Public — **must be created** (migration `034`, or create in the Supabase dashboard like `avatars`) |
 
 ---
 
@@ -415,7 +416,8 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `031_shoutouts.sql` | `shoutouts` table — member-posted shoutouts on the home dashboard. **Must be applied** before the Shoutouts widget works. |
 | `032_message_sender_name.sql` | `sender_name` column on `messages` (snapshot of sender display name) + backfill from current application names. Lets conversations survive sender deletion. |
 | `033_conversations.sql` | **Group messaging.** Adds `conversations` + `conversation_participants` tables; `messages.conversation_id` + `parent_message_id` (and makes `recipient_clerk_id` nullable); group governance columns (`join_policy`/`visibility` on `groups`, `role` on `group_members`). Backfills a conversation per group and per existing DM pair (preserving read state). Additive + idempotent; **must be applied** before group messaging works. |
-| `034_group_badge_image.sql` | `badge_image` column on `groups` + public `group-badges` storage bucket and read policy. Additive + idempotent; **must be applied** before group badges render (the profile + Groups admin select `badge_image`). |
+| `034_group_badge_image.sql` | `badge_image` column on `groups` (later renamed to `icon_image` by `035`) + public `group-badges` storage bucket and read policy. Additive + idempotent. |
+| `035_rename_group_badge_to_icon.sql` | Renames `groups.badge_image` → `groups.icon_image` (the per-group uploaded image, now called an "icon" in the UI/code; the emoji field stays `groups.icon`). Data preserved; bucket keeps its `group-badges` name. **Must be applied** — the profile + Groups admin select `icon_image`. |
 
 ---
 

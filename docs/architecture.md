@@ -111,7 +111,7 @@ Sign-out flow:
 | `/api/admin/groups` | GET/POST | List (with member counts) / create groups |
 | `/api/admin/groups/[id]` | PATCH/DELETE | Update / delete group |
 | `/api/admin/groups/[id]/members` | GET/POST/DELETE | Group roster / add member / remove member (`?clerk_user_id=`) |
-| `/api/admin/groups/[id]/badge` | POST/DELETE | Upload / clear a group's badge image (`group-badges` bucket; sets `groups.badge_image`). Mirrors the avatar route. |
+| `/api/admin/groups/[id]/icon` | POST/DELETE | Upload / clear a group's icon image (`group-badges` bucket; sets `groups.icon_image`). Mirrors the avatar route. |
 | `/api/admin/schedule` | GET/POST | List / create schedule events |
 | `/api/admin/schedule/[id]` | PATCH/DELETE | Update / delete event |
 | `/api/admin/schedule/icon` | POST | Upload custom event icon |

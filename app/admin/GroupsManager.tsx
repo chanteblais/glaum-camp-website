@@ -7,7 +7,7 @@ type Group = {
   name: string
   description: string | null
   icon: string | null
-  badge_image: string | null
+  icon_image: string | null
   apply_selectable: boolean
   sort_order: number
   join_policy: string
@@ -62,12 +62,12 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   )
 }
 
-// ── Badge image upload ──────────────────────────────────────────────────────
-// Optional per-group badge image, rendered scattered on the member profile.
+// ── Icon image upload ───────────────────────────────────────────────────────
+// Optional per-group icon image, rendered scattered on the member profile.
 // Uploads immediately (persists server-side) and reports the new URL upward so
 // the group row stays in sync.
 
-function BadgeField({ groupId, initial, onChange }: {
+function IconField({ groupId, initial, onChange }: {
   groupId: string
   initial: string | null
   onChange: (url: string | null) => void
@@ -80,25 +80,25 @@ function BadgeField({ groupId, initial, onChange }: {
   async function upload(file: File) {
     setBusy(true); setErr(null)
     const fd = new FormData()
-    fd.append('badge', file)
-    const res = await fetch(`/api/admin/groups/${groupId}/badge`, { method: 'POST', body: fd })
+    fd.append('icon', file)
+    const res = await fetch(`/api/admin/groups/${groupId}/icon`, { method: 'POST', body: fd })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) { setErr(data.error ?? 'Upload failed'); setBusy(false); return }
-    setPreview(data.badge_image)
-    onChange(data.badge_image)
+    setPreview(data.icon_image)
+    onChange(data.icon_image)
     setBusy(false)
   }
 
   async function remove() {
     setBusy(true); setErr(null)
-    const res = await fetch(`/api/admin/groups/${groupId}/badge`, { method: 'DELETE' })
+    const res = await fetch(`/api/admin/groups/${groupId}/icon`, { method: 'DELETE' })
     if (res.ok) { setPreview(null); onChange(null) }
     setBusy(false)
     if (inputRef.current) inputRef.current.value = ''
   }
 
   return (
-    <Field label="Badge image (optional)" hint="A patch-style image shown scattered on members' profiles. PNG with transparency works best.">
+    <Field label="Icon (optional)" hint="A patch-style image shown scattered on members' profiles. PNG with transparency works best.">
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
         <div style={{ width: 64, height: 64, flexShrink: 0, borderRadius: '0.5rem', border: '1px solid rgba(200,168,72,0.2)', background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
           {preview
@@ -126,7 +126,7 @@ function BadgeField({ groupId, initial, onChange }: {
 // ── Group Modal ───────────────────────────────────────────────────────────────
 
 function GroupModal({
-  initial, isNew, onSave, onClose, saving, error, groupId, initialBadge, onBadgeChange,
+  initial, isNew, onSave, onClose, saving, error, groupId, initialIcon, onIconChange,
 }: {
   initial: GroupForm
   isNew: boolean
@@ -135,8 +135,8 @@ function GroupModal({
   saving: boolean
   error: string | null
   groupId?: string
-  initialBadge?: string | null
-  onBadgeChange?: (url: string | null) => void
+  initialIcon?: string | null
+  onIconChange?: (url: string | null) => void
 }) {
   const [form, setForm] = useState(initial)
   const set = (k: keyof GroupForm, v: string) => setForm(f => ({ ...f, [k]: v }))
@@ -154,7 +154,7 @@ function GroupModal({
         <Field label="Description (optional)">
           <textarea style={{ ...inputStyle, resize: 'vertical', minHeight: '72px' }} value={form.description} onChange={e => set('description', e.target.value)} placeholder="What is this group for? Shown to applicants when offered on the form." />
         </Field>
-        <Field label="Icon (optional — emoji)">
+        <Field label="Emoji (optional)">
           <input style={inputStyle} value={form.icon} onChange={e => set('icon', e.target.value)} placeholder="e.g. ⚒️" />
         </Field>
         <Field label="Who can join" hint="Admin-assigned: only admins manage members. Open: members can join/leave themselves from the Messages → Find a group picker.">
@@ -170,9 +170,9 @@ function GroupModal({
           </select>
         </Field>
         {groupId
-          ? <BadgeField groupId={groupId} initial={initialBadge ?? null} onChange={url => onBadgeChange?.(url)} />
+          ? <IconField groupId={groupId} initial={initialIcon ?? null} onChange={url => onIconChange?.(url)} />
           : <p style={{ fontSize: '0.72rem', opacity: 0.4, lineHeight: 1.5, marginBottom: '1rem' }}>
-              Save the group first, then re-open it to add a badge image.
+              Save the group first, then re-open it to add an icon.
             </p>}
         <p style={{ fontSize: '0.72rem', opacity: 0.4, lineHeight: 1.5, marginBottom: '1.25rem' }}>
           To let applicants opt into groups, add a <strong style={{ opacity: 0.8 }}>Group selection</strong> field in the Application Builder and choose which groups it offers.
@@ -446,10 +446,10 @@ export function GroupsManager({ members }: { members: AssignableMember[] }) {
         saving={saving}
         error={error}
         groupId={editing.id}
-        initialBadge={editing.badge_image}
-        onBadgeChange={(url) => {
-          setEditing(g => g ? { ...g, badge_image: url } : g)
-          setGroups(prev => prev.map(g => g.id === editing.id ? { ...g, badge_image: url } : g))
+        initialIcon={editing.icon_image}
+        onIconChange={(url) => {
+          setEditing(g => g ? { ...g, icon_image: url } : g)
+          setGroups(prev => prev.map(g => g.id === editing.id ? { ...g, icon_image: url } : g))
         }}
       />}
     </div>

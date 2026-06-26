@@ -8,7 +8,7 @@ type OptInGroup = {
   name: string
   description: string | null
   icon: string | null
-  badge_image: string | null
+  icon_image: string | null
   joined: boolean
 }
 
@@ -82,10 +82,10 @@ export function GroupCommitments() {
                 transition: 'border-color 0.15s, background 0.15s', opacity: busy ? 0.6 : 1,
               }}
             >
-              {/* Badge / icon */}
+              {/* Icon */}
               <div style={{ width: 48, height: 48, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {g.badge_image
-                  ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={g.badge_image} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                {g.icon_image
+                  ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={g.icon_image} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                   : <span style={{ fontSize: '1.5rem' }}>{g.icon || '✦'}</span>}
               </div>
 

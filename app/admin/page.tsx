@@ -63,15 +63,15 @@ export default async function AdminPage() {
   const shiftSignupOpen = configMap['config_shift_signup_open'] !== 'false'
   const distinctions = parseDistinctions(configMap['config_distinctions'])
 
-  // Group badge images — offered as medal art in the distinctions builder.
-  const { data: groupBadgeRows } = await supabaseAdmin
+  // Group icon images — offered as medal art in the distinctions builder.
+  const { data: groupIconRows } = await supabaseAdmin
     .from('groups')
-    .select('name, badge_image')
-    .not('badge_image', 'is', null)
+    .select('name, icon_image')
+    .not('icon_image', 'is', null)
     .order('sort_order')
-  const groupBadgeOptions = (groupBadgeRows ?? [])
-    .filter(g => g.badge_image)
-    .map(g => ({ name: g.name as string, image: g.badge_image as string }))
+  const groupIconOptions = (groupIconRows ?? [])
+    .filter(g => g.icon_image)
+    .map(g => ({ name: g.name as string, image: g.icon_image as string }))
 
   const { data: notifications, error: notificationsError } = await supabaseAdmin
     .from('admin_notifications')
@@ -271,7 +271,7 @@ export default async function AdminPage() {
           title="Distinctions"
           summary="Earned medals in each member's Cabinet of Distinctions"
         >
-          <DistinctionsManager initialDistinctions={distinctions} groupBadgeOptions={groupBadgeOptions} />
+          <DistinctionsManager initialDistinctions={distinctions} groupIconOptions={groupIconOptions} />
         </CollapsibleSection>
 
         {/* ── CONFIGURATION ── */}

@@ -77,9 +77,9 @@ Defined in `globals.css` under `@layer components`:
 
 | Class | Purpose |
 |---|---|
-| `.profile-main-grid` | Two-column responsive grid for profile page main content |
+| `.profile-main-grid` | `1.1fr 1fr` equal-height grid for the Active Commitments + Attunement Status cards |
 | `.profile-info-grid` | Info card grid within profile |
-| `.profile-badge-row` | `1fr auto 1fr` grid to keep avatar centered with badge overlay |
+| `.profile-header-grid` | `1fr auto 1fr` header band: Designation · portrait · Member Information (stacks under 768px) |
 | `.commitments-rows` | Responsive rows in the Commitments card |
 | `.commitments-row` | Single commitment row |
 | `.commitments-row-text` | Text portion of a commitment row |

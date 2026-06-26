@@ -31,7 +31,7 @@ export type DistinctionRule = {
   id: string
   label: string
   description?: string
-  /** Medal art URL (an existing group badge_image, or a pasted image URL). */
+  /** Medal art URL (an existing group icon_image, or a pasted image URL). */
   image?: string
   /** Emoji glyph fallback, rendered in a CSS frame when no `image` is set. */
   glyph?: string
