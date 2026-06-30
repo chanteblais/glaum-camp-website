@@ -420,6 +420,7 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `035_rename_group_badge_to_icon.sql` | Renames `groups.badge_image` → `groups.icon_image` (the per-group uploaded image, now called an "icon" in the UI/code; the emoji field stays `groups.icon`). Data preserved; bucket keeps its `group-badges` name. **Must be applied** — the profile + Groups admin select `icon_image`. |
 | `039_lead_up_gatherings.sql` | **Lead-Up Gatherings.** Adds `lead_up_events` + `lead_up_event_rsvps` tables — real-dated planning sessions on the runway to the event, separate from `schedule_events`. Additive + idempotent; **must be applied** before the feature works. See [`lead-up-gatherings.md`](./lead-up-gatherings.md). |
 | `040_lead_up_notified.sql` | `notified_at TIMESTAMPTZ` on `lead_up_events` — tracks the "Notify members" broadcast. Additive + idempotent. |
+| `041_lead_up_image.sql` | `image_url TEXT` on `lead_up_events` + public `lead-up-images` storage bucket & read policy. Additive + idempotent; **must be applied** (or create the bucket manually) before image upload works. |
 
 ---
 
@@ -438,6 +439,7 @@ Real-dated planning/brainstorming gatherings on the runway to the event — deli
 | `location` | TEXT | physical place (optional) |
 | `link` | TEXT | virtual link, e.g. Zoom/Meet (optional) |
 | `host` | TEXT | who's running it (optional) |
+| `image_url` | TEXT | optional banner image (public `lead-up-images` bucket); rendered on the /schedule cards + announcement email |
 | `visible` | BOOL | shown to members |
 | `sort_order` | INT | tiebreak ordering (date is primary) |
 | `notified_at` | TIMESTAMPTZ | when members were last alerted (bell + email) via the admin "Notify members" button; NULL = never. Drives the manager's "Notified" state. |

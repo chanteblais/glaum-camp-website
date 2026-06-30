@@ -146,10 +146,15 @@ export async function sendLeadUpGatheringEmail(opts: {
   when: string | null
   location: string | null
   link: string | null
+  imageUrl?: string | null
 }) {
-  const { to, recipientName, title, when, location, link } = opts
+  const { to, recipientName, title, when, location, link, imageUrl } = opts
   const scheduleUrl = `${APP_URL}/schedule`
   const prefsUrl = `${APP_URL}/profile#notifications`
+
+  const banner = imageUrl
+    ? `<img src="${encodeURI(imageUrl)}" alt="" style="width:100%;max-height:200px;object-fit:cover;border-radius:8px;margin:0 0 16px" />`
+    : ''
 
   const detailRows = [
     when ? `<p style="margin:4px 0"><strong>When:</strong> ${escapeHtml(when)}</p>` : '',
@@ -160,6 +165,7 @@ export async function sendLeadUpGatheringEmail(opts: {
   const html = `
     <p>Hi ${escapeHtml(recipientName)},</p>
     <p>A new gathering on the way to camp:</p>
+    ${banner}
     <div style="margin:18px 0;padding:14px 18px;border-left:3px solid #C8A848;background:rgba(200,168,72,0.06);color:#3a2b14;border-radius:6px">
       <p style="margin:0 0 6px;font-size:17px;color:#634D0B"><strong>${escapeHtml(title)}</strong></p>
       ${detailRows}

@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
       location: body.location || null,
       link: body.link || null,
       host: body.host || null,
+      image_url: body.image_url || null,
       visible: body.visible ?? true,
       sort_order,
     }])

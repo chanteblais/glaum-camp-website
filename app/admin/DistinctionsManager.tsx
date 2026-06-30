@@ -8,6 +8,7 @@ import {
   type DistinctionOp,
   type DistinctionRule,
 } from '@/lib/distinctions'
+import { builtinAssets } from '@/lib/asset-library'
 import type { DistinctionCatalogEntry, DistinctionValueType } from '@/lib/profile-fields'
 
 const GOLD = '#C8A848'
@@ -27,10 +28,45 @@ const isCountOp = (op: DistinctionOp) => op === 'count_gte'
 // written into the rule's `image` field (and autosaved with the rest of the JSON).
 // Shows a live thumbnail of whatever `value` currently is — uploaded, a reused
 // group icon, or a pasted URL.
-function MedalUpload({ ruleId, value, onChange }: {
+// A single selectable medal thumbnail.
+function MedalTile({ src, label, selected, onClick }: {
+  src: string
+  label: string
+  selected: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      style={{ width: 60, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+    >
+      <span style={{
+        width: 60, height: 60, borderRadius: '0.5rem', overflow: 'hidden',
+        background: 'rgba(8,0,18,0.6)',
+        border: selected ? '2px solid #C8A848' : '1px solid rgba(200,168,72,0.2)',
+        boxShadow: selected ? '0 0 0 1px rgba(200,168,72,0.4)' : 'none',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt="" style={{ width: '92%', height: '92%', objectFit: 'contain' }} />
+      </span>
+      <span style={{ fontSize: '0.55rem', color: CREAM, opacity: selected ? 0.95 : 0.55, maxWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '0.02em' }}>
+        {label}
+      </span>
+    </button>
+  )
+}
+
+// Medal image picker: a gallery of included images (the built-in asset library +
+// reusable group icons) plus an "Upload your own" tile. Replaces the old glyph /
+// paste-URL controls — external admins just click an image or upload one.
+function MedalPicker({ ruleId, value, onChange, groupIconOptions }: {
   ruleId: string
   value: string | undefined
   onChange: (url: string | undefined) => void
+  groupIconOptions: GroupIconOption[]
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
@@ -48,30 +84,61 @@ function MedalUpload({ ruleId, value, onChange }: {
     if (inputRef.current) inputRef.current.value = ''
   }
 
+  const included = [
+    ...builtinAssets('distinction').map(a => ({ key: a.id, src: a.src, label: a.label })),
+    ...groupIconOptions.map(g => ({ key: g.image, src: g.image, label: `${g.name} icon` })),
+  ]
+  // A custom-uploaded image won't be in `included`; surface it as its own selected tile.
+  const showUploaded = !!value && !included.some(i => i.src === value)
+
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-      <span style={{
-        width: 28, height: 28, flexShrink: 0, borderRadius: '0.35rem',
-        border: '1px solid rgba(200,168,72,0.2)', background: 'rgba(255,255,255,0.03)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-      }}>
-        {value
-          ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={value} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-          : <span style={{ fontSize: '0.55rem', opacity: 0.3 }}>—</span>}
-      </span>
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
-        disabled={busy}
-        style={{ ...selectStyle, cursor: busy ? 'wait' : 'pointer', color: '#FFFACD', opacity: busy ? 0.5 : 1 }}
-        title="Upload a custom medal image"
-      >
-        {busy ? 'Uploading…' : value ? 'Replace' : 'Upload'}
-      </button>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+      <span style={tinyLabel}>Medal image</span>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.55rem', alignItems: 'flex-start' }}>
+        {included.map(opt => (
+          <MedalTile key={opt.key} src={opt.src} label={opt.label} selected={value === opt.src} onClick={() => onChange(opt.src)} />
+        ))}
+        {showUploaded && (
+          <MedalTile src={value!} label="Your upload" selected onClick={() => { /* already selected */ }} />
+        )}
+
+        {/* Upload your own */}
+        <div style={{ width: 60, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}>
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={busy}
+            title="Upload your own image"
+            style={{
+              width: 60, height: 60, borderRadius: '0.5rem',
+              border: '1px dashed rgba(200,168,72,0.45)', background: 'rgba(255,255,255,0.03)',
+              color: '#FFFACD', cursor: busy ? 'wait' : 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem', lineHeight: 1,
+            }}
+          >
+            {busy ? '…' : '＋'}
+          </button>
+          <span style={{ fontSize: '0.55rem', color: CREAM, opacity: 0.55, letterSpacing: '0.02em' }}>
+            {busy ? 'Uploading' : 'Upload'}
+          </span>
+        </div>
+
+        {/* Clear */}
+        {value && (
+          <button
+            type="button"
+            onClick={() => onChange(undefined)}
+            title="Use no image"
+            style={{ alignSelf: 'center', background: 'none', border: 'none', cursor: 'pointer', color: CREAM, opacity: 0.4, fontSize: '0.62rem', letterSpacing: '0.04em', textDecoration: 'underline', padding: '0.2rem' }}
+          >
+            Clear
+          </button>
+        )}
+      </div>
+      {err && <span style={{ fontSize: '0.62rem', color: '#ff8a8a' }}>{err}</span>}
       <input ref={inputRef} type="file" accept="image/png,image/webp,image/svg+xml,image/jpeg,image/gif" style={{ display: 'none' }}
         onChange={e => { const f = e.target.files?.[0]; if (f) upload(f) }} />
-      {err && <span style={{ fontSize: '0.62rem', color: '#ff8a8a' }}>{err}</span>}
-    </span>
+    </div>
   )
 }
 
@@ -228,39 +295,13 @@ export function DistinctionsManager({
                 style={{ ...inputStyle, width: '100%', fontSize: '0.78rem', opacity: 0.85 }}
               />
 
-              {/* Medal art */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <span style={tinyLabel}>Medal</span>
-                <input
-                  value={rule.glyph ?? ''}
-                  onChange={e => patch(idx, { glyph: e.target.value })}
-                  placeholder="✦"
-                  title="Emoji glyph (used when no image)"
-                  style={{ ...selectStyle, width: '3rem', textAlign: 'center' }}
-                />
-                <select
-                  value={rule.image ?? ''}
-                  onChange={e => patch(idx, { image: e.target.value || undefined })}
-                  style={selectStyle}
-                  title="Reuse a group icon"
-                >
-                  <option value="" style={{ background: '#1A0A24' }}>— use glyph —</option>
-                  {groupIconOptions.map(g => (
-                    <option key={g.image} value={g.image} style={{ background: '#1A0A24' }}>{g.name} icon</option>
-                  ))}
-                </select>
-                <input
-                  value={rule.image ?? ''}
-                  onChange={e => patch(idx, { image: e.target.value || undefined })}
-                  placeholder="or paste image URL"
-                  style={{ ...inputStyle, flex: 1, minWidth: '8rem', fontSize: '0.72rem' }}
-                />
-                <MedalUpload
-                  ruleId={rule.id}
-                  value={rule.image}
-                  onChange={url => patch(idx, { image: url })}
-                />
-              </div>
+              {/* Medal image — pick an included image or upload your own */}
+              <MedalPicker
+                ruleId={rule.id}
+                value={rule.image}
+                onChange={url => patch(idx, { image: url })}
+                groupIconOptions={groupIconOptions}
+              />
 
               {/* Conditions */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', borderLeft: '1px solid rgba(200,168,72,0.18)', paddingLeft: '0.7rem' }}>
@@ -442,7 +483,7 @@ export function DistinctionsManager({
       <button
         onClick={() => update([
           ...rules,
-          { id: `distinction-${Date.now()}`, label: 'New distinction', glyph: '✦', conditions: [defaultCondition()], enabled: true },
+          { id: `distinction-${Date.now()}`, label: 'New distinction', conditions: [defaultCondition()], enabled: true },
         ])}
         style={{
           width: '100%', padding: '0.65rem',

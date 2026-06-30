@@ -18,7 +18,6 @@ function PollItem({ poll }: { poll: Poll }) {
   const [userVotes, setUserVotes] = useState<number[]>(poll.initialUserVotes)
   const [pending, setPending] = useState<number[]>([])
   const [error, setError] = useState<string | null>(null)
-  const hasVoted = userVotes.length > 0
   const total = counts.reduce((a, b) => a + b, 0)
 
   async function vote(idx: number) {
@@ -85,24 +84,20 @@ function PollItem({ poll }: { poll: Poll }) {
                 transition: 'border-color 0.15s',
               }}
             >
-              {/* progress bar fill */}
-              {hasVoted && (
-                <span style={{
-                  position: 'absolute', inset: 0, right: `${100 - pct}%`,
-                  background: isVoted ? 'rgba(200,168,72,0.08)' : 'rgba(255,255,255,0.025)',
-                  transition: 'right 0.4s ease',
-                  pointerEvents: 'none',
-                }} />
-              )}
+              {/* progress bar fill — results are visible to everyone, voted or not */}
+              <span style={{
+                position: 'absolute', inset: 0, right: `${100 - pct}%`,
+                background: isVoted ? 'rgba(200,168,72,0.08)' : 'rgba(255,255,255,0.025)',
+                transition: 'right 0.4s ease',
+                pointerEvents: 'none',
+              }} />
               <span style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
                 <span style={{ fontSize: '0.83rem', color: isVoted ? '#C8A848' : '#F3EDE6', opacity: isPending ? 0.6 : 1 }}>
                   {isVoted && '✓ '}{opt}
                 </span>
-                {hasVoted && (
-                  <span style={{ fontSize: '0.72rem', color: '#C8A848', opacity: 0.6, flexShrink: 0 }}>
-                    {pct}% · {counts[i]}
-                  </span>
-                )}
+                <span style={{ fontSize: '0.72rem', color: '#C8A848', opacity: 0.6, flexShrink: 0 }}>
+                  {pct}% · {counts[i]}
+                </span>
               </span>
             </button>
           )

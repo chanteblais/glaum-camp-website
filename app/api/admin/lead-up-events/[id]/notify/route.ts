@@ -33,7 +33,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
   const { data: gathering } = await supabaseAdmin
     .from('lead_up_events')
-    .select('id, title, event_date, start_time, location, link, visible')
+    .select('id, title, event_date, start_time, location, link, image_url, visible')
     .eq('id', params.id)
     .maybeSingle()
 
@@ -91,6 +91,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
         when,
         location: gathering.location,
         link: gathering.link,
+        imageUrl: gathering.image_url,
       })
       if (result.ok) emailed++
     } catch (err) {

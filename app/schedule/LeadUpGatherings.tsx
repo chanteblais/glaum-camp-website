@@ -12,6 +12,7 @@ type LeadUpEvent = {
   location: string | null
   link: string | null
   host: string | null
+  image_url: string | null
   rsvp_count: number
   rsvped: boolean
 }
@@ -91,10 +92,14 @@ export function LeadUpGatherings() {
           const time = timeLabel(ev)
           return (
             <div key={ev.id} style={{
-              display: 'flex', alignItems: 'flex-start', gap: '1.1rem',
-              padding: '1.1rem 1.25rem', borderRadius: '1rem',
+              borderRadius: '1rem', overflow: 'hidden',
               border: '1px solid rgba(200,168,72,0.2)', background: 'rgba(10,0,20,0.45)',
             }}>
+              {ev.image_url && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={ev.image_url} alt="" style={{ width: '100%', height: '170px', objectFit: 'cover', display: 'block', borderBottom: '1px solid rgba(200,168,72,0.15)' }} />
+              )}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.1rem', padding: '1.1rem 1.25rem' }}>
               {/* Date block */}
               <div style={{
                 flexShrink: 0, width: '64px', textAlign: 'center',
@@ -144,6 +149,7 @@ export function LeadUpGatherings() {
                     {ev.rsvp_count} {ev.rsvp_count === 1 ? 'going' : 'going'}
                   </span>
                 )}
+              </div>
               </div>
             </div>
           )

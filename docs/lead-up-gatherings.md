@@ -47,6 +47,7 @@ New table `lead_up_events` — deliberately lighter than `schedule_events`:
 | `location` | TEXT | physical place — optional |
 | `link` | TEXT | virtual link (Zoom/Meet) — brainstorms are often remote; optional |
 | `host` | TEXT | who's running it — optional |
+| `image_url` | TEXT | optional banner image (public `lead-up-images` bucket, migration `041`); shown on the /schedule cards, the home-dashboard teaser (thumbnail), + announcement email |
 | `visible` | BOOL | admin show/hide |
 | `sort_order` | INT | |
 
@@ -65,7 +66,7 @@ RSVP status set: `going` / `maybe` / `not_going` (or just a binary `going` toggl
 
 ## Member alerts (migration `040`, built)
 
-An admin **"Notify members"** button on each gathering in the manager fans out an alert — **deliberate, not automatic**, so drafts/edits don't spam, and it can be re-sent. `POST /api/admin/lead-up-events/[id]/notify`:
+Two admin entry points, both routing to the same fan-out: a **"Notify members on save"** toggle in the **create** modal (shown only when the gathering is "Visible to members"; the create flow notifies right after the POST returns the new id), and a **"Notify members"** button on each row for sending later or re-sending. **Deliberate, not automatic** — the toggle defaults off and isn't shown on edit, so drafts/edits don't spam. `POST /api/admin/lead-up-events/[id]/notify`:
 - requires the gathering be **visible**;
 - inserts a `user_notifications` bell row (`event_type: 'lead_up_gathering'`, deep-links to `/schedule`) for every approved member with an account, minus the acting admin (batch insert);
 - emails those members via `sendLeadUpGatheringEmail` (`lib/send-email.ts`), **gated by each member's `email_announcements` preference** (default ON), best-effort per recipient;

@@ -34,7 +34,7 @@ export default async function Home() {
   let application: Record<string, unknown> | null = null
   let campSignup: Record<string, unknown> | null = null
   let upcomingEvents: { id: string; day: string; time: string; title: string; subtitle: string | null; icon_type: string; event_date: string | null; event_category: string }[] = []
-  let leadUpEvents: { id: string; title: string; event_date: string | null; start_time: string | null; location: string | null; host: string | null }[] = []
+  let leadUpEvents: { id: string; title: string; event_date: string | null; start_time: string | null; location: string | null; host: string | null; image_url: string | null }[] = []
   let spotlightPool: unknown[] = []
   let userFirstName: string | null = null
   type ActivityItem = { label: string; name: string; ts: string; avatar_url: string | null }
@@ -83,7 +83,7 @@ let canManagePolls = false
           .limit(4),
         supabaseAdmin
           .from('lead_up_events')
-          .select('id, title, event_date, start_time, location, host')
+          .select('id, title, event_date, start_time, location, host, image_url')
           .eq('visible', true)
           .or(`event_date.is.null,event_date.gte.${new Date().toISOString().slice(0, 10)}`)
           .order('event_date', { ascending: true, nullsFirst: false })
@@ -366,8 +366,9 @@ let canManagePolls = false
                 icon_type: 'star',
                 event_date: e.event_date,
                 event_category: 'lead_up',
+                image_url: e.image_url,
               }))
-              const EventList = ({ events, label, href }: { events: typeof upcomingEvents; label: string; href: string }) => (
+              const EventList = ({ events, label, href }: { events: (typeof upcomingEvents[number] & { image_url?: string | null })[]; label: string; href: string }) => (
                 <div style={{ border: '1px solid rgba(200,168,72,0.25)', borderRadius: '1rem', background: 'rgba(10,0,20,0.5)', overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
                   <div style={{ padding: '1.25rem 1.5rem 1rem', borderBottom: '1px solid rgba(200,168,72,0.15)' }}>
                     <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '0.7rem', letterSpacing: '0.18em', color: '#C8A848', margin: 0, textTransform: 'uppercase', opacity: 0.9 }}>
@@ -407,6 +408,10 @@ let canManagePolls = false
                             <p style={{ fontSize: '0.72rem', color: '#B0947A', margin: 0, opacity: 0.75 }}>{ev.subtitle}</p>
                           )}
                         </div>
+                        {ev.image_url && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={ev.image_url} alt="" style={{ width: '88px', height: '88px', objectFit: 'cover', borderRadius: '0.6rem', flexShrink: 0, border: '1px solid rgba(200,168,72,0.25)' }} />
+                        )}
                         <span style={{ color: '#C8A848', opacity: 0.25, fontSize: '0.8rem', flexShrink: 0 }}>›</span>
                       </div>
                     ))}

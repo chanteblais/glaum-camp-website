@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { normaliseToken } from '@/lib/time-format'
 
 type LeadUpEvent = {
@@ -13,6 +13,7 @@ type LeadUpEvent = {
   location: string | null
   link: string | null
   host: string | null
+  image_url: string | null
   visible: boolean
   sort_order: number
   notified_at: string | null
@@ -23,7 +24,7 @@ type Draft = Omit<LeadUpEvent, 'id' | 'sort_order' | 'rsvp_count' | 'notified_at
 
 const blank = (): Draft => ({
   title: '', description: '', event_date: null, start_time: '', end_time: '',
-  location: '', link: '', host: '', visible: true,
+  location: '', link: '', host: '', image_url: null, visible: true,
 })
 
 const inputStyle: React.CSSProperties = {
@@ -71,15 +72,51 @@ function formatDate(d: string | null): string {
   return dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
-function GatheringModal({ initial, onSave, onClose, saving, error }: {
+function GatheringModal({ initial, isCreate, onSave, onClose, saving, error }: {
   initial: Draft
-  onSave: (form: Draft) => void
+  isCreate: boolean
+  onSave: (form: Draft, notify: boolean) => void
   onClose: () => void
   saving: boolean
   error: string | null
 }) {
   const [form, setForm] = useState(initial)
+  const [notify, setNotify] = useState(false)
+  const [imageUploading, setImageUploading] = useState(false)
+  const [imageError, setImageError] = useState<string | null>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
   const set = (k: keyof Draft, v: unknown) => setForm(p => ({ ...p, [k]: v }))
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImageUploading(true)
+    setImageError(null)
+    try {
+      const fd = new FormData()
+      fd.append('image', file)
+      const res = await fetch('/api/admin/lead-up-events/image', { method: 'POST', body: fd })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      set('image_url', data.url)
+    } catch (err: unknown) {
+      setImageError(err instanceof Error ? err.message : 'Upload failed')
+    } finally {
+      setImageUploading(false)
+      if (imageInputRef.current) imageInputRef.current.value = ''
+    }
+  }
+
+  const handleImageRemove = () => {
+    const url = form.image_url
+    set('image_url', null)
+    // Best-effort storage cleanup; the field is already cleared regardless.
+    if (url) {
+      fetch('/api/admin/lead-up-events/image', {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }),
+      }).catch(() => {})
+    }
+  }
 
   // A time field is invalid only when it's non-empty and unparseable.
   const startInvalid = !!form.start_time?.trim() && normaliseToken(form.start_time) === null
@@ -98,11 +135,12 @@ function GatheringModal({ initial, onSave, onClose, saving, error }: {
 
   const handleSubmit = () => {
     // Saves are gated on validity, so normaliseToken returns a value here.
+    // A hidden gathering can't be notified, so only fan out when it's visible.
     onSave({
       ...form,
       start_time: form.start_time?.trim() ? (normaliseToken(form.start_time) ?? form.start_time) : form.start_time,
       end_time: form.end_time?.trim() ? (normaliseToken(form.end_time) ?? form.end_time) : form.end_time,
-    })
+    }, notify && form.visible)
   }
 
   return (
@@ -160,9 +198,42 @@ function GatheringModal({ initial, onSave, onClose, saving, error }: {
           <input style={inputStyle} value={form.host ?? ''} placeholder="Who's running it" onChange={e => set('host', e.target.value)} />
         </Field>
 
-        <div style={{ marginBottom: '1.25rem' }}>
+        <Field label="Image (optional)">
+          {form.image_url ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={form.image_url} alt="" style={{ width: '88px', height: '64px', objectFit: 'cover', borderRadius: '0.5rem', border: '1px solid rgba(200,168,72,0.25)' }} />
+              <button type="button" onClick={handleImageRemove} style={{ background: 'none', border: '1px solid rgba(255,100,100,0.3)', borderRadius: '0.4rem', color: '#ff8a8a', cursor: 'pointer', padding: '0.3rem 0.7rem', fontSize: '0.72rem', opacity: 0.7 }}>
+                Remove
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => imageInputRef.current?.click()}
+              disabled={imageUploading}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(200,168,72,0.08)', border: '1px dashed rgba(200,168,72,0.35)', borderRadius: '0.5rem', color: '#C8A848', cursor: 'pointer', padding: '0.5rem 0.9rem', fontSize: '0.78rem', opacity: imageUploading ? 0.5 : 0.85 }}
+            >
+              {imageUploading ? 'Uploading…' : '＋ Upload image'}
+            </button>
+          )}
+          <input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleImageUpload} style={{ display: 'none' }} />
+          {imageError && <p style={{ color: '#ff8a8a', fontSize: '0.72rem', marginTop: '0.4rem' }}>{imageError}</p>}
+        </Field>
+
+        <div style={{ marginBottom: isCreate ? '0.75rem' : '1.25rem' }}>
           <Toggle checked={form.visible} onChange={v => set('visible', v)} label="Visible to members" />
         </div>
+
+        {isCreate && (
+          <div style={{ marginBottom: '1.25rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(200,168,72,0.1)' }}>
+            {form.visible ? (
+              <Toggle checked={notify} onChange={setNotify} label="Notify members on save (bell + email)" />
+            ) : (
+              <p style={{ fontSize: '0.76rem', opacity: 0.4, margin: 0 }}>Turn on “Visible to members” to alert members on save.</p>
+            )}
+          </div>
+        )}
 
         {error && <p style={{ color: '#ff8a8a', fontSize: '0.82rem', marginBottom: '0.75rem' }}>{error}</p>}
 
@@ -199,7 +270,7 @@ export function LeadUpGatheringsManager() {
 
   useEffect(() => { load() }, [])
 
-  const handleSave = async (form: Draft) => {
+  const handleSave = async (form: Draft, notify = false) => {
     setSaving(true)
     setModalError(null)
     try {
@@ -214,6 +285,20 @@ export function LeadUpGatheringsManager() {
         })
       }
       if (!res.ok) { const d = await res.json(); throw new Error(d.error) }
+
+      // New gatherings can fan out the alert immediately if requested.
+      if (modal?.mode === 'add' && notify) {
+        const created = (await res.json()).event
+        if (created?.id) {
+          const nres = await fetch(`/api/admin/lead-up-events/${created.id}/notify`, { method: 'POST' })
+          const ndata = await nres.json().catch(() => ({}))
+          setNotifyResult({
+            id: created.id,
+            text: nres.ok ? `Notified ${ndata.notified} · emailed ${ndata.emailed}` : (ndata.error || 'Saved, but notify failed'),
+          })
+        }
+      }
+
       await load()
       setModal(null)
     } catch (e: unknown) {
@@ -354,8 +439,9 @@ export function LeadUpGatheringsManager() {
       {modal && (
         <GatheringModal
           initial={modal.mode === 'edit'
-            ? { title: modal.event.title, description: modal.event.description, event_date: modal.event.event_date, start_time: modal.event.start_time, end_time: modal.event.end_time, location: modal.event.location, link: modal.event.link, host: modal.event.host, visible: modal.event.visible }
+            ? { title: modal.event.title, description: modal.event.description, event_date: modal.event.event_date, start_time: modal.event.start_time, end_time: modal.event.end_time, location: modal.event.location, link: modal.event.link, host: modal.event.host, image_url: modal.event.image_url, visible: modal.event.visible }
             : blank()}
+          isCreate={modal.mode === 'add'}
           onSave={handleSave}
           onClose={() => setModal(null)}
           saving={saving}

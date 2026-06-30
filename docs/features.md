@@ -52,7 +52,7 @@ Configurable widgets (order, visibility, and width controlled by admin via the p
 |---|---|---|
 | `announcements` | Announcements | Visible, non-expired admin announcements; pinned first. Hidden if empty |
 | `shoutouts` | Shoutouts | Member-posted shoutouts (newest first). Approved members post via a "✦ Share a shoutout" button at the bottom that opens an inline composer; authors and admins can delete (✕). See **Shoutouts** under Supporting Features |
-| `polls` | Polls | Active, non-expired admin polls. Members vote inline; results shown after voting |
+| `polls` | Polls | Active, non-expired admin polls. Members vote inline; results visible to everyone (voted or not) |
 | `events` | Upcoming Gatherings | Pre-camp + at-camp `schedule_events` in the next 14 days. "View full schedule →" links to `/schedule` |
 | `spotlight` | Meet a Member | Left: rotating member spotlight (cycles every minute). Right: Upcoming Gatherings list |
 | `activity` | Recent Activity | Mixed feed of member joins + profile updates, up to 6 items |
@@ -362,8 +362,7 @@ Admin creates polls in the Admin Dashboard → Polls section (or via `+ Poll` in
 
 **Member experience:**
 - Active (visible + non-expired) polls appear in the `polls` dashboard widget
-- Before voting: plain option buttons
-- After voting: animated progress bars, percentages, and vote counts appear
+- Results (progress bars, percentages, vote counts) are visible to **all** members, voted or not — voting just adds the ✓ highlight on your choice
 - Members can change their vote at any time (previous votes are replaced)
 - Single-choice and multiple-choice modes supported
 
