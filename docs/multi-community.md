@@ -4,6 +4,8 @@ This document tracks the evolution of the Glåüm camp platform toward a **reusa
 
 Glåüm is the first community on the platform.
 
+> **Living ledger:** [`generalizability-log.md`](./generalizability-log.md) is the append-as-you-go record of every Glåüm/What-If–specific or single-community assumption found while building/dogfooding. It is maintained automatically during iterations and is the concrete requirements source for the Phase 1 foundation below. Build the foundation *after* What If (July 23, 2026), informed by that log + real test-user needs.
+
 ---
 
 ## Guiding principles

@@ -12,6 +12,7 @@ Paste at the start of a new Claude session. Deliberately short; the detailed doc
 - `docs/design-system.md` — colors, fonts, CSS classes, component patterns
 
 ## Conventions & gotchas
+- **Generalizability log (standing task):** This is a dogfood toward a multi-community SaaS. During **any** iteration, when you hardcode/encounter a Glåüm- or What-If–specific value (name, term, color, copy, option list, image, font, domain) or single-community assumption, **append a row to `docs/generalizability-log.md`** (log it, don't necessarily fix it; prefer config-first when you do touch it). What If is July 23, 2026 — ship single-tenant until then; the log feeds the post–What If multi-tenant foundation. See `docs/multi-community.md`.
 - **Data:** server components → `supabaseAdmin` directly (service key); client components → `fetch('/api/...')` → API route → `supabaseAdmin`. `lib/supabase.ts` is a lazy Proxy so missing env vars don't break the build. Env in `.env.local`.
 - **Auth:** Clerk v7. Admin = `publicMetadata.role === 'admin'`. Shared helper `lib/profile-auth.ts`.
 - No shared layout header — each page owns its header row. Mobile nav breakpoint in JS (`window.innerWidth < 768`). `overflow-x: hidden` on html/body.
