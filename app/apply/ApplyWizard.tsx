@@ -925,12 +925,25 @@ export function ApplyWizard({ userEmail, formConfig, agreementItems, attendanceO
     setSubmitting(true)
     setError(null)
     try {
+      // Phase 3: registry-bound fields write their answers to the canonical member
+      // profile. Collect { [registryKey]: answer } for every bound field that has
+      // a non-empty answer (custom-field answers live in custom_answers[field.key]).
+      const profile_values: Record<string, string | string[]> = {}
+      for (const s of formConfig.steps) {
+        for (const f of s.fields) {
+          if (!f.profileFieldKey) continue
+          const v = form.custom_answers[f.key]
+          if (v === undefined || v === '' || (Array.isArray(v) && v.length === 0)) continue
+          profile_values[f.profileFieldKey] = v
+        }
+      }
       const res = await fetch('/api/apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
           onboarding_status: form.onboarding_status ? [form.onboarding_status] : [],
+          profile_values,
         }),
       })
       const data = await res.json()

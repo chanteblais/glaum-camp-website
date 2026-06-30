@@ -6,6 +6,7 @@ import {
   getOwnedApplication,
 } from '@/lib/profile-auth'
 import { notifyAdmin } from '@/lib/notify-admin'
+import { setMemberStatus } from '@/lib/members'
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth()
@@ -56,6 +57,9 @@ export async function POST(req: NextRequest) {
     console.error('[profile/cancel POST]', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
+  // Dual-write: mirror the cancellation onto the canonical member record.
+  await setMemberStatus(userId, application.id as string, 'cancelled')
 
   const displayName =
     (application.preferred_name as string) ||

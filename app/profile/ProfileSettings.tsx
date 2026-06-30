@@ -25,6 +25,8 @@ type ApplicationData = {
   space_requirements?: string | null
   structures?: string | null
   rideshare?: string | null
+  public_bio?: string | null
+  public_skills?: string | null
 }
 
 const inputStyle: React.CSSProperties = {
@@ -81,6 +83,8 @@ export function ProfileSettings({ application }: { application: ApplicationData 
     space_requirements: application.space_requirements ?? '',
     structures: application.structures ?? '',
     rideshare: application.rideshare ?? '',
+    public_bio: application.public_bio ?? '',
+    public_skills: application.public_skills ?? '',
   })
 
   useEffect(() => {
@@ -98,6 +102,8 @@ export function ProfileSettings({ application }: { application: ApplicationData 
       space_requirements: application.space_requirements ?? '',
       structures: application.structures ?? '',
       rideshare: application.rideshare ?? '',
+      public_bio: application.public_bio ?? '',
+      public_skills: application.public_skills ?? '',
     })
   }, [application])
 
@@ -297,6 +303,28 @@ export function ProfileSettings({ application }: { application: ApplicationData 
                 onChange={(e) => setForm({ ...form, pronouns: e.target.value })}
               />
             </Field>
+          </div>
+
+          {/* Public profile — what other members see on your directory page. */}
+          <div id="settings-field-public_bio" style={{ marginBottom: '1.25rem' }}>
+            <label style={labelStyle}>About <span style={{ textTransform: 'none', letterSpacing: 0, opacity: 0.5 }}>· shown on your public profile</span></label>
+            <textarea
+              style={{ ...inputStyle, minHeight: '5.5rem', resize: 'vertical', lineHeight: 1.6 }}
+              value={form.public_bio}
+              maxLength={600}
+              placeholder="A short introduction other members will see…"
+              onChange={(e) => setForm({ ...form, public_bio: e.target.value })}
+            />
+          </div>
+
+          <div id="settings-field-public_skills" style={{ marginBottom: '1.25rem' }}>
+            <label style={labelStyle}>Skills &amp; Gifts <span style={{ textTransform: 'none', letterSpacing: 0, opacity: 0.5 }}>· comma-separated</span></label>
+            <input
+              style={inputStyle}
+              value={form.public_skills}
+              placeholder="Carpentry, Photography, First Aid, Lighting"
+              onChange={(e) => setForm({ ...form, public_skills: e.target.value })}
+            />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 1rem' }}>

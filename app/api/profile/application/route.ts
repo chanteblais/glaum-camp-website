@@ -7,6 +7,7 @@ import {
   getOwnedApplication,
 } from '@/lib/profile-auth'
 import { formatFieldLabel, notifyAdmin, summarizeChanges } from '@/lib/notify-admin'
+import { upsertMember } from '@/lib/members'
 
 export async function PATCH(req: NextRequest) {
   const { userId } = await auth()
@@ -67,6 +68,14 @@ export async function PATCH(req: NextRequest) {
   if (error) {
     console.error('[profile/application PATCH]', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  // Phase 1 dual-write: mirror identity edits onto the canonical member record.
+  const identityKeys = ['first_name', 'last_name', 'preferred_name', 'pronouns', 'phone', 'email'] as const
+  const identityPatch: Record<string, unknown> = {}
+  for (const k of identityKeys) if (k in updates) identityPatch[k] = updates[k]
+  if (Object.keys(identityPatch).length > 0) {
+    await upsertMember(userId, { ...identityPatch, application_id: application.id as string })
   }
 
   const displayName =

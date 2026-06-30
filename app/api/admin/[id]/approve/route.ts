@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { sendUserEmail, APP_URL } from '@/lib/send-email'
+import { setMemberStatus } from '@/lib/members'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const { userId } = await auth()
@@ -35,6 +36,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (updateError) {
     return NextResponse.json({ error: updateError.message }, { status: 500 })
   }
+
+  // Phase 1 dual-write: mirror the approval onto the canonical member record.
+  await setMemberStatus(application?.clerk_user_id ?? null, id, 'approved')
 
   // Notify the applicant
   let emailWarning: string | undefined

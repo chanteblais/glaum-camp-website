@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { notifyAdmin } from '@/lib/notify-admin'
+import { upsertMember } from '@/lib/members'
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth()
@@ -10,92 +11,114 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Check for duplicate application
+    // A prior application only blocks re-applying if it's still active. A
+    // *cancelled* application is treated as "no application" everywhere else
+    // (profile/apply pages), so it must not block — we revive it below instead.
     const { data: existing } = await supabaseAdmin
       .from('applications')
-      .select('id')
+      .select('id, status')
       .eq('clerk_user_id', userId)
       .maybeSingle()
 
-    if (existing) {
+    if (existing && existing.status !== 'cancelled') {
       return NextResponse.json({ error: 'Application already submitted' }, { status: 409 })
     }
 
     const data = await req.json()
 
-    const { data: inserted, error } = await supabaseAdmin
-      .from('applications')
-      .insert([{
-        clerk_user_id: userId,
-        avatar_url: data.avatar_url || null,
+    const record = {
+      clerk_user_id: userId,
+      avatar_url: data.avatar_url || null,
 
-        // Section 1 — Basic Info
-        first_name: data.first_name,
-        last_name: data.last_name,
-        preferred_name: data.preferred_name || null,
-        pronouns: data.pronouns || null,
-        email: data.email,
-        phone: data.phone,
-        instagram: data.instagram || null,
-        location: data.location || null,
-        emergency_contact: data.emergency_contact || null,
-        referral: data.referral || null,
-        camped_before: data.camped_before,
+      // Section 1 — Basic Info
+      first_name: data.first_name,
+      last_name: data.last_name,
+      preferred_name: data.preferred_name || null,
+      pronouns: data.pronouns || null,
+      email: data.email,
+      phone: data.phone,
+      instagram: data.instagram || null,
+      location: data.location || null,
+      emergency_contact: data.emergency_contact || null,
+      referral: data.referral || null,
+      camped_before: data.camped_before,
 
-        // Section 2 — About You
-        about_you: data.about_you || null,
-        community_acceptance: data.community_acceptance || null,
-        special_skills: data.special_skills || null,
-        recent_achievements: data.recent_achievements || null,
-        official_designation: data.official_designation || null,
-        research_interests: data.research_interests || null,
-        known_side_effects: data.known_side_effects || null,
-        onboarding_status: data.onboarding_status || [],
-        onboarding_status_other: data.onboarding_status_other || null,
+      // Section 2 — About You
+      about_you: data.about_you || null,
+      community_acceptance: data.community_acceptance || null,
+      special_skills: data.special_skills || null,
+      recent_achievements: data.recent_achievements || null,
+      official_designation: data.official_designation || null,
+      research_interests: data.research_interests || null,
+      known_side_effects: data.known_side_effects || null,
+      onboarding_status: data.onboarding_status || [],
+      onboarding_status_other: data.onboarding_status_other || null,
 
-        // Section 3 — Event Plans
-        attendance: data.attendance,
-        arrival_date: data.arrival_date || null,
-        departure_date: data.departure_date || null,
-        membership_type: data.membership_type,
-        vehicle: data.vehicle || null,
-        space_requirements: data.space_requirements || null,
-        structures: data.structures || null,
-        rideshare: data.rideshare || null,
+      // Section 3 — Event Plans
+      attendance: data.attendance,
+      arrival_date: data.arrival_date || null,
+      departure_date: data.departure_date || null,
+      membership_type: data.membership_type,
+      vehicle: data.vehicle || null,
+      space_requirements: data.space_requirements || null,
+      structures: data.structures || null,
+      rideshare: data.rideshare || null,
 
-        // Section 2 (wizard) — new fields
-        find_at_camp: data.find_at_camp || null,
+      // Section 2 (wizard) — new fields
+      find_at_camp: data.find_at_camp || null,
 
-        // Section 4 — Participation
-        department_interests: data.department_interests || [],
-        leadership_interest: data.leadership_interest || null,
-        setup_available: data.setup_available || null,
-        setup_limitations: data.setup_limitations || [],
-        setup_notes: data.setup_notes || null,
-        community_contribution: data.community_contribution || null,
-        welcome_support: data.welcome_support || null,
-        leadership_note: data.leadership_note || null,
-        skills_contribution: data.skills_contribution || null,
+      // Section 4 — Participation
+      department_interests: data.department_interests || [],
+      leadership_interest: data.leadership_interest || null,
+      setup_available: data.setup_available || null,
+      setup_limitations: data.setup_limitations || [],
+      setup_notes: data.setup_notes || null,
+      community_contribution: data.community_contribution || null,
+      welcome_support: data.welcome_support || null,
+      leadership_note: data.leadership_note || null,
+      skills_contribution: data.skills_contribution || null,
 
-        // Section 5 — Community Culture
-        draws_to_community: data.draws_to_community || null,
-        healthy_community: data.healthy_community || null,
+      // Section 5 — Community Culture
+      draws_to_community: data.draws_to_community || null,
+      healthy_community: data.healthy_community || null,
 
-        // Section 6 — Contribution Expectations
-        acknowledgements: data.acknowledgements || [],
+      // Section 6 — Contribution Expectations
+      acknowledgements: data.acknowledgements || [],
 
-        // Section 7 — Final Glåüm Questions
-        shrimp_relationship: data.shrimp_relationship || null,
+      // Section 7 — Final Glåüm Questions
+      shrimp_relationship: data.shrimp_relationship || null,
 
-        // Custom sections (admin-added)
-        ...(data.custom_answers && Object.keys(data.custom_answers).length > 0
-          ? { custom_answers: data.custom_answers }
-          : {}),
+      // Custom sections (admin-added)
+      custom_answers:
+        data.custom_answers && Object.keys(data.custom_answers).length > 0
+          ? data.custom_answers
+          : null,
 
-        status: 'pending',
-      }])
-      .select('id')
-      .single()
+      status: 'pending',
+    }
+
+    // Revive a previously cancelled application in place (clearing its review /
+    // cancellation state) rather than inserting a second row — the rest of the app
+    // assumes one application row per clerk_user_id. Otherwise insert a new one.
+    const { data: inserted, error } = existing
+      ? await supabaseAdmin
+          .from('applications')
+          .update({
+            ...record,
+            submitted_at: new Date().toISOString(),
+            cancel_reason: null,
+            cancelled_at: null,
+            reviewed_at: null,
+            reviewed_by: null,
+          })
+          .eq('id', existing.id)
+          .select('id')
+          .single()
+      : await supabaseAdmin
+          .from('applications')
+          .insert([record])
+          .select('id')
+          .single()
 
     if (error) {
       console.error('Supabase error:', error)
@@ -143,6 +166,28 @@ export async function POST(req: NextRequest) {
         }
       }
     }
+
+    // Phase 1 dual-write: mirror identity to the canonical `members` table and
+    // seed the profile from the already-keyed custom answers. Guarded inside
+    // upsertMember — a failure here must never break the application submission.
+    await upsertMember(
+      userId,
+      {
+        email: data.email,
+        first_name: data.first_name,
+        last_name: data.last_name,
+        preferred_name: data.preferred_name || null,
+        pronouns: data.pronouns || null,
+        phone: data.phone,
+        avatar_url: data.avatar_url || null,
+        status: 'pending',
+        application_id: inserted?.id ?? null,
+      },
+      // Phase 3: registry-bound fields populate the canonical profile under their
+      // Profile Field key. Seed member_profiles from these (not raw custom_answers,
+      // which stay on the application row for the "Additional Responses" view).
+      data.profile_values && typeof data.profile_values === 'object' ? data.profile_values : undefined,
+    )
 
     const displayName = [data.preferred_name || data.first_name, data.last_name].filter(Boolean).join(' ')
     await notifyAdmin({

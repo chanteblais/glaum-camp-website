@@ -1,13 +1,13 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   DISTINCTION_OPS,
   type DistinctionCondition,
   type DistinctionOp,
   type DistinctionRule,
 } from '@/lib/distinctions'
-import { MEMBER_FACT_CATALOG, type MemberFactType } from '@/lib/member-facts'
+import type { DistinctionCatalogEntry, DistinctionValueType } from '@/lib/profile-fields'
 
 const GOLD = '#C8A848'
 const PURPLE = '#D239F8'
@@ -15,15 +15,64 @@ const CREAM = '#F3EDE6'
 
 export type GroupIconOption = { name: string; image: string }
 
-const factType = (key: string): MemberFactType =>
-  MEMBER_FACT_CATALOG.find(f => f.key === key)?.type ?? 'string'
-
-const opsForFact = (key: string) =>
-  DISTINCTION_OPS.filter(o => o.forTypes.includes(factType(key)))
-
 const isBoolOp = (op: DistinctionOp) => op === 'is_true' || op === 'is_false'
+// Count ops compare the NUMBER of selected values, so their value input is numeric
+// even though the fact itself is a list (string[]).
+const isCountOp = (op: DistinctionOp) => op === 'count_gte'
 
-const numberFacts = MEMBER_FACT_CATALOG.filter(f => f.type === 'number')
+// ── Medal art upload ─────────────────────────────────────────────────────────
+// Uploads a custom medal image for a single distinction, normalized onto the
+// standard icon frame server-side, and reports the resulting URL upward so it's
+// written into the rule's `image` field (and autosaved with the rest of the JSON).
+// Shows a live thumbnail of whatever `value` currently is — uploaded, a reused
+// group icon, or a pasted URL.
+function MedalUpload({ ruleId, value, onChange }: {
+  ruleId: string
+  value: string | undefined
+  onChange: (url: string | undefined) => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  async function upload(file: File) {
+    setBusy(true); setErr(null)
+    const fd = new FormData()
+    fd.append('icon', file)
+    const res = await fetch(`/api/admin/distinctions/${encodeURIComponent(ruleId)}/icon`, { method: 'POST', body: fd })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) { setErr(data.error ?? 'Upload failed'); setBusy(false); return }
+    onChange(data.image)
+    setBusy(false)
+    if (inputRef.current) inputRef.current.value = ''
+  }
+
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+      <span style={{
+        width: 28, height: 28, flexShrink: 0, borderRadius: '0.35rem',
+        border: '1px solid rgba(200,168,72,0.2)', background: 'rgba(255,255,255,0.03)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+      }}>
+        {value
+          ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={value} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+          : <span style={{ fontSize: '0.55rem', opacity: 0.3 }}>—</span>}
+      </span>
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        disabled={busy}
+        style={{ ...selectStyle, cursor: busy ? 'wait' : 'pointer', color: '#FFFACD', opacity: busy ? 0.5 : 1 }}
+        title="Upload a custom medal image"
+      >
+        {busy ? 'Uploading…' : value ? 'Replace' : 'Upload'}
+      </button>
+      <input ref={inputRef} type="file" accept="image/png,image/webp,image/svg+xml,image/jpeg,image/gif" style={{ display: 'none' }}
+        onChange={e => { const f = e.target.files?.[0]; if (f) upload(f) }} />
+      {err && <span style={{ fontSize: '0.62rem', color: '#ff8a8a' }}>{err}</span>}
+    </span>
+  )
+}
 
 const inputStyle: React.CSSProperties = {
   background: 'transparent', border: 'none',
@@ -44,35 +93,63 @@ const tinyLabel: React.CSSProperties = {
 export function DistinctionsManager({
   initialDistinctions,
   groupIconOptions,
+  factCatalog,
 }: {
   initialDistinctions: DistinctionRule[]
   groupIconOptions: GroupIconOption[]
+  /** Facts a rule may reference — system (derived) + stored profile fields. */
+  factCatalog: DistinctionCatalogEntry[]
 }) {
+  const factType = (key: string): DistinctionValueType =>
+    factCatalog.find(f => f.key === key)?.type ?? 'string'
+  const opsForFact = (key: string) =>
+    DISTINCTION_OPS.filter(o => o.forTypes.includes(factType(key)))
+  const numberFacts = factCatalog.filter(f => f.type === 'number')
+
+  // A new condition defaults to the first number fact (else first fact), with a
+  // valid operator/value for its type.
+  const defaultCondition = (): DistinctionCondition => {
+    const f = numberFacts[0] ?? factCatalog[0]
+    if (!f) return { fact: 'years_since_joined', op: 'gte', value: 1 }
+    const op = opsForFact(f.key)[0]?.value ?? 'eq'
+    return { fact: f.key, op, value: isBoolOp(op) ? undefined : (f.type === 'number' ? 1 : '') }
+  }
+
   const [rules, setRules] = useState<DistinctionRule[]>(initialDistinctions)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Manual save: edits stay local until "Save changes" is clicked. `dirty` tracks
+  // unsaved edits so the button/status make the state obvious.
+  const [dirty, setDirty] = useState(false)
+  const [saving, setSaving] = useState(false)
 
-  const save = useCallback((next: DistinctionRule[]) => {
-    if (timer.current) clearTimeout(timer.current)
-    timer.current = setTimeout(async () => {
-      try {
-        const res = await fetch('/api/admin/page-content', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ config_distinctions: JSON.stringify(next) }),
-        })
-        if (!res.ok) {
-          const d = await res.json().catch(() => ({}))
-          setError(d.error ?? 'Failed to save'); setSaved(false)
-        } else {
-          setError(null); setSaved(true); setTimeout(() => setSaved(false), 1800)
-        }
-      } catch { setError('Network error'); setSaved(false) }
-    }, 600)
-  }, [])
+  async function save() {
+    setSaving(true)
+    try {
+      const res = await fetch('/api/admin/page-content', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config_distinctions: JSON.stringify(rules) }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        setError(d.error ?? 'Failed to save')
+      } else {
+        setError(null); setDirty(false); setSaved(true); setTimeout(() => setSaved(false), 2500)
+      }
+    } catch { setError('Network error') }
+    setSaving(false)
+  }
 
-  function update(next: DistinctionRule[]) { setRules(next); save(next) }
+  // Warn before leaving (tab close / refresh) with unsaved edits.
+  useEffect(() => {
+    if (!dirty) return
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [dirty])
+
+  function update(next: DistinctionRule[]) { setRules(next); setDirty(true); setSaved(false) }
   const patch = (idx: number, change: Partial<DistinctionRule>) =>
     update(rules.map((r, i) => i === idx ? { ...r, ...change } : r))
 
@@ -172,6 +249,11 @@ export function DistinctionsManager({
                   placeholder="or paste image URL"
                   style={{ ...inputStyle, flex: 1, minWidth: '8rem', fontSize: '0.72rem' }}
                 />
+                <MedalUpload
+                  ruleId={rule.id}
+                  value={rule.image}
+                  onChange={url => patch(idx, { image: url })}
+                />
               </div>
 
               {/* Conditions */}
@@ -196,32 +278,42 @@ export function DistinctionsManager({
                         }}
                         style={selectStyle}
                       >
-                        {MEMBER_FACT_CATALOG.map(f => (
+                        {factCatalog.map(f => (
                           <option key={f.key} value={f.key} style={{ background: '#1A0A24' }}>{f.label}</option>
                         ))}
                       </select>
                       <select
                         value={c.op}
-                        onChange={e => patchCondition(idx, ci, { op: e.target.value as DistinctionOp })}
+                        onChange={e => {
+                          const op = e.target.value as DistinctionOp
+                          const change: Partial<DistinctionCondition> = { op }
+                          // Keep the value valid for the new operator's input kind.
+                          if (isBoolOp(op)) change.value = undefined
+                          else if (isCountOp(op) && typeof c.value !== 'number') change.value = 1
+                          patchCondition(idx, ci, change)
+                        }}
                         style={selectStyle}
                       >
                         {ops.map(o => (
                           <option key={o.value} value={o.value} style={{ background: '#1A0A24' }}>{o.label}</option>
                         ))}
                       </select>
-                      {!isBoolOp(c.op) && (
-                        <input
-                          value={c.value ?? ''}
-                          onChange={e => {
-                            const v = e.target.value
-                            const num = factType(c.fact) === 'number'
-                            patchCondition(idx, ci, { value: num ? (v === '' ? undefined : Number(v)) : v })
-                          }}
-                          type={factType(c.fact) === 'number' ? 'number' : 'text'}
-                          placeholder="value"
-                          style={{ ...selectStyle, width: '5rem' }}
-                        />
-                      )}
+                      {!isBoolOp(c.op) && (() => {
+                        const numeric = factType(c.fact) === 'number' || isCountOp(c.op)
+                        return (
+                          <input
+                            value={c.value ?? ''}
+                            onChange={e => {
+                              const v = e.target.value
+                              patchCondition(idx, ci, { value: numeric ? (v === '' ? undefined : Number(v)) : v })
+                            }}
+                            type={numeric ? 'number' : 'text'}
+                            min={isCountOp(c.op) ? 1 : undefined}
+                            placeholder={isCountOp(c.op) ? 'count' : 'value'}
+                            style={{ ...selectStyle, width: '5rem' }}
+                          />
+                        )
+                      })()}
                       <button
                         onClick={() => patch(idx, { conditions: rule.conditions.filter((_, i) => i !== ci) })}
                         title="Remove condition"
@@ -231,7 +323,7 @@ export function DistinctionsManager({
                   )
                 })}
                 <button
-                  onClick={() => patch(idx, { conditions: [...rule.conditions, { fact: 'years_since_joined', op: 'gte', value: 1 }] })}
+                  onClick={() => patch(idx, { conditions: [...rule.conditions, defaultCondition()] })}
                   style={{ alignSelf: 'flex-start', background: 'none', border: 'none', cursor: 'pointer', color: GOLD, opacity: 0.6, fontSize: '0.72rem', letterSpacing: '0.04em', padding: '0.1rem 0' }}
                 >+ Add condition</button>
               </div>
@@ -292,7 +384,7 @@ export function DistinctionsManager({
       <button
         onClick={() => update([
           ...rules,
-          { id: `distinction-${Date.now()}`, label: 'New distinction', glyph: '✦', conditions: [{ fact: 'years_since_joined', op: 'gte', value: 1 }], enabled: true },
+          { id: `distinction-${Date.now()}`, label: 'New distinction', glyph: '✦', conditions: [defaultCondition()], enabled: true },
         ])}
         style={{
           width: '100%', padding: '0.65rem',
@@ -303,9 +395,29 @@ export function DistinctionsManager({
         }}
       >+ Add distinction</button>
 
-      <div style={{ minHeight: '1.2rem', marginTop: '0.75rem' }}>
-        {error && <p style={{ fontSize: '0.78rem', color: '#ff8a8a', margin: 0 }}>{error}</p>}
-        {!error && saved && <p style={{ fontSize: '0.72rem', color: GOLD, opacity: 0.6, margin: 0 }}>Saved ✓</p>}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '1.25rem' }}>
+        <button
+          onClick={save}
+          disabled={!dirty || saving}
+          style={{
+            padding: '0.6rem 1.6rem', borderRadius: '9999px', border: 'none',
+            cursor: (!dirty || saving) ? 'default' : 'pointer',
+            background: (!dirty || saving) ? 'rgba(200,168,72,0.15)' : GOLD,
+            color: (!dirty || saving) ? 'rgba(243,237,230,0.5)' : '#1A0A24',
+            fontSize: '0.82rem', letterSpacing: '0.06em', fontWeight: 600,
+            transition: 'all 0.15s',
+          }}
+        >
+          {saving ? 'Saving…' : 'Save changes'}
+        </button>
+        <span style={{ fontSize: '0.75rem' }}>
+          {error
+            ? <span style={{ color: '#ff8a8a' }}>{error}</span>
+            : saving ? null
+            : dirty ? <span style={{ color: PURPLE, opacity: 0.85 }}>Unsaved changes</span>
+            : saved ? <span style={{ color: GOLD, opacity: 0.7 }}>Saved ✓</span>
+            : null}
+        </span>
       </div>
     </div>
   )

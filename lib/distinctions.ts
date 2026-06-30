@@ -8,17 +8,24 @@
 // app/admin/AttunementTasksManager.tsx): config is one JSON string stored in
 // page_content under `config_distinctions`, edited in DistinctionsManager.
 
-import type { MemberFacts } from './member-facts'
+// The evaluation context is the merged namespace of derived system facts
+// (lib/member-facts.ts) AND stored profile values (member_profiles.values),
+// keyed by registry field key. The engine reads it generically — it neither
+// knows nor cares where a value came from. See docs/profile-architecture.md.
+export type FactContext = Record<string, unknown>
 
-export type DistinctionOp = 'gte' | 'lte' | 'eq' | 'includes' | 'is_true' | 'is_false'
+export type DistinctionOp = 'gte' | 'lte' | 'eq' | 'includes' | 'count_gte' | 'is_true' | 'is_false'
 
 export const DISTINCTION_OPS: { value: DistinctionOp; label: string; forTypes: string[] }[] = [
-  { value: 'gte',      label: '≥',          forTypes: ['number'] },
-  { value: 'lte',      label: '≤',          forTypes: ['number'] },
-  { value: 'eq',       label: '=',          forTypes: ['number', 'string'] },
-  { value: 'includes', label: 'includes',   forTypes: ['string[]'] },
-  { value: 'is_true',  label: 'is true',    forTypes: ['boolean'] },
-  { value: 'is_false', label: 'is false',   forTypes: ['boolean'] },
+  { value: 'gte',       label: '≥',            forTypes: ['number'] },
+  { value: 'lte',       label: '≤',            forTypes: ['number'] },
+  { value: 'eq',        label: '=',            forTypes: ['number', 'string'] },
+  { value: 'includes',  label: 'includes',     forTypes: ['string[]'] },
+  // Cardinality: how many values are selected (e.g. "Veteran — Event Experience
+  // has at least 3 values"). Value is the threshold count.
+  { value: 'count_gte', label: 'has at least', forTypes: ['string[]'] },
+  { value: 'is_true',   label: 'is true',      forTypes: ['boolean'] },
+  { value: 'is_false',  label: 'is false',     forTypes: ['boolean'] },
 ]
 
 export type DistinctionCondition = {
@@ -129,9 +136,9 @@ export function parseDistinctions(raw?: string | null): DistinctionRule[] {
   }
 }
 
-function conditionPasses(c: DistinctionCondition, facts: MemberFacts): boolean {
+function conditionPasses(c: DistinctionCondition, facts: FactContext): boolean {
   // A condition on an absent/null fact never passes (keeps dormant rules dormant).
-  const raw = (facts as Record<string, unknown>)[c.fact]
+  const raw = facts[c.fact]
 
   switch (c.op) {
     case 'is_true':  return raw === true
@@ -143,6 +150,8 @@ function conditionPasses(c: DistinctionCondition, facts: MemberFacts): boolean {
       return String(raw) === String(c.value)
     case 'includes':
       return Array.isArray(raw) && raw.map(String).includes(String(c.value))
+    case 'count_gte':
+      return Array.isArray(raw) && typeof c.value === 'number' && raw.length >= c.value
     default:
       return false
   }
@@ -150,13 +159,13 @@ function conditionPasses(c: DistinctionCondition, facts: MemberFacts): boolean {
 
 // Evaluate enabled rules against a member's facts and return the earned medals.
 export function evaluateDistinctions(
-  facts: MemberFacts,
+  facts: FactContext,
   rules: DistinctionRule[],
 ): EarnedDistinction[] {
   return rules
     .filter(r => r.enabled && r.conditions.length > 0 && r.conditions.every(c => conditionPasses(c, facts)))
     .map(r => {
-      const yearVal = r.yearFact ? (facts as Record<string, unknown>)[r.yearFact] : undefined
+      const yearVal = r.yearFact ? facts[r.yearFact] : undefined
       return {
         id: r.id,
         label: r.label,

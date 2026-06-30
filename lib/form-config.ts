@@ -33,6 +33,11 @@ export type FieldConfig = {
   isCustom?: boolean
   type?: FieldType
   options?: string[]
+  // When set, this field's answer is saved to the canonical member profile under
+  // the given Profile Field registry key (member_profiles.values) — not just
+  // custom_answers. Lets one profile field be collected by, and reused across,
+  // application forms. See docs/profile-architecture.md (Phase 3).
+  profileFieldKey?: string
 }
 
 export type StepConfig = {

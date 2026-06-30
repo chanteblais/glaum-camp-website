@@ -16,7 +16,9 @@ import { getMemberGroups, groupCommitmentMeta } from '@/lib/groups'
 import { buildAttunementChecklist } from '@/lib/attunement'
 import { buildMemberFacts } from '@/lib/member-facts'
 import { parseDistinctions, evaluateDistinctions } from '@/lib/distinctions'
+import { resolveMember, getMemberProfileValues } from '@/lib/members'
 import { CabinetOfDistinctions } from './CabinetOfDistinctions'
+import { ProfileDetails } from './ProfileDetails'
 
 // ── Identity stat list (mirrors the mockup's right-column at-a-glance facts) ──
 function StatIcon({ name }: { name: 'calendar' | 'star' | 'shield' | 'hand' }) {
@@ -106,7 +108,14 @@ export default async function ProfilePage() {
   // derived from existing data; medals are never persisted — they're recomputed
   // here from the admin-configured rules. See lib/member-facts.ts + lib/distinctions.ts.
   const memberFacts = buildMemberFacts({ application, roleInfo, memberGroups, roleApproved })
-  const earnedDistinctions = evaluateDistinctions(memberFacts, parseDistinctions(attuneConfig['config_distinctions']))
+  // Distinctions evaluate the merged namespace: stored profile values (Phase 1
+  // member_profiles) ∪ derived system facts. System facts win on any key overlap
+  // (they're authoritative and non-spoofable). Guarded — empty when no member row
+  // exists yet, so this falls back to system-facts-only behavior.
+  const profileMember = await resolveMember(application?.clerk_user_id ?? userId, email)
+  const profileValues = profileMember ? await getMemberProfileValues(profileMember.id) : {}
+  const factContext = { ...profileValues, ...memberFacts }
+  const earnedDistinctions = evaluateDistinctions(factContext, parseDistinctions(attuneConfig['config_distinctions']))
 
   // Link clerk_user_id for approved applications found by email
   if (application?.status === 'approved' && !application.clerk_user_id) {
@@ -313,7 +322,7 @@ export default async function ProfilePage() {
                   Camp with Glåüm at What If 2026. Full participation — you'll sleep on site, help build and hold the space, and take on volunteer shifts as part of the camp.
                 </p>
                 <a
-                  href="/apply?join=1"
+                  href="/apply?track=member"
                   style={{
                     display: 'block',
                     textAlign: 'center',
@@ -456,6 +465,13 @@ export default async function ProfilePage() {
 
             <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.2), transparent)', margin: '0 0 2.5rem' }} />
 
+
+            {/* Registry-defined profile fields the member can view / edit
+                (Phase 4 — reads/writes member_profiles.values). Renders nothing
+                until the registry has member-visible fields. */}
+            <ProfileDetails />
+
+            <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.2), transparent)', margin: '2.5rem 0' }} />
 
             <div style={{ padding: '2rem', border: '1px solid rgba(210,57,248,0.2)', borderRadius: '1rem', background: 'rgba(210,57,248,0.04)' }}>
               <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.1rem', color: '#C8A848', marginBottom: '1rem' }}>

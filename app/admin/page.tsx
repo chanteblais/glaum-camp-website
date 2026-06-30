@@ -19,9 +19,11 @@ import { PollsManager } from './PollsManager'
 import { AdminsManager } from './AdminsManager'
 import { AttunementTasksManager } from './AttunementTasksManager'
 import { DistinctionsManager } from './DistinctionsManager'
+import { ProfileFieldsManager } from './ProfileFieldsManager'
 import { ShiftSignupToggle } from './ShiftSignupToggle'
 import { parseAttunementTasks } from '@/lib/site-config'
 import { parseDistinctions } from '@/lib/distinctions'
+import { parseProfileFields, distinctionCatalog } from '@/lib/profile-fields'
 
 export default async function AdminPage() {
   const { userId } = await auth()
@@ -57,11 +59,15 @@ export default async function AdminPage() {
   const { data: configRows } = await supabaseAdmin
     .from('page_content')
     .select('key, value')
-    .in('key', ['config_attunement_tasks', 'config_shift_signup_open', 'config_distinctions'])
+    .in('key', ['config_attunement_tasks', 'config_shift_signup_open', 'config_distinctions', 'config_profile_fields'])
   const configMap = Object.fromEntries((configRows ?? []).map(r => [r.key, r.value]))
   const attunementTasks = parseAttunementTasks(configMap['config_attunement_tasks'])
   const shiftSignupOpen = configMap['config_shift_signup_open'] !== 'false'
   const distinctions = parseDistinctions(configMap['config_distinctions'])
+  const profileFields = parseProfileFields(configMap['config_profile_fields'])
+  // Facts a distinction rule may reference — derived from the registry (system +
+  // distinction-eligible stored fields), replacing the old hardcoded catalog.
+  const distinctionFactCatalog = distinctionCatalog(profileFields)
 
   // Group icon images — offered as medal art in the distinctions builder.
   const { data: groupIconRows } = await supabaseAdmin
@@ -266,12 +272,20 @@ export default async function AdminPage() {
           <AttunementTasksManager initialTasks={attunementTasks} />
         </CollapsibleSection>
 
+        {/* ── PROFILE FIELDS ── */}
+        <CollapsibleSection
+          title="Profile Fields"
+          summary="The canonical schema for member profile data"
+        >
+          <ProfileFieldsManager initialFields={profileFields} />
+        </CollapsibleSection>
+
         {/* ── DISTINCTIONS ── */}
         <CollapsibleSection
           title="Distinctions"
           summary="Earned medals in each member's Cabinet of Distinctions"
         >
-          <DistinctionsManager initialDistinctions={distinctions} groupIconOptions={groupIconOptions} />
+          <DistinctionsManager initialDistinctions={distinctions} groupIconOptions={groupIconOptions} factCatalog={distinctionFactCatalog} />
         </CollapsibleSection>
 
         {/* ── CONFIGURATION ── */}

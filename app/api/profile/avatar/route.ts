@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { upsertMember } from '@/lib/members'
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 const MAX_BYTES = 5 * 1024 * 1024 // 5 MB
@@ -55,6 +56,9 @@ export async function POST(req: NextRequest) {
     .from('volunteers')
     .update({ avatar_url: avatarUrl })
     .eq('clerk_user_id', userId)
+
+  // Dual-write: mirror the new avatar onto the canonical member record.
+  await upsertMember(userId, { avatar_url: avatarUrl })
 
   return NextResponse.json({ avatarUrl })
 }

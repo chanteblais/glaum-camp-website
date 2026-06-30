@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import type { MemberFormConfig, VolunteerFormConfig, StepConfig, FieldConfig } from '@/lib/form-config'
 import { mergeMemberConfig } from '@/lib/form-config'
+import { parseProfileFields, applicationFields } from '@/lib/profile-fields'
 import { DEFAULT_TRACK_COPY, type TrackCopy } from '@/lib/site-config'
 
 // ── Colors ────────────────────────────────────────────────────────────────────
@@ -160,6 +161,7 @@ function FieldRow({
   onToggleVisible, onToggleRequired, onLabelChange, onDescChange,
   onOptionsChange, onDelete,
   onMoveUp, onMoveDown, isFirst, isLast, onToggleWidth, groups = [],
+  profileFieldOptions, onBindProfileField,
 }: {
   field: FieldConfig
   saving: boolean
@@ -176,6 +178,9 @@ function FieldRow({
   isLast?: boolean
   onToggleWidth?: () => void
   groups?: { id: string; name: string }[]
+  // Registry fields this custom field may save its answer into (Phase 3).
+  profileFieldOptions?: { key: string; label: string }[]
+  onBindProfileField?: (key: string | undefined) => void
 }) {
   const showOptions = (field.isCustom && (field.type === 'radio' || field.type === 'checkbox')) || field.type === 'agreement'
   const isAgreement = field.type === 'agreement'
@@ -266,6 +271,23 @@ function FieldRow({
             <span style={{ display: 'inline-block', marginTop: '0.35rem', fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: PURPLE, opacity: 0.5, fontWeight: 700 }}>
               {FIELD_TYPE_LABELS[field.type ?? 'text'] ?? 'Field'}
             </span>
+          )}
+          {/* Phase 3: bind a custom field's answer to a canonical profile field. */}
+          {field.isCustom && field.type !== 'group_select' && onBindProfileField && (profileFieldOptions?.length ?? 0) > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.4rem' }}>
+              <span style={{ fontSize: '0.58rem', letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.4 }}>Saves to</span>
+              <select
+                value={field.profileFieldKey ?? ''}
+                onChange={e => onBindProfileField(e.target.value || undefined)}
+                title="Save this answer to a member profile field (reusable across forms; usable in distinctions)"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(200,168,72,0.2)', borderRadius: '0.3rem', color: CREAM, fontSize: '0.7rem', padding: '0.15rem 0.35rem', fontFamily: 'inherit', outline: 'none' }}
+              >
+                <option value="" style={{ background: INK }}>Custom answer only</option>
+                {profileFieldOptions!.map(o => (
+                  <option key={o.key} value={o.key} style={{ background: INK }}>{o.label}</option>
+                ))}
+              </select>
+            </div>
           )}
         </div>
 
@@ -428,7 +450,7 @@ function StepSection({
   step, index, total, displayNum, expanded, saving,
   onToggleExpand, onToggleVisible, onMoveUp, onMoveDown,
   onTitleChange, onSubtitleChange, onFieldChange, onDelete, onAddField, onDeleteField,
-  fieldsModular, onMoveField, onToggleFieldWidth, onAddElement, groups,
+  fieldsModular, onMoveField, onToggleFieldWidth, onAddElement, groups, profileFieldOptions,
 }: {
   step: StepConfig
   index: number
@@ -437,6 +459,7 @@ function StepSection({
   expanded: boolean
   saving: boolean
   groups: { id: string; name: string }[]
+  profileFieldOptions?: { key: string; label: string }[]
   onToggleExpand: () => void
   onToggleVisible: () => void
   onMoveUp: () => void
@@ -582,6 +605,8 @@ function StepSection({
                 onToggleWidth={fieldsModular && onToggleFieldWidth ? () => onToggleFieldWidth(field.key) : undefined}
                 onDelete={!field.locked ? () => onDeleteField(field.key) : undefined}
                 groups={groups}
+                profileFieldOptions={profileFieldOptions}
+                onBindProfileField={field.isCustom ? key => onFieldChange(field.key, { profileFieldKey: key }) : undefined}
               />
             )
           })}
@@ -696,6 +721,19 @@ export function ApplicationBuilder({
     fetch('/api/admin/groups')
       .then(r => r.json())
       .then(d => setAllGroups((d.groups ?? []).map((g: { id: string; name: string }) => ({ id: g.id, name: g.name }))))
+      .catch(() => { /* leave empty */ })
+  }, [])
+
+  // Application-eligible Profile Fields — the registry fields a custom question
+  // can save its answer into (Phase 3). Fetched from the page-content config.
+  const [profileFieldOptions, setProfileFieldOptions] = useState<{ key: string; label: string }[]>([])
+  useEffect(() => {
+    fetch('/api/admin/page-content')
+      .then(r => r.json())
+      .then(d => {
+        const fields = parseProfileFields(d.content?.config_profile_fields)
+        setProfileFieldOptions(applicationFields(fields).map(f => ({ key: f.key, label: f.label })))
+      })
       .catch(() => { /* leave empty */ })
   }, [])
 
@@ -1079,6 +1117,7 @@ export function ApplicationBuilder({
                 onToggleFieldWidth={fieldKey => toggleMemberFieldWidth(step.key, fieldKey)}
                 onAddElement={element => handleAddElement(step.key, element)}
                 groups={allGroups}
+                profileFieldOptions={profileFieldOptions}
               />
             ))}
 
