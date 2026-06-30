@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { EventIcon, ICON_TYPES } from '@/components/EventIcon'
+import { formatTime } from '@/lib/time-format'
 
 type ScheduleEvent = {
   id: string
@@ -51,35 +52,6 @@ function sortChronologically(evs: ScheduleEvent[]): ScheduleEvent[] {
     if (dayDiff !== 0) return dayDiff
     return parseStartMinutes(a.time) - parseStartMinutes(b.time)
   })
-}
-
-// Normalise a single time token like "7", "7pm", "7:00pm", "19:00", "7:30 PM" → "7:00 PM"
-function normaliseToken(t: string): string {
-  t = t.trim()
-  if (!t) return t
-  const m = t.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i)
-  if (!m) return t // unrecognised — leave as-is
-  let h = parseInt(m[1], 10)
-  const min = m[2] ?? '00'
-  const meridiem = m[3]?.toLowerCase()
-  if (meridiem === 'pm' && h < 12) h += 12
-  if (meridiem === 'am' && h === 12) h = 0
-  // If no meridiem provided, infer: treat < 7 as PM (camp context), ≥ 7 as AM/PM by value
-  const period = h >= 12 ? 'PM' : 'AM'
-  const displayH = h % 12 === 0 ? 12 : h % 12
-  return `${displayH}:${min} ${period}`
-}
-
-// Normalise a full time string, handling ranges like "7 - 10pm" or "7:00PM – 10:00 PM"
-function formatTime(raw: string): string {
-  if (!raw.trim()) return raw
-  // Split on en-dash, em-dash, or hyphen (with optional surrounding spaces)
-  const parts = raw.split(/\s*[–—-]\s*/)
-  if (parts.length === 2) {
-    const [start, end] = parts.map(normaliseToken)
-    return `${start} – ${end}`
-  }
-  return normaliseToken(raw)
 }
 
 const blank = (): Omit<ScheduleEvent, 'id' | 'sort_order'> => ({

@@ -20,19 +20,28 @@ function Medal({ d }: { d: EarnedDistinction }) {
           alignItems: 'center',
           justifyContent: 'center',
           position: 'relative',
+          // Clip the medal art to the circle. Icons are normalized onto a
+          // landscape frame (lib/icon-image.ts), so we size them by height and
+          // let the transparent sides overflow — overflow:hidden trims that
+          // excess to the round edge. (Outer box-shadow is unaffected by clip.)
+          overflow: 'hidden',
           background: 'radial-gradient(circle at 38% 30%, rgba(210,57,248,0.16), rgba(8,0,18,0.9) 72%)',
           border: '2px solid #C8A848',
           boxShadow: '0 8px 24px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.4), inset 0 0 18px rgba(200,168,72,0.18), inset 0 0 0 1px rgba(255,249,232,0.12)',
         }}
       >
-        {/* inner engraved ring */}
-        <span aria-hidden style={{ position: 'absolute', inset: '6px', borderRadius: '50%', border: '1px solid rgba(200,168,72,0.45)', pointerEvents: 'none' }} />
         {d.image ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={d.image}
             alt={`${d.label} medal`}
-            style={{ width: '78%', height: '78%', objectFit: 'contain', filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.5))' }}
+            // Size by height (not objectFit) so the artwork — centered on a
+            // landscape normalize frame — fills the medal. width:auto +
+            // maxWidth:none lets the transparent sides spill past the frame,
+            // where overflow:hidden on the circle clips them. This mirrors the
+            // commitment-circle icons, so every current and future medal inherits
+            // the same generous, padding-free sizing. Aspect ratio is preserved.
+            style={{ height: '132%', width: 'auto', maxWidth: 'none', display: 'block', filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.5))' }}
           />
         ) : (
           <span style={{ fontSize: '2.1rem', lineHeight: 1, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.6))' }}>
@@ -54,6 +63,20 @@ function Medal({ d }: { d: EarnedDistinction }) {
       }}>
         {d.label}
       </p>
+      {d.engraving && (
+        <p style={{
+          marginTop: '0.2rem',
+          fontSize: '0.62rem',
+          letterSpacing: '0.04em',
+          color: '#C8A848',
+          opacity: 0.85,
+          fontStyle: 'italic',
+          lineHeight: 1.35,
+          fontFamily: 'var(--font-cormorant-garamond), serif',
+        }}>
+          {d.engraving}
+        </p>
+      )}
       {d.year != null && (
         <p style={{ marginTop: '0.15rem', fontSize: '0.6rem', letterSpacing: '0.14em', color: '#D239F8', opacity: 0.8 }}>
           {d.year}

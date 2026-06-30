@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { ScheduleSection } from '@/components/ScheduleSection'
+import { LeadUpGatherings } from './LeadUpGatherings'
 import { Header } from '@/components/Header'
 
 export default async function SchedulePage() {
@@ -40,6 +41,8 @@ export default async function SchedulePage() {
         </h1>
 
         <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.4), transparent)', margin: '2rem 0 3rem' }} />
+
+        <LeadUpGatherings />
 
         <ScheduleSection />
 

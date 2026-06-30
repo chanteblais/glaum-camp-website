@@ -222,7 +222,7 @@ Bell notifications shown to individual members.
 |---|---|---|
 | `id` | UUID PK | |
 | `clerk_user_id` | TEXT | Recipient |
-| `event_type` | TEXT | e.g. `application_approved`/`_rejected`, `role_suggestion_*`, `role_request_*`, `volunteer_approved`, `new_message`, `group_mention`. `UserNotificationBell` maps each to a deep link. |
+| `event_type` | TEXT | e.g. `application_approved`/`_rejected`, `role_suggestion_*`, `role_request_*`, `volunteer_approved`, `new_message`, `group_mention`, `lead_up_gathering` (deep-links to `/schedule`). `UserNotificationBell` maps each to a deep link. |
 | `message` | TEXT | |
 | `details` | JSONB | Event payload, e.g. `{ senderId }` for `new_message`, `{ groupId, messageId }` for `group_mention` |
 | `created_at` | TIMESTAMPTZ | |
@@ -418,6 +418,43 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `033_conversations.sql` | **Group messaging.** Adds `conversations` + `conversation_participants` tables; `messages.conversation_id` + `parent_message_id` (and makes `recipient_clerk_id` nullable); group governance columns (`join_policy`/`visibility` on `groups`, `role` on `group_members`). Backfills a conversation per group and per existing DM pair (preserving read state). Additive + idempotent; **must be applied** before group messaging works. |
 | `034_group_badge_image.sql` | `badge_image` column on `groups` (later renamed to `icon_image` by `035`) + public `group-badges` storage bucket and read policy. Additive + idempotent. |
 | `035_rename_group_badge_to_icon.sql` | Renames `groups.badge_image` → `groups.icon_image` (the per-group uploaded image, now called an "icon" in the UI/code; the emoji field stays `groups.icon`). Data preserved; bucket keeps its `group-badges` name. **Must be applied** — the profile + Groups admin select `icon_image`. |
+| `039_lead_up_gatherings.sql` | **Lead-Up Gatherings.** Adds `lead_up_events` + `lead_up_event_rsvps` tables — real-dated planning sessions on the runway to the event, separate from `schedule_events`. Additive + idempotent; **must be applied** before the feature works. See [`lead-up-gatherings.md`](./lead-up-gatherings.md). |
+| `040_lead_up_notified.sql` | `notified_at TIMESTAMPTZ` on `lead_up_events` — tracks the "Notify members" broadcast. Additive + idempotent. |
+
+---
+
+### `lead_up_events`
+
+Real-dated planning/brainstorming gatherings on the runway to the event — deliberately separate from `schedule_events` (the at-camp program) so none of the camp machinery (group `contribution_type` matching, capacity-per-role, attunement) applies. Surfaced on `/schedule` ("Before We Gather") and the home dashboard teaser.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `title` | TEXT | |
+| `description` | TEXT | |
+| `event_date` | DATE | real calendar date (not a camp-relative slot label); NULL = TBD |
+| `start_time` | TEXT | display time string |
+| `end_time` | TEXT | optional |
+| `location` | TEXT | physical place (optional) |
+| `link` | TEXT | virtual link, e.g. Zoom/Meet (optional) |
+| `host` | TEXT | who's running it (optional) |
+| `visible` | BOOL | shown to members |
+| `sort_order` | INT | tiebreak ordering (date is primary) |
+| `notified_at` | TIMESTAMPTZ | when members were last alerted (bell + email) via the admin "Notify members" button; NULL = never. Drives the manager's "Notified" state. |
+
+---
+
+### `lead_up_event_rsvps`
+
+Per-session RSVP to a lead-up gathering. Presence of a row = "I'll be at this planning session" — a headcount only; **never** touches attunement, shifts, or `camp_signups`.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `lead_up_event_id` | UUID FK → `lead_up_events.id` (ON DELETE CASCADE) | |
+| `clerk_user_id` | TEXT | |
+| `status` | TEXT | defaults `'going'`; exists so a future three-state RSVP needs no migration |
+| | | `UNIQUE (lead_up_event_id, clerk_user_id)` |
 
 ---
 

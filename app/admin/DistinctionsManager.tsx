@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   DISTINCTION_OPS,
+  DISTINCTION_ENGRAVING_MAX,
   type DistinctionCondition,
   type DistinctionOp,
   type DistinctionRule,
@@ -367,6 +368,22 @@ export function DistinctionsManager({
                     style={{ alignSelf: 'flex-start', background: 'none', border: 'none', cursor: 'pointer', color: GOLD, opacity: 0.6, fontSize: '0.72rem', letterSpacing: '0.04em', padding: '0.1rem 0' }}
                   >+ Add condition</button>
                 )}
+              </div>
+
+              {/* Engraving — optional static caption under the medal */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={tinyLabel}>Engraving</span>
+                <input
+                  value={rule.engraving ?? ''}
+                  onChange={e => patch(idx, { engraving: e.target.value || undefined })}
+                  maxLength={DISTINCTION_ENGRAVING_MAX}
+                  placeholder="Optional caption under the medal"
+                  title={`Short text engraved beneath the medal — up to ${DISTINCTION_ENGRAVING_MAX} characters`}
+                  style={{ ...inputStyle, flex: 1, minWidth: '8rem', fontSize: '0.74rem' }}
+                />
+                <span style={{ ...tinyLabel, opacity: 0.4, fontVariantNumeric: 'tabular-nums' }}>
+                  {(rule.engraving ?? '').length}/{DISTINCTION_ENGRAVING_MAX}
+                </span>
               </div>
 
               {/* Year source */}

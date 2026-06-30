@@ -10,6 +10,7 @@ import { AdminNav } from './AdminNav'
 import { CategoryHeading } from './CategoryHeading'
 import { MANAGE_CATEGORIES } from './admin-sections'
 import { ScheduleManager } from './ScheduleManager'
+import { LeadUpGatheringsManager } from './LeadUpGatheringsManager'
 import { AnnouncementsManager } from './AnnouncementsManager'
 import { GroupsManager } from './GroupsManager'
 import { getGroupNamesByUser } from '@/lib/groups'
@@ -245,6 +246,13 @@ export default async function AdminPage() {
         >
           <ShiftSignupToggle initialOpen={shiftSignupOpen} />
           <ScheduleManager />
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          title="Lead-Up Gatherings"
+          summary="Planning sessions on the runway to the event (members RSVP)"
+        >
+          <LeadUpGatheringsManager />
         </CollapsibleSection>
 
         {/* ═══════════════ COMMUNICATION ═══════════════ */}

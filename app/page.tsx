@@ -34,6 +34,7 @@ export default async function Home() {
   let application: Record<string, unknown> | null = null
   let campSignup: Record<string, unknown> | null = null
   let upcomingEvents: { id: string; day: string; time: string; title: string; subtitle: string | null; icon_type: string; event_date: string | null; event_category: string }[] = []
+  let leadUpEvents: { id: string; title: string; event_date: string | null; start_time: string | null; location: string | null; host: string | null }[] = []
   let spotlightPool: unknown[] = []
   let userFirstName: string | null = null
   type ActivityItem = { label: string; name: string; ts: string; avatar_url: string | null }
@@ -64,7 +65,7 @@ let canManagePolls = false
     application = appRaw?.status === 'cancelled' ? null : appRaw ?? null
 
     if (application?.status === 'approved') {
-      const [signupResult, eventsResult, spotlightResult, announcementsResult, pollsResult, pollVotesResult, shoutoutsResult] = await Promise.all([
+      const [signupResult, eventsResult, leadUpResult, spotlightResult, announcementsResult, pollsResult, pollVotesResult, shoutoutsResult] = await Promise.all([
         supabaseAdmin
           .from('camp_signups')
           .select('role_id, schedule_event_id, role_approval_status, roles(name, description, purpose, department_id, departments(name, icon)), schedule_events(title, day, time, icon_type)')
@@ -76,6 +77,14 @@ let canManagePolls = false
           .eq('visible', true)
           .not('event_type', 'eq', 'camp_tending')
           .or(`event_date.is.null,event_date.lte.${new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)}`)
+          .or(`event_date.is.null,event_date.gte.${new Date().toISOString().slice(0, 10)}`)
+          .order('event_date', { ascending: true, nullsFirst: false })
+          .order('sort_order', { ascending: true })
+          .limit(4),
+        supabaseAdmin
+          .from('lead_up_events')
+          .select('id, title, event_date, start_time, location, host')
+          .eq('visible', true)
           .or(`event_date.is.null,event_date.gte.${new Date().toISOString().slice(0, 10)}`)
           .order('event_date', { ascending: true, nullsFirst: false })
           .order('sort_order', { ascending: true })
@@ -114,6 +123,7 @@ let canManagePolls = false
 
       campSignup = signupResult.data ?? null
       upcomingEvents = (eventsResult.data ?? []) as typeof upcomingEvents
+      leadUpEvents = (leadUpResult.data ?? []) as typeof leadUpEvents
       spotlightPool = spotlightResult.data ?? []
       announcements = (announcementsResult.data ?? []) as Announcement[]
 
@@ -344,8 +354,19 @@ let canManagePolls = false
 
             {/* ── WIDGETS (order + visibility controlled by admin) ── */}
             {(() => {
-              const preCamp = upcomingEvents.filter(e => e.event_category === 'pre_camp')
               const atCamp = upcomingEvents.filter(e => e.event_category !== 'pre_camp')
+              // Lead-up gatherings come from their own table; map them into the
+              // EventList shape (real dates → weekday label).
+              const leadUp = leadUpEvents.map(e => ({
+                id: e.id,
+                day: e.event_date ? new Date(e.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short' }) : 'TBD',
+                time: e.start_time ?? '',
+                title: e.title,
+                subtitle: e.location || (e.host ? `with ${e.host}` : null),
+                icon_type: 'star',
+                event_date: e.event_date,
+                event_category: 'lead_up',
+              }))
               const EventList = ({ events, label, href }: { events: typeof upcomingEvents; label: string; href: string }) => (
                 <div style={{ border: '1px solid rgba(200,168,72,0.25)', borderRadius: '1rem', background: 'rgba(10,0,20,0.5)', overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
                   <div style={{ padding: '1.25rem 1.5rem 1rem', borderBottom: '1px solid rgba(200,168,72,0.15)' }}>
@@ -433,9 +454,9 @@ let canManagePolls = false
 
                 events: (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', height: '100%' }}>
-                    {preCamp.length > 0 && <EventList events={preCamp} label="Pre-Camp Gatherings" href="/schedule" />}
+                    {leadUp.length > 0 && <EventList events={leadUp} label="Lead-Up Gatherings" href="/schedule" />}
                     {atCamp.length > 0 && <EventList events={atCamp} label="Upcoming Gatherings" href="/schedule" />}
-                    {upcomingEvents.length === 0 && <EventList events={[]} label="Upcoming Gatherings" href="/schedule" />}
+                    {leadUp.length === 0 && atCamp.length === 0 && <EventList events={[]} label="Upcoming Gatherings" href="/schedule" />}
                   </div>
                 ),
 

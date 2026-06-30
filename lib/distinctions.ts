@@ -34,6 +34,11 @@ export type DistinctionCondition = {
   value?: string | number
 }
 
+// Max length of a medal's engraving caption. Kept short so it fits under the
+// ~100px Cabinet medal without overwhelming the label. Enforced both in the
+// admin input (maxLength) and defensively at parse time.
+export const DISTINCTION_ENGRAVING_MAX = 32
+
 export type DistinctionRule = {
   id: string
   label: string
@@ -42,6 +47,12 @@ export type DistinctionRule = {
   image?: string
   /** Emoji glyph fallback, rendered in a CSS frame when no `image` is set. */
   glyph?: string
+  /**
+   * Optional short static caption engraved under the medal (e.g. "Keeper of the
+   * Grove"). Same for every member who earns it; capped at DISTINCTION_ENGRAVING_MAX.
+   * Renders above the dynamic `year` when both are set.
+   */
+  engraving?: string
   /** Which fact supplies the medal's engraved year (e.g. `joined_year`). */
   yearFact?: string
   /**
@@ -59,6 +70,7 @@ export type EarnedDistinction = {
   description?: string
   image?: string
   glyph?: string
+  engraving?: string
   year?: number
   /** Granted by an admin rather than met by conditions (honorary). */
   manual?: boolean
@@ -131,6 +143,9 @@ export function parseDistinctions(raw?: string | null): DistinctionRule[] {
         description: typeof r.description === 'string' ? r.description : undefined,
         image: typeof r.image === 'string' && r.image ? r.image : undefined,
         glyph: typeof r.glyph === 'string' && r.glyph ? r.glyph : undefined,
+        engraving: typeof r.engraving === 'string' && r.engraving.trim()
+          ? r.engraving.trim().slice(0, DISTINCTION_ENGRAVING_MAX)
+          : undefined,
         yearFact: typeof r.yearFact === 'string' && r.yearFact ? r.yearFact : undefined,
         match: r.match === 'any' ? 'any' : undefined,
         conditions: Array.isArray(r.conditions)
@@ -191,6 +206,7 @@ export function evaluateDistinctions(
       description: r.description,
       image: r.image,
       glyph: r.glyph,
+      engraving: r.engraving,
       year: typeof yearVal === 'number' ? yearVal : undefined,
       manual: awarded && !conditionsMet,
     })

@@ -134,6 +134,47 @@ export async function sendGroupActivityEmail(opts: {
   await sendUserEmail(to, `New activity in ${groupName}`, html)
 }
 
+/**
+ * Announce a new lead-up gathering (planning/brainstorm session) to a member.
+ * Links to the /schedule page where they can read details and RSVP. Gated by
+ * the recipient's `email_announcements` preference (checked by the caller).
+ */
+export async function sendLeadUpGatheringEmail(opts: {
+  to: string
+  recipientName: string
+  title: string
+  when: string | null
+  location: string | null
+  link: string | null
+}) {
+  const { to, recipientName, title, when, location, link } = opts
+  const scheduleUrl = `${APP_URL}/schedule`
+  const prefsUrl = `${APP_URL}/profile#notifications`
+
+  const detailRows = [
+    when ? `<p style="margin:4px 0"><strong>When:</strong> ${escapeHtml(when)}</p>` : '',
+    location ? `<p style="margin:4px 0"><strong>Where:</strong> ${escapeHtml(location)}</p>` : '',
+    link ? `<p style="margin:4px 0"><strong>Link:</strong> <a href="${encodeURI(link)}" style="color:#634D0B">${escapeHtml(link)}</a></p>` : '',
+  ].join('')
+
+  const html = `
+    <p>Hi ${escapeHtml(recipientName)},</p>
+    <p>A new gathering on the way to camp:</p>
+    <div style="margin:18px 0;padding:14px 18px;border-left:3px solid #C8A848;background:rgba(200,168,72,0.06);color:#3a2b14;border-radius:6px">
+      <p style="margin:0 0 6px;font-size:17px;color:#634D0B"><strong>${escapeHtml(title)}</strong></p>
+      ${detailRows}
+    </div>
+    <p style="margin:24px 0">
+      <a href="${scheduleUrl}" style="display:inline-block;background:#C8A848;color:#1A0A24;text-decoration:none;padding:11px 22px;border-radius:8px;font-weight:bold">View &amp; RSVP ✦</a>
+    </p>
+    <p style="font-size:12px;color:#8a8a8a;margin-top:28px">
+      You're receiving this because you have announcement emails turned on.
+      <a href="${prefsUrl}" style="color:#8a8a8a">Manage your notification preferences</a>.
+    </p>`
+
+  return sendUserEmail(to, `New gathering: ${title}`, html)
+}
+
 // ── Helpers ───────────────────────────────────────────────────────
 
 function escapeHtml(s: string): string {
