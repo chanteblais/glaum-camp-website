@@ -17,6 +17,7 @@ import { buildAttunementChecklist } from '@/lib/attunement'
 import { buildMemberFacts } from '@/lib/member-facts'
 import { parseDistinctions, evaluateDistinctions } from '@/lib/distinctions'
 import { resolveMember, getMemberProfileValues } from '@/lib/members'
+import { getMemberAwards } from '@/lib/distinction-awards'
 import { CabinetOfDistinctions } from './CabinetOfDistinctions'
 import { ProfileDetails } from './ProfileDetails'
 
@@ -114,8 +115,9 @@ export default async function ProfilePage() {
   // exists yet, so this falls back to system-facts-only behavior.
   const profileMember = await resolveMember(application?.clerk_user_id ?? userId, email)
   const profileValues = profileMember ? await getMemberProfileValues(profileMember.id) : {}
+  const awardedIds = profileMember ? new Set(await getMemberAwards(profileMember.id)) : undefined
   const factContext = { ...profileValues, ...memberFacts }
-  const earnedDistinctions = evaluateDistinctions(factContext, parseDistinctions(attuneConfig['config_distinctions']))
+  const earnedDistinctions = evaluateDistinctions(factContext, parseDistinctions(attuneConfig['config_distinctions']), awardedIds)
 
   // Link clerk_user_id for approved applications found by email — and mirror the
   // link onto the canonical member record, so future identity reads resolve by

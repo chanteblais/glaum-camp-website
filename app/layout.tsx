@@ -1,9 +1,11 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Libre_Baskerville, Marcellus, Cormorant_Garamond } from 'next/font/google'
 import { ClerkProvider } from '@clerk/nextjs'
 import { headers } from 'next/headers'
 import { clerkFallbackHome, resolveSiteOrigin } from '@/lib/site-origin'
 import { SITE_NAME, EVENT_NAME, SITE_DESCRIPTION } from '@/lib/site-config'
+import ServiceWorkerRegister from './ServiceWorkerRegister'
+import InstallPrompt from './InstallPrompt'
 import './globals.css'
 
 const libreBaskerville = Libre_Baskerville({
@@ -35,7 +37,18 @@ export const metadata: Metadata = {
     shortcut: ['/favicon/favicon.ico'],
     apple: '/favicon/apple-touch-icon.png',
   },
-  manifest: '/favicon/site.webmanifest',
+  // Manifest is generated dynamically by app/manifest.ts (auto-linked by Next).
+  appleWebApp: {
+    capable: true,
+    title: SITE_NAME,
+    statusBarStyle: 'black',
+  },
+}
+
+export const viewport: Viewport = {
+  themeColor: '#1A0A24',
+  width: 'device-width',
+  initialScale: 1,
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -54,6 +67,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           style={{ fontFamily: 'var(--font-libre-baskerville), Georgia, serif' }}
         >
           <div className="site-shell">{children}</div>
+          <ServiceWorkerRegister />
+          <InstallPrompt />
         </body>
       </html>
     </ClerkProvider>

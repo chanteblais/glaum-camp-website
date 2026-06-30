@@ -2,7 +2,7 @@ import { auth, clerkClient } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { NotificationBell } from '@/app/admin/NotificationBell'
-import { AdminTabBar } from '@/app/admin/AdminTabBar'
+import { AdminNav } from '@/app/admin/AdminNav'
 import { MembersDropdown } from './MembersDropdown'
 import { getGroupNamesByUser } from '@/lib/groups'
 
@@ -165,21 +165,16 @@ export default async function OverviewPage() {
   })).filter(g => g.members.length > 0)
 
   return (
-    <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
+    <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflowX: 'clip' }}>
       <img src="/hands-left.svg" alt="" aria-hidden style={{ position: 'fixed', left: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
       <img src="/hands-right.svg" alt="" aria-hidden style={{ position: 'fixed', right: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
 
-      <div style={{ maxWidth: '960px', margin: '0 auto', padding: '3rem 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
+      <div style={{ maxWidth: '960px', margin: '0 auto', padding: '0 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
 
-        {/* Page header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
-          <a href="/" style={{ fontSize: '0.8rem', letterSpacing: '0.1em', color: '#C8A848', textDecoration: 'none', opacity: 0.6 }}>
-            ← Back to camp
-          </a>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-            <NotificationBell initialNotifications={notifications ?? []} />
-            <span style={{ fontSize: '0.7rem', letterSpacing: '0.15em', color: '#D239F8', opacity: 0.6 }}>ADMIN</span>
-          </div>
+        <AdminNav />
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.5rem' }}>
+          <NotificationBell initialNotifications={notifications ?? []} />
         </div>
 
         <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(1.8rem, 5vw, 2.5rem)', color: '#C8A848', marginBottom: '0.5rem', textAlign: 'center' }}>
@@ -188,8 +183,6 @@ export default async function OverviewPage() {
         <p style={{ textAlign: 'center', opacity: 0.4, fontSize: '0.85rem', marginBottom: '2.5rem' }}>
           {pending.length} pending · {approved.length} approved
         </p>
-
-        <AdminTabBar />
 
         {/* ── PARTICIPATION OVERVIEW ── */}
         <section style={{ marginBottom: '2.5rem' }}>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { PollsManager } from './PollsManager'
 
 type Poll = {
   id: string
@@ -118,8 +119,12 @@ function PollItem({ poll }: { poll: Poll }) {
   )
 }
 
-export function PollWidget({ polls }: { polls: Poll[] }) {
-  if (polls.length === 0) return null
+export function PollWidget({ polls, canManage = false }: { polls: Poll[]; canManage?: boolean }) {
+  const [managing, setManaging] = useState(false)
+
+  // Members with no active polls and no management rights see nothing; poll
+  // managers always get the widget so they have somewhere to create the first one.
+  if (polls.length === 0 && !canManage) return null
 
   return (
     <div style={{
@@ -131,18 +136,54 @@ export function PollWidget({ polls }: { polls: Poll[] }) {
       flexDirection: 'column',
       height: '100%',
     }}>
-      <div style={{ padding: '1rem 1.5rem 0.75rem', borderBottom: '1px solid rgba(200,168,72,0.12)' }}>
+      <div style={{ padding: '1rem 1.5rem 0.75rem', borderBottom: '1px solid rgba(200,168,72,0.12)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
         <p style={{ fontSize: '0.62rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, margin: 0 }}>
           Polls
         </p>
+        {canManage && (
+          <button
+            onClick={() => setManaging(true)}
+            style={{ background: 'none', border: '1px solid rgba(200,168,72,0.25)', borderRadius: '0.4rem', color: '#C8A848', padding: '0.2rem 0.7rem', cursor: 'pointer', fontSize: '0.68rem', letterSpacing: '0.08em' }}
+          >
+            Manage
+          </button>
+        )}
       </div>
       <div>
-        {polls.map((poll, i) => (
-          <div key={poll.id} style={{ borderBottom: i < polls.length - 1 ? '1px solid rgba(200,168,72,0.08)' : 'none' }}>
-            <PollItem poll={poll} />
-          </div>
-        ))}
+        {polls.length === 0 ? (
+          <p style={{ fontSize: '0.82rem', opacity: 0.4, fontStyle: 'italic', textAlign: 'center', padding: '1.5rem' }}>
+            No active polls. Use Manage to create one.
+          </p>
+        ) : (
+          polls.map((poll, i) => (
+            <div key={poll.id} style={{ borderBottom: i < polls.length - 1 ? '1px solid rgba(200,168,72,0.08)' : 'none' }}>
+              <PollItem poll={poll} />
+            </div>
+          ))
+        )}
       </div>
+
+      {managing && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 900, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '3rem 1.5rem', overflowY: 'auto' }}
+          onClick={() => setManaging(false)}
+        >
+          <div
+            style={{ background: '#1A0A24', border: '1px solid rgba(200,168,72,0.3)', borderRadius: '1rem', padding: '1.75rem', maxWidth: '620px', width: '100%' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h2 style={{ fontFamily: 'TokyoDreams, serif', color: '#C8A848', fontSize: '1.2rem', margin: 0 }}>Manage Polls</h2>
+              <button
+                onClick={() => setManaging(false)}
+                aria-label="Close"
+                style={{ background: 'none', border: 'none', color: '#F3EDE6', opacity: 0.5, cursor: 'pointer', fontSize: '1.4rem', lineHeight: 1, padding: '0 0.25rem' }}
+              >×</button>
+            </div>
+            <PollsManager />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

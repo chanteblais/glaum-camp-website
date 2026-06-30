@@ -6,24 +6,16 @@ import { CollapsibleSection } from './CollapsibleSection'
 import { VolunteersSection } from './VolunteersSection'
 import { NotificationsSection } from './NotificationsSection'
 import { NotificationBell } from './NotificationBell'
-import { AdminTabBar } from './AdminTabBar'
+import { AdminNav } from './AdminNav'
+import { CategoryHeading } from './CategoryHeading'
+import { MANAGE_CATEGORIES } from './admin-sections'
 import { ScheduleManager } from './ScheduleManager'
 import { AnnouncementsManager } from './AnnouncementsManager'
-import { DepartmentsManager } from './DepartmentsManager'
 import { GroupsManager } from './GroupsManager'
 import { getGroupNamesByUser } from '@/lib/groups'
 import { RoleRequestsSection } from './RoleRequestsSection'
 import { RoleSuggestionsSection } from './RoleSuggestionsSection'
-import { DebugSection } from './DebugSection'
-import { PollsManager } from './PollsManager'
-import { AdminsManager } from './AdminsManager'
-import { AttunementTasksManager } from './AttunementTasksManager'
-import { DistinctionsManager } from './DistinctionsManager'
-import { ProfileFieldsManager } from './ProfileFieldsManager'
 import { ShiftSignupToggle } from './ShiftSignupToggle'
-import { parseAttunementTasks } from '@/lib/site-config'
-import { parseDistinctions } from '@/lib/distinctions'
-import { parseProfileFields, distinctionCatalog } from '@/lib/profile-fields'
 
 export default async function AdminPage() {
   const { userId } = await auth()
@@ -59,45 +51,15 @@ export default async function AdminPage() {
   const { data: configRows } = await supabaseAdmin
     .from('page_content')
     .select('key, value')
-    .in('key', ['config_attunement_tasks', 'config_shift_signup_open', 'config_distinctions', 'config_profile_fields'])
+    .in('key', ['config_shift_signup_open'])
   const configMap = Object.fromEntries((configRows ?? []).map(r => [r.key, r.value]))
-  const attunementTasks = parseAttunementTasks(configMap['config_attunement_tasks'])
   const shiftSignupOpen = configMap['config_shift_signup_open'] !== 'false'
-  const distinctions = parseDistinctions(configMap['config_distinctions'])
-  const profileFields = parseProfileFields(configMap['config_profile_fields'])
-  // Facts a distinction rule may reference — derived from the registry (system +
-  // distinction-eligible stored fields), replacing the old hardcoded catalog.
-  const distinctionFactCatalog = distinctionCatalog(profileFields)
-
-  // Group icon images — offered as medal art in the distinctions builder.
-  const { data: groupIconRows } = await supabaseAdmin
-    .from('groups')
-    .select('name, icon_image')
-    .not('icon_image', 'is', null)
-    .order('sort_order')
-  const groupIconOptions = (groupIconRows ?? [])
-    .filter(g => g.icon_image)
-    .map(g => ({ name: g.name as string, image: g.icon_image as string }))
 
   const { data: notifications, error: notificationsError } = await supabaseAdmin
     .from('admin_notifications')
     .select('id, application_id, event_type, message, details, created_at, read_at')
     .order('created_at', { ascending: false })
     .limit(20)
-
-  // Fetch approved members + check which are admins in Clerk
-  const approvedWithClerk = (applications ?? []).filter(a => a.status === 'approved' && a.clerk_user_id)
-  const clerkUsers = await Promise.all(
-    approvedWithClerk.map(a => client.users.getUser(a.clerk_user_id!).catch(() => null))
-  )
-  const adminMembers = approvedWithClerk.map((a, i) => ({
-    clerk_user_id: a.clerk_user_id!,
-    first_name: a.first_name,
-    last_name: a.last_name,
-    preferred_name: a.preferred_name ?? null,
-    email: a.email,
-    isAdmin: clerkUsers[i]?.publicMetadata?.role === 'admin',
-  }))
 
   if (dbError) console.error('[Admin] Supabase query error:', dbError)
   if (notificationsError) console.error('[Admin] Notifications query error:', notificationsError)
@@ -111,7 +73,7 @@ export default async function AdminPage() {
   const cancelled = all.filter(a => a.status === 'cancelled' && !activeVolunteerEmails.has(a.email.toLowerCase()))
 
   return (
-    <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
+    <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflowX: 'clip' }}>
 
       {/* Decorative hands */}
       <img
@@ -147,16 +109,12 @@ export default async function AdminPage() {
         }}
       />
 
-      <div style={{ maxWidth: '960px', margin: '0 auto', padding: '3rem 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
+      <div style={{ maxWidth: '960px', margin: '0 auto', padding: '0 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
-          <a href="/" style={{ fontSize: '0.8rem', letterSpacing: '0.1em', color: '#C8A848', textDecoration: 'none', opacity: 0.6 }}>
-            ← Back to camp
-          </a>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-            <NotificationBell initialNotifications={notifications ?? []} />
-            <span style={{ fontSize: '0.7rem', letterSpacing: '0.15em', color: '#D239F8', opacity: 0.6 }}>ADMIN</span>
-          </div>
+        <AdminNav sections={MANAGE_CATEGORIES} />
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.5rem' }}>
+          <NotificationBell initialNotifications={notifications ?? []} />
         </div>
 
         <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(1.8rem, 5vw, 2.5rem)', color: '#C8A848', marginBottom: '0.5rem', textAlign: 'center' }}>
@@ -165,8 +123,6 @@ export default async function AdminPage() {
         <p style={{ textAlign: 'center', opacity: 0.5, fontSize: '0.85rem', marginBottom: '2.5rem' }}>
           {pending.length} pending · {approved.length} approved · {rejected.length} rejected · {cancelled.length} cancelled
         </p>
-
-        <AdminTabBar />
 
         <NotificationsSection initialNotifications={notifications ?? []} />
 
@@ -177,7 +133,10 @@ export default async function AdminPage() {
           </div>
         )}
 
-        {/* ── VOLUNTEERS ── */}
+        {/* ═══════════════ PEOPLE ═══════════════ */}
+        <CategoryHeading id="people" />
+
+        {/* Registered members + outside volunteers */}
         <CollapsibleSection
           title="Registered Hands"
           summary={`${approved.length} members · ${activeVolunteers.length} outside${pendingVolunteers.length > 0 ? ` · ${pendingVolunteers.length} pending` : ''}`}
@@ -198,129 +157,7 @@ export default async function AdminPage() {
           />
         </CollapsibleSection>
 
-
-{/* ── ROLE REQUESTS ── */}
-        <CollapsibleSection
-          title="Role Requests"
-          summary="Pending approval"
-        >
-          <RoleRequestsSection />
-        </CollapsibleSection>
-
-        {/* ── ROLE SUGGESTIONS ── */}
-        <CollapsibleSection
-          title="Role Suggestions"
-          summary="Submitted by members"
-        >
-          <RoleSuggestionsSection />
-        </CollapsibleSection>
-
-        {/* ── DEPARTMENTS & ROLES ── */}
-        <CollapsibleSection
-          title="Departments"
-          summary="Roles grouped by department"
-        >
-          <DepartmentsManager />
-        </CollapsibleSection>
-
-        {/* ── GROUPS ── */}
-        <CollapsibleSection
-          title="Groups"
-          summary="See and assign who's in each group (e.g. Setup, Teardown, Decor)"
-        >
-          <GroupsManager
-            members={approved
-              .filter(a => a.clerk_user_id)
-              .map(a => ({
-                clerk_user_id: a.clerk_user_id!,
-                displayName: [a.preferred_name || a.first_name, a.last_name].filter(Boolean).join(' '),
-                email: a.email,
-              }))}
-          />
-        </CollapsibleSection>
-
-        {/* ── ANNOUNCEMENTS ── */}
-        <CollapsibleSection
-          title="Announcements"
-          summary="Post updates visible to all members"
-        >
-          <AnnouncementsManager />
-        </CollapsibleSection>
-
-        {/* ── POLLS ── */}
-        <CollapsibleSection
-          title="Polls"
-          summary="Create polls for members to vote on"
-        >
-          <PollsManager />
-        </CollapsibleSection>
-
-        {/* ── SCHEDULE ── */}
-        <CollapsibleSection
-          title="Schedule"
-          summary="Edit public schedule"
-        >
-          <ShiftSignupToggle initialOpen={shiftSignupOpen} />
-          <ScheduleManager />
-        </CollapsibleSection>
-
-        {/* ── ATTUNEMENT TASKS ── */}
-        <CollapsibleSection
-          title="Attunement Tasks"
-          summary="Profile checklist items members complete"
-        >
-          <AttunementTasksManager initialTasks={attunementTasks} />
-        </CollapsibleSection>
-
-        {/* ── PROFILE FIELDS ── */}
-        <CollapsibleSection
-          title="Profile Fields"
-          summary="The canonical schema for member profile data"
-        >
-          <ProfileFieldsManager initialFields={profileFields} />
-        </CollapsibleSection>
-
-        {/* ── DISTINCTIONS ── */}
-        <CollapsibleSection
-          title="Distinctions"
-          summary="Earned medals in each member's Cabinet of Distinctions"
-        >
-          <DistinctionsManager initialDistinctions={distinctions} groupIconOptions={groupIconOptions} factCatalog={distinctionFactCatalog} />
-        </CollapsibleSection>
-
-        {/* ── CONFIGURATION ── */}
-        <div style={{ marginBottom: '1.5rem' }}>
-          <a
-            href="/admin/configure"
-            style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              width: '100%', boxSizing: 'border-box',
-              padding: '1rem 1.5rem',
-              borderRadius: '0.75rem',
-              border: '1px solid rgba(200,168,72,0.2)',
-              background: 'rgba(200,168,72,0.03)',
-              color: '#C8A848',
-              textDecoration: 'none',
-              fontSize: '0.88rem',
-              letterSpacing: '0.06em',
-            }}
-          >
-            <span>Configure Applications</span>
-            <span style={{ opacity: 0.5 }}>→</span>
-          </a>
-        </div>
-
-        {/* ── ADMINS ── */}
-        <CollapsibleSection title="Admins" summary="Grant or remove admin access">
-          <AdminsManager members={adminMembers} />
-        </CollapsibleSection>
-
-        {/* ── DEBUG ── */}
-        <CollapsibleSection title="Debug Tools" summary="Testing utilities">
-          <DebugSection />
-        </CollapsibleSection>
-
-        {/* ── REGISTRY ── */}
+        {/* Application review queue */}
         <CollapsibleSection
           title="Applications"
           summary={`${pending.length} pending${rejected.length > 0 ? ` · ${rejected.length} not approved` : ''}${cancelled.length > 0 ? ` · ${cancelled.length} cancelled` : ''}`}
@@ -365,6 +202,59 @@ export default async function AdminPage() {
               )}
             </>
           )}
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          title="Role Requests"
+          summary="Pending approval"
+        >
+          <RoleRequestsSection />
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          title="Role Suggestions"
+          summary="Submitted by members"
+        >
+          <RoleSuggestionsSection />
+        </CollapsibleSection>
+
+        {/* ═══════════════ GROUPS ═══════════════ */}
+        <CategoryHeading id="groups" />
+
+        <CollapsibleSection
+          title="Groups"
+          summary="See and assign who's in each group (e.g. Setup, Teardown, Decor)"
+        >
+          <GroupsManager
+            members={approved
+              .filter(a => a.clerk_user_id)
+              .map(a => ({
+                clerk_user_id: a.clerk_user_id!,
+                displayName: [a.preferred_name || a.first_name, a.last_name].filter(Boolean).join(' '),
+                email: a.email,
+              }))}
+          />
+        </CollapsibleSection>
+
+        {/* ═══════════════ PROGRAM ═══════════════ */}
+        <CategoryHeading id="program" />
+
+        <CollapsibleSection
+          title="Schedule"
+          summary="Edit public schedule"
+        >
+          <ShiftSignupToggle initialOpen={shiftSignupOpen} />
+          <ScheduleManager />
+        </CollapsibleSection>
+
+        {/* ═══════════════ COMMUNICATION ═══════════════ */}
+        <CategoryHeading id="communication" />
+
+        <CollapsibleSection
+          title="Announcements"
+          summary="Post updates visible to all members"
+        >
+          <AnnouncementsManager />
         </CollapsibleSection>
 
       </div>

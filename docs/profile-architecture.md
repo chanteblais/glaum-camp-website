@@ -173,6 +173,26 @@ everything reversible until the new store is proven.
   - **Future (optional):** a home-dashboard teaser / attunement-task integration (`lib/attunement.ts`)
     so the prompt also shows off-profile; email nudge for required gaps.
 
+## Distinctions enhancements (post-Phase-5)
+
+- **OR conditions (done; no migration).** `DistinctionRule.match: 'all' | 'any'` (`lib/distinctions.ts`)
+  — `all` = AND (default), `any` = OR. The rule builder shows an **ALL / ANY** selector once a rule
+  has 2+ conditions. A rule with **no** conditions is now "manual only" (see below) rather than dead.
+- **Manual attribution (code done; migration `038` pending apply).** Admins grant honours by hand —
+  honorary/one-off awards, or overrides — unioned with the rule-derived ones.
+  - `supabase-migrations/038_member_distinctions.sql` — `member_distinctions(member_id, distinction_id,
+    note, granted_by, granted_at)`, unique per (member, distinction).
+  - `lib/distinction-awards.ts` — guarded `getMemberAwards` / `grantDistinction` / `revokeDistinction`.
+  - `evaluateDistinctions(facts, rules, awardedIds?)` — earned if conditions pass **OR** the id is in
+    `awardedIds`; `EarnedDistinction.manual` flags honour-only ones. Still never persisted — awards +
+    facts are the inputs, the medal list is derived every render.
+  - Admin UI: `app/admin/[id]/DistinctionAwards.tsx` (Grant/Revoke per distinction) in a new
+    **Distinctions** section on the member detail page; `POST/DELETE /api/admin/members/[memberId]/distinctions`.
+  - Reads union awards in `profile/page.tsx` + `members/[id]`. Guarded — degrades to rule-derived-only
+    until `038` is applied.
+  - **Future (optional):** an "exclude" tier (revoke a condition-met distinction); show `manual` medals
+    distinctly in the Cabinet.
+
 ## Open questions
 
 - **Volunteers** run a parallel `volunteers`-as-profile pattern. Fold into `members` later, or

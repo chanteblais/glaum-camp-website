@@ -44,7 +44,11 @@ export type DistinctionRule = {
   glyph?: string
   /** Which fact supplies the medal's engraved year (e.g. `joined_year`). */
   yearFact?: string
-  /** All conditions must pass (AND). */
+  /**
+   * How conditions combine: 'all' = AND (default), 'any' = OR. A rule with NO
+   * conditions is "manual only" — earned solely when an admin grants it by hand.
+   */
+  match?: 'all' | 'any'
   conditions: DistinctionCondition[]
   enabled: boolean
 }
@@ -56,6 +60,8 @@ export type EarnedDistinction = {
   image?: string
   glyph?: string
   year?: number
+  /** Granted by an admin rather than met by conditions (honorary). */
+  manual?: boolean
 }
 
 // Default honours — populate the cabinet out of the box. Rules referencing facts
@@ -126,6 +132,7 @@ export function parseDistinctions(raw?: string | null): DistinctionRule[] {
         image: typeof r.image === 'string' && r.image ? r.image : undefined,
         glyph: typeof r.glyph === 'string' && r.glyph ? r.glyph : undefined,
         yearFact: typeof r.yearFact === 'string' && r.yearFact ? r.yearFact : undefined,
+        match: r.match === 'any' ? 'any' : undefined,
         conditions: Array.isArray(r.conditions)
           ? (r.conditions.map(parseCondition).filter(Boolean) as DistinctionCondition[])
           : [],
@@ -158,21 +165,35 @@ function conditionPasses(c: DistinctionCondition, facts: FactContext): boolean {
 }
 
 // Evaluate enabled rules against a member's facts and return the earned medals.
+// A rule is earned when its conditions are met (AND/OR per `match`) OR it was
+// manually granted to this member (`awardedIds`). Rules with no conditions are
+// earned only via a manual grant. Earned medals are still never persisted — the
+// award store + facts are the inputs, the medal list is derived every render.
 export function evaluateDistinctions(
   facts: FactContext,
   rules: DistinctionRule[],
+  awardedIds?: ReadonlySet<string>,
 ): EarnedDistinction[] {
-  return rules
-    .filter(r => r.enabled && r.conditions.length > 0 && r.conditions.every(c => conditionPasses(c, facts)))
-    .map(r => {
-      const yearVal = r.yearFact ? facts[r.yearFact] : undefined
-      return {
-        id: r.id,
-        label: r.label,
-        description: r.description,
-        image: r.image,
-        glyph: r.glyph,
-        year: typeof yearVal === 'number' ? yearVal : undefined,
-      }
+  const out: EarnedDistinction[] = []
+  for (const r of rules) {
+    if (!r.enabled) continue
+    const conditionsMet =
+      r.conditions.length > 0 &&
+      (r.match === 'any'
+        ? r.conditions.some(c => conditionPasses(c, facts))
+        : r.conditions.every(c => conditionPasses(c, facts)))
+    const awarded = !!awardedIds?.has(r.id)
+    if (!conditionsMet && !awarded) continue
+    const yearVal = r.yearFact ? facts[r.yearFact] : undefined
+    out.push({
+      id: r.id,
+      label: r.label,
+      description: r.description,
+      image: r.image,
+      glyph: r.glyph,
+      year: typeof yearVal === 'number' ? yearVal : undefined,
+      manual: awarded && !conditionsMet,
     })
+  }
+  return out
 }

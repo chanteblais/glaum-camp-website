@@ -44,12 +44,14 @@ export default async function Home() {
   let polls: PollRow[] = []
   let shoutouts: Shoutout[] = []
 let isAdmin = false
+let canManagePolls = false
 
   if (userId) {
     const user = await currentUser()
     const email = user?.emailAddresses[0]?.emailAddress
     userFirstName = user?.firstName ?? null
     isAdmin = user?.publicMetadata?.role === 'admin'
+    canManagePolls = user?.publicMetadata?.canManagePolls === true
 
     const { data: appRaw } = await supabaseAdmin
       .from('applications')
@@ -427,7 +429,7 @@ let isAdmin = false
                   />
                 ),
 
-                polls: <PollWidget polls={polls} />,
+                polls: <PollWidget polls={polls} canManage={isAdmin || canManagePolls} />,
 
                 events: (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', height: '100%' }}>

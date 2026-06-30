@@ -5,6 +5,7 @@ import type { MemberFormConfig, VolunteerFormConfig, StepConfig, FieldConfig } f
 import { mergeMemberConfig } from '@/lib/form-config'
 import { parseProfileFields, applicationFields } from '@/lib/profile-fields'
 import { DEFAULT_TRACK_COPY, type TrackCopy } from '@/lib/site-config'
+import { AdminNav } from '../AdminNav'
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 
@@ -1010,14 +1011,9 @@ export function ApplicationBuilder({
       background: `radial-gradient(ellipse at 50% 0%, rgba(93,43,122,0.35) 0%, ${INK} 70%)`,
       color: CREAM,
     }}>
-      <div style={{ maxWidth: '960px', margin: '0 auto', padding: '3rem 1.5rem 6rem' }}>
+      <div style={{ maxWidth: '960px', margin: '0 auto', padding: '0 1.5rem 6rem' }}>
 
-        {/* Top bar */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
-          <a href="/admin" style={{ fontSize: '0.8rem', letterSpacing: '0.1em', color: GOLD, textDecoration: 'none', opacity: 0.6 }}>
-            ← Back to admin
-          </a>
-        </div>
+        <AdminNav />
 
         {/* Floating save indicator — always visible, even scrolled down */}
         <div style={{

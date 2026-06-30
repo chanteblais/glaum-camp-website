@@ -5,6 +5,11 @@ import { AdminActions } from '../AdminActions'
 import { RemoveMemberButton } from '../RemoveMemberButton'
 import { MemberSignupCard } from '../MemberSignupCard'
 import { mergeMemberConfig } from '@/lib/form-config'
+import { resolveMember } from '@/lib/members'
+import { getMemberAwards } from '@/lib/distinction-awards'
+import { parseDistinctions } from '@/lib/distinctions'
+import { DistinctionAwards } from './DistinctionAwards'
+import { AdminNav } from '../AdminNav'
 
 export default async function ApplicationDetailPage({ params }: { params: { id: string } }) {
   const { userId } = await auth()
@@ -77,6 +82,18 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
   try { if (cfgRow?.value) rawCfg = JSON.parse(cfgRow.value) } catch { /* defaults */ }
   const cfg = mergeMemberConfig(rawCfg)
 
+  // Manual distinctions: resolve this person's canonical member record + their
+  // current hand-granted awards, plus every defined distinction to offer.
+  const member = (app.clerk_user_id || app.email)
+    ? await resolveMember(app.clerk_user_id ?? null, app.email)
+    : null
+  const { data: distCfgRow } = await supabaseAdmin
+    .from('page_content').select('value').eq('key', 'config_distinctions').maybeSingle()
+  const awardRules = parseDistinctions(distCfgRow?.value).map(r => ({
+    id: r.id, label: r.label, glyph: r.glyph, image: r.image, manualOnly: r.conditions.length === 0,
+  }))
+  const memberAwards = member ? await getMemberAwards(member.id) : []
+
   // The only built-in field key whose column name differs from the key.
   const COLUMN_FOR: Record<string, string> = { dept_interests: 'department_interests' }
   // Built-in fields that should render as long-form (multi-line) answers.
@@ -133,11 +150,13 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
 
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1 }}>
-      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '3rem 1.5rem 6rem' }}>
+      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '0 1.5rem 6rem' }}>
 
-        {/* Nav */}
-        <div style={{ marginBottom: '3rem' }}>
-          <a href="/admin" style={{ fontSize: '0.8rem', letterSpacing: '0.1em', color: '#C8A848', textDecoration: 'none', opacity: 0.6 }}>
+        <AdminNav />
+
+        {/* Contextual back link */}
+        <div style={{ marginBottom: '2.5rem' }}>
+          <a href="/admin#people" style={{ fontSize: '0.8rem', letterSpacing: '0.1em', color: '#C8A848', textDecoration: 'none', opacity: 0.6 }}>
             ← Back to registry
           </a>
         </div>
@@ -240,6 +259,16 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
             <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
               <AdminActions id={app.id} email={app.email} redirectAfter="/admin" />
             </div>
+          </>
+        )}
+
+        {/* Manual distinctions — grant/revoke honours by hand */}
+        {app.status === 'approved' && (
+          <>
+            <Divider />
+            <Section title="Distinctions">
+              <DistinctionAwards memberId={member?.id ?? null} rules={awardRules} initialAwards={memberAwards} />
+            </Section>
           </>
         )}
 

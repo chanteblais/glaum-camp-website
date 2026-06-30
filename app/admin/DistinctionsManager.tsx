@@ -105,6 +105,11 @@ export function DistinctionsManager({
   const opsForFact = (key: string) =>
     DISTINCTION_OPS.filter(o => o.forTypes.includes(factType(key)))
   const numberFacts = factCatalog.filter(f => f.type === 'number')
+  // Facts that actually represent a calendar year, for the "engraved year" picker —
+  // excludes counts/durations like group count or years-since-joining.
+  const yearFacts = numberFacts.filter(f =>
+    f.key === 'joined_year' || (/\byear\b/i.test(f.label) && !/(since|ago|count|number|#)/i.test(f.label)),
+  )
 
   // A new condition defaults to the first number fact (else first fact), with a
   // valid operator/value for its type.
@@ -258,10 +263,44 @@ export function DistinctionsManager({
 
               {/* Conditions */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', borderLeft: '1px solid rgba(200,168,72,0.18)', paddingLeft: '0.7rem' }}>
-                <span style={{ ...tinyLabel, opacity: 0.45 }}>Earned when ALL of:</span>
-                {rule.conditions.length === 0 && (
-                  <span style={{ fontSize: '0.7rem', opacity: 0.35, fontStyle: 'italic' }}>
-                    No conditions — this rule never fires. Add one.
+                {/* How it's earned — segmented toggle between automatic (conditions) and by hand. */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                  <span style={{ ...tinyLabel, opacity: 0.5 }}>How it&rsquo;s earned</span>
+                  <div style={{ display: 'inline-flex', border: '1px solid rgba(200,168,72,0.3)', borderRadius: '9999px', overflow: 'hidden' }}>
+                    <button
+                      onClick={() => { if (rule.conditions.length === 0) patch(idx, { conditions: [defaultCondition()] }) }}
+                      title="Earned automatically when the member's facts meet conditions"
+                      style={{ border: 'none', cursor: 'pointer', padding: '0.3rem 0.9rem', fontSize: '0.7rem', letterSpacing: '0.04em', background: rule.conditions.length > 0 ? GOLD : 'transparent', color: rule.conditions.length > 0 ? '#1A0A24' : CREAM, fontWeight: rule.conditions.length > 0 ? 600 : 400, opacity: rule.conditions.length > 0 ? 1 : 0.6 }}
+                    >Automatically</button>
+                    <button
+                      onClick={() => { if (rule.conditions.length > 0) patch(idx, { conditions: [], match: undefined }) }}
+                      title="Granted by hand, per-member, from the member's admin page"
+                      style={{ border: 'none', borderLeft: '1px solid rgba(200,168,72,0.3)', cursor: 'pointer', padding: '0.3rem 0.9rem', fontSize: '0.7rem', letterSpacing: '0.04em', background: rule.conditions.length === 0 ? PURPLE : 'transparent', color: rule.conditions.length === 0 ? '#fff' : CREAM, fontWeight: rule.conditions.length === 0 ? 600 : 400, opacity: rule.conditions.length === 0 ? 1 : 0.6 }}
+                    >By hand</button>
+                  </div>
+                </div>
+
+                {rule.conditions.length === 0 ? (
+                  <span style={{ fontSize: '0.72rem', opacity: 0.45, fontStyle: 'italic', lineHeight: 1.5 }}>
+                    Awarded by hand from a member&rsquo;s page: <strong style={{ opacity: 0.8 }}>Admin → open a member → Distinctions</strong>.
+                  </span>
+                ) : (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    <span style={{ ...tinyLabel, opacity: 0.45 }}>Earned when</span>
+                    {rule.conditions.length > 1 ? (
+                      <select
+                        value={rule.match ?? 'all'}
+                        onChange={e => patch(idx, { match: e.target.value === 'any' ? 'any' : undefined })}
+                        style={{ ...selectStyle, padding: '0.1rem 0.3rem' }}
+                        title="ALL = every condition (AND) · ANY = at least one (OR)"
+                      >
+                        <option value="all" style={{ background: '#1A0A24' }}>ALL</option>
+                        <option value="any" style={{ background: '#1A0A24' }}>ANY</option>
+                      </select>
+                    ) : (
+                      <span style={{ ...tinyLabel, opacity: 0.45 }}>{(rule.match ?? 'all') === 'any' ? 'ANY' : 'ALL'}</span>
+                    )}
+                    <span style={{ ...tinyLabel, opacity: 0.45 }}>of:</span>
                   </span>
                 )}
                 {rule.conditions.map((c, ci) => {
@@ -322,10 +361,12 @@ export function DistinctionsManager({
                     </div>
                   )
                 })}
-                <button
-                  onClick={() => patch(idx, { conditions: [...rule.conditions, defaultCondition()] })}
-                  style={{ alignSelf: 'flex-start', background: 'none', border: 'none', cursor: 'pointer', color: GOLD, opacity: 0.6, fontSize: '0.72rem', letterSpacing: '0.04em', padding: '0.1rem 0' }}
-                >+ Add condition</button>
+                {rule.conditions.length > 0 && (
+                  <button
+                    onClick={() => patch(idx, { conditions: [...rule.conditions, defaultCondition()] })}
+                    style={{ alignSelf: 'flex-start', background: 'none', border: 'none', cursor: 'pointer', color: GOLD, opacity: 0.6, fontSize: '0.72rem', letterSpacing: '0.04em', padding: '0.1rem 0' }}
+                  >+ Add condition</button>
+                )}
               </div>
 
               {/* Year source */}
@@ -337,7 +378,7 @@ export function DistinctionsManager({
                   style={selectStyle}
                 >
                   <option value="" style={{ background: '#1A0A24' }}>— none —</option>
-                  {numberFacts.map(f => (
+                  {yearFacts.map(f => (
                     <option key={f.key} value={f.key} style={{ background: '#1A0A24' }}>{f.label}</option>
                   ))}
                 </select>

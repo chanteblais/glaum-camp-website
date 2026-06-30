@@ -9,6 +9,7 @@ import { buildMemberFacts } from '@/lib/member-facts'
 import { parseDistinctions, evaluateDistinctions } from '@/lib/distinctions'
 import { resolveMember, getMemberProfileValues } from '@/lib/members'
 import { parseProfileFields, storedFields } from '@/lib/profile-fields'
+import { getMemberAwards } from '@/lib/distinction-awards'
 import { CabinetOfDistinctions } from '@/app/profile/CabinetOfDistinctions'
 
 const GOLD = '#C8A848'
@@ -102,8 +103,9 @@ export default async function MemberPage({ params }: { params: { id: string } })
   // Guarded — falls back to system-facts-only when no member row exists yet.
   const profileMember = await resolveMember((member.clerk_user_id as string | null) ?? null)
   const profileValues = profileMember ? await getMemberProfileValues(profileMember.id) : {}
+  const awardedIds = profileMember ? new Set(await getMemberAwards(profileMember.id)) : undefined
   const factContext = { ...profileValues, ...memberFacts }
-  const earnedDistinctions = evaluateDistinctions(factContext, parseDistinctions(distRow?.value))
+  const earnedDistinctions = evaluateDistinctions(factContext, parseDistinctions(distRow?.value), awardedIds)
 
   const displayName = member.preferred_name || member.first_name || 'Member'
   const memberSince = member.submitted_at ? new Date(member.submitted_at as string).getFullYear() : null
