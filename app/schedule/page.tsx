@@ -10,7 +10,7 @@ export default async function SchedulePage() {
 
   // Only approved members can view schedule
   const { data: application } = await supabaseAdmin
-    .from('applications')
+    .from('members')
     .select('status')
     .eq('clerk_user_id', userId)
     .maybeSingle()

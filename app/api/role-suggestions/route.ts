@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   const user = await currentUser()
   const email = user?.emailAddresses[0]?.emailAddress
   const { data: application } = await supabaseAdmin
-    .from('applications')
+    .from('members')
     .select('status, preferred_name, first_name')
     .or(`clerk_user_id.eq.${userId},email.eq.${email}`)
     .eq('status', 'approved')

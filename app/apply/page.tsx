@@ -25,7 +25,7 @@ export default async function ApplyPage({ searchParams }: { searchParams: { trac
   }
 
   const [{ data: existing }, { data: volunteer }, { data: configRows }] = await Promise.all([
-    supabaseAdmin.from('applications').select('id, status').eq('clerk_user_id', userId).maybeSingle(),
+    supabaseAdmin.from('members').select('id, status').eq('clerk_user_id', userId).maybeSingle(),
     supabaseAdmin.from('volunteers').select('id, status').eq('clerk_user_id', userId).maybeSingle(),
     supabaseAdmin.from('page_content').select('key, value').in('key', [
       'config_member_form',

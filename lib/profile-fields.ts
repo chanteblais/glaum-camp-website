@@ -52,6 +52,17 @@ export type ProfileField = {
   /** May be referenced in distinction rule conditions. */
   distinctionEligible: boolean
   /**
+   * Prompt existing members who have no value yet to fill this in (Phase 4.5 —
+   * "I should've asked this on the application"). Only meaningful alongside
+   * memberEditable. Optional prompts are dismissible; see `required`.
+   */
+  askExisting?: boolean
+  /**
+   * When an `askExisting` prompt is also required, members can't dismiss it — it
+   * persists until answered. Optional (`required` false) prompts offer "Not now".
+   */
+  required?: boolean
+  /**
    * Read-only DERIVED fact (groups, tenure, designation, …). Not stored, not
    * editable, not application-eligible. Present in the registry so distinctions
    * and the profile UI see stored + derived fields in one namespace.
@@ -151,6 +162,8 @@ function parseField(raw: unknown): ProfileField | null {
     memberEditable:      system ? false : r.memberEditable === true,
     applicationEligible: system ? false : r.applicationEligible === true,
     distinctionEligible: r.distinctionEligible !== false,
+    askExisting:         system ? undefined : (r.askExisting === true || undefined),
+    required:            system ? undefined : (r.required === true || undefined),
     system: system || undefined,
     enabled: r.enabled !== false,
   }
@@ -205,4 +218,33 @@ export function distinctionCatalog(fields: ProfileField[]): DistinctionCatalogEn
     label: f.label,
     type: distinctionValueType(f.type),
   }))
+}
+
+// ── Profile catch-up (Phase 4.5) ────────────────────────────────────────────────
+
+/** Reserved key in member_profiles.values holding the field keys a member dismissed. */
+export const DISMISSED_KEY = '__dismissedFields'
+
+export function isProfileValueEmpty(v: unknown): boolean {
+  return v == null || v === '' || (Array.isArray(v) && v.length === 0)
+}
+
+/**
+ * Fields to prompt this member to fill in: enabled, member-editable, flagged
+ * "ask existing", with no value yet. Required gaps always show; optional gaps the
+ * member dismissed are hidden. ("Added after they applied" === "no value" — no
+ * need to track when the field was added.)
+ */
+export function profileGaps(
+  fields: ProfileField[],
+  values: Record<string, unknown>,
+): ProfileField[] {
+  const dismissed = new Set(
+    Array.isArray(values[DISMISSED_KEY]) ? (values[DISMISSED_KEY] as unknown[]).map(String) : [],
+  )
+  return fields.filter(f =>
+    f.enabled && f.askExisting && f.memberEditable &&
+    isProfileValueEmpty(values[f.key]) &&
+    (f.required || !dismissed.has(f.key)),
+  )
 }

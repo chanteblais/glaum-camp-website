@@ -29,10 +29,10 @@ export async function GET() {
     .select('id, name, department_id, departments(name, icon)')
     .in('id', roleIds)
 
-  // Fetch applicant names from applications table
+  // Applicant names from the canonical members table (Phase 5).
   const userIds = signups.map(s => s.clerk_user_id)
   const { data: applications } = await supabaseAdmin
-    .from('applications')
+    .from('members')
     .select('clerk_user_id, first_name, last_name, preferred_name')
     .in('clerk_user_id', userIds)
 

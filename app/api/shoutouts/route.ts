@@ -11,7 +11,8 @@ async function withAvatars(rows: ShoutoutRow[]) {
   const ids = Array.from(new Set(rows.map(r => r.clerk_user_id)))
   if (ids.length === 0) return rows.map(r => ({ ...r, avatar_url: null as string | null }))
   const { data: apps } = await supabaseAdmin
-    .from('applications')
+    // Phase 5: identity resolution reads the canonical `members` table.
+    .from('members')
     .select('clerk_user_id, avatar_url')
     .in('clerk_user_id', ids)
   const avatarMap = Object.fromEntries((apps ?? []).map(a => [a.clerk_user_id, a.avatar_url]))
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
   const user = await currentUser()
   const email = user?.emailAddresses[0]?.emailAddress
   const { data: application } = await supabaseAdmin
-    .from('applications')
+    .from('members')
     .select('status, preferred_name, first_name')
     .or(`clerk_user_id.eq.${userId},email.eq.${email}`)
     .eq('status', 'approved')

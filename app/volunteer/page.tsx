@@ -24,7 +24,7 @@ export default async function VolunteerPage({ searchParams }: { searchParams: { 
 
   const [{ data: existing }, { data: application }, { data: configRows }] = await Promise.all([
     supabaseAdmin.from('volunteers').select('id, status').eq('clerk_user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
-    supabaseAdmin.from('applications').select('id, status').or(`clerk_user_id.eq.${userId},email.eq.${email}`).order('submitted_at', { ascending: false }).limit(1).maybeSingle(),
+    supabaseAdmin.from('members').select('id, status').or(`clerk_user_id.eq.${userId},email.eq.${email}`).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabaseAdmin.from('page_content').select('key, value').eq('key', 'config_volunteer_form'),
   ])
 

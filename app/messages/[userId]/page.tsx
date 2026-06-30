@@ -23,7 +23,7 @@ export default async function ThreadPage({ params }: { params: { userId: string 
 
   // Fetch recipient profile
   const { data: other } = await supabaseAdmin
-    .from('applications')
+    .from('members')
     .select('clerk_user_id, first_name, preferred_name, avatar_url, pronouns')
     .eq('clerk_user_id', params.userId)
     .eq('status', 'approved')

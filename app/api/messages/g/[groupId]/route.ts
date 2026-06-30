@@ -49,7 +49,8 @@ export async function GET(_req: Request, { params }: { params: { groupId: string
   const senderIds = Array.from(new Set((msgs ?? []).map(m => m.sender_clerk_id)))
   const { data: profiles } = senderIds.length
     ? await supabaseAdmin
-        .from('applications')
+        // Phase 5: identity resolution reads the canonical `members` table.
+        .from('members')
         .select('clerk_user_id, first_name, preferred_name, avatar_url')
         .in('clerk_user_id', senderIds)
     : { data: [] }
@@ -106,7 +107,7 @@ export async function POST(req: Request, { params }: { params: { groupId: string
 
   // Snapshot the sender's display name (the messages table has no FK to applications).
   const { data: senderApp } = await supabaseAdmin
-    .from('applications')
+    .from('members')
     .select('preferred_name, first_name')
     .eq('clerk_user_id', userId)
     .maybeSingle()
@@ -173,7 +174,7 @@ async function notifyMentions(opts: {
   if (!memberIds.length) return []
 
   const { data: apps } = await supabaseAdmin
-    .from('applications')
+    .from('members')
     .select('clerk_user_id, first_name, preferred_name')
     .in('clerk_user_id', memberIds)
 
@@ -271,7 +272,7 @@ async function notifyOptedIn(opts: {
   const { data: group } = await supabaseAdmin.from('groups').select('name').eq('id', groupId).maybeSingle()
   const groupName = group?.name || 'a group'
   const { data: apps } = await supabaseAdmin
-    .from('applications')
+    .from('members')
     .select('clerk_user_id, first_name, preferred_name')
     .in('clerk_user_id', recipientIds)
   const nameById = new Map((apps ?? []).map(a => [a.clerk_user_id, a.preferred_name || a.first_name || 'there']))

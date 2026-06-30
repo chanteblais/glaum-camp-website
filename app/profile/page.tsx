@@ -117,12 +117,19 @@ export default async function ProfilePage() {
   const factContext = { ...profileValues, ...memberFacts }
   const earnedDistinctions = evaluateDistinctions(factContext, parseDistinctions(attuneConfig['config_distinctions']))
 
-  // Link clerk_user_id for approved applications found by email
+  // Link clerk_user_id for approved applications found by email — and mirror the
+  // link onto the canonical member record, so future identity reads resolve by
+  // clerk_user_id rather than the email fallback.
   if (application?.status === 'approved' && !application.clerk_user_id) {
     await supabaseAdmin
       .from('applications')
       .update({ clerk_user_id: userId })
       .eq('id', application.id)
+    await supabaseAdmin
+      .from('members')
+      .update({ clerk_user_id: userId })
+      .eq('application_id', application.id)
+      .is('clerk_user_id', null)
   }
 
   const isAdmin = user?.publicMetadata?.role === 'admin'

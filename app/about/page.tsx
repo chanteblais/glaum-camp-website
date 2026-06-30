@@ -14,7 +14,7 @@ export default async function AboutPage() {
     const user = await currentUser()
     const email = user?.emailAddresses[0]?.emailAddress
     const { data } = await supabaseAdmin
-      .from('applications')
+      .from('members')
       .select('id, status')
       .or(`clerk_user_id.eq.${userId},email.eq.${email}`)
       .neq('status', 'cancelled')

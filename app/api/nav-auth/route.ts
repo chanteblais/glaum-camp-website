@@ -55,7 +55,7 @@ export async function GET(req: Request) {
   let isApproved = false
 
   const { data: appRow } = await supabaseAdmin
-    .from('applications')
+    .from('members')
     .select('avatar_url, status')
     .or(`clerk_user_id.eq.${userId}${email ? `,email.eq.${email}` : ''}`)
     .limit(1)

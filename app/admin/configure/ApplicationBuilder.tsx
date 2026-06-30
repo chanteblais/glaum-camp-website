@@ -282,7 +282,7 @@ function FieldRow({
                 title="Save this answer to a member profile field (reusable across forms; usable in distinctions)"
                 style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(200,168,72,0.2)', borderRadius: '0.3rem', color: CREAM, fontSize: '0.7rem', padding: '0.15rem 0.35rem', fontFamily: 'inherit', outline: 'none' }}
               >
-                <option value="" style={{ background: INK }}>Custom answer only</option>
+                <option value="" style={{ background: INK }}>This application only</option>
                 {profileFieldOptions!.map(o => (
                   <option key={o.key} value={o.key} style={{ background: INK }}>{o.label}</option>
                 ))}

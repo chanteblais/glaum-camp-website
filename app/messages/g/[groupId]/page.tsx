@@ -37,7 +37,7 @@ export default async function GroupThreadPage({ params }: { params: { groupId: s
   // me renders highlighted too (the composer autocomplete filters me out).
   const { data: memberApps } = memberIds.length
     ? await supabaseAdmin
-        .from('applications')
+        .from('members')
         .select('clerk_user_id, first_name, preferred_name, avatar_url')
         .in('clerk_user_id', memberIds)
         .eq('status', 'approved')

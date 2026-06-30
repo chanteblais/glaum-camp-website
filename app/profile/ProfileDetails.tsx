@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { ProfileField } from '@/lib/profile-fields'
+import { profileGaps, DISMISSED_KEY, type ProfileField } from '@/lib/profile-fields'
 
 const GOLD = '#C8A848'
 const PURPLE = '#D239F8'
@@ -106,10 +106,29 @@ export function ProfileDetails() {
   if (!fields || fields.length === 0) return null
 
   const editable = fields.filter(f => f.memberEditable)
+  // Catch-up gaps (Phase 4.5): ask-existing fields with no value yet. Recomputed
+  // from live `values`, so a gap clears the moment the member fills it in.
+  const gaps = profileGaps(fields, values)
+  const gapKeys = new Set(gaps.map(g => g.key))
 
   function setValue(key: string, v: unknown) {
     setValues(prev => ({ ...prev, [key]: v }))
     setDirty(true); setSaved(false)
+  }
+
+  // "Not now" on an optional prompt — persist the dismissal and drop it locally.
+  async function dismissGap(key: string) {
+    setValues(prev => {
+      const list = Array.isArray(prev[DISMISSED_KEY]) ? (prev[DISMISSED_KEY] as string[]) : []
+      return { ...prev, [DISMISSED_KEY]: Array.from(new Set([...list, key])) }
+    })
+    try {
+      await fetch('/api/profile/fields', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ __dismiss: key }),
+      })
+    } catch { /* local dismissal stands; re-prompts next load if the write failed */ }
   }
 
   async function save() {
@@ -141,20 +160,47 @@ export function ProfileDetails() {
         Keep your details up to date. Editable fields can be changed any time.
       </p>
 
+      {gaps.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', padding: '0.85rem 1rem', marginBottom: '1.5rem', border: '1px solid rgba(210,57,248,0.3)', borderRadius: '0.6rem', background: 'rgba(210,57,248,0.06)' }}>
+          <span aria-hidden style={{ color: PURPLE, fontSize: '0.9rem', lineHeight: 1.4 }}>✦</span>
+          <p style={{ fontSize: '0.82rem', color: '#F4E3FA', opacity: 0.9, margin: 0, lineHeight: 1.6 }}>
+            {gaps.length === 1
+              ? 'There’s a detail we’d love you to add'
+              : `There are ${gaps.length} details we’d love you to add`}
+            {' '}— a few things we weren’t asking when you first joined. They’re highlighted below.
+          </p>
+        </div>
+      )}
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
-        {fields.map(field => (
-          <div key={field.key}>
-            <label style={{ display: 'block', fontSize: '0.7rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: GOLD, opacity: 0.7, marginBottom: '0.4rem' }}>
-              {field.label}
-            </label>
-            {field.description && (
-              <p style={{ fontSize: '0.74rem', opacity: 0.4, margin: '0 0 0.5rem', fontStyle: 'italic' }}>{field.description}</p>
-            )}
-            {field.memberEditable
-              ? <FieldEditor field={field} value={values[field.key]} onChange={v => setValue(field.key, v)} />
-              : <p style={{ fontSize: '0.9rem', color: CREAM, opacity: 0.85, margin: 0 }}>{displayValue(field, values[field.key])}</p>}
-          </div>
-        ))}
+        {fields.map(field => {
+          const isGap = gapKeys.has(field.key)
+          return (
+            <div key={field.key} style={isGap ? { borderLeft: `2px solid rgba(210,57,248,0.5)`, paddingLeft: '0.85rem', marginLeft: '-0.85rem' } : undefined}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', marginBottom: '0.4rem', flexWrap: 'wrap' }}>
+                <label style={{ fontSize: '0.7rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: GOLD, opacity: 0.7 }}>
+                  {field.label}
+                </label>
+                {isGap && (
+                  <span style={{ fontSize: '0.56rem', letterSpacing: '0.1em', textTransform: 'uppercase', padding: '0.12rem 0.5rem', borderRadius: '9999px', border: '1px solid rgba(210,57,248,0.4)', color: PURPLE }}>
+                    {field.required ? 'Required' : 'Please complete'}
+                  </span>
+                )}
+                {isGap && !field.required && (
+                  <button type="button" onClick={() => dismissGap(field.key)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: CREAM, opacity: 0.4, fontSize: '0.7rem', textDecoration: 'underline', padding: 0 }}>
+                    Not now
+                  </button>
+                )}
+              </div>
+              {field.description && (
+                <p style={{ fontSize: '0.74rem', opacity: 0.4, margin: '0 0 0.5rem', fontStyle: 'italic' }}>{field.description}</p>
+              )}
+              {field.memberEditable
+                ? <FieldEditor field={field} value={values[field.key]} onChange={v => setValue(field.key, v)} />
+                : <p style={{ fontSize: '0.9rem', color: CREAM, opacity: 0.85, margin: 0 }}>{displayValue(field, values[field.key])}</p>}
+            </div>
+          )
+        })}
       </div>
 
       {editable.length > 0 && (

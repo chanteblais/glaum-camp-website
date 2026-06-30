@@ -26,7 +26,8 @@ export default async function MessagesPage() {
 
   // Fetch all other approved members for the "New Message" picker
   const { data: members } = await supabaseAdmin
-    .from('applications')
+    // Phase 5: identity resolution reads the canonical `members` table.
+    .from('members')
     .select('clerk_user_id, first_name, preferred_name, avatar_url')
     .eq('status', 'approved')
     .neq('clerk_user_id', userId)

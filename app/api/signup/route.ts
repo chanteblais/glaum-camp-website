@@ -7,7 +7,7 @@ async function requireApprovedCamper(userId: string) {
   const email = user?.emailAddresses[0]?.emailAddress
 
   const { data: application } = await supabaseAdmin
-    .from('applications')
+    .from('members')
     .select('id, status')
     .or(`clerk_user_id.eq.${userId},email.eq.${email}`)
     .eq('status', 'approved')

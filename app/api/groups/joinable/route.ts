@@ -11,7 +11,7 @@ export async function GET() {
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { data: app } = await supabaseAdmin
-    .from('applications')
+    .from('members')
     .select('status')
     .eq('clerk_user_id', userId)
     .maybeSingle()

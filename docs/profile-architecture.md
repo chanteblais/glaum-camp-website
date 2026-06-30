@@ -125,26 +125,53 @@ everything reversible until the new store is proven.
   **Profile** section for `public` stored fields with values. **Deferred to Phase 5:** reading core
   *identity* (name/photo) from `members` instead of `applications` — left until the systematic
   cutover so it's done once, everywhere.
-- [ ] **Phase 5 — Decommission application-as-profile.** Migrate remaining ~30 read paths' identity
-  lookups off `applications` → `members` (kills the `email`-fallback fragility). `applications`
-  becomes purely a submission/review artifact; legacy answer columns frozen.
-- [ ] **Phase 4.5 — Profile catch-up (planned; falls out of Phase 4).** Solves "I should've asked
-  this on the application, but people have already applied." Because the profile is canonical,
-  *added-after* and *missing* are the same condition: the member has no value for the field — no
-  need to track when a field was added. Mechanics:
-  - **New registry flag** `askExisting` ("Ask existing members"): only flagged fields prompt, so a
-    fun/optional field doesn't nag everyone. A *gap* = enabled, member-editable, `askExisting` field
-    with no (non-empty) value for that member — pure derivation, like distinctions.
-  - **Surfacing:** reuse the attunement checklist (`lib/attunement.ts`) — a gap becomes a task
-    ("Tell us your Event Experience →") on the dashboard + profile. (Alt surfaces: a "Complete your
-    profile" card; email nudge for required fields.)
-  - **Answering** = the Phase 4 member self-edit path (write registry-keyed values to
-    `member_profiles`, honoring `memberEditable`). Building Phase 4 gets most of this for free.
-  - **Required vs. dismissible (decided):** optional `askExisting` fields are dismissible ("not
-    now"); a stronger "Required of members" tier persists until answered.
-  - **Payoff:** since distinctions read profile values, backfilling retroactively *grants* honours
-    (a long-time member fills in Event Experience → earns Founding Member).
-  - Strong multi-org / platform feature. Build after real data exists to verify against.
+- [x] **Phase 5 — Decommission application-as-profile.** *(Substantively done — all cross-member
+  identity/status reads are canonical; remaining `applications` reads are legitimately the
+  submission/review artifact.)* Migrate read paths' identity lookups off `applications` → `members`.
+  - **Done (14 sites, build-verified):** message sender/recipient/picker name + avatar resolution
+    (`api/messages/route.ts`, `api/messages/g/[groupId]/route.ts`, `messages/page.tsx`,
+    `messages/[userId]/page.tsx`, `messages/g/[groupId]/page.tsx`), shoutout avatars + author check
+    (`api/shoutouts`), role-suggestion gate (`api/role-suggestions`), role-request applicant names
+    (`api/admin/role-requests`). All faithful swaps — `members` has the same identity columns +
+    `status`, fully synced via backfill + dual-writes. Display-only, so worst case is a stale name,
+    never a gating/security issue.
+  - **Batch 2 done (12 sites, build-verified):** status-gating reads → `members.status` in
+    `schedule`, `members` + `members/[id]` viewer-gates, `apply`, `signup`, `about`, `volunteer`,
+    `api/schedule/[id]/rsvp`, `api/groups/joinable`, `api/groups/[id]/join`, `api/nav-auth`,
+    `api/signup`. (`signup`/`volunteer` ordered by `submitted_at`, which `members` lacks → switched
+    to `created_at`; one row per person anyway.) Plus: `profile/page.tsx` now mirrors clerk-linking
+    onto the member record so future identity reads resolve by `clerk_user_id`.
+  - **Intentionally left on `applications` (not a gap):** `profile/page.tsx` + `lib/profile-auth.ts`
+    read the owner's own **submission record** (logistics like arrival/departure + identity) by
+    `clerk_user_id`-or-`email`. Restructuring these to split identity onto `members` would **not**
+    kill the email-fallback — `members.clerk_user_id` can be NULL for un-linked members, so the
+    fallback is intrinsic, not fragile — and carries real risk on the core profile page for ~no gain.
+    Likewise `app/page.tsx`, the `members` directory cards, `members/[id]` detail, and all admin /
+    `api/admin` / `api/apply` / `api/profile` routes legitimately read `applications` (submission +
+    review workflow + app-specific columns). **Net:** every *cross-member* identity/status read is
+    now canonical (`members`); `applications` is read only as the submission/review artifact it is.
+  - **Future (optional):** unify the `members` directory ↔ `members/[id]` link on `clerk_user_id`
+    (currently coupled via application `id`); a later migration could drop now-unused legacy answer
+    columns from `applications`.
+- [x] **Phase 4.5 — Profile catch-up (built; build-verified).** Solves "I should've asked this on the
+  application, but people have already applied." *added-after* === *missing* — no value for the field
+  — so no need to track when a field was added.
+  - **Registry flags** (`lib/profile-fields.ts`): `askExisting` ("Catch-up" toggle) marks a field to
+    prompt members who lack a value; `required` makes that prompt non-dismissible. Both opt-in (off
+    by default) and editable in `Admin → Profile Fields`. Helper `profileGaps(fields, values)` derives
+    a member's gaps (enabled · memberEditable · askExisting · empty · not-dismissed-unless-required).
+  - **Surfacing:** the `/profile` **Profile Details** card (Phase 4) is the catch-up surface — a
+    purple callout summarizes the gaps and each gap field is flagged (**Please complete** / **Required**)
+    with the input inline. Members fill it right there; the gap clears live as they type.
+  - **Dismissal:** optional gaps offer **"Not now"**, persisted in `member_profiles.values` under the
+    reserved `__dismissedFields` key (ignored by registry reads); required gaps can't be dismissed.
+    Handled by `PATCH /api/profile/fields` (`__dismiss`).
+  - **Answering** reuses the Phase 4 self-edit path (`/api/profile/fields`).
+  - **Payoff:** since distinctions read profile values, backfilling retroactively *grants* honours.
+  - **To activate:** an admin toggles **Catch-up** (and optionally **Required**) on a field in
+    `Admin → Profile Fields`. Until then no one is prompted.
+  - **Future (optional):** a home-dashboard teaser / attunement-task integration (`lib/attunement.ts`)
+    so the prompt also shows off-profile; email nudge for required gaps.
 
 ## Open questions
 

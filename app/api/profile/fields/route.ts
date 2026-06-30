@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { resolveMember, getMemberProfileValues, setProfileValues } from '@/lib/members'
-import { parseProfileFields, storedFields, type ProfileField } from '@/lib/profile-fields'
+import { parseProfileFields, storedFields, DISMISSED_KEY, type ProfileField } from '@/lib/profile-fields'
 
 // Member-facing read/write of registry-defined profile fields
 // (member_profiles.values). Phase 4 of profile-as-source-of-truth.
@@ -63,15 +63,30 @@ export async function PATCH(req: NextRequest) {
   if (!member) return NextResponse.json({ error: 'No member profile found' }, { status: 404 })
 
   const body = (await req.json()) as Record<string, unknown>
-  const editable = new Map(
-    (await loadStoredFields()).filter(f => f.memberEditable).map(f => [f.key, f]),
-  )
+  const stored = await loadStoredFields()
+  const editable = new Map(stored.filter(f => f.memberEditable).map(f => [f.key, f]))
 
   const updates: Record<string, unknown> = {}
   for (const [key, raw] of Object.entries(body)) {
+    if (key.startsWith('__')) continue // reserved control keys handled below
     const field = editable.get(key)
     if (!field) continue // ignore unknown / non-editable keys
     updates[key] = coerceValue(field, raw)
+  }
+
+  // Catch-up dismissal (Phase 4.5): record which optional prompts the member
+  // chose "Not now" on. Required prompts can't be dismissed, so ignore those.
+  const dismiss = body[DISMISSED_KEY] ?? body.__dismiss
+  if (dismiss != null) {
+    const requestedRaw = Array.isArray(dismiss) ? dismiss : [dismiss]
+    const requested = requestedRaw
+      .map(String)
+      .filter(k => { const f = editable.get(k); return f && f.askExisting && !f.required })
+    if (requested.length) {
+      const current = await getMemberProfileValues(member.id)
+      const prev = Array.isArray(current[DISMISSED_KEY]) ? (current[DISMISSED_KEY] as unknown[]).map(String) : []
+      updates[DISMISSED_KEY] = Array.from(new Set([...prev, ...requested]))
+    }
   }
 
   if (Object.keys(updates).length === 0) {

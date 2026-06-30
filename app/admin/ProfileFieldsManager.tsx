@@ -70,6 +70,8 @@ function FlagRow({ field, onChange }: {
     { key: 'memberEditable',      label: 'Editable',     title: 'Members can edit their own value' },
     { key: 'applicationEligible', label: 'In apps',      title: 'Can be used as an application question' },
     { key: 'distinctionEligible', label: 'In rules',     title: 'Can be referenced by distinction rules' },
+    { key: 'askExisting',         label: 'Catch-up',     title: 'Prompt existing members who haven’t filled this in yet' },
+    { key: 'required',            label: 'Required',     title: 'Catch-up prompt can’t be dismissed (use together with Catch-up)' },
   ]
   return (
     <div style={{ display: 'flex', gap: '1.1rem', flexWrap: 'wrap', alignItems: 'center' }}>

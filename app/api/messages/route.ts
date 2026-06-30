@@ -66,7 +66,8 @@ export async function GET() {
   const otherIds = convs.filter(c => c.type === 'direct' && c.otherUserId).map(c => c.otherUserId as string)
   const { data: profiles } = otherIds.length
     ? await supabaseAdmin
-        .from('applications')
+        // Phase 5: identity resolution reads the canonical `members` table.
+        .from('members')
         .select('clerk_user_id, first_name, preferred_name, avatar_url')
         .in('clerk_user_id', otherIds)
         .eq('status', 'approved')
@@ -137,7 +138,7 @@ export async function POST(req: Request) {
 
   // Verify recipient is an approved member
   const { data: recipient } = await supabaseAdmin
-    .from('applications')
+    .from('members')
     .select('clerk_user_id, first_name, preferred_name')
     .eq('clerk_user_id', recipientId)
     .eq('status', 'approved')
@@ -149,7 +150,7 @@ export async function POST(req: Request) {
   // readable even if the sender's application is later deleted. Prefer the
   // application name (what's shown elsewhere), falling back to Clerk's first name.
   const { data: senderApp } = await supabaseAdmin
-    .from('applications')
+    .from('members')
     .select('preferred_name, first_name')
     .eq('clerk_user_id', userId)
     .maybeSingle()

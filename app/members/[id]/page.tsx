@@ -55,7 +55,7 @@ export default async function MemberPage({ params }: { params: { id: string } })
   const email = user?.emailAddresses[0]?.emailAddress
 
   const { data: viewer } = await supabaseAdmin
-    .from('applications')
+    .from('members')
     .select('status')
     .or(`clerk_user_id.eq.${userId},email.eq.${email}`)
     .eq('status', 'approved')

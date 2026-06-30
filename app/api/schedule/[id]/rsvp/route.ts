@@ -5,7 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 // Confirm the signed-in user is an approved member before they may RSVP.
 async function requireApprovedMember(userId: string): Promise<boolean> {
   const { data } = await supabaseAdmin
-    .from('applications')
+    .from('members')
     .select('status')
     .eq('clerk_user_id', userId)
     .eq('status', 'approved')
