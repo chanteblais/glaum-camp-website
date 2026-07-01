@@ -10,11 +10,13 @@ import { DistinctionsManager } from '../DistinctionsManager'
 import { AttunementTasksManager } from '../AttunementTasksManager'
 import { DepartmentsManager } from '../DepartmentsManager'
 import { GroupsManager } from '../GroupsManager'
+import { ShiftTypesManager } from '../ShiftTypesManager'
 import { AdminsManager } from '../AdminsManager'
 import { PollManagersManager } from '../PollManagersManager'
 import { DebugSection } from '../DebugSection'
 import { CONFIGURE_CATEGORIES } from '../admin-sections'
 import { parseAttunementTasks } from '@/lib/site-config'
+import { getGroupCollections } from '@/lib/group-collections'
 import { parseDistinctions } from '@/lib/distinctions'
 import { parseProfileFields, distinctionCatalog } from '@/lib/profile-fields'
 
@@ -46,6 +48,17 @@ export default async function ConfigurePage() {
   const groupIconOptions = (groupIconRows ?? [])
     .filter(g => g.icon_image)
     .map(g => ({ name: g.name as string, image: g.icon_image as string }))
+
+  // Collections + their group counts — power the Attunement "collection membership"
+  // requirement (which collection, and the cap on how many groups can be required).
+  const { collections: groupCollections, uncollected } = await getGroupCollections()
+  const attunementCollections = groupCollections.map(c => ({ id: c.id, name: c.name, groupCount: c.groups.length }))
+  const totalGroupCount = groupCollections.reduce((n, c) => n + c.groups.length, 0) + uncollected.length
+
+  // Shift types — offered as targets for a shift-hours attunement task.
+  const { data: shiftTypeRows } = await supabaseAdmin
+    .from('shift_types').select('id, name').order('sort_order')
+  const shiftTypeOptions = (shiftTypeRows ?? []).map(s => ({ id: s.id as string, name: s.name as string }))
 
   const { data: notifications } = await supabaseAdmin
     .from('admin_notifications')
@@ -147,7 +160,7 @@ export default async function ConfigurePage() {
           title="Attunement Tasks"
           summary="Profile checklist items members complete"
         >
-          <AttunementTasksManager initialTasks={attunementTasks} />
+          <AttunementTasksManager initialTasks={attunementTasks} collections={attunementCollections} totalGroupCount={totalGroupCount} shiftTypes={shiftTypeOptions} />
         </CollapsibleSection>
 
         {/* ═══════════════ STRUCTURE ═══════════════ */}
@@ -165,6 +178,13 @@ export default async function ConfigurePage() {
           summary="Group collections and the groups within them — plus who's assigned to each"
         >
           <GroupsManager members={groupMembers} />
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          title="Shift Types"
+          summary="The kinds of shift members sign up for (Setup, Service, …)"
+        >
+          <ShiftTypesManager />
         </CollapsibleSection>
 
         {/* ═══════════════ ACCESS & SYSTEM ═══════════════ */}

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { SuggestRoleModal } from './SuggestRoleModal'
 import { isImageIcon } from '@/lib/icon-src'
+import { shiftHue } from '@/lib/shift-colors'
 
 type Role = {
   id: string
@@ -28,17 +29,29 @@ type Department = {
   roles: Role[]
 }
 
-type ScheduleEvent = {
+// A signable shift slot from /api/shift-signups (shifts redesign: a member can
+// hold several; hours count toward the shift-type requirements they owe).
+type ShiftSlot = {
   id: string
-  day: string
-  time: string
   title: string
   subtitle: string | null
-  icon_type: string
-  highlight: boolean
-  is_recurring: boolean
+  day: string
+  time: string
+  event_date: string | null
+  duration_hours: number
   capacity: number | null
-  signed_up: number | null  // null = no capacity set (not signable)
+  signed_up: number
+  shift_type_id: string | null
+  shift_type_name: string
+  shift_type_icon: string | null
+  held: boolean
+}
+
+// One owed shift-type requirement (derived from groups/roles + universal tasks).
+type OwedReq = {
+  shiftTypeId: string
+  requiredHours: number
+  heldHours: number
 }
 
 type Signup = {
@@ -47,98 +60,47 @@ type Signup = {
   role_approval_status: string | null
 }
 
-// ── Status Banner ─────────────────────────────────────────────────────────────
+// Prefer the real date ("Saturday, July 25") when the event carries one; fall
+// back to the day name. Replaces the old hardcoded DAY_TO_DATE_LABEL map.
+// "1:00 PM – 4:00 PM" → "1–4 PM"; "9:30 PM – 12:00 AM" → "9:30 PM–12 AM".
+// Compact form for narrow calendar cards.
+function compactTime(time: string): string {
+  const parts = time.split(/\s*[–—-]\s*/).map(p => p.trim().replace(/:00\b/g, ''))
+  if (parts.length !== 2) return time.replace(/:00\b/g, '')
+  const mer = (s: string) => /\b(AM|PM)$/i.exec(s)?.[1]?.toUpperCase() ?? null
+  let [a, b] = parts
+  if (mer(a) && mer(a) === mer(b)) a = a.replace(/\s*(AM|PM)$/i, '')
+  return `${a}–${b}`
+}
 
-function SignupStatusBanner({
-  signup, hasRoles, hasShiftableEvents,
-}: {
-  signup: Signup | null
-  hasRoles: boolean
-  hasShiftableEvents: boolean
-}) {
-  if (!hasRoles && !hasShiftableEvents) return null
-
-  const hasRole = !!signup?.role_id
-  const hasShift = !!signup?.schedule_event_id
-  const isPending = signup?.role_approval_status === 'pending'
-  const allDone = (!hasRoles || (hasRole && !isPending)) && (!hasShiftableEvents || hasShift)
-
-  if (isPending) {
-    return (
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: '0.6rem',
-        padding: '0.65rem 1rem', borderRadius: '9999px',
-        border: '1px solid rgba(210,57,248,0.3)',
-        background: 'rgba(210,57,248,0.06)',
-        marginBottom: '2rem', width: 'fit-content',
-      }}>
-        <span style={{ color: '#D239F8', fontSize: '0.75rem' }}>○</span>
-        <span style={{ fontSize: '0.78rem', color: '#D239F8', opacity: 0.85, letterSpacing: '0.04em' }}>
-          Role request pending approval
-        </span>
-      </div>
-    )
+function shiftDateLabel(s: { event_date: string | null; day: string }): string {
+  if (s.event_date) {
+    const d = new Date(`${s.event_date}T12:00:00`)
+    if (!isNaN(d.getTime())) return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
   }
-
-  if (allDone) {
-    return (
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: '0.6rem',
-        padding: '0.65rem 1rem', borderRadius: '9999px',
-        border: '1px solid rgba(100,200,120,0.3)',
-        background: 'rgba(100,200,120,0.06)',
-        marginBottom: '2rem', width: 'fit-content',
-      }}>
-        <span style={{ color: '#7dcf8e', fontSize: '0.75rem' }}>✓</span>
-        <span style={{ fontSize: '0.78rem', color: '#7dcf8e', opacity: 0.85, letterSpacing: '0.04em' }}>
-          Role &amp; shift confirmed
-        </span>
-      </div>
-    )
-  }
-
-  const missing = []
-  if (hasRoles && !hasRole) missing.push('a role')
-  if (hasShiftableEvents && !hasShift) missing.push('a shift')
-
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap',
-      padding: '0.75rem 1.1rem', borderRadius: '0.75rem',
-      border: '1px solid rgba(210,168,50,0.35)',
-      background: 'rgba(210,168,50,0.06)',
-      marginBottom: '2rem',
-    }}>
-      <span style={{ fontSize: '0.82rem', color: '#C8A848', opacity: 0.9 }}>
-        ⚠ You still need to choose {missing.join(' and ')}.
-      </span>
-      <a href="#role-signup" style={{ fontSize: '0.78rem', color: '#C8A848', opacity: 0.65, textDecoration: 'underline', textUnderlineOffset: '2px' }}>
-        Sign up below →
-      </a>
-    </div>
-  )
+  return s.day
 }
 
 // ── Current Signup Cards ──────────────────────────────────────────────────────
 
 function CurrentSignupCards({
-  signup, departments, scheduleEvents, onOptOut, onCancelShift,
+  signup, departments, heldShifts, shiftTypes, onOptOut, onCancelShift,
 }: {
   signup: Signup | null
   departments: Department[]
-  scheduleEvents: ScheduleEvent[]
+  heldShifts: ShiftSlot[]
+  shiftTypes: ShiftTypeInfo[]
   onOptOut: () => void
-  onCancelShift: () => void
+  onCancelShift: (id: string) => Promise<void>
 }) {
   const [roleExpanded, setRoleExpanded] = useState(false)
-  const [shiftExpanded, setShiftExpanded] = useState(false)
   const [optingOut, setOptingOut] = useState(false)
-  const [cancellingShift, setCancellingShift] = useState(false)
+  const [cancellingId, setCancellingId] = useState<string | null>(null)
+  const [pendingCancel, setPendingCancel] = useState<ShiftSlot | null>(null)
 
   const allRoles = departments.flatMap(d => d.roles)
   const role = allRoles.find(r => r.id === signup?.role_id)
   const dept = role ? departments.find(d => d.id === role.department_id) : null
-  const event = scheduleEvents.find(e => e.id === signup?.schedule_event_id)
 
   const hasRoleDetail = role && (role.purpose || role.responsibilities_before || role.responsibilities_during || role.ideal_for || role.commitment || role.commitment_period)
 
@@ -150,12 +112,11 @@ function CurrentSignupCards({
     setOptingOut(false)
   }
 
-  async function handleCancelShift() {
-    if (!confirm('Cancel your shift? You can choose a new one below.')) return
-    setCancellingShift(true)
-    await onCancelShift()
-    setShiftExpanded(false)
-    setCancellingShift(false)
+  async function handleCancelShift(id: string) {
+    setPendingCancel(null)
+    setCancellingId(id)
+    await onCancelShift(id)
+    setCancellingId(null)
   }
 
   return (
@@ -210,63 +171,59 @@ function CurrentSignupCards({
         )}
       </div>
 
-      {/* Shift card — expandable */}
+      {/* Shifts card — every shift the member holds, each cancellable */}
       <div style={{
         border: '1px solid rgba(210,57,248,0.15)', borderRadius: '0.75rem',
         background: 'rgba(210,57,248,0.02)', overflow: 'hidden',
       }}>
-        <button
-          onClick={() => event && setShiftExpanded(o => !o)}
-          style={{
-            width: '100%', textAlign: 'left', padding: '1rem 1.25rem',
-            background: 'none', border: 'none', cursor: event ? 'pointer' : 'default', display: 'block',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <p style={{ fontSize: '0.68rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#D239F8', opacity: 0.85, margin: '0 0 0.4rem' }}>
-              Your Shift
-            </p>
-            {event && (
-              <span style={{ fontSize: '0.6rem', color: '#D239F8', opacity: 0.4 }}>{shiftExpanded ? '▲' : '▼'}</span>
-            )}
-          </div>
-          {event ? (
-            <>
-              <p style={{ fontSize: '0.92rem', color: '#F3EDE6', margin: 0 }}>{event.title}</p>
-              {event.time && <p style={{ fontSize: '0.77rem', opacity: 0.7, margin: '0.25rem 0 0' }}>{event.time}</p>}
-              <p style={{ fontSize: '0.72rem', color: '#D239F8', opacity: 0.75, margin: '0.25rem 0 0', letterSpacing: '0.04em' }}>
-                {DAY_TO_DATE_LABEL[event.day] ?? event.day}
-              </p>
-            </>
+        <div style={{ padding: '1rem 1.25rem' }}>
+          <p style={{ fontSize: '0.68rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#D239F8', opacity: 0.85, margin: '0 0 0.4rem' }}>
+            Your Shifts
+          </p>
+          {heldShifts.length === 0 ? (
+            <p style={{ fontSize: '0.85rem', opacity: 0.35, fontStyle: 'italic', margin: 0 }}>None yet</p>
           ) : (
-            <p style={{ fontSize: '0.85rem', opacity: 0.35, fontStyle: 'italic', margin: 0 }}>Not chosen</p>
-          )}
-        </button>
-
-        {event && shiftExpanded && (
-          <div style={{ borderTop: '1px solid rgba(210,57,248,0.12)' }}>
-            {event.subtitle && (
-              <div style={{ padding: '0.85rem 1.25rem' }}>
-                <p style={{ fontSize: '0.8rem', lineHeight: 1.65, opacity: 0.7, margin: 0 }}>{event.subtitle}</p>
-              </div>
-            )}
-            <div style={{ padding: '0.75rem 1.25rem', borderTop: event.subtitle ? '1px solid rgba(210,57,248,0.08)' : undefined }}>
-              <button
-                onClick={handleCancelShift}
-                disabled={cancellingShift}
-                style={{
-                  background: 'none', border: '1px solid rgba(255,80,80,0.25)', borderRadius: '9999px',
-                  color: '#ff8a8a', cursor: 'pointer', padding: '0.35rem 0.85rem',
-                  fontSize: '0.75rem', opacity: cancellingShift ? 0.4 : 0.75,
-                  transition: 'opacity 0.15s',
-                }}
-              >
-                {cancellingShift ? 'Cancelling…' : 'Cancel this shift'}
-              </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              {heldShifts.map(s => (
+                <div key={s.id} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ fontSize: '0.88rem', color: '#F3EDE6', margin: 0 }}>
+                      {s.shift_type_icon && <span style={{ marginRight: '0.3rem' }}>{s.shift_type_icon}</span>}
+                      {s.title}
+                    </p>
+                    <p style={{ fontSize: '0.72rem', color: '#D239F8', opacity: 0.75, margin: '0.15rem 0 0', letterSpacing: '0.04em' }}>
+                      {shiftDateLabel(s)}{s.time ? ` · ${s.time}` : ''}{s.duration_hours > 0 ? ` · ${s.duration_hours}h` : ''}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setPendingCancel(s)}
+                    disabled={cancellingId === s.id}
+                    style={{
+                      background: 'none', border: '1px solid rgba(255,80,80,0.25)', borderRadius: '9999px',
+                      color: '#ff8a8a', cursor: 'pointer', padding: '0.2rem 0.6rem',
+                      fontSize: '0.68rem', opacity: cancellingId === s.id ? 0.4 : 0.65,
+                      transition: 'opacity 0.15s', flexShrink: 0,
+                    }}
+                  >
+                    {cancellingId === s.id ? '…' : 'Cancel'}
+                  </button>
+                </div>
+              ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
+
+      {pendingCancel && (
+        <ShiftConfirmModal
+          slot={pendingCancel}
+          action="cancel"
+          hue={hueFor(pendingCancel, new Map(shiftTypes.map(t => [t.id, t])))}
+          typeName={pendingCancel.shift_type_name}
+          onConfirm={() => handleCancelShift(pendingCancel.id)}
+          onClose={() => setPendingCancel(null)}
+        />
+      )}
     </div>
   )
 }
@@ -355,11 +312,10 @@ function CommitmentPill({ commitment, period }: { commitment: string | null; per
 // ── Department Card (collapsible) ─────────────────────────────────────────────
 
 function DeptCard({
-  dept, selectedRole, selectedShiftEvent, signup, saving, error, onChange, onDeselect, onConfirm, canConfirm,
+  dept, selectedRole, signup, saving, error, onChange, onDeselect, onConfirm, canConfirm,
 }: {
   dept: Department
   selectedRole: string | null
-  selectedShiftEvent: ScheduleEvent | null
   signup: Signup | null
   saving: boolean
   error: string | null
@@ -490,12 +446,7 @@ function DeptCard({
 
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
                         <div>
-                          {selectedShiftEvent ? (
-                            <p style={{ fontSize: '0.78rem', color: '#D239F8', opacity: 0.8, margin: 0 }}>
-                              Shift: <span style={{ color: '#F3EDE6' }}>{selectedShiftEvent.title}</span>
-                              {selectedShiftEvent.time && <span style={{ opacity: 0.5 }}> · {selectedShiftEvent.time}</span>}
-                            </p>
-                          ) : role.requires_approval ? (
+                          {role.requires_approval ? (
                             <p style={{ fontSize: '0.78rem', opacity: 0.4, margin: 0, fontStyle: 'italic' }}>
                               You can pick a shift after your role is approved.
                             </p>
@@ -549,11 +500,10 @@ function DeptCard({
 // ── Role Picker (departments + roles) ─────────────────────────────────────────
 
 function RolePicker({
-  departments, selectedRole, selectedShiftEvent, signup, saving, error, onChange, onDeselect, onConfirm, canConfirm,
+  departments, selectedRole, signup, saving, error, onChange, onDeselect, onConfirm, canConfirm,
 }: {
   departments: Department[]
   selectedRole: string | null
-  selectedShiftEvent: ScheduleEvent | null
   signup: Signup | null
   saving: boolean
   error: string | null
@@ -575,7 +525,6 @@ function RolePicker({
             key={dept.id}
             dept={dept}
             selectedRole={selectedRole}
-            selectedShiftEvent={selectedShiftEvent}
             signup={signup}
             saving={saving}
             error={error}
@@ -590,286 +539,406 @@ function RolePicker({
   )
 }
 
-// ── Calendar Shift Picker ─────────────────────────────────────────────────────
+// ── Shift Calendar Picker ─────────────────────────────────────────────────────
+//
+// Day columns derived from the shifts' REAL dates (replaces the old hardcoded
+// Thu–Sun July grid, keeps the calendar feel — picking by day is easier). Cards
+// are coloured by shift type (lib/shift-colors.ts, same palette as the main
+// schedule); hours-progress lives in a chip row above the calendar. A member
+// can hold any number of shifts: click a card to sign up, click a held card to
+// cancel.
 
-const CALENDAR_DAYS = [
-  { day: 'Thursday', short: 'Thu', dayNum: 23 },
-  { day: 'Friday',   short: 'Fri', dayNum: 24 },
-  { day: 'Saturday', short: 'Sat', dayNum: 25 },
-  { day: 'Sunday',   short: 'Sun', dayNum: 26 },
-]
+type ShiftTypeInfo = { id: string; name: string; icon: string | null; color_index: number }
 
-const DAY_TO_DATE_LABEL: Record<string, string> = {
-  Thursday:  'Thursday, July 23',
-  Friday:    'Friday, July 24',
-  Saturday:  'Saturday, July 25',
-  Sunday:    'Sunday, July 26',
+const UNTYPED_HUE = { rgb: '210,57,248', accent: '#D239F8' }
+
+function hueFor(s: ShiftSlot, typesById: Map<string, ShiftTypeInfo>) {
+  const t = s.shift_type_id ? typesById.get(s.shift_type_id) : undefined
+  return t ? shiftHue(t.color_index) : UNTYPED_HUE
 }
 
-function ShiftPicker({
-  scheduleEvents, selectedShift, signup, onChange, onConfirm, saving, error,
-}: {
-  scheduleEvents: ScheduleEvent[]
-  selectedShift: string | null
-  signup: Signup | null
-  onChange: (id: string) => void
-  onConfirm: () => void
-  saving: boolean
-  error: string | null
-}) {
-  const [expandedEvent, setExpandedEvent] = useState<string | null>(null)
+// "2026-07-01" → { short: 'WED', num: 1, month: 'JUL' }
+function dateColumnLabel(iso: string): { short: string; num: number; month: string } | null {
+  const d = new Date(`${iso}T12:00:00`)
+  if (isNaN(d.getTime())) return null
+  return {
+    short: d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(),
+    num: d.getDate(),
+    month: d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase(),
+  }
+}
 
-  if (scheduleEvents.length === 0) return null
+function OwedChips({ owed, shiftTypes }: { owed: OwedReq[]; shiftTypes: ShiftTypeInfo[] }) {
+  if (owed.length === 0) return null
+  const typesById = new Map(shiftTypes.map(t => [t.id, t]))
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'center', marginBottom: '1.25rem' }}>
+      {owed.map(o => {
+        const t = typesById.get(o.shiftTypeId)
+        const hue = t ? shiftHue(t.color_index) : UNTYPED_HUE
+        const met = o.heldHours >= o.requiredHours
+        return (
+          <span key={o.shiftTypeId} style={{
+            display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+            padding: '0.3rem 0.75rem', borderRadius: '9999px',
+            border: `1px solid rgba(${hue.rgb},${met ? 0.55 : 0.4})`,
+            background: `rgba(${hue.rgb},${met ? 0.14 : 0.07})`,
+            fontSize: '0.72rem', color: hue.accent, letterSpacing: '0.04em', whiteSpace: 'nowrap',
+          }}>
+            {t?.icon && <span>{t.icon}</span>}
+            <span>{t?.name ?? 'Shift'}</span>
+            <span style={{ opacity: 0.9, fontWeight: 600 }}>{met ? '✓' : `${o.heldHours}/${o.requiredHours}h`}</span>
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
+function ShiftCard({
+  slot, hue, busy, onSignUp, onCancel,
+}: {
+  slot: ShiftSlot
+  hue: { rgb: string; accent: string }
+  busy: boolean
+  onSignUp: (id: string) => void
+  onCancel: (id: string) => void
+}) {
+  const full = slot.capacity != null && !slot.held && slot.signed_up >= slot.capacity
+
+  const handleClick = () => {
+    if (busy) return
+    if (slot.held) { onCancel(slot.id); return }
+    if (full) return
+    onSignUp(slot.id)
+  }
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={busy || (full && !slot.held)}
+      style={{
+        width: '100%', textAlign: 'left', padding: '0.45rem 0.5rem',
+        borderRadius: '0.45rem', display: 'block',
+        border: slot.held
+          ? `1.5px solid rgba(${hue.rgb},0.95)`
+          : full
+            ? '1px solid rgba(255,255,255,0.08)'
+            : `1px solid rgba(${hue.rgb},0.45)`,
+        background: slot.held
+          ? `rgba(${hue.rgb},0.22)`
+          : full
+            ? 'rgba(255,255,255,0.015)'
+            : `rgba(${hue.rgb},0.07)`,
+        cursor: full && !slot.held ? 'not-allowed' : 'pointer',
+        opacity: busy ? 0.55 : 1,
+        transition: 'border-color 0.15s, background 0.15s, opacity 0.15s',
+      }}
+    >
+      {slot.time && (
+        <p style={{ fontSize: '0.6rem', color: hue.accent, opacity: full ? 0.4 : 0.8, margin: '0 0 0.15rem', letterSpacing: '0.03em', lineHeight: 1.4 }}>
+          {compactTime(slot.time)}{slot.duration_hours > 0 ? ` · ${slot.duration_hours}h` : ''}
+        </p>
+      )}
+      <p lang="en" style={{ fontSize: '0.73rem', color: full ? 'rgba(243,237,230,0.4)' : '#F3EDE6', margin: 0, lineHeight: 1.3, overflowWrap: 'break-word', hyphens: 'auto' }}>
+        {slot.title}
+      </p>
+      <p style={{ fontSize: '0.65rem', margin: '0.25rem 0 0', lineHeight: 1.35, overflowWrap: 'break-word', color: slot.held ? '#7dcf8e' : full ? '#ff8a8a' : hue.accent, opacity: slot.held ? 0.95 : full ? 0.8 : 0.7 }}>
+        {busy
+          ? 'Saving…'
+          : slot.held
+            ? '✓ Signed up'
+            : full
+              ? 'Full'
+              : slot.capacity != null
+                ? `${slot.capacity - slot.signed_up} of ${slot.capacity} open`
+                : 'Open'}
+      </p>
+    </button>
+  )
+}
+
+// In-app confirmation (replaces the native browser confirm dialog) — a small
+// card in the site's language, accented with the shift type's colour.
+function ShiftConfirmModal({
+  slot, action, hue, typeName, onConfirm, onClose,
+}: {
+  slot: ShiftSlot
+  action: 'signup' | 'cancel'
+  hue: { rgb: string; accent: string }
+  typeName: string
+  onConfirm: () => void
+  onClose: () => void
+}) {
+  const isCancel = action === 'cancel'
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 60 }} />
+      <div style={{
+        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 61,
+        background: '#1A0A24', border: `1px solid rgba(${hue.rgb},0.45)`, borderRadius: '1rem',
+        padding: '1.6rem 1.75rem', width: '90%', maxWidth: '380px',
+        boxShadow: `0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(${hue.rgb},0.12)`,
+      }}>
+        <p style={{ fontSize: '0.65rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: hue.accent, opacity: 0.85, margin: '0 0 0.6rem' }}>
+          {slot.shift_type_icon && <span style={{ marginRight: '0.35rem' }}>{slot.shift_type_icon}</span>}
+          {isCancel ? `Cancel ${typeName} shift?` : `${typeName} shift`}
+        </p>
+        <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.2rem', color: '#F3EDE6', margin: '0 0 0.35rem', lineHeight: 1.3 }}>
+          {slot.title}
+        </p>
+        <p style={{ fontSize: '0.8rem', color: hue.accent, opacity: 0.85, margin: 0, letterSpacing: '0.03em' }}>
+          {shiftDateLabel(slot)}
+          {slot.time ? ` · ${slot.time}` : ''}
+          {slot.duration_hours > 0 ? ` · ${slot.duration_hours}h` : ''}
+        </p>
+        {!isCancel && slot.capacity != null && (
+          <p style={{ fontSize: '0.72rem', opacity: 0.45, margin: '0.4rem 0 0' }}>
+            {slot.capacity - slot.signed_up} of {slot.capacity} spots open
+          </p>
+        )}
+        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.4rem' }}>
+          <button
+            onClick={onClose}
+            style={{ padding: '0.5rem 1.1rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.2)', background: 'transparent', color: '#F3EDE6', cursor: 'pointer', fontSize: '0.8rem', opacity: 0.7 }}
+          >
+            Never mind
+          </button>
+          <button
+            onClick={onConfirm}
+            style={{
+              padding: '0.5rem 1.25rem', borderRadius: '9999px', cursor: 'pointer',
+              fontSize: '0.8rem', letterSpacing: '0.05em', color: '#F3EDE6',
+              border: isCancel ? '1px solid rgba(255,80,80,0.45)' : `1px solid rgba(${hue.rgb},0.55)`,
+              background: isCancel ? 'rgba(255,80,80,0.1)' : `rgba(${hue.rgb},0.14)`,
+            }}
+          >
+            {isCancel ? 'Cancel shift' : 'Sign up'}
+          </button>
+        </div>
+      </div>
+    </>
+  )
+}
+
+function ShiftsPicker({
+  shifts, owed, shiftTypes, signingId, error, onSignUp, onCancel,
+}: {
+  shifts: ShiftSlot[]
+  owed: OwedReq[]
+  shiftTypes: ShiftTypeInfo[]
+  signingId: string | null
+  error: string | null
+  onSignUp: (id: string) => void
+  onCancel: (id: string) => void
+}) {
+  const [pending, setPending] = useState<{ slot: ShiftSlot; action: 'signup' | 'cancel' } | null>(null)
+
+  if (shifts.length === 0) return null
+
+  const typesById = new Map(shiftTypes.map(t => [t.id, t]))
+
+  // Day columns from the shifts' real dates (dated first, then a TBD column).
+  const byDate = new Map<string, ShiftSlot[]>()
+  for (const s of shifts) {
+    const key = s.event_date ?? 'tbd'
+    if (!byDate.has(key)) byDate.set(key, [])
+    byDate.get(key)!.push(s)
+  }
+  const columns = Array.from(byDate.entries()).sort(([a], [b]) => {
+    if (a === 'tbd') return 1
+    if (b === 'tbd') return -1
+    return a.localeCompare(b)
+  })
+
+  const owedOutstanding = owed.filter(o => o.heldHours < o.requiredHours).length
+  const confirmSignUp = (id: string) => {
+    const s = shifts.find(x => x.id === id)
+    if (s) setPending({ slot: s, action: 'signup' })
+  }
+  const confirmCancel = (id: string) => {
+    const s = shifts.find(x => x.id === id)
+    if (s) setPending({ slot: s, action: 'cancel' })
+  }
 
   return (
     <div>
-      {signup?.schedule_event_id ? (
-        <div style={{ marginBottom: '1rem', textAlign: 'center' }}>
-          <p style={{ fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#D239F8', opacity: 0.85, marginBottom: '0.25rem' }}>
-            Your Shift
-          </p>
-          <p style={{ fontSize: '0.9rem', color: '#F3EDE6', margin: 0 }}>
-            {scheduleEvents.find(e => e.id === signup.schedule_event_id)?.title ?? 'Shift confirmed'}
-          </p>
-        </div>
-      ) : (
-        <p style={{ fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#D239F8', opacity: 0.85, marginBottom: '1rem', textAlign: 'center' }}>
-          Choose a Shift
-        </p>
-      )}
+      <p style={{ fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#D239F8', opacity: 0.85, marginBottom: '0.5rem', textAlign: 'center' }}>
+        Shifts
+      </p>
+      <p style={{ fontSize: '0.78rem', opacity: 0.55, textAlign: 'center', margin: '0 0 1rem', lineHeight: 1.6 }}>
+        {owedOutstanding > 0
+          ? 'Sign up for shifts until each requirement below is met. You can hold several — tap a shift to sign up.'
+          : owed.length > 0
+            ? 'Your shift requirements are met — you can still pick up extra shifts.'
+            : 'Tap a shift to sign up for it.'}
+      </p>
 
-      {/* Horizontally scrollable on mobile */}
-      <div style={{ overflowX: 'auto', marginLeft: '-1.5rem', marginRight: '-1.5rem', paddingLeft: '1.5rem', paddingRight: '1.5rem' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(160px, 1fr))', gap: '0.75rem', minWidth: '640px' }}>
-          {CALENDAR_DAYS.map(day => {
-            const dayEvents = scheduleEvents.filter(e => e.day === day.day && !e.is_recurring)
+      <OwedChips owed={owed} shiftTypes={shiftTypes} />
 
-            return (
-              <div key={day.day} style={{ display: 'flex', flexDirection: 'column' }}>
-                {/* Day header */}
-                <div style={{
-                  padding: '0.6rem 0.75rem',
-                  borderRadius: '0.6rem 0.6rem 0 0',
-                  background: 'rgba(210,57,248,0.08)',
-                  border: '1px solid rgba(210,57,248,0.18)',
-                  borderBottom: 'none',
-                  textAlign: 'center',
-                }}>
-                  <p style={{ fontSize: '0.65rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#D239F8', opacity: 0.7, margin: 0 }}>{day.short}</p>
-                  <p style={{ fontSize: '1rem', color: '#F3EDE6', margin: '0.1rem 0 0', fontFamily: 'TokyoDreams, serif' }}>{day.dayNum}</p>
-                </div>
+      {error && <p style={{ color: '#ff8a8a', fontSize: '0.78rem', textAlign: 'center', margin: '0 0 1rem' }}>{error}</p>}
 
-                {/* Column body */}
-                <div style={{
-                  flex: 1, padding: '0.6rem',
-                  border: '1px solid rgba(210,57,248,0.12)',
-                  borderRadius: '0 0 0.6rem 0.6rem',
-                  background: 'rgba(255,255,255,0.01)',
-                  display: 'flex', flexDirection: 'column', gap: '0.4rem',
-                }}>
-                  {dayEvents.map(ev => {
-                    const isSignable = ev.capacity != null
-                    const full = isSignable && ev.signed_up != null && ev.signed_up >= ev.capacity! && ev.id !== signup?.schedule_event_id
-                    const selected = selectedShift === ev.id
-                    const isExpanded = expandedEvent === ev.id
-                    const hasDetail = !!ev.subtitle
-
-                    // Signable events get selectable treatment; others are context-only
-                    if (isSignable) {
-                      return (
-                        <div key={ev.id} style={{ borderRadius: '0.4rem', overflow: 'hidden' }}>
-                          <button
-                            onClick={() => {
-                              if (full) return
-                              onChange(ev.id)
-                              setExpandedEvent(isExpanded ? null : ev.id)
-                            }}
-                            style={{
-                              width: '100%', textAlign: 'left', padding: '0.5rem 0.6rem',
-                              borderRadius: isExpanded ? '0.4rem 0.4rem 0 0' : '0.4rem',
-                              border: selected && ev.id === signup?.schedule_event_id
-                                ? '1px solid rgba(210,57,248,0.9)'
-                                : selected
-                                ? '1px solid rgba(210,57,248,0.6)'
-                                : full
-                                  ? '1px solid rgba(255,80,80,0.2)'
-                                  : '1px solid rgba(210,57,248,0.3)',
-                              borderBottom: isExpanded ? 'none' : undefined,
-                              background: selected && ev.id === signup?.schedule_event_id
-                                ? 'rgba(210,57,248,0.22)'
-                                : selected
-                                ? 'rgba(210,57,248,0.12)'
-                                : full ? 'rgba(255,255,255,0.01)' : 'rgba(210,57,248,0.05)',
-                              cursor: full ? 'not-allowed' : 'pointer',
-                              transition: 'border-color 0.15s, background 0.15s',
-                              display: 'block',
-                            }}
-                          >
-                            {ev.time && <p style={{ fontSize: '0.6rem', color: '#D239F8', opacity: 0.55, margin: '0 0 0.15rem', letterSpacing: '0.05em' }}>{ev.time}</p>}
-                            <p style={{ fontSize: '0.75rem', color: full ? 'rgba(243,237,230,0.4)' : '#F3EDE6', margin: 0, lineHeight: 1.3 }}>{ev.title}</p>
-                            <p style={{ fontSize: '0.65rem', margin: '0.25rem 0 0', color: full ? '#ff8a8a' : '#D239F8', opacity: full ? 0.8 : 0.65 }}>
-                              {full
-                                ? 'Full'
-                                : `${ev.capacity! - (ev.signed_up ?? 0)} of ${ev.capacity} open`}
-                            </p>
-                          </button>
-                          {isExpanded && hasDetail && (
-                            <div style={{
-                              padding: '0.4rem 0.6rem',
-                              border: '1px solid rgba(210,57,248,0.3)',
-                              borderTop: 'none',
-                              borderRadius: '0 0 0.4rem 0.4rem',
-                              background: 'rgba(210,57,248,0.04)',
-                            }}>
-                              <p style={{ fontSize: '0.7rem', opacity: 0.6, margin: 0, lineHeight: 1.5 }}>{ev.subtitle}</p>
-                            </div>
-                          )}
-                        </div>
-                      )
-                    }
-
-                    // Non-signable events: muted context only, click to expand subtitle
-                    return (
-                      <div key={ev.id} style={{ borderRadius: '0.35rem', overflow: 'hidden', opacity: 0.45 }}>
-                        <button
-                          onClick={() => hasDetail && setExpandedEvent(isExpanded ? null : ev.id)}
-                          style={{
-                            width: '100%', textAlign: 'left', padding: '0.3rem 0.45rem',
-                            borderRadius: isExpanded ? '0.35rem 0.35rem 0 0' : '0.35rem',
-                            background: 'transparent',
-                            border: '1px solid rgba(255,255,255,0.06)',
-                            borderBottom: isExpanded ? 'none' : undefined,
-                            cursor: hasDetail ? 'pointer' : 'default',
-                            display: 'block',
-                          }}
-                        >
-                          {ev.time && <p style={{ fontSize: '0.58rem', color: '#F3EDE6', opacity: 0.5, margin: '0 0 0.1rem', letterSpacing: '0.03em' }}>{ev.time}</p>}
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.25rem' }}>
-                            <p style={{ fontSize: '0.7rem', color: '#F3EDE6', margin: 0, lineHeight: 1.3 }}>{ev.title}</p>
-                            {hasDetail && <span style={{ fontSize: '0.5rem', color: '#F3EDE6', opacity: 0.5, flexShrink: 0 }}>{isExpanded ? '▲' : '▼'}</span>}
-                          </div>
-                        </button>
-                        {isExpanded && ev.subtitle && (
-                          <div style={{
-                            padding: '0.3rem 0.45rem',
-                            background: 'rgba(255,255,255,0.02)',
-                            border: '1px solid rgba(255,255,255,0.06)',
-                            borderTop: 'none',
-                            borderRadius: '0 0 0.35rem 0.35rem',
-                          }}>
-                            <p style={{ fontSize: '0.65rem', opacity: 0.8, margin: 0, lineHeight: 1.5 }}>{ev.subtitle}</p>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-
-                  {dayEvents.length === 0 && (
-                    <p style={{ fontSize: '0.7rem', opacity: 0.2, fontStyle: 'italic', textAlign: 'center', padding: '0.5rem 0' }}>—</p>
-                  )}
-                </div>
+      {/* Mobile-first: days stack vertically with a compact inline date bar and
+          full-width cards. From 640px up, the days sit side by side in ONE row
+          (no scroll, no wrap) so the whole event span reads as a calendar. */}
+      <style>{`
+        .shift-cal { display: flex; flex-direction: column; gap: 0.75rem; }
+        .shift-cal-day { display: flex; flex-direction: column; min-width: 0; }
+        .shift-cal-head { display: flex; align-items: baseline; gap: 0.45rem; padding: 0.5rem 0.8rem; border-radius: 0.6rem 0.6rem 0 0; background: rgba(210,57,248,0.08); border: 1px solid rgba(210,57,248,0.18); border-bottom: none; }
+        .shift-cal-head-num { font-size: 1rem; color: #F3EDE6; margin: 0; font-family: TokyoDreams, serif; }
+        .shift-cal-head-label { font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; color: #D239F8; opacity: 0.7; margin: 0; }
+        .shift-cal-body { flex: 1; padding: 0.6rem; border: 1px solid rgba(210,57,248,0.12); border-radius: 0 0 0.6rem 0.6rem; background: rgba(255,255,255,0.01); display: flex; flex-direction: column; gap: 0.4rem; }
+        @media (min-width: 640px) {
+          .shift-cal { display: grid; grid-template-columns: repeat(${columns.length}, minmax(0, 1fr)); gap: 0.5rem; }
+          .shift-cal-head { display: block; text-align: center; padding: 0.55rem 0.4rem; }
+          .shift-cal-head-num { margin-top: 0.1rem; }
+          /* Let the calendar panel break out of the narrow text column so the
+             day columns get real width on desktop (centered over the viewport). */
+          .shift-panel-breakout { width: min(1150px, calc(100vw - 3rem)); margin-left: calc((100% - min(1150px, calc(100vw - 3rem))) / 2); }
+        }
+      `}</style>
+      <div className="shift-cal">
+        {columns.map(([key, slots]) => {
+          const label = key === 'tbd' ? null : dateColumnLabel(key)
+          return (
+            <div key={key} className="shift-cal-day">
+              <div className="shift-cal-head">
+                <p className="shift-cal-head-label">
+                  {label ? `${label.short} · ${label.month}` : slots[0]?.day?.slice(0, 3).toUpperCase() ?? 'TBD'}
+                </p>
+                <p className="shift-cal-head-num">{label ? label.num : '—'}</p>
               </div>
+              <div className="shift-cal-body">
+                {slots.map(s => (
+                  <ShiftCard
+                    key={s.id}
+                    slot={s}
+                    hue={hueFor(s, typesById)}
+                    busy={signingId === s.id}
+                    onSignUp={confirmSignUp}
+                    onCancel={confirmCancel}
+                  />
+                ))}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Type legend */}
+      {shiftTypes.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem 1rem', justifyContent: 'center', marginTop: '1rem' }}>
+          {shiftTypes.filter(t => shifts.some(s => s.shift_type_id === t.id)).map(t => {
+            const hue = shiftHue(t.color_index)
+            return (
+              <span key={t.id} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.65rem', opacity: 0.6, letterSpacing: '0.05em' }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: hue.accent, display: 'inline-block' }} />
+                {t.name}
+              </span>
             )
           })}
         </div>
-      </div>
+      )}
 
-      {/* Confirm footer */}
-      {selectedShift && selectedShift !== signup?.schedule_event_id && (
-        <div style={{
-          marginTop: '1.25rem',
-          padding: '0.85rem 1.25rem',
-          borderTop: '1px solid rgba(210,57,248,0.15)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap',
-        }}>
-          <p style={{ fontSize: '0.8rem', color: '#D239F8', opacity: 0.8, margin: 0 }}>
-            {scheduleEvents.find(e => e.id === selectedShift)?.title ?? 'Shift selected'}
-          </p>
-          {signup?.schedule_event_id ? (
-            <p style={{ fontSize: '0.78rem', opacity: 0.5, fontStyle: 'italic', margin: 0 }}>
-              Cancel your current shift above before selecting a new one.
-            </p>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              {error && <p style={{ color: '#ff8a8a', fontSize: '0.75rem', margin: 0 }}>{error}</p>}
-              <button
-                onClick={onConfirm}
-                disabled={saving}
-                style={{
-                  padding: '0.5rem 1.25rem', borderRadius: '9999px',
-                  border: '1px solid rgba(210,57,248,0.5)',
-                  background: 'rgba(210,57,248,0.08)',
-                  color: '#F3EDE6', cursor: saving ? 'not-allowed' : 'pointer',
-                  fontSize: '0.8rem', letterSpacing: '0.06em',
-                  opacity: saving ? 0.5 : 1, transition: 'all 0.2s',
-                }}
-              >
-                {saving ? 'Saving…' : 'Confirm shift'}
-              </button>
-            </div>
-          )}
-        </div>
+      {/* Confirmation modal */}
+      {pending && (
+        <ShiftConfirmModal
+          slot={pending.slot}
+          action={pending.action}
+          hue={hueFor(pending.slot, typesById)}
+          typeName={pending.slot.shift_type_name}
+          onConfirm={() => {
+            const { slot, action } = pending
+            setPending(null)
+            if (action === 'signup') onSignUp(slot.id)
+            else onCancel(slot.id)
+          }}
+          onClose={() => setPending(null)}
+        />
       )}
     </div>
   )
 }
 
+
 // ── Section Wrapper (owns state) ──────────────────────────────────────────────
 
 export function SignupSection({ showPickers = true }: { showPickers?: boolean }) {
   const [departments, setDepartments] = useState<Department[]>([])
-  const [scheduleEvents, setScheduleEvents] = useState<ScheduleEvent[]>([])
   const [signup, setSignup] = useState<Signup | null>(null)
+  const [shifts, setShifts] = useState<ShiftSlot[]>([])
+  const [owed, setOwed] = useState<OwedReq[]>([])
+  const [shiftTypes, setShiftTypes] = useState<ShiftTypeInfo[]>([])
   const [shiftSignupOpen, setShiftSignupOpen] = useState(true)
   const [loading, setLoading] = useState(true)
 
   const [selectedRole, setSelectedRole] = useState<string | null>(null)
-  const [selectedShift, setSelectedShift] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [signingId, setSigningId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [shiftError, setShiftError] = useState<string | null>(null)
   const [showSuggest, setShowSuggest] = useState(false)
 
+  // Roles come from the legacy /api/signup; shifts from the many-to-many
+  // /api/shift-signups (owed requirements + held slots + hours).
   useEffect(() => {
-    fetch('/api/signup')
-      .then(r => r.json())
-      .then(d => {
-        setDepartments(d.departments ?? [])
-        setScheduleEvents(d.scheduleEvents ?? [])
-        setSignup(d.signup ?? null)
-        setShiftSignupOpen(d.shiftSignupOpen !== false)
-        setSelectedRole(d.signup?.role_id ?? null)
-        setSelectedShift(d.signup?.schedule_event_id ?? null)
+    Promise.all([
+      fetch('/api/signup').then(r => r.json()),
+      fetch('/api/shift-signups').then(r => r.json()),
+    ])
+      .then(([roleData, shiftData]) => {
+        setDepartments(roleData.departments ?? [])
+        setSignup(roleData.signup ?? null)
+        setSelectedRole(roleData.signup?.role_id ?? null)
+        setShifts(shiftData.shifts ?? [])
+        setOwed(shiftData.owed ?? [])
+        setShiftTypes(shiftData.shiftTypes ?? [])
+        setShiftSignupOpen(shiftData.shiftSignupOpen !== false)
       })
       .finally(() => setLoading(false))
   }, [])
 
   const hasRoles = departments.some(d => d.roles.length > 0)
-  const hasShiftableEvents = scheduleEvents.some(e => e.capacity != null)
-  const hasCalendarEvents = scheduleEvents.some(e => CALENDAR_DAYS.some(d => d.day === e.day) && !e.is_recurring)
+  const heldShifts = shifts.filter(s => s.held)
 
-  const allRoles = departments.flatMap(d => d.roles)
-  const selectedRoleObj = allRoles.find(r => r.id === selectedRole) ?? null
-  const selectedRoleRequiresApproval = selectedRoleObj?.requires_approval ?? false
+  // Re-pull shifts + owed after any signup change so counts, hours, and
+  // requirement progress stay exact (cheaper than mirroring the math locally).
+  async function refreshShifts() {
+    try {
+      const d = await fetch('/api/shift-signups').then(r => r.json())
+      setShifts(d.shifts ?? [])
+      setOwed(d.owed ?? [])
+      setShiftTypes(d.shiftTypes ?? [])
+    } catch { /* keep current state */ }
+  }
 
-  // Approval-required roles can be requested with just a role selection (no shift needed yet)
-  const canSave = !!selectedRole
-
-  const selectedShiftEvent = scheduleEvents.find(e => e.id === selectedShift) ?? null
-
-  async function handleCancelShift() {
-    const res = await fetch('/api/signup', {
+  async function handleSignUpShift(id: string) {
+    if (signingId) return
+    setSigningId(id); setShiftError(null)
+    const res = await fetch('/api/shift-signups', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ schedule_event_id: null }),
+      body: JSON.stringify({ schedule_event_id: id }),
     })
-    if (!res.ok) return
-    setSignup(prev => prev ? { ...prev, schedule_event_id: null } : null)
-    setSelectedShift(null)
-    setScheduleEvents(prev => prev.map(e => {
-      if (e.signed_up == null) return e
-      if (e.id === signup?.schedule_event_id) return { ...e, signed_up: Math.max(0, e.signed_up - 1) }
-      return e
-    }))
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      setShiftError(data.error ?? 'Something went wrong')
+    } else {
+      await refreshShifts()
+    }
+    setSigningId(null)
+  }
+
+  async function handleCancelShift(id: string) {
+    setSigningId(id); setShiftError(null)
+    const res = await fetch(`/api/shift-signups?schedule_event_id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      setShiftError(data.error ?? 'Something went wrong')
+    } else {
+      await refreshShifts()
+    }
+    setSigningId(null)
   }
 
   async function handleOptOut() {
@@ -894,13 +963,10 @@ export function SignupSection({ showPickers = true }: { showPickers?: boolean })
     if (!selectedRole || saving) return
     setSaving(true); setError(null)
 
-    const body: Record<string, string | null> = { role_id: selectedRole }
-    if (selectedShift) body.schedule_event_id = selectedShift
-
     const res = await fetch('/api/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ role_id: selectedRole }),
     })
     const data = await res.json()
 
@@ -909,7 +975,7 @@ export function SignupSection({ showPickers = true }: { showPickers?: boolean })
     const prevSignup = signup
     const updated: Signup = {
       role_id: selectedRole!,
-      schedule_event_id: selectedShift ?? signup?.schedule_event_id ?? null,
+      schedule_event_id: signup?.schedule_event_id ?? null,
       role_approval_status: data.signup?.role_approval_status ?? null,
     }
     setSignup(updated)
@@ -923,36 +989,6 @@ export function SignupSection({ showPickers = true }: { showPickers?: boolean })
         return r
       }),
     })))
-    setScheduleEvents(prev => prev.map(e => {
-      if (e.signed_up == null) return e
-      if (e.id === selectedShift && e.id !== prevSignup?.schedule_event_id) return { ...e, signed_up: e.signed_up + 1 }
-      if (e.id === prevSignup?.schedule_event_id && e.id !== selectedShift) return { ...e, signed_up: Math.max(0, e.signed_up - 1) }
-      return e
-    }))
-  }
-
-  async function handleSaveShift() {
-    if (!selectedShift || saving) return
-    setSaving(true); setError(null)
-    const prevSignup = signup
-    const res = await fetch('/api/signup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ schedule_event_id: selectedShift }),
-    })
-    const data = await res.json()
-    if (!res.ok) { setError(data.error ?? 'Something went wrong'); setSaving(false); return }
-    setSignup(prev => prev
-      ? { ...prev, schedule_event_id: selectedShift }
-      : { role_id: null, schedule_event_id: selectedShift, role_approval_status: null }
-    )
-    setScheduleEvents(prev => prev.map(e => {
-      if (e.signed_up == null) return e
-      if (e.id === selectedShift && e.id !== prevSignup?.schedule_event_id) return { ...e, signed_up: e.signed_up + 1 }
-      if (e.id === prevSignup?.schedule_event_id && e.id !== selectedShift) return { ...e, signed_up: Math.max(0, e.signed_up - 1) }
-      return e
-    }))
-    setSaving(false)
   }
 
   if (loading) return (
@@ -961,12 +997,12 @@ export function SignupSection({ showPickers = true }: { showPickers?: boolean })
     </div>
   )
 
-  if (!hasRoles && !hasCalendarEvents) return null
+  if (!hasRoles && shifts.length === 0) return null
 
   return (
     <div id="role-signup" style={{ marginBottom: '2.5rem' }}>
       {showSuggest && <SuggestRoleModal onClose={() => setShowSuggest(false)} />}
-      <CurrentSignupCards signup={signup} departments={departments} scheduleEvents={scheduleEvents} onOptOut={handleOptOut} onCancelShift={handleCancelShift} />
+      <CurrentSignupCards signup={signup} departments={departments} heldShifts={heldShifts} shiftTypes={shiftTypes} onOptOut={handleOptOut} onCancelShift={handleCancelShift} />
 
       {showPickers && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -977,14 +1013,13 @@ export function SignupSection({ showPickers = true }: { showPickers?: boolean })
               <RolePicker
                 departments={departments}
                 selectedRole={selectedRole}
-                selectedShiftEvent={selectedShiftEvent}
                 signup={signup}
                 saving={saving}
                 error={error}
                 onChange={setSelectedRole}
                 onDeselect={() => setSelectedRole(signup?.role_id ?? null)}
                 onConfirm={handleSave}
-                canConfirm={canSave}
+                canConfirm={!!selectedRole}
               />
             </div>
           )}
@@ -999,28 +1034,28 @@ export function SignupSection({ showPickers = true }: { showPickers?: boolean })
             </button>
           </div>
 
-          {/* Calendar shift picker — hidden while shift signup is closed */}
-          {hasCalendarEvents && shiftSignupOpen && (
-            <div style={{ padding: '1.5rem', border: '1px solid rgba(210,57,248,0.15)', borderRadius: '1rem', background: 'rgba(210,57,248,0.02)' }}>
-              <ShiftPicker
-                scheduleEvents={scheduleEvents}
-                selectedShift={selectedShift}
-                signup={signup}
-                onChange={setSelectedShift}
-                onConfirm={handleSaveShift}
-                saving={saving}
-                error={error}
+          {/* Shift picker — hidden while shift signup is closed */}
+          {shifts.length > 0 && shiftSignupOpen && (
+            <div className="shift-panel-breakout" style={{ padding: '1.5rem', border: '1px solid rgba(210,57,248,0.15)', borderRadius: '1rem', background: 'rgba(210,57,248,0.02)' }}>
+              <ShiftsPicker
+                shifts={shifts}
+                owed={owed}
+                shiftTypes={shiftTypes}
+                signingId={signingId}
+                error={shiftError}
+                onSignUp={handleSignUpShift}
+                onCancel={handleCancelShift}
               />
             </div>
           )}
 
-          {hasCalendarEvents && !shiftSignupOpen && (
+          {shifts.length > 0 && !shiftSignupOpen && (
             <div style={{ padding: '1.5rem', border: '1px solid rgba(210,57,248,0.15)', borderRadius: '1rem', background: 'rgba(210,57,248,0.02)', textAlign: 'center' }}>
               <p style={{ fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#D239F8', opacity: 0.85, marginBottom: '0.5rem' }}>
                 Shifts
               </p>
               <p style={{ fontSize: '0.85rem', opacity: 0.6, margin: 0, lineHeight: 1.6 }}>
-                Shift times aren&rsquo;t confirmed yet. Shift signup will open here once the schedule is set — check back soon.
+                Shift times aren't confirmed yet. Shift signup will open here once the schedule is set — check back soon.
               </p>
             </div>
           )}

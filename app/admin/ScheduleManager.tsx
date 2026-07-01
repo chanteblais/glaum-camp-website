@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { EventIcon, ICON_TYPES } from '@/components/EventIcon'
 import { formatTime } from '@/lib/time-format'
+import { shiftDurationHours, formatShiftRange } from '@/lib/shift-hours'
 
 type ScheduleEvent = {
   id: string
@@ -21,7 +22,15 @@ type ScheduleEvent = {
   contribution_type: string | null
   event_date: string | null
   event_category: string
+  participation_type: 'general' | 'shift' | 'mandatory'
+  shift_type_id: string | null
+  requires_ack: boolean
+  start_time: string | null
+  end_time: string | null
 }
+
+// Shift types offered when an event is a Shift (Configure → Shift Types registry).
+type ShiftTypeOption = { id: string; name: string }
 
 const DAYS = ['Thursday', 'Friday', 'Saturday', 'Sunday', 'Wednesday', 'Tuesday', 'Monday']
 const DAY_ORDER: Record<string, number> = {
@@ -56,7 +65,7 @@ function sortChronologically(evs: ScheduleEvent[]): ScheduleEvent[] {
 
 const blank = (): Omit<ScheduleEvent, 'id' | 'sort_order'> => ({
   day: 'Thursday', time: '', title: '', subtitle: '', detail_desc: '',
-  icon_type: 'star', visible: true, highlight: false, is_recurring: false, capacity: null, event_type: null, contribution_type: null, event_date: null, event_category: 'at_camp',
+  icon_type: 'star', visible: true, highlight: false, is_recurring: false, capacity: null, event_type: null, contribution_type: null, event_date: null, event_category: 'at_camp', participation_type: 'general', shift_type_id: null, requires_ack: false, start_time: null, end_time: null,
 })
 
 const inputStyle: React.CSSProperties = {
@@ -102,12 +111,14 @@ function EventModal({
   onClose,
   saving,
   error,
+  shiftTypes,
   customIcons = [],
   onDeleteIcon,
 }: {
   initial: Omit<ScheduleEvent, 'id' | 'sort_order'>
   onSave: (form: Omit<ScheduleEvent, 'id' | 'sort_order'>) => void
   onClose: () => void
+  shiftTypes: ShiftTypeOption[]
   customIcons?: string[]
   onDeleteIcon?: (url: string) => void
   saving: boolean
@@ -160,7 +171,7 @@ function EventModal({
           <input style={inputStyle} value={form.title} onChange={(e) => set('title', e.target.value)} />
         </Field>
 
-        <div style={{ display: 'grid', gridTemplateColumns: form.is_recurring ? '1fr' : '1fr 1fr', gap: '0 1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: (form.is_recurring || form.participation_type === 'shift') ? '1fr' : '1fr 1fr', gap: '0 1rem' }}>
           {!form.is_recurring && (
             <Field label="Day">
               <select style={inputStyle} value={form.day} onChange={(e) => set('day', e.target.value)}>
@@ -168,9 +179,12 @@ function EventModal({
               </select>
             </Field>
           )}
-          <Field label="Time">
-            <input style={inputStyle} value={form.time} placeholder="e.g. 7:00 PM – 10:00 PM" onChange={(e) => set('time', e.target.value)} />
-          </Field>
+          {/* Shift events set their time via Start/End (below); other events use free text. */}
+          {form.participation_type !== 'shift' && (
+            <Field label="Time">
+              <input style={inputStyle} value={form.time} placeholder="e.g. 7:00 PM – 10:00 PM" onChange={(e) => set('time', e.target.value)} />
+            </Field>
+          )}
         </div>
 
         {!form.is_recurring && (
@@ -294,55 +308,67 @@ function EventModal({
           {iconError && <p style={{ color: '#ff8a8a', fontSize: '0.75rem', marginTop: '0.4rem' }}>{iconError}</p>}
         </Field>
 
-        <Field label="Capacity (optional — leave blank for no signup)">
-          <input
-            style={{ ...inputStyle, width: '120px' }}
-            type="number"
-            min={1}
-            placeholder="e.g. 20"
-            value={form.capacity ?? ''}
-            onChange={e => set('capacity', e.target.value === '' ? null : parseInt(e.target.value) || null)}
-          />
+        <Field label="Participation">
+          <select
+            style={{ ...inputStyle, cursor: 'pointer' }}
+            value={form.participation_type}
+            onChange={e => set('participation_type', e.target.value)}
+          >
+            <option value="general">General — just happening, optional</option>
+            <option value="shift">Shift — members sign up</option>
+            <option value="mandatory">Mandatory — everyone attends</option>
+          </select>
         </Field>
+
+        {form.participation_type === 'shift' && (
+          <>
+            <Field label="Shift type">
+              <select
+                style={{ ...inputStyle, cursor: 'pointer' }}
+                value={form.shift_type_id ?? ''}
+                onChange={e => set('shift_type_id', e.target.value || null)}
+              >
+                <option value="">Select…</option>
+                {shiftTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+              <p style={{ fontSize: '0.72rem', opacity: 0.4, lineHeight: 1.5, margin: '0.35rem 0 0' }}>
+                Kinds are defined in Configure → Shift Types. Requirements (who owes hours) live on groups/roles or attunement tasks.
+              </p>
+            </Field>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '0 1rem', alignItems: 'end' }}>
+              <Field label="Start">
+                <input type="time" style={inputStyle} value={form.start_time ?? ''} onChange={e => set('start_time', e.target.value || null)} />
+              </Field>
+              <Field label="End">
+                <input type="time" style={inputStyle} value={form.end_time ?? ''} onChange={e => set('end_time', e.target.value || null)} />
+              </Field>
+              <div style={{ marginBottom: '1rem', paddingBottom: '0.6rem', fontSize: '0.82rem', color: '#C8A848', opacity: 0.75, whiteSpace: 'nowrap' }}>
+                {shiftDurationHours(form.start_time, form.end_time) > 0 ? `${shiftDurationHours(form.start_time, form.end_time)}h` : '—'}
+              </div>
+            </div>
+            <Field label="Capacity per slot (optional — blank = unlimited)">
+              <input
+                style={{ ...inputStyle, width: '120px' }}
+                type="number"
+                min={1}
+                placeholder="e.g. 20"
+                value={form.capacity ?? ''}
+                onChange={e => set('capacity', e.target.value === '' ? null : parseInt(e.target.value) || null)}
+              />
+            </Field>
+          </>
+        )}
+
+        {form.participation_type === 'mandatory' && (
+          <div style={{ marginBottom: '1rem' }}>
+            <Toggle checked={form.requires_ack} onChange={(v) => set('requires_ack', v)} label="Requires acknowledgement (members tap “I'll be there”)" />
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem 1.5rem', marginBottom: '1.25rem' }}>
           <Toggle checked={form.visible} onChange={(v) => set('visible', v)} label="Visible on site" />
           <Toggle checked={form.highlight} onChange={(v) => set('highlight', v)} label="Highlight day" />
           <Toggle checked={form.is_recurring} onChange={(v) => set('is_recurring', v)} label="Daily recurring" />
-          <Field label="Event Type">
-            <select
-              style={{ ...inputStyle, fontSize: '0.82rem', cursor: 'pointer' }}
-              value={form.event_type ?? ''}
-              onChange={e => set('event_type', e.target.value || null)}
-            >
-              <option value="">General</option>
-              <option value="all_hands">All Hands</option>
-              <option value="camp_tending">Camp Tending</option>
-              <option value="service">Service</option>
-            </select>
-          </Field>
-          <Field label="Category">
-            <select
-              style={{ ...inputStyle, fontSize: '0.82rem', cursor: 'pointer' }}
-              value={form.event_category}
-              onChange={e => set('event_category', e.target.value)}
-            >
-              <option value="at_camp">At Camp</option>
-              <option value="pre_camp">Pre-Camp</option>
-            </select>
-          </Field>
-          <Field label="Contribution">
-            <select
-              style={{ ...inputStyle, fontSize: '0.82rem', cursor: 'pointer' }}
-              value={form.contribution_type ?? ''}
-              onChange={e => set('contribution_type', e.target.value || null)}
-            >
-              <option value="">None</option>
-              <option value="Setup">Setup</option>
-              <option value="Teardown">Teardown</option>
-              <option value="Decor">Decor</option>
-            </select>
-          </Field>
         </div>
 
         {error && <p style={{ color: '#ff8a8a', fontSize: '0.82rem', marginBottom: '0.75rem' }}>{error}</p>}
@@ -360,8 +386,11 @@ function EventModal({
   )
 }
 
+const PARTICIPATION_BADGE: Record<string, string> = { general: '#8fb0d0', shift: '#D239F8', mandatory: '#C8A848' }
+
 function EventRow({
   event,
+  shiftTypeName,
   isDragOver,
   onEdit,
   onDelete,
@@ -372,6 +401,7 @@ function EventRow({
   onDragEnd,
 }: {
   event: ScheduleEvent
+  shiftTypeName?: string
   isDragOver: boolean
   onEdit: () => void
   onDelete: () => void
@@ -423,6 +453,13 @@ function EventRow({
         <p style={{ fontSize: '0.88rem', fontWeight: 600, color: '#F3EDE6', margin: '0.15rem 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{event.title}</p>
       </div>
 
+      {/* Participation badge — shift shows its shift-type name */}
+      {event.participation_type !== 'general' && (
+        <span style={{ fontSize: '0.6rem', color: PARTICIPATION_BADGE[event.participation_type] ?? '#C8A848', opacity: 0.9, border: `1px solid ${(PARTICIPATION_BADGE[event.participation_type] ?? '#C8A848')}55`, borderRadius: '9999px', padding: '0.1rem 0.5rem', flexShrink: 0, letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
+          {event.participation_type === 'shift' ? (shiftTypeName ?? 'Shift') : 'Mandatory'}
+        </span>
+      )}
+
       {/* Actions */}
       <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
         <button
@@ -445,6 +482,7 @@ function EventRow({
 
 export function ScheduleManager() {
   const [events, setEvents] = useState<ScheduleEvent[]>([])
+  const [shiftTypes, setShiftTypes] = useState<ShiftTypeOption[]>([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState<{ mode: 'add'; recurring: boolean } | { mode: 'edit'; event: ScheduleEvent } | null>(null)
   const [saving, setSaving] = useState(false)
@@ -463,6 +501,13 @@ export function ScheduleManager() {
 
   useEffect(() => { load() }, [])
 
+  useEffect(() => {
+    fetch('/api/admin/shift-types')
+      .then(r => r.json())
+      .then(d => setShiftTypes((d.shiftTypes ?? []).map((t: ShiftTypeOption) => ({ id: t.id, name: t.name }))))
+      .catch(() => setShiftTypes([]))
+  }, [])
+
   const regular = events.filter((e) => !e.is_recurring)
   const recurring = events.filter((e) => e.is_recurring)
   const customIcons = Array.from(new Set(events.map(e => e.icon_type).filter(t => t.startsWith('http') || t.startsWith('/'))))
@@ -470,7 +515,13 @@ export function ScheduleManager() {
   const handleSave = async (form: Omit<ScheduleEvent, 'id' | 'sort_order'>) => {
     setSaving(true)
     setModalError(null)
-    const normalised = { ...form, time: formatTime(form.time) }
+    // Shift events derive their display `time` from start/end; others keep free
+    // text. Fall back to the existing text if start/end aren't set yet, so an
+    // untimed legacy shift doesn't lose its display line.
+    const time = form.participation_type === 'shift'
+      ? (formatShiftRange(form.start_time, form.end_time) || form.time)
+      : formatTime(form.time)
+    const normalised = { ...form, time }
     try {
       let res: Response
       if (modal?.mode === 'edit') {
@@ -577,6 +628,7 @@ const handleDrop = async (group: ScheduleEvent[], targetId: string) => {
           {regular.map((ev) => (
             <EventRow
               key={ev.id} event={ev}
+              shiftTypeName={shiftTypes.find(t => t.id === ev.shift_type_id)?.name}
               isDragOver={dragOverId === ev.id}
               onEdit={() => { setModal({ mode: 'edit', event: ev }); setModalError(null) }}
               onDelete={() => handleDelete(ev.id)}
@@ -608,6 +660,7 @@ const handleDrop = async (group: ScheduleEvent[], targetId: string) => {
           {recurring.map((ev) => (
             <EventRow
               key={ev.id} event={ev}
+              shiftTypeName={shiftTypes.find(t => t.id === ev.shift_type_id)?.name}
               isDragOver={dragOverId === ev.id}
               onEdit={() => { setModal({ mode: 'edit', event: ev }); setModalError(null) }}
               onDelete={() => handleDelete(ev.id)}
@@ -629,6 +682,7 @@ const handleDrop = async (group: ScheduleEvent[], targetId: string) => {
           onClose={() => setModal(null)}
           saving={saving}
           error={modalError}
+          shiftTypes={shiftTypes}
           customIcons={customIcons}
           onDeleteIcon={handleDeleteIcon}
         />

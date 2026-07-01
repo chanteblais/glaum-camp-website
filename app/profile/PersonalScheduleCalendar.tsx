@@ -1,6 +1,7 @@
 'use client'
 
 import { useId, useState, useEffect } from 'react'
+import { MANDATORY_HUE, shiftHue } from '@/lib/shift-colors'
 
 export type PersonalEvent = {
   id: string
@@ -12,6 +13,8 @@ export type PersonalEvent = {
   icon_type: string
   highlight: boolean
   event_type: string | null
+  participation_type?: string | null
+  shift_color_index?: number | null
   isPersonal: boolean
 }
 
@@ -53,10 +56,23 @@ function parseEventTimes(timeStr: string | null) {
 
 type EventColors = { border: string; bg: string; time: string; title: string; subtitle: string; label?: string }
 
+// Mandatory events = everyone attends (not a personal shift).
+const isMandatory = (ev: PersonalEvent) =>
+  ev.participation_type === 'mandatory' || ev.event_type === 'all_hands'
+
 function eventColors(ev: PersonalEvent): EventColors {
-  const label = ev.isPersonal && ev.event_type !== 'all_hands' ? 'Your Shift' : undefined
-  if (ev.event_type === 'all_hands') {
+  const label = ev.isPersonal && !isMandatory(ev) ? 'Your Shift' : undefined
+  if (isMandatory(ev)) {
     return { border: '#5FA58E', bg: 'linear-gradient(145deg, rgba(13,50,72,0.9), rgba(11,27,50,0.92))', time: '#76C7B2', title: CREAM, subtitle: '#AD759A', label }
+  }
+  // Shift events tint the dark card with their shift type's palette hue.
+  if (ev.participation_type === 'shift' && ev.shift_color_index != null) {
+    const hue = shiftHue(ev.shift_color_index)
+    return {
+      border: `rgba(${hue.rgb},0.8)`,
+      bg: `linear-gradient(145deg, rgba(${hue.rgb},0.22), rgba(18,4,28,0.94))`,
+      time: hue.accent, title: CREAM, subtitle: hue.accent, label,
+    }
   }
   if (ev.event_type === 'camp_tending') {
     return { border: '#B68018', bg: 'linear-gradient(145deg, rgba(36,15,43,0.92), rgba(18,5,30,0.94))', time: '#D19B30', title: GOLD, subtitle: CREAM, label }
@@ -70,7 +86,7 @@ function eventColors(ev: PersonalEvent): EventColors {
 function EventCard({ event, top, height }: { event: PersonalEvent; top: number; height: number }) {
   const c = eventColors(event)
   const tall = height >= 66
-  const isPersonalShift = event.isPersonal && event.event_type !== 'all_hands'
+  const isPersonalShift = event.isPersonal && !isMandatory(event)
 
   return (
     <div style={{

@@ -28,24 +28,38 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
 
   if (!app) notFound()
 
-  // Fetch signup if member has a clerk_user_id
-  let signupData: { role: any; shift: any } | null = null
+  // Fetch signup if member has a clerk_user_id. Shifts are many-to-many
+  // (member_shift_signups) plus the legacy single camp_signups.schedule_event_id.
+  let signupData: { role: any; shifts: { id: string; title: string; time: string | null; day: string }[] } | null = null
   if (app.clerk_user_id) {
-    const { data: signup } = await supabaseAdmin
-      .from('camp_signups')
-      .select('role_id, schedule_event_id, role_approval_status')
-      .eq('clerk_user_id', app.clerk_user_id)
-      .maybeSingle()
+    const [{ data: signup }, { data: heldRows }] = await Promise.all([
+      supabaseAdmin
+        .from('camp_signups')
+        .select('role_id, schedule_event_id, role_approval_status')
+        .eq('clerk_user_id', app.clerk_user_id)
+        .maybeSingle(),
+      supabaseAdmin
+        .from('member_shift_signups')
+        .select('schedule_events(id, title, time, day)')
+        .eq('clerk_user_id', app.clerk_user_id),
+    ])
 
-    if (signup) {
-      const [roleRes, shiftRes] = await Promise.all([
-        signup.role_id
-          ? supabaseAdmin.from('roles').select('name, commitment, department_id, departments(name, icon)').eq('id', signup.role_id).single()
-          : Promise.resolve({ data: null }),
-        signup.schedule_event_id
-          ? supabaseAdmin.from('schedule_events').select('title, time, day').eq('id', signup.schedule_event_id).single()
-          : Promise.resolve({ data: null }),
-      ])
+    if (signup || (heldRows ?? []).length > 0) {
+      const roleRes = signup?.role_id
+        ? await supabaseAdmin.from('roles').select('name, commitment, department_id, departments(name, icon)').eq('id', signup.role_id).single()
+        : { data: null }
+
+      // Union many-to-many + legacy single, deduped by event id.
+      const shiftMap = new Map<string, { id: string; title: string; time: string | null; day: string }>()
+      for (const r of heldRows ?? []) {
+        const ev = r.schedule_events as any
+        if (ev?.id) shiftMap.set(ev.id, { id: ev.id, title: ev.title, time: ev.time ?? null, day: ev.day })
+      }
+      if (signup?.schedule_event_id && !shiftMap.has(signup.schedule_event_id)) {
+        const { data: legacyEv } = await supabaseAdmin
+          .from('schedule_events').select('id, title, time, day').eq('id', signup.schedule_event_id).single()
+        if (legacyEv) shiftMap.set(legacyEv.id, { id: legacyEv.id, title: legacyEv.title, time: legacyEv.time ?? null, day: legacyEv.day })
+      }
 
       const roleRow = roleRes.data as any
       const dept = roleRow?.departments as { name: string; icon: string | null } | null
@@ -56,13 +70,9 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
           department: dept?.name ?? null,
           department_icon: dept?.icon ?? null,
           commitment: roleRow.commitment ?? null,
-          approval_status: signup.role_approval_status ?? null,
+          approval_status: signup?.role_approval_status ?? null,
         } : null,
-        shift: shiftRes.data ? {
-          title: (shiftRes.data as any).title,
-          time: (shiftRes.data as any).time ?? null,
-          day: (shiftRes.data as any).day,
-        } : null,
+        shifts: Array.from(shiftMap.values()),
       }
     }
   }
@@ -264,7 +274,7 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
               <MemberSignupCard
                 clerkUserId={app.clerk_user_id}
                 role={signupData?.role ?? null}
-                shift={signupData?.shift ?? null}
+                shifts={signupData?.shifts ?? []}
               />
             </Section>
             <Divider />

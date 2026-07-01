@@ -1,62 +1,68 @@
 import { supabaseAdmin } from '@/lib/supabase'
+import { shiftColorIndexMap } from '@/lib/shift-colors'
 import { PersonalScheduleCalendar, type PersonalEvent } from './PersonalScheduleCalendar'
 
 type Props = {
   userId: string
-  contributions: string[]
 }
 
-export async function PersonalSchedule({ userId, contributions }: Props) {
-  const EVENT_COLS = 'id, day, time, title, subtitle, detail_desc, icon_type, highlight, event_type'
+// A member's personal schedule = mandatory events (everyone attends) + the
+// shifts they actually hold (member_shift_signups ∪ the legacy single signup).
+// The old contribution_type-tagged events are superseded: the group says WHAT
+// you contribute, the shifts you signed up for say WHEN.
+export async function PersonalSchedule({ userId }: Props) {
+  const EVENT_COLS = 'id, day, time, title, subtitle, detail_desc, icon_type, highlight, event_type, participation_type, shift_type_id'
 
-  const [{ data: allHandsEvents }, { data: contributionEvents }, { data: userSignups }] = await Promise.all([
+  const [{ data: mandatoryEvents }, { data: heldRows }, { data: legacySignup }, { data: shiftTypes }] = await Promise.all([
     supabaseAdmin
       .from('schedule_events')
       .select(EVENT_COLS)
-      .eq('event_type', 'all_hands')
+      .eq('participation_type', 'mandatory')
       .eq('visible', true)
       .order('sort_order', { ascending: true }),
-    contributions.length > 0
-      ? supabaseAdmin
-          .from('schedule_events')
-          .select(EVENT_COLS)
-          .in('contribution_type', contributions)
-          .eq('visible', true)
-          .order('sort_order', { ascending: true })
-      : Promise.resolve({ data: [] }),
+    supabaseAdmin
+      .from('member_shift_signups')
+      .select(`schedule_events(${EVENT_COLS})`)
+      .eq('clerk_user_id', userId),
     supabaseAdmin
       .from('camp_signups')
       .select(`schedule_events(${EVENT_COLS})`)
       .eq('clerk_user_id', userId)
-      .not('schedule_event_id', 'is', null),
+      .not('schedule_event_id', 'is', null)
+      .maybeSingle(),
+    supabaseAdmin.from('shift_types').select('id').order('sort_order'),
   ])
+
+  // Palette slot per shift type (registry order) — drives the card colours.
+  const colorIndex = shiftColorIndexMap(shiftTypes ?? [])
+  const withColor = <T extends { shift_type_id?: string | null }>(ev: T) => ({
+    ...ev,
+    shift_color_index: ev.shift_type_id != null ? colorIndex[ev.shift_type_id] ?? null : null,
+  })
 
   const seenIds = new Set<string>()
   const events: PersonalEvent[] = []
 
-  // All hands (shown to everyone)
-  for (const ev of allHandsEvents ?? []) {
+  // Mandatory events (shown to everyone)
+  for (const ev of mandatoryEvents ?? []) {
     seenIds.add(ev.id)
-    events.push({ ...ev, isPersonal: false })
+    events.push({ ...withColor(ev), isPersonal: false })
   }
 
-  // Contribution-tagged events (shown because of user's contributions)
-  for (const ev of contributionEvents ?? []) {
-    if (seenIds.has(ev.id)) continue
-    seenIds.add(ev.id)
-    events.push({ ...ev, isPersonal: true })
-  }
-
-  // User's explicitly signed shift events
-  for (const signup of userSignups ?? []) {
-    const ev = signup.schedule_events as unknown as Omit<PersonalEvent, 'isPersonal'> | null
+  // Shifts the member holds (many-to-many + legacy single, deduped)
+  const heldEvents = [
+    ...(heldRows ?? []).map(r => r.schedule_events),
+    legacySignup?.schedule_events,
+  ]
+  for (const raw of heldEvents) {
+    const ev = raw as unknown as (Omit<PersonalEvent, 'isPersonal' | 'shift_color_index'> & { shift_type_id?: string | null }) | null
     if (!ev) continue
     if (seenIds.has(ev.id)) {
       const existing = events.find(e => e.id === ev.id)
       if (existing) existing.isPersonal = true
     } else {
       seenIds.add(ev.id)
-      events.push({ ...ev, isPersonal: true })
+      events.push({ ...withColor(ev), isPersonal: true })
     }
   }
 

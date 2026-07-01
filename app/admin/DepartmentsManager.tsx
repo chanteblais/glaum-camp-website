@@ -18,7 +18,11 @@ type Role = {
   commitment: string | null
   commitment_period: string | null
   requires_approval: boolean
+  required_shift_type_id: string | null
+  required_shift_hours: number | null
 }
+
+type ShiftTypeOption = { id: string; name: string }
 
 type Department = {
   id: string
@@ -40,6 +44,8 @@ type RoleForm = {
   commitment: string
   commitment_period: string
   requires_approval: boolean
+  required_shift_type_id: string
+  required_shift_hours: string
 }
 
 const COMMITMENT_LEVELS = ['Low', 'Low–Medium', 'Medium', 'Medium–High', 'High']
@@ -141,17 +147,18 @@ function DeptModal({
 // ── Role Modal ────────────────────────────────────────────────────────────────
 
 function blankRoleForm(): RoleForm {
-  return { name: '', description: '', capacity: 1, purpose: '', responsibilities_before: '', responsibilities_during: '', ideal_for: '', commitment: '', commitment_period: '', requires_approval: false }
+  return { name: '', description: '', capacity: 1, purpose: '', responsibilities_before: '', responsibilities_during: '', ideal_for: '', commitment: '', commitment_period: '', requires_approval: false, required_shift_type_id: '', required_shift_hours: '' }
 }
 
 function RoleModal({
-  initial, onSave, onClose, saving, error,
+  initial, onSave, onClose, saving, error, shiftTypes,
 }: {
   initial: RoleForm
   onSave: (f: RoleForm) => void
   onClose: () => void
   saving: boolean
   error: string | null
+  shiftTypes: ShiftTypeOption[]
 }) {
   const [form, setForm] = useState(initial)
   const set = (k: keyof RoleForm, v: string | number) => setForm(f => ({ ...f, [k]: v }))
@@ -248,6 +255,19 @@ function RoleModal({
             </p>
           </div>
         </label>
+
+        <SectionDivider label="Shift requirement (optional)" />
+        <Field label="Shift type" hint="Members with this role owe this many hours of the chosen shift type. Attunement reflects it. Leave as “None” for no requirement.">
+          <select style={selectStyle} value={form.required_shift_type_id} onChange={e => set('required_shift_type_id', e.target.value)}>
+            <option value="">None</option>
+            {shiftTypes.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </Field>
+        {form.required_shift_type_id && (
+          <Field label="Required hours">
+            <input type="number" min="0.5" step="0.5" style={{ ...inputStyle, width: '120px' }} value={form.required_shift_hours} onChange={e => set('required_shift_hours', e.target.value)} placeholder="e.g. 3" />
+          </Field>
+        )}
 
         {error && <p style={{ color: '#ff8a8a', fontSize: '0.82rem', marginBottom: '0.75rem' }}>{error}</p>}
         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
@@ -458,18 +478,21 @@ export function DepartmentsManager({ groupIconOptions = [] }: { groupIconOptions
 
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  const [shiftTypes, setShiftTypes] = useState<ShiftTypeOption[]>([])
 
   useEffect(() => {
     Promise.all([
       fetch('/api/admin/departments').then(r => r.json()),
       fetch('/api/admin/roles').then(r => r.json()),
-    ]).then(([deptData, rolesData]) => {
+      fetch('/api/admin/shift-types').then(r => r.json()),
+    ]).then(([deptData, rolesData, shiftData]) => {
       const roles: Role[] = rolesData.roles ?? []
       const depts: Department[] = (deptData.departments ?? []).map((d: Department) => ({
         ...d,
         roles: roles.filter(r => r.department_id === d.id).sort((a, b) => a.sort_order - b.sort_order),
       }))
       setDepartments(depts)
+      setShiftTypes(shiftData.shiftTypes ?? [])
     }).finally(() => setLoading(false))
   }, [])
 
@@ -566,7 +589,7 @@ export function DepartmentsManager({ groupIconOptions = [] }: { groupIconOptions
 
       {creatingDept && <DeptModal initial={{ name: '', description: '', icon: '' }} onSave={handleCreateDept} onClose={() => setCreatingDept(false)} saving={deptSaving} error={deptError} groupIconOptions={groupIconOptions} />}
       {editingDept && <DeptModal initial={{ name: editingDept.name, description: editingDept.description ?? '', icon: editingDept.icon ?? '' }} onSave={(f) => handleUpdateDept(editingDept, f)} onClose={() => setEditingDept(null)} saving={deptSaving} error={deptError} deptId={editingDept.id} groupIconOptions={groupIconOptions} />}
-      {creatingRole && <RoleModal initial={blankRoleForm()} onSave={(f) => handleCreateRole(creatingRole.deptId, f)} onClose={() => setCreatingRole(null)} saving={roleSaving} error={roleError} />}
+      {creatingRole && <RoleModal initial={blankRoleForm()} onSave={(f) => handleCreateRole(creatingRole.deptId, f)} onClose={() => setCreatingRole(null)} saving={roleSaving} error={roleError} shiftTypes={shiftTypes} />}
       {editingRole && (
         <RoleModal
           initial={{
@@ -580,11 +603,14 @@ export function DepartmentsManager({ groupIconOptions = [] }: { groupIconOptions
             commitment: editingRole.role.commitment ?? '',
             commitment_period: editingRole.role.commitment_period ?? '',
             requires_approval: editingRole.role.requires_approval ?? false,
+            required_shift_type_id: editingRole.role.required_shift_type_id ?? '',
+            required_shift_hours: editingRole.role.required_shift_hours != null ? String(editingRole.role.required_shift_hours) : '',
           }}
           onSave={(f) => handleUpdateRole(editingRole.role, f)}
           onClose={() => setEditingRole(null)}
           saving={roleSaving}
           error={roleError}
+          shiftTypes={shiftTypes}
         />
       )}
     </div>

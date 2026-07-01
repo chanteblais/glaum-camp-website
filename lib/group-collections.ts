@@ -16,6 +16,8 @@ export type GroupCollection = {
   selection: SelectionMode
   /** Whether members' groups in this collection appear on their profile. */
   show_on_profile: boolean
+  /** Whether members may self-join this collection's groups on the Participate page. */
+  self_join: boolean
   sort_order: number
 }
 
@@ -44,7 +46,7 @@ export async function getGroupCollections(): Promise<{
   const [{ data: collections }, { data: groups }] = await Promise.all([
     supabaseAdmin
       .from('group_collections')
-      .select('id, name, description, selection, show_on_profile, sort_order')
+      .select('id, name, description, selection, show_on_profile, self_join, sort_order')
       .order('sort_order', { ascending: true }),
     supabaseAdmin
       .from('groups')

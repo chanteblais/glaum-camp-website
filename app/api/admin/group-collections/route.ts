@@ -16,7 +16,7 @@ async function requireAdmin() {
 export async function GET() {
   const { data, error } = await supabaseAdmin
     .from('group_collections')
-    .select('id, name, description, selection, show_on_profile, sort_order')
+    .select('id, name, description, selection, show_on_profile, self_join, sort_order')
     .order('sort_order', { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   if (!(await requireAdmin())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await req.json()
-  const { name, description, selection, show_on_profile, sort_order } = body
+  const { name, description, selection, show_on_profile, self_join, sort_order } = body
 
   if (!name) return NextResponse.json({ error: 'name is required' }, { status: 400 })
   if (selection && selection !== 'single' && selection !== 'multi') {
@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
       description: description ?? null,
       selection: selection ?? 'multi',
       show_on_profile: show_on_profile ?? true,
+      self_join: self_join ?? false,
       sort_order: sort_order ?? 0,
     })
     .select()

@@ -6,7 +6,8 @@ import { Section, Kicker, GoldDivider } from '@/components/Section'
 import { ScheduleSection } from '@/components/ScheduleSection'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getMemberGroups } from '@/lib/groups'
-import { buildAttunementChecklist } from '@/lib/attunement'
+import { buildAttunementChecklist, memberGroupCounts } from '@/lib/attunement'
+import { getMemberShiftState, EMPTY_MEMBER_SHIFT_STATE } from '@/lib/shift-attunement'
 
 import { HomePageEditor } from './HomePageEditor'
 import { supabaseResizedUrl } from '@/lib/supabase-image'
@@ -216,23 +217,28 @@ let canManagePolls = false
   const isApproved = application?.status === 'approved'
 
   const roleInfo = campSignup?.roles as { name?: string; description?: string | null; purpose?: string | null; departments?: { name?: string; icon?: string } | null } | null
-  const shiftInfo = campSignup?.schedule_events as { title?: string; day?: string; time?: string; icon_type?: string } | null
   const badgeDeptName = roleInfo?.departments?.name ?? null
   const badgeRoleName = roleInfo?.name ?? null
 
   // Groups the member belongs to (replaces the old setup_preference "contributions").
-  const contributions = (await getMemberGroups(application?.clerk_user_id as string | null)).map(g => g.name)
+  const memberGroups = await getMemberGroups(application?.clerk_user_id as string | null)
+  const { groupCountsByCollection, totalGroupCount } = memberGroupCounts(memberGroups)
 
   const displayName = (application?.preferred_name as string | null) ?? (application?.first_name as string | null) ?? userFirstName ?? 'Welcome'
 
   // Attunement checklist — shared with the profile page via buildAttunementChecklist
   // so the home banner's outstanding count always matches the profile checklist.
+  const shiftClerkId = (application?.clerk_user_id as string | null) ?? userId
+  const shiftState = shiftClerkId ? await getMemberShiftState(shiftClerkId) : EMPTY_MEMBER_SHIFT_STATE
   const attunementTasks = buildAttunementChecklist(pageContent['config_attunement_tasks'], {
     hasPhoto: !!application?.avatar_url,
-    hasContribution: contributions.length > 0,
+    groupCountsByCollection,
+    totalGroupCount,
     roleDone: !!campSignup?.role_id && campSignup?.role_approval_status !== 'pending',
-    hasShift: !!campSignup?.schedule_event_id,
+    hasShift: shiftState.hasShift || !!campSignup?.schedule_event_id,
     shiftSignupOpen: pageContent['config_shift_signup_open'] !== 'false',
+    hoursByShiftType: shiftState.hoursByShiftType,
+    derivedShiftRequirements: shiftState.derivedShiftRequirements,
   })
   const allAttuned = attunementTasks.every(t => t.done)
 

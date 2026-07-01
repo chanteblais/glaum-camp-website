@@ -12,8 +12,10 @@ import { CommitmentsSection } from './CommitmentsSection'
 import { TaskStatus } from './TaskStatus'
 import { PersonalSchedule } from './PersonalSchedule'
 import { AttunementStatus } from './AttunementStatus'
+import { ApprovedCamperPill } from '@/app/ApprovedCamperPill'
 import { getMemberGroups, groupCommitmentMeta } from '@/lib/groups'
-import { buildAttunementChecklist } from '@/lib/attunement'
+import { buildAttunementChecklist, memberGroupCounts } from '@/lib/attunement'
+import { getMemberShiftState } from '@/lib/shift-attunement'
 import { buildMemberFacts } from '@/lib/member-facts'
 import { parseDistinctions, evaluateDistinctions } from '@/lib/distinctions'
 import { resolveMember, getMemberProfileValues } from '@/lib/members'
@@ -70,18 +72,42 @@ export default async function ProfilePage() {
   const volunteer = (volunteerRaw?.status === 'active' || volunteerRaw?.status === 'pending') ? volunteerRaw : null
 
   // Fetch signup status for approved members and active (not pending) volunteers
-  const { data: campSignup } = (application?.status === 'approved' || volunteer?.status === 'active')
-    ? await supabaseAdmin
-        .from('camp_signups')
-        .select('role_id, schedule_event_id, role_approval_status, roles(name, description, purpose, department_id, departments(name, icon)), schedule_events(title, day, time, icon_type)')
-        .eq('clerk_user_id', userId)
-        .maybeSingle()
-    : { data: null }
+  const isActiveMember = application?.status === 'approved' || volunteer?.status === 'active'
+  const [{ data: campSignup }, { data: heldShiftRows }] = isActiveMember
+    ? await Promise.all([
+        supabaseAdmin
+          .from('camp_signups')
+          .select('role_id, schedule_event_id, role_approval_status, roles(name, description, purpose, department_id, departments(name, icon)), schedule_events(id, title, day, time, icon_type, event_date)')
+          .eq('clerk_user_id', userId)
+          .maybeSingle(),
+        supabaseAdmin
+          .from('member_shift_signups')
+          .select('schedule_events(id, title, day, time, icon_type, event_date)')
+          .eq('clerk_user_id', userId),
+      ])
+    : [{ data: null }, { data: null }]
 
-  // Extract role + department + shift info
+  // Extract role + department info
   const roleInfo = campSignup?.roles as { name?: string; description?: string | null; purpose?: string | null; departments?: { name?: string; icon?: string } | null } | null
-  const shiftInfo = campSignup?.schedule_events as { title?: string; day?: string; time?: string; icon_type?: string } | null
   const roleApproved = !!campSignup?.role_id && campSignup?.role_approval_status !== 'pending'
+
+  // Every shift the member holds: many-to-many + the legacy single, deduped.
+  type HeldShiftRow = { id: string; title: string; day: string; time: string; icon_type: string; event_date: string | null }
+  const heldShiftMap = new Map<string, HeldShiftRow>()
+  for (const r of heldShiftRows ?? []) {
+    const ev = r.schedule_events as unknown as HeldShiftRow | null
+    if (ev?.id) heldShiftMap.set(ev.id, ev)
+  }
+  const legacyShiftEv = campSignup?.schedule_events as unknown as HeldShiftRow | null
+  if (legacyShiftEv?.id) heldShiftMap.set(legacyShiftEv.id, legacyShiftEv)
+  const heldShifts = Array.from(heldShiftMap.values()).map(ev => ({
+    id: ev.id,
+    title: ev.title ?? '',
+    day: ev.day ?? '',
+    time: ev.time ?? '',
+    icon_type: ev.icon_type ?? 'star',
+    event_date: ev.event_date ?? null,
+  }))
 
   // Groups the member belongs to (replaces the old setup_preference "contributions").
   // `contributions` = group names; `groupMeta` carries each group's icon/description
@@ -90,6 +116,7 @@ export default async function ProfilePage() {
   // Full list drives attunement + distinction facts; the profile card shows only
   // groups whose collection is marked visible (show_on_profile).
   const contributions = memberGroups.map(g => g.name)
+  const { groupCountsByCollection, totalGroupCount } = memberGroupCounts(memberGroups)
   const visibleGroups = memberGroups.filter(g => g.showOnProfile)
   const groupMeta = groupCommitmentMeta(visibleGroups)
 
@@ -100,13 +127,19 @@ export default async function ProfilePage() {
     .select('key, value')
     .in('key', ['config_attunement_tasks', 'config_shift_signup_open', 'config_distinctions'])
   const attuneConfig = Object.fromEntries((attuneConfigRows ?? []).map(r => [r.key, r.value]))
+  // Shift-hours state: held hours per shift type + obligations derived from the
+  // member's groups/roles. Same helper as the home dashboard — keep in sync.
+  const shiftState = await getMemberShiftState(application?.clerk_user_id ?? userId)
   // Shared with the home dashboard banner via buildAttunementChecklist — keep both in sync.
   const attunementTasks = buildAttunementChecklist(attuneConfig['config_attunement_tasks'], {
     hasPhoto: !!application?.avatar_url,
-    hasContribution: contributions.length > 0,
+    groupCountsByCollection,
+    totalGroupCount,
     roleDone: !!campSignup?.role_id && campSignup?.role_approval_status !== 'pending',
-    hasShift: !!campSignup?.schedule_event_id,
+    hasShift: shiftState.hasShift || !!campSignup?.schedule_event_id,
     shiftSignupOpen: attuneConfig['config_shift_signup_open'] !== 'false',
+    hoursByShiftType: shiftState.hoursByShiftType,
+    derivedShiftRequirements: shiftState.derivedShiftRequirements,
   })
 
   // Member facts → earned distinctions (Cabinet of Distinctions). Facts are
@@ -152,7 +185,7 @@ export default async function ProfilePage() {
   // Member-authored quote surfaced under the name in the header. (The bio/About
   // narrative shows only on the public profile; here it's edited in Profile Details.)
   const quoteText = typeof profileValues['quote'] === 'string' ? (profileValues['quote'] as string).trim() : ''
-  const commitmentCount = contributions.length + (shiftInfo ? 1 : 0)
+  const commitmentCount = contributions.length + heldShifts.length
   const attunementDone = attunementTasks.length > 0 && attunementTasks.every(t => t.done)
   const attunementRemaining = attunementTasks.filter(t => !t.done).length
 
@@ -189,9 +222,7 @@ export default async function ProfilePage() {
       <p style={{ fontSize: '0.8rem', opacity: 0.4, marginTop: '-0.1rem', marginBottom: '0' }}>{email}</p>
       {isApproved && (
         <div style={{ marginTop: '0.5rem' }}>
-          <span style={{ display: 'inline-block', padding: '0.4rem 1.4rem', borderRadius: '9999px', backgroundColor: 'rgba(210,57,248,0.15)', border: '1px solid rgba(210,57,248,0.3)', fontSize: '0.75rem', letterSpacing: '0.12em', color: '#D239F8' }}>
-            ✦ APPROVED CAMPER ✦
-          </span>
+          <ApprovedCamperPill />
         </div>
       )}
       {isApproved && quoteText && (
@@ -446,7 +477,7 @@ export default async function ProfilePage() {
                 contributions={visibleGroups.map(g => g.name)}
                 role={roleInfo ? { name: roleInfo.name ?? '', description: roleInfo.description ?? null, purpose: roleInfo.purpose ?? null } : null}
                 dept={roleInfo?.departments ? { name: roleInfo.departments.name ?? '', icon: roleInfo.departments.icon ?? null } : null}
-                shift={shiftInfo ? { title: shiftInfo.title ?? '', day: shiftInfo.day ?? '', time: shiftInfo.time ?? '', icon_type: shiftInfo.icon_type ?? 'star' } : null}
+                shifts={heldShifts}
                 roleApprovalStatus={campSignup?.role_approval_status ?? null}
                 contributionTypes={groupMeta}
                 showManageLink
@@ -467,7 +498,7 @@ export default async function ProfilePage() {
               </a>
             </div>
 
-            <PersonalSchedule userId={userId} contributions={contributions} />
+            <PersonalSchedule userId={userId} />
 
             <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.3), transparent)', marginBottom: '2.5rem' }} />
 

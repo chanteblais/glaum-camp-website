@@ -26,6 +26,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (body.join_policy !== undefined) update.join_policy = body.join_policy
     if (body.visibility !== undefined) update.visibility = body.visibility
     if (body.collection_id !== undefined) update.collection_id = body.collection_id === '' ? null : body.collection_id
+    if (body.required_shift_type_id !== undefined) update.required_shift_type_id = body.required_shift_type_id || null
+    if (body.required_shift_hours !== undefined) update.required_shift_hours = body.required_shift_hours === '' || body.required_shift_hours == null ? null : Number(body.required_shift_hours)
 
     const { data, error } = await supabaseAdmin
       .from('groups')

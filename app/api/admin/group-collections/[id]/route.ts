@@ -21,6 +21,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (body.description !== undefined) update.description = body.description === '' ? null : body.description
     if (body.sort_order !== undefined) update.sort_order = body.sort_order
     if (body.show_on_profile !== undefined) update.show_on_profile = !!body.show_on_profile
+    if (body.self_join !== undefined) update.self_join = !!body.self_join
     if (body.selection !== undefined) {
       if (body.selection !== 'single' && body.selection !== 'multi') {
         return NextResponse.json({ error: 'selection must be single or multi' }, { status: 400 })

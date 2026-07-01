@@ -41,12 +41,18 @@ export default async function AdminPage() {
 
   const groupNamesByUser = await getGroupNamesByUser()
 
-  const { data: signupsRaw } = await supabaseAdmin
-    .from('camp_signups')
-    .select('clerk_user_id, schedule_event_id')
-  const signupEventMap = Object.fromEntries(
+  // "Has a shift" per member — union of the many-to-many table and the legacy
+  // single signup column (a member counts if they hold at least one shift).
+  const [{ data: signupsRaw }, { data: multiSignupsRaw }] = await Promise.all([
+    supabaseAdmin.from('camp_signups').select('clerk_user_id, schedule_event_id'),
+    supabaseAdmin.from('member_shift_signups').select('clerk_user_id, schedule_event_id'),
+  ])
+  const signupEventMap: Record<string, string | null> = Object.fromEntries(
     (signupsRaw ?? []).map(s => [s.clerk_user_id, s.schedule_event_id ?? null])
   )
+  for (const s of multiSignupsRaw ?? []) {
+    if (s.schedule_event_id) signupEventMap[s.clerk_user_id] = s.schedule_event_id
+  }
 
   const { data: configRows } = await supabaseAdmin
     .from('page_content')

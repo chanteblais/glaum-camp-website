@@ -15,7 +15,7 @@ async function requireAdmin() {
 export async function GET() {
   const { data: groups, error } = await supabaseAdmin
     .from('groups')
-    .select('id, name, description, icon, icon_image, apply_selectable, sort_order, join_policy, visibility, collection_id')
+    .select('id, name, description, icon, icon_image, apply_selectable, sort_order, join_policy, visibility, collection_id, required_shift_type_id, required_shift_hours')
     .order('sort_order', { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   if (!(await requireAdmin())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await req.json()
-  const { name, description, icon, icon_image, apply_selectable, sort_order, join_policy, visibility, collection_id } = body
+  const { name, description, icon, icon_image, apply_selectable, sort_order, join_policy, visibility, collection_id, required_shift_type_id, required_shift_hours } = body
 
   if (!name) return NextResponse.json({ error: 'name is required' }, { status: 400 })
 
@@ -49,6 +49,8 @@ export async function POST(req: NextRequest) {
       icon_image: icon_image || null,
       apply_selectable: !!apply_selectable,
       sort_order: sort_order ?? 0,
+      required_shift_type_id: required_shift_type_id || null,
+      required_shift_hours: required_shift_hours === '' || required_shift_hours == null ? null : Number(required_shift_hours),
       ...(join_policy ? { join_policy } : {}),
       ...(visibility ? { visibility } : {}),
       ...(collection_id ? { collection_id } : {}),

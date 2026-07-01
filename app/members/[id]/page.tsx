@@ -10,6 +10,7 @@ import { resolveMember, getMemberProfileValues } from '@/lib/members'
 import { parseProfileFields, storedFields } from '@/lib/profile-fields'
 import { getMemberAwards } from '@/lib/distinction-awards'
 import { CabinetOfDistinctions } from '@/app/profile/CabinetOfDistinctions'
+import { ApprovedCamperPill } from '@/app/ApprovedCamperPill'
 
 const GOLD = '#C8A848'
 const PURPLE = '#D239F8'
@@ -126,14 +127,10 @@ export default async function MemberPage({ params }: { params: { id: string } })
   const quoteText = typeof profileValues['quote'] === 'string' ? (profileValues['quote'] as string).trim() : ''
 
   // Contributions = group memberships, grouped by their collection (visible ones
-  // only). Nothing is hardcoded — collections and their order come from the data.
-  // When there's a single collection its name titles the column (matching the
-  // "Contributions" mock); multiple collections each get their own sub-label.
+  // only), each collection titled by its own name. Nothing is hardcoded —
+  // collections and their order come from the data.
   const visibleGroups = memberGroups.filter(g => g.showOnProfile)
   const contributionCollections = groupByCollection(visibleGroups)
-  const contribTitle = contributionCollections.length === 1 && contributionCollections[0].name
-    ? contributionCollections[0].name
-    : 'Contributions'
 
   // Bio + skills come from the canonical profile values (member_profiles.values),
   // the same source the member's own /profile reads — NOT the legacy
@@ -158,9 +155,6 @@ export default async function MemberPage({ params }: { params: { id: string } })
     .map(f => ({ field: f, value: profileValues[f.key] }))
     .filter(({ value }) => value != null && value !== '' && !(Array.isArray(value) && value.length === 0))
 
-  const hasMiddle = !!bio || !!(deptName || roleName) || visibleGroups.length > 0
-  // All visible contribution groups flattened for the horizontal row.
-  const contribGroups = contributionCollections.flatMap(c => c.groups)
 
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
@@ -168,15 +162,13 @@ export default async function MemberPage({ params }: { params: { id: string } })
       <style dangerouslySetInnerHTML={{ __html: `
         .pub-hero { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 2.5rem; }
         .pub-hero-id { min-width: 0; }
-        .pub-mid { display: grid; gap: 0.85rem; align-items: stretch; }
-        .pub-mid-right { display: flex; flex-direction: column; gap: 0.85rem; }
+        .pub-msg-btn:hover { background: rgba(210,57,248,0.22) !important; border-color: rgba(210,57,248,0.78) !important; box-shadow: 0 0 14px rgba(175,75,255,0.3) !important; }
         .pub-roles { display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; justify-items: center; gap: 1.4rem; }
         @media (max-width: 720px) {
           .pub-hero { grid-template-columns: 1fr; justify-items: center; text-align: center; gap: 1.4rem; }
           .pub-hero-id { text-align: center; }
         }
         @media (max-width: 820px) {
-          .pub-mid { grid-template-columns: 1fr !important; }
           .pub-roles { grid-template-columns: 1fr; gap: 1.1rem; }
           .pub-roles > :nth-child(2) { display: none; }
         }
@@ -187,7 +179,7 @@ export default async function MemberPage({ params }: { params: { id: string } })
       <main aria-labelledby="member-heading" style={{ maxWidth: '1080px', margin: '0 auto', padding: '6rem 1.5rem 7rem', position: 'relative', zIndex: 1 }}>
 
         {/* ── Hero: portrait (left) · identity (right) ─────────────────────── */}
-        <header className="pub-hero" style={{ marginBottom: '0.85rem' }}>
+        <header className="pub-hero" style={{ marginBottom: '0.85rem', marginLeft: '2rem' }}>
           <div style={{
             width: '260px', height: '260px', borderRadius: '50%',
             border: '5px solid #6F491F',
@@ -224,62 +216,71 @@ export default async function MemberPage({ params }: { params: { id: string } })
               </p>
             )}
             <div style={{ marginTop: '1rem', display: 'flex', flexWrap: 'wrap', gap: '0.7rem' }}>
-              <span style={{ display: 'inline-block', padding: '0.42rem 1.3rem', borderRadius: '9999px', backgroundColor: 'rgba(210,57,248,0.15)', border: '1px solid rgba(210,57,248,0.3)', fontSize: '0.72rem', letterSpacing: '0.12em', color: PURPLE }}>
-                ✦ APPROVED CAMPER ✦
-              </span>
-              <a href={`/messages/${member.clerk_user_id}`} aria-label={`Send a message to ${displayName}`} style={{ display: 'inline-block', padding: '0.42rem 1.3rem', borderRadius: '9999px', border: '1px solid rgba(210,57,248,0.35)', color: PURPLE, fontSize: '0.72rem', letterSpacing: '0.08em', textDecoration: 'none', opacity: 0.9, fontFamily: 'TokyoDreams, serif' }}>
+              <ApprovedCamperPill />
+              <a className="pub-msg-btn" href={`/messages/${member.clerk_user_id}`} aria-label={`Send a message to ${displayName}`} style={{ display: 'inline-block', padding: '0.42rem 1.3rem', borderRadius: '9999px', background: 'rgba(210,57,248,0.13)', border: '1px solid rgba(210,57,248,0.5)', boxShadow: '0 0 10px rgba(175,75,255,0.14)', color: '#EEB4F6', fontSize: '0.72rem', letterSpacing: '0.08em', textDecoration: 'none', fontFamily: 'TokyoDreams, serif', transition: 'background 0.15s, border-color 0.15s, box-shadow 0.15s' }}>
                 <span aria-hidden="true">✉ </span>Message
               </a>
             </div>
           </div>
         </header>
 
-        {/* ── About (left) · Roles + Contributions (right) ─────────────────── */}
-        {hasMiddle && (
-          <div className="pub-mid" style={{ marginBottom: '0.85rem', gridTemplateColumns: bio ? '0.52fr 1.7fr' : '1fr' }}>
-            {bio && (
-              <section style={{ ...cardStyle(), display: 'flex', flexDirection: 'column', padding: '2.1rem 2.2rem' }}>
-                <ColHeading title="About" />
-                <p style={{ fontSize: '0.88rem', lineHeight: 1.85, color: ROSE, whiteSpace: 'pre-line' }}>{bio}</p>
-              </section>
-            )}
+        {/* ── About (plain text under the hero) · Roles · Contributions ──────── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.95rem', marginBottom: '0.85rem' }}>
+          {bio && (
+            <section style={{ alignSelf: 'flex-start', maxWidth: '26rem', width: '100%', marginLeft: '3.25rem' }}>
+              <ColHeading title="About" align="left" />
+              <p style={{ fontSize: '0.92rem', lineHeight: 1.85, color: ROSE, whiteSpace: 'pre-line', textAlign: 'left', margin: 0 }}>{bio}</p>
+            </section>
+          )}
 
-            <div className="pub-mid-right">
-              {(deptName || roleName) && (
-                <section style={cardStyle()}>
-                  <ColHeading title="Roles & Responsibilities" />
-                  {deptName && roleName ? (
-                    <div className="pub-roles">
-                      <DetailRow large centered icon="/handicon.png" kicker="Primary role" title={roleName} desc={roleDesc} />
-                      <RoleSeparator />
-                      <DetailRow large centered icon={deptIcon || '✦'} kicker="Department" title={deptName} desc={deptDesc} />
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                      {roleName && <DetailRow large icon="/handicon.png" kicker="Primary role" title={roleName} desc={roleDesc} />}
-                      {deptName && <DetailRow large icon={deptIcon || '✦'} kicker="Department" title={deptName} desc={deptDesc} />}
-                    </div>
-                  )}
-                </section>
+          {(deptName || roleName) && (
+            <section style={cardStyle()}>
+              <ColHeading title="Roles & Responsibilities" />
+              {deptName && roleName ? (
+                <div className="pub-roles">
+                  <DetailRow large centered icon="/handicon.png" kicker="Primary role" title={roleName} desc={roleDesc} />
+                  <RoleSeparator />
+                  <DetailRow large centered icon={deptIcon || '✦'} kicker="Department" title={deptName} desc={deptDesc} />
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {roleName && <DetailRow large icon="/handicon.png" kicker="Primary role" title={roleName} desc={roleDesc} />}
+                  {deptName && <DetailRow large icon={deptIcon || '✦'} kicker="Department" title={deptName} desc={deptDesc} />}
+                </div>
               )}
+            </section>
+          )}
 
-              {contribGroups.length > 0 && (
-                <section style={cardStyle()}>
-                  <ColHeading title={contribTitle} />
-                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'center', gap: '0.6rem 1.4rem' }}>
-                    {contribGroups.flatMap((g, i) => [
-                      ...(i > 0 ? [<span key={`cs-${g.id}`} aria-hidden style={{ alignSelf: 'center', color: PURPLE, fontSize: '0.7rem', opacity: 0.8 }}>✦</span>] : []),
-                      <div key={g.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', width: '92px' }}>
-                        <IconMedallion icon={g.icon || g.icon_image || '✦'} size={76} />
-                        <span style={{ fontSize: '0.85rem', color: WARM, fontFamily: 'var(--font-cormorant-garamond), serif', fontWeight: 600, textAlign: 'center' }}>{g.name}</span>
-                      </div>,
-                    ])}
-                  </div>
-                </section>
-              )}
-            </div>
-          </div>
-        )}
+          {contributionCollections.length > 0 && (
+            <section style={cardStyle()}>
+              {/* Collections sit inline, separated by a soft vertical divide;
+                  when a collection can't fit it wraps onto its own row. */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'stretch', rowGap: '1.5rem' }}>
+                {contributionCollections.flatMap((col, ci) => [
+                  ...(ci > 0 ? [
+                    <span
+                      key={`cdiv-${col.id ?? ci}`}
+                      aria-hidden
+                      style={{ alignSelf: 'stretch', width: '1px', margin: '0 1.6rem', background: 'linear-gradient(to bottom, transparent, rgba(200,168,72,0.28) 22%, rgba(200,168,72,0.28) 78%, transparent)' }}
+                    />,
+                  ] : []),
+                  <div key={col.id ?? '__none__'} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <ColHeading title={col.name || 'Contributions'} />
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'center', gap: '0.6rem 1.4rem' }}>
+                      {col.groups.flatMap((g, i) => [
+                        ...(i > 0 ? [<span key={`cs-${g.id}`} aria-hidden style={{ alignSelf: 'center', color: PURPLE, fontSize: '0.7rem', opacity: 0.8 }}>✦</span>] : []),
+                        <div key={g.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', width: '92px' }}>
+                          <IconMedallion icon={g.icon || g.icon_image || '✦'} size={76} />
+                          <span style={{ fontSize: '0.85rem', color: WARM, fontFamily: 'var(--font-cormorant-garamond), serif', fontWeight: 600, textAlign: 'center' }}>{g.name}</span>
+                        </div>,
+                      ])}
+                    </div>
+                  </div>,
+                ])}
+              </div>
+            </section>
+          )}
+        </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
 
@@ -349,9 +350,9 @@ function groupByCollection(groups: MemberGroup[]) {
 
 // Gold caps column heading flanked by ✦ ornaments (✦ TITLE ✦), matching the
 // registry-card headers in the mock. Used inside the tri-column card.
-function ColHeading({ title }: { title: string }) {
+function ColHeading({ title, align = 'center' }: { title: string; align?: 'center' | 'left' }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem', margin: '0 0 0.9rem' }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: align === 'left' ? 'flex-start' : 'center', gap: '0.6rem', margin: '0 0 0.9rem' }}>
       <span aria-hidden style={{ color: GOLD, fontSize: '0.72rem', opacity: 0.8 }}>✦</span>
       <h2 style={{
         fontFamily: 'var(--font-cormorant-garamond), serif', fontSize: '0.92rem', fontWeight: 600,

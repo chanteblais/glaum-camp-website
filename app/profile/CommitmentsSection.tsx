@@ -3,11 +3,13 @@ import { isImageIcon } from '@/lib/icon-src'
 import type { ContributionType } from '@/lib/application-options'
 import { DEFAULT_CONTRIBUTION_TYPES } from '@/lib/application-options'
 
+export type CommitmentShift = { id: string; title: string; day: string; time: string; icon_type: string; event_date: string | null }
+
 type Props = {
   contributions: string[]
   role: { name: string; description: string | null; purpose: string | null } | null
   dept: { name: string; icon: string | null } | null
-  shift: { title: string; day: string; time: string; icon_type: string } | null
+  shifts: CommitmentShift[]
   roleApprovalStatus: string | null
   contributionTypes?: ContributionType[]
   showManageLink?: boolean
@@ -17,13 +19,14 @@ type Props = {
   hideRole?: boolean
 }
 
-const DAY_LABELS: Record<string, string> = {
-  Wednesday: 'Wednesday, July 23',
-  Thursday:  'Thursday, July 24',
-  Friday:    'Friday, July 25',
-  Saturday:  'Saturday, July 26',
-  Sunday:    'Sunday, July 27',
-  Monday:    'Monday, July 28',
+// Real date ("Saturday, July 25") when the event carries one, else the day name.
+// Replaces the old hardcoded July DAY_LABELS map.
+function shiftDayLabel(s: CommitmentShift): string {
+  if (s.event_date) {
+    const d = new Date(`${s.event_date}T12:00:00`)
+    if (!isNaN(d.getTime())) return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+  }
+  return s.day
 }
 
 const TAG_STYLES: Record<string, { color: string; border: string; bg: string }> = {
@@ -106,11 +109,11 @@ function AccentHeader({ title, compact }: { title: string; compact?: boolean }) 
   )
 }
 
-export function CommitmentsSection({ contributions, role, dept, shift, roleApprovalStatus, contributionTypes = DEFAULT_CONTRIBUTION_TYPES, showManageLink = false, title = 'Your Commitments', compact = false, hideRole = false }: Props) {
+export function CommitmentsSection({ contributions, role, dept, shifts, roleApprovalStatus, contributionTypes = DEFAULT_CONTRIBUTION_TYPES, showManageLink = false, title = 'Your Commitments', compact = false, hideRole = false }: Props) {
   const metaByValue = Object.fromEntries(contributionTypes.map(t => [t.value, { icon: t.icon, desc: t.description }]))
-  // When the designation lives in the header, this card is groups + shift only.
+  // When the designation lives in the header, this card is groups + shifts only.
   const showRole = role && !hideRole
-  const hasAnything = contributions.length > 0 || showRole || shift
+  const hasAnything = contributions.length > 0 || showRole || shifts.length > 0
   if (!hasAnything) return null
 
   const isPending = roleApprovalStatus === 'pending'
@@ -155,7 +158,7 @@ export function CommitmentsSection({ contributions, role, dept, shift, roleAppro
               iconSize={iconSize}
               compact={compact}
             />
-            {(contributions.length > 0 || shift) && (
+            {(contributions.length > 0 || shifts.length > 0) && (
               <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.3), transparent)' }} />
             )}
           </div>
@@ -188,28 +191,33 @@ export function CommitmentsSection({ contributions, role, dept, shift, roleAppro
                 iconSize={iconSize}
                 compact={compact}
               />
-              {(i < contributions.length - 1 || shift) && (
+              {(i < contributions.length - 1 || shifts.length > 0) && (
                 <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.3), transparent)' }} />
               )}
             </div>
           )
         })}
 
-        {/* Shift */}
-        {shift && (
-          <Row
-            circleContent={
-              <div style={{ color: '#C8A848', opacity: 0.75 }}>
-                <EventIcon type={shift.icon_type} size={compact ? 28 : 36} />
-              </div>
-            }
-            title={shift.title}
-            description={`${DAY_LABELS[shift.day] ?? shift.day}\n${shift.time}`}
-            tag="SHIFT"
-            iconSize={iconSize}
-            compact={compact}
-          />
-        )}
+        {/* Shifts — every shift the member holds */}
+        {shifts.map((shift, i) => (
+          <div key={shift.id}>
+            <Row
+              circleContent={
+                <div style={{ color: '#C8A848', opacity: 0.75 }}>
+                  <EventIcon type={shift.icon_type} size={compact ? 28 : 36} />
+                </div>
+              }
+              title={shift.title}
+              description={`${shiftDayLabel(shift)}\n${shift.time}`}
+              tag="SHIFT"
+              iconSize={iconSize}
+              compact={compact}
+            />
+            {i < shifts.length - 1 && (
+              <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.3), transparent)' }} />
+            )}
+          </div>
+        ))}
       </div>
 
       {/* Footer */}

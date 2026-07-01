@@ -3,16 +3,18 @@
 import { useState } from 'react'
 import { isImageIcon } from '@/lib/icon-src'
 
+export type MemberShift = { id: string; title: string; time: string | null; day: string }
+
 type Props = {
   clerkUserId: string
   role: { name: string; department: string | null; department_icon: string | null; commitment: string | null; approval_status: string | null } | null
-  shift: { title: string; time: string | null; day: string } | null
+  shifts: MemberShift[]
 }
 
-export function MemberSignupCard({ clerkUserId, role, shift }: Props) {
+export function MemberSignupCard({ clerkUserId, role, shifts }: Props) {
   const [currentRole, setCurrentRole] = useState(role)
-  const [currentShift, setCurrentShift] = useState(shift)
-  const [clearing, setClearing] = useState<'role' | 'shift' | null>(null)
+  const [currentShifts, setCurrentShifts] = useState(shifts)
+  const [clearing, setClearing] = useState<string | null>(null) // 'role' | shift event id
   const [approving, setApproving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -33,21 +35,38 @@ export function MemberSignupCard({ clerkUserId, role, shift }: Props) {
     setApproving(false)
   }
 
-  async function handleClear(type: 'role' | 'shift') {
-    if (!confirm(`Remove this member's ${type}? They will be notified to choose a new one.`)) return
-    setClearing(type)
+  async function handleClearRole() {
+    if (!confirm("Remove this member's role? They will be notified to choose a new one.")) return
+    setClearing('role')
     setError(null)
     const res = await fetch(`/api/admin/signups/${clerkUserId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(type === 'role' ? { clear_role: true } : { clear_shift: true }),
+      body: JSON.stringify({ clear_role: true }),
     })
     if (!res.ok) {
       const d = await res.json()
       setError(d.error ?? 'Something went wrong')
     } else {
-      if (type === 'role') setCurrentRole(null)
-      if (type === 'shift') setCurrentShift(null)
+      setCurrentRole(null)
+    }
+    setClearing(null)
+  }
+
+  async function handleRemoveShift(eventId: string) {
+    if (!confirm('Remove this shift from the member? They can pick a replacement on their signup page.')) return
+    setClearing(eventId)
+    setError(null)
+    const res = await fetch(`/api/admin/signups/${clerkUserId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ remove_shift: eventId }),
+    })
+    if (!res.ok) {
+      const d = await res.json()
+      setError(d.error ?? 'Something went wrong')
+    } else {
+      setCurrentShifts(prev => prev.filter(s => s.id !== eventId))
     }
     setClearing(null)
   }
@@ -106,7 +125,7 @@ export function MemberSignupCard({ clerkUserId, role, shift }: Props) {
               </button>
             )}
             <button
-              onClick={() => handleClear('role')}
+              onClick={handleClearRole}
               disabled={clearing === 'role'}
               style={{
                 background: 'none', border: '1px solid rgba(255,80,80,0.25)', borderRadius: '9999px',
@@ -120,39 +139,43 @@ export function MemberSignupCard({ clerkUserId, role, shift }: Props) {
         )}
       </div>
 
-      {/* Shift card */}
+      {/* Shifts card — every shift the member holds */}
       <div style={{
         padding: '1rem 1.25rem',
         border: '1px solid rgba(210,57,248,0.15)',
         borderRadius: '0.75rem',
         background: 'rgba(210,57,248,0.02)',
-        display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap',
       }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontSize: '0.65rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#D239F8', opacity: 0.5, margin: '0 0 0.3rem' }}>Shift</p>
-          {currentShift ? (
-            <>
-              <p style={{ fontSize: '0.92rem', color: '#F3EDE6', margin: 0 }}>{currentShift.title}</p>
-              {currentShift.time && <p style={{ fontSize: '0.77rem', opacity: 0.45, margin: '0.2rem 0 0' }}>{currentShift.time}</p>}
-              <p style={{ fontSize: '0.72rem', color: '#D239F8', opacity: 0.4, margin: '0.2rem 0 0' }}>{currentShift.day}</p>
-            </>
-          ) : (
-            <p style={{ fontSize: '0.85rem', opacity: 0.35, fontStyle: 'italic', margin: 0 }}>Not assigned</p>
-          )}
-        </div>
-        {currentShift && (
-          <button
-            onClick={() => handleClear('shift')}
-            disabled={clearing === 'shift'}
-            style={{
-              background: 'none', border: '1px solid rgba(255,80,80,0.25)', borderRadius: '9999px',
-              color: '#ff8a8a', cursor: 'pointer', padding: '0.35rem 0.85rem',
-              fontSize: '0.75rem', flexShrink: 0,
-              opacity: clearing === 'shift' ? 0.4 : 0.75,
-            }}
-          >
-            {clearing === 'shift' ? 'Removing…' : 'Remove shift'}
-          </button>
+        <p style={{ fontSize: '0.65rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#D239F8', opacity: 0.5, margin: '0 0 0.3rem' }}>
+          Shifts{currentShifts.length > 0 ? ` — ${currentShifts.length}` : ''}
+        </p>
+        {currentShifts.length === 0 ? (
+          <p style={{ fontSize: '0.85rem', opacity: 0.35, fontStyle: 'italic', margin: 0 }}>None</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+            {currentShifts.map(s => (
+              <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: '0.9rem', color: '#F3EDE6', margin: 0 }}>{s.title}</p>
+                  <p style={{ fontSize: '0.72rem', color: '#D239F8', opacity: 0.45, margin: '0.15rem 0 0' }}>
+                    {s.day}{s.time ? ` · ${s.time}` : ''}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleRemoveShift(s.id)}
+                  disabled={clearing === s.id}
+                  style={{
+                    background: 'none', border: '1px solid rgba(255,80,80,0.25)', borderRadius: '9999px',
+                    color: '#ff8a8a', cursor: 'pointer', padding: '0.25rem 0.7rem',
+                    fontSize: '0.7rem', flexShrink: 0,
+                    opacity: clearing === s.id ? 0.4 : 0.75,
+                  }}
+                >
+                  {clearing === s.id ? 'Removing…' : 'Remove'}
+                </button>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 

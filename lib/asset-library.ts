@@ -97,6 +97,33 @@ export const BUILTIN_ASSETS: AssetLibraryItem[] = [
     source: 'builtin',
     tags: ['flame', 'fire', 'chalice', 'goblet', 'brazier', 'lotus', 'pedestal'],
   },
+  {
+    id: 'covered-wagon',
+    label: 'Covered Wagon',
+    src: '/asset-library/icons/covered-wagon.webp',
+    kind: 'raster',
+    category: 'icon',
+    source: 'builtin',
+    tags: ['wagon', 'cart', 'wheels', 'canopy', 'pioneer', 'transport', 'travel'],
+  },
+  {
+    id: 'fruit-bowl',
+    label: 'Bowl of Fruit',
+    src: '/asset-library/icons/fruit-bowl.webp',
+    kind: 'raster',
+    category: 'icon',
+    source: 'builtin',
+    tags: ['bowl', 'fruit', 'apple', 'bread', 'grapes', 'harvest', 'food', 'pedestal'],
+  },
+  {
+    id: 'lantern',
+    label: 'Lantern',
+    src: '/asset-library/icons/lantern.webp',
+    kind: 'raster',
+    category: 'icon',
+    source: 'builtin',
+    tags: ['lantern', 'lamp', 'flame', 'fire', 'light', 'glow', 'guide'],
+  },
 ]
 
 /** Built-in assets usable in a given category. */

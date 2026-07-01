@@ -10,24 +10,51 @@ async function requireAdmin() {
   return user.publicMetadata?.role === 'admin' ? userId : null
 }
 
-// PATCH: clear role_id, schedule_event_id, or both
+// PATCH: clear the member's role, remove one shift (remove_shift: <event_id>),
+// or clear all their shifts (clear_shift). Shifts live in member_shift_signups
+// (many-to-many) plus the legacy camp_signups.schedule_event_id — both cleared.
 export async function PATCH(req: NextRequest, { params }: { params: { userId: string } }) {
   if (!(await requireAdmin())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await req.json()
-  const update: Record<string, null> = {}
-  if (body.clear_role) { update.role_id = null; update.role_approval_status = null }
-  if (body.clear_shift) update.schedule_event_id = null
 
-  if (Object.keys(update).length === 0) {
+  if (!body.clear_role && !body.clear_shift && !body.remove_shift) {
     return NextResponse.json({ error: 'Nothing to clear' }, { status: 400 })
   }
 
-  const { error } = await supabaseAdmin
-    .from('camp_signups')
-    .update(update)
-    .eq('clerk_user_id', params.userId)
+  if (body.clear_role) {
+    const { error } = await supabaseAdmin
+      .from('camp_signups')
+      .update({ role_id: null, role_approval_status: null })
+      .eq('clerk_user_id', params.userId)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  }
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (body.remove_shift) {
+    const { error } = await supabaseAdmin
+      .from('member_shift_signups')
+      .delete()
+      .eq('clerk_user_id', params.userId)
+      .eq('schedule_event_id', body.remove_shift)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    await supabaseAdmin
+      .from('camp_signups')
+      .update({ schedule_event_id: null })
+      .eq('clerk_user_id', params.userId)
+      .eq('schedule_event_id', body.remove_shift)
+  }
+
+  if (body.clear_shift) {
+    const { error } = await supabaseAdmin
+      .from('member_shift_signups')
+      .delete()
+      .eq('clerk_user_id', params.userId)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    await supabaseAdmin
+      .from('camp_signups')
+      .update({ schedule_event_id: null })
+      .eq('clerk_user_id', params.userId)
+  }
+
   return NextResponse.json({ success: true })
 }

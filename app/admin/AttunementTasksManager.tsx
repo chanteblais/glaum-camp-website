@@ -11,11 +11,46 @@ const GOLD = '#C8A848'
 const PURPLE = '#D239F8'
 const CREAM = '#F3EDE6'
 
-function reqHint(requirement: AttunementRequirement): string {
-  return ATTUNEMENT_REQUIREMENTS.find(r => r.value === requirement)?.hint ?? ''
-}
+type CollectionOption = { id: string; name: string; groupCount: number }
+type ShiftTypeOption = { id: string; name: string }
 
-export function AttunementTasksManager({ initialTasks }: { initialTasks: AttunementTask[] }) {
+export function AttunementTasksManager({
+  initialTasks,
+  collections,
+  totalGroupCount,
+  shiftTypes,
+}: {
+  initialTasks: AttunementTask[]
+  collections: CollectionOption[]
+  totalGroupCount: number
+  shiftTypes: ShiftTypeOption[]
+}) {
+  // Max groups a 'collection' task may require = groups present in that collection
+  // (or the total across all collections when no specific collection is chosen).
+  const maxForTask = (task: AttunementTask): number =>
+    task.collectionId
+      ? (collections.find(c => c.id === task.collectionId)?.groupCount ?? 0)
+      : totalGroupCount
+
+  const reqHint = (task: AttunementTask): string => {
+    if (task.requirement === 'collection') {
+      const name = task.collectionId
+        ? (collections.find(c => c.id === task.collectionId)?.name ?? 'a collection')
+        : 'any collection'
+      const n = task.requiredCount ?? 1
+      const base = `Completes when the member belongs to ${n} group${n !== 1 ? 's' : ''} in ${name}.`
+      return maxForTask(task) === 0 ? `${base} (No groups here yet — add some first.)` : base
+    }
+    if (task.requirement === 'shift') {
+      const type = task.shiftTypeId
+        ? (shiftTypes.find(s => s.id === task.shiftTypeId)?.name ?? 'a shift type')
+        : 'any'
+      const h = task.requiredHours ?? 1
+      return `Completes when the member has signed up for ${h}h of ${type} shift${task.shiftTypeId ? 's' : ''}.`
+    }
+    return ATTUNEMENT_REQUIREMENTS.find(r => r.value === task.requirement)?.hint ?? ''
+  }
+
   const [tasks, setTasks] = useState<AttunementTask[]>(initialTasks)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -49,6 +84,46 @@ export function AttunementTasksManager({ initialTasks }: { initialTasks: Attunem
   function update(next: AttunementTask[]) {
     setTasks(next)
     save(next)
+  }
+
+  // The requirement <select> encodes a collection choice as `col:<id>` (empty id
+  // = any collection) and a shift choice as `shift:<id>` (empty id = any shift).
+  // Static requirements keep their plain value.
+  function changeRequirement(idx: number, value: string) {
+    update(tasks.map((t, i) => {
+      if (i !== idx) return t
+      if (value.startsWith('col:')) {
+        const id = value.slice(4) || undefined
+        const max = id ? (collections.find(c => c.id === id)?.groupCount ?? 0) : totalGroupCount
+        const requiredCount = Math.min(Math.max(t.requiredCount ?? 1, 1), Math.max(max, 1))
+        return { id: t.id, label: t.label, enabled: t.enabled, requirement: 'collection' as const, collectionId: id, requiredCount }
+      }
+      if (value.startsWith('shift:')) {
+        const id = value.slice(6) || undefined
+        return { id: t.id, label: t.label, enabled: t.enabled, requirement: 'shift' as const, shiftTypeId: id, requiredHours: t.requiredHours ?? 1 }
+      }
+      // Other requirement: drop the collection/shift-only fields.
+      return { id: t.id, label: t.label, enabled: t.enabled, requirement: value as AttunementRequirement }
+    }))
+  }
+
+  function changeHours(idx: number, raw: string) {
+    update(tasks.map((t, i) => {
+      if (i !== idx) return t
+      const requiredHours = Math.max(parseFloat(raw) || 0.5, 0.5)
+      return { ...t, requiredHours }
+    }))
+  }
+
+  // Clamp the required count to [1, groups present] so an admin can't require more
+  // groups than the collection holds.
+  function changeCount(idx: number, raw: string) {
+    update(tasks.map((t, i) => {
+      if (i !== idx) return t
+      const max = Math.max(maxForTask(t), 1)
+      const requiredCount = Math.min(Math.max(parseInt(raw, 10) || 1, 1), max)
+      return { ...t, requiredCount }
+    }))
   }
 
   return (
@@ -119,8 +194,12 @@ export function AttunementTasksManager({ initialTasks }: { initialTasks: Attunem
                   Completes when
                 </span>
                 <select
-                  value={task.requirement}
-                  onChange={e => update(tasks.map((t, i) => i === idx ? { ...t, requirement: e.target.value as AttunementRequirement } : t))}
+                  value={
+                    task.requirement === 'collection' ? `col:${task.collectionId ?? ''}`
+                    : task.requirement === 'shift' ? `shift:${task.shiftTypeId ?? ''}`
+                    : task.requirement
+                  }
+                  onChange={e => changeRequirement(idx, e.target.value)}
                   style={{
                     background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(200,168,72,0.2)',
                     borderRadius: '0.3rem', color: CREAM, fontSize: '0.75rem',
@@ -130,10 +209,58 @@ export function AttunementTasksManager({ initialTasks }: { initialTasks: Attunem
                   {ATTUNEMENT_REQUIREMENTS.map(r => (
                     <option key={r.value} value={r.value} style={{ background: '#1A0A24' }}>{r.label}</option>
                   ))}
+                  <optgroup label="Shift hours" style={{ background: '#1A0A24' }}>
+                    <option value="shift:" style={{ background: '#1A0A24' }}>Any shift</option>
+                    {shiftTypes.map(s => (
+                      <option key={s.id} value={`shift:${s.id}`} style={{ background: '#1A0A24' }}>{s.name}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Collection membership" style={{ background: '#1A0A24' }}>
+                    <option value="col:" style={{ background: '#1A0A24' }}>Any collection</option>
+                    {collections.map(c => (
+                      <option key={c.id} value={`col:${c.id}`} style={{ background: '#1A0A24' }}>{c.name}</option>
+                    ))}
+                  </optgroup>
                 </select>
+                {task.requirement === 'collection' && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', opacity: 0.6, whiteSpace: 'nowrap' }}>
+                    <span>— requires</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={Math.max(maxForTask(task), 1)}
+                      value={task.requiredCount ?? 1}
+                      onChange={e => changeCount(idx, e.target.value)}
+                      style={{
+                        width: '3rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(200,168,72,0.2)',
+                        borderRadius: '0.3rem', color: CREAM, fontSize: '0.75rem',
+                        padding: '0.2rem 0.35rem', outline: 'none', fontFamily: 'inherit',
+                      }}
+                    />
+                    <span>of {maxForTask(task)} group{maxForTask(task) !== 1 ? 's' : ''}</span>
+                  </span>
+                )}
+                {task.requirement === 'shift' && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', opacity: 0.6, whiteSpace: 'nowrap' }}>
+                    <span>— requires</span>
+                    <input
+                      type="number"
+                      min={0.5}
+                      step={0.5}
+                      value={task.requiredHours ?? 1}
+                      onChange={e => changeHours(idx, e.target.value)}
+                      style={{
+                        width: '3.5rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(200,168,72,0.2)',
+                        borderRadius: '0.3rem', color: CREAM, fontSize: '0.75rem',
+                        padding: '0.2rem 0.35rem', outline: 'none', fontFamily: 'inherit',
+                      }}
+                    />
+                    <span>hours</span>
+                  </span>
+                )}
               </div>
               <p style={{ fontSize: '0.68rem', opacity: 0.35, margin: 0, fontStyle: 'italic' }}>
-                {reqHint(task.requirement)}
+                {reqHint(task)}
               </p>
             </div>
 

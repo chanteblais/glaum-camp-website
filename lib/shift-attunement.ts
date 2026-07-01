@@ -1,0 +1,118 @@
+import { supabaseAdmin } from '@/lib/supabase'
+import { shiftDurationHours } from '@/lib/shift-hours'
+
+// Server-side helper: everything attunement needs to evaluate shift-hours
+// requirements for one member. Shared by the home dashboard (app/page.tsx) and
+// the profile checklist (app/profile/page.tsx) so both derive identical state.
+//
+// A member's owed shift requirements come from two authored places:
+//   · universal  — attunement tasks with requirement 'shift' (+ shiftTypeId/hours),
+//                  evaluated inside buildAttunementChecklist against hoursByShiftType
+//   · conditional — groups/roles they hold that carry required_shift_type_id +
+//                  required_shift_hours, returned here as derived requirements
+//                  (they become extra checklist lines)
+
+export type DerivedShiftRequirement = {
+  id: string            // stable checklist id, e.g. 'shift-group-<uuid>'
+  label: string         // e.g. "Teardown Shift"
+  shiftTypeId: string
+  requiredHours: number
+}
+
+export type MemberShiftState = {
+  hasShift: boolean
+  hoursByShiftType: Record<string, number>
+  totalShiftHours: number
+  derivedShiftRequirements: DerivedShiftRequirement[]
+}
+
+// For logged-out / no-member contexts where there's nothing to look up.
+export const EMPTY_MEMBER_SHIFT_STATE: MemberShiftState = {
+  hasShift: false,
+  hoursByShiftType: {},
+  totalShiftHours: 0,
+  derivedShiftRequirements: [],
+}
+
+type ReqRow = {
+  required_shift_type_id: string | null
+  required_shift_hours: number | null
+  shift_types: { name: string } | null
+}
+
+export async function getMemberShiftState(clerkUserId: string): Promise<MemberShiftState> {
+  const [signupsRes, legacyRes, groupRes] = await Promise.all([
+    // Many-to-many holds (the redesign's table; 045 backfilled the legacy single).
+    supabaseAdmin
+      .from('member_shift_signups')
+      .select('schedule_event_id')
+      .eq('clerk_user_id', clerkUserId),
+    // Legacy single signup + the member's role (which may carry a requirement).
+    supabaseAdmin
+      .from('camp_signups')
+      .select('schedule_event_id, role_id, role_approval_status, roles(required_shift_type_id, required_shift_hours, shift_types:required_shift_type_id(name))')
+      .eq('clerk_user_id', clerkUserId)
+      .maybeSingle(),
+    // Groups the member belongs to, with their optional requirement.
+    supabaseAdmin
+      .from('group_members')
+      .select('groups(id, required_shift_type_id, required_shift_hours, shift_types:required_shift_type_id(name))')
+      .eq('clerk_user_id', clerkUserId),
+  ])
+
+  // ── Hours held: union of many-to-many + legacy single signup ──────────────
+  const eventIds = new Set<string>()
+  for (const r of signupsRes.data ?? []) if (r.schedule_event_id) eventIds.add(r.schedule_event_id)
+  if (legacyRes.data?.schedule_event_id) eventIds.add(legacyRes.data.schedule_event_id)
+
+  const hoursByShiftType: Record<string, number> = {}
+  let totalShiftHours = 0
+  if (eventIds.size > 0) {
+    const { data: events } = await supabaseAdmin
+      .from('schedule_events')
+      .select('id, participation_type, shift_type_id, start_time, end_time')
+      .in('id', Array.from(eventIds))
+    for (const ev of events ?? []) {
+      if (ev.participation_type !== 'shift' || !ev.shift_type_id) continue
+      const h = shiftDurationHours(ev.start_time, ev.end_time)
+      if (h <= 0) continue
+      hoursByShiftType[ev.shift_type_id] = (hoursByShiftType[ev.shift_type_id] ?? 0) + h
+      totalShiftHours += h
+    }
+  }
+
+  // ── Derived requirements from groups + role ───────────────────────────────
+  // One line per shift type; overlapping sources keep the LARGEST hours (being
+  // in two things that both want teardown means you owe the bigger ask, not both).
+  const byType = new Map<string, { label: string; requiredHours: number; sourceId: string }>()
+
+  const addReq = (row: ReqRow | null | undefined, sourceId: string) => {
+    if (!row?.required_shift_type_id || !row.required_shift_hours || row.required_shift_hours <= 0) return
+    const existing = byType.get(row.required_shift_type_id)
+    if (existing && existing.requiredHours >= row.required_shift_hours) return
+    byType.set(row.required_shift_type_id, {
+      label: `${row.shift_types?.name ?? 'Shift'} Shift`,
+      requiredHours: row.required_shift_hours,
+      sourceId,
+    })
+  }
+
+  for (const gm of groupRes.data ?? []) {
+    addReq(gm.groups as unknown as ReqRow, `group-${(gm.groups as unknown as { id?: string })?.id ?? 'unknown'}`)
+  }
+  // Role requirement only counts once the role is actually held (not pending).
+  if (legacyRes.data?.role_id && legacyRes.data.role_approval_status !== 'pending') {
+    addReq(legacyRes.data.roles as unknown as ReqRow, `role-${legacyRes.data.role_id}`)
+  }
+
+  const derivedShiftRequirements: DerivedShiftRequirement[] = Array.from(byType.entries()).map(
+    ([shiftTypeId, r]) => ({ id: `shift-${r.sourceId}`, label: r.label, shiftTypeId, requiredHours: r.requiredHours })
+  )
+
+  return {
+    hasShift: eventIds.size > 0,
+    hoursByShiftType,
+    totalShiftHours,
+    derivedShiftRequirements,
+  }
+}

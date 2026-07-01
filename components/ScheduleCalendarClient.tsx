@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { EventIcon } from '@/components/EventIcon'
+import { MANDATORY_HUE, shiftHue } from '@/lib/shift-colors'
 
 type ScheduleEvent = {
   id: string
@@ -14,6 +15,8 @@ type ScheduleEvent = {
   highlight: boolean
   is_recurring: boolean
   event_type: string | null
+  participation_type?: string | null
+  shift_color_index?: number | null
 }
 
 const DAYS = [
@@ -29,7 +32,9 @@ const DAY_ORDER: Record<string, number> = Object.fromEntries(DAYS.map((d, i) => 
 
 const PX_PER_HOUR = 56
 
-// Colour palette per event type
+// Colour scheme (lib/shift-colors.ts): mandatory = the old all-hands teal;
+// each shift type gets a distinct hue from the palette by registry position.
+// The legacy event_type text keys are kept as a fallback for undecorated rows.
 const EVENT_TYPE_STYLES: Record<string, { border: string; background: string; text: string }> = {
   all_hands:    { border: 'rgba(40,200,190,0.45)',  background: 'rgba(40,200,190,0.1)',  text: '#28c8be' },
   camp_tending: { border: 'rgba(240,90,20,0.55)',   background: 'rgba(240,90,20,0.12)',  text: '#e6781e' },
@@ -37,7 +42,21 @@ const EVENT_TYPE_STYLES: Record<string, { border: string; background: string; te
 }
 const DEFAULT_STYLE = { border: 'rgba(200,168,72,0.15)', background: 'rgba(255,255,255,0.03)', text: '#F3EDE6' }
 
+// True when the event carries a colour of its own (bolder title treatment).
+function isColored(event: ScheduleEvent): boolean {
+  return event.participation_type === 'mandatory'
+    || (event.participation_type === 'shift' && event.shift_color_index != null)
+    || !!event.event_type
+}
+
 function eventTypeStyle(event: ScheduleEvent) {
+  if (event.participation_type === 'mandatory') {
+    return { border: `rgba(${MANDATORY_HUE.rgb},0.45)`, background: `rgba(${MANDATORY_HUE.rgb},0.1)`, text: MANDATORY_HUE.accent }
+  }
+  if (event.participation_type === 'shift' && event.shift_color_index != null) {
+    const hue = shiftHue(event.shift_color_index)
+    return { border: `rgba(${hue.rgb},0.5)`, background: `rgba(${hue.rgb},0.1)`, text: hue.accent }
+  }
   if (event.event_type && EVENT_TYPE_STYLES[event.event_type]) return EVENT_TYPE_STYLES[event.event_type]
   if (event.highlight) return { border: 'rgba(200,168,72,0.25)', background: 'rgba(200,168,72,0.04)', text: '#F3EDE6' }
   return DEFAULT_STYLE
@@ -134,7 +153,7 @@ function EventBlock({ event, style }: { event: ScheduleEvent; style: React.CSSPr
           <div style={{ color: '#C8A848', opacity: 0.65 }}>
             <EventIcon type={event.icon_type} size={10} />
           </div>
-          <p style={{ fontSize: '0.68rem', color: eventTypeStyle(event).text, margin: 0, lineHeight: 1.3, fontWeight: (event.highlight || !!event.event_type) ? 600 : 400, wordBreak: 'break-word' }}>
+          <p style={{ fontSize: '0.68rem', color: eventTypeStyle(event).text, margin: 0, lineHeight: 1.3, fontWeight: (event.highlight || isColored(event)) ? 600 : 400, wordBreak: 'break-word' }}>
             {event.title}
           </p>
           {hasDetail && (

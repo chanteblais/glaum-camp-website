@@ -15,7 +15,11 @@ type Group = {
   visibility: string
   collection_id: string | null
   member_count: number
+  required_shift_type_id: string | null
+  required_shift_hours: number | null
 }
+
+type ShiftTypeOption = { id: string; name: string }
 
 type Collection = {
   id: string
@@ -23,6 +27,7 @@ type Collection = {
   description: string | null
   selection: 'single' | 'multi'
   show_on_profile: boolean
+  self_join: boolean
   sort_order: number
 }
 
@@ -43,7 +48,7 @@ export type AssignableMember = {
   email: string
 }
 
-type GroupForm = { name: string; description: string; icon: string; icon_image: string; join_policy: string; visibility: string; collection_id: string; apply_selectable: boolean }
+type GroupForm = { name: string; description: string; icon: string; icon_image: string; join_policy: string; visibility: string; collection_id: string; required_shift_type_id: string; required_shift_hours: string }
 
 const selectStyle: React.CSSProperties = {
   width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(200,168,72,0.2)',
@@ -76,7 +81,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 // ── Group Modal ───────────────────────────────────────────────────────────────
 
 function GroupModal({
-  initial, isNew, onSave, onClose, saving, error, groupId, collections, groupIconOptions,
+  initial, isNew, onSave, onClose, saving, error, groupId, collections, groupIconOptions, shiftTypes,
 }: {
   initial: GroupForm
   isNew: boolean
@@ -87,6 +92,7 @@ function GroupModal({
   groupId?: string
   collections: Collection[]
   groupIconOptions: GroupIconOption[]
+  shiftTypes: ShiftTypeOption[]
 }) {
   const [form, setForm] = useState(initial)
   const set = <K extends keyof GroupForm>(k: K, v: GroupForm[K]) => setForm(f => ({ ...f, [k]: v }))
@@ -127,6 +133,17 @@ function GroupModal({
             <option value="hidden">Hidden (invite / admin-add only)</option>
           </select>
         </Field>
+        <Field label="Shift requirement (optional)" hint="Members of this group owe this many hours of the chosen shift type. Attunement reflects it once they join. Leave as “None” for no requirement.">
+          <select style={selectStyle} value={form.required_shift_type_id} onChange={e => set('required_shift_type_id', e.target.value)}>
+            <option value="">None</option>
+            {shiftTypes.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </Field>
+        {form.required_shift_type_id && (
+          <Field label="Required hours">
+            <input type="number" min="0.5" step="0.5" style={{ ...inputStyle, width: '120px' }} value={form.required_shift_hours} onChange={e => set('required_shift_hours', e.target.value)} placeholder="e.g. 3" />
+          </Field>
+        )}
         <Field label="Icon (optional)" hint="A patch-style image shown scattered on members' profiles. Choose an included image or upload your own.">
           <AssetImagePicker
             value={form.icon_image || undefined}
@@ -137,19 +154,8 @@ function GroupModal({
             label="Group icon"
           />
         </Field>
-        <Field label="Members can opt in" hint="When on, this group appears on the member Participate page for self-join — as long as its collection is set to show on profiles. Turn off for admin-assigned-only groups.">
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', fontSize: '0.85rem', color: '#F3EDE6' }}>
-            <input type="checkbox" checked={form.apply_selectable} onChange={e => set('apply_selectable', e.target.checked)} style={{ width: 16, height: 16, accentColor: GOLD, cursor: 'pointer' }} />
-            Members can opt in (self-join on Participate)
-          </label>
-          <p style={{ fontSize: '0.72rem', margin: '0.4rem 0 0', lineHeight: 1.5, opacity: 0.6, color: form.apply_selectable ? GOLD : '#F3EDE6' }}>
-            {form.apply_selectable
-              ? 'On — members can self-join this group on the Participate page (its collection must be visible on profiles).'
-              : 'Off — admin-assigned only; members cannot self-join.'}
-          </p>
-        </Field>
         <p style={{ fontSize: '0.72rem', opacity: 0.4, lineHeight: 1.5, marginBottom: '1.25rem' }}>
-          To let <em>applicants</em> opt into groups during the application, also add a <strong style={{ opacity: 0.8 }}>Group selection</strong> field in the Application Builder.
+          Whether members can self-join is set on the <strong style={{ opacity: 0.8 }}>collection</strong> (edit the collection to toggle Self-join). To let <em>applicants</em> opt in during the application, add a <strong style={{ opacity: 0.8 }}>Group selection</strong> field in the Application Builder.
         </p>
         {error && <p style={{ color: '#ff8a8a', fontSize: '0.82rem', marginBottom: '0.75rem' }}>{error}</p>}
         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
@@ -328,7 +334,7 @@ function GroupRow({
 
 // ── Collection Modal ──────────────────────────────────────────────────────────
 
-type CollectionForm = { name: string; description: string; selection: 'single' | 'multi'; show_on_profile: boolean }
+type CollectionForm = { name: string; description: string; selection: 'single' | 'multi'; show_on_profile: boolean; self_join: boolean }
 
 function CollectionModal({
   initial, isNew, onSave, onClose, saving, error,
@@ -364,10 +370,16 @@ function CollectionModal({
             <option value="single">One group only</option>
           </select>
         </Field>
-        <Field label="Show on profile" hint="When on, a member's groups in this collection appear on their profile. Turn off for operational collections you don't want shown publicly.">
+        <Field label="Visible on profile" hint="When on, a member's groups in this collection appear on their profile (/profile + public /members/[id]). Turn off for operational collections you don't want shown there. Display only — does not affect self-join.">
           <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', fontSize: '0.85rem', color: '#F3EDE6' }}>
             <input type="checkbox" checked={form.show_on_profile} onChange={e => setForm(f => ({ ...f, show_on_profile: e.target.checked }))} style={{ width: 16, height: 16, accentColor: GOLD, cursor: 'pointer' }} />
-            {form.show_on_profile ? 'Visible on member profiles' : 'Hidden from member profiles'}
+            Visible on member profiles
+          </label>
+        </Field>
+        <Field label="Self-join" hint="When on, members can join/leave this collection's groups themselves on the Participate page (/signup → Your Contributions). Independent of profile visibility. Turn off for admin-assigned-only collections.">
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', fontSize: '0.85rem', color: '#F3EDE6' }}>
+            <input type="checkbox" checked={form.self_join} onChange={e => setForm(f => ({ ...f, self_join: e.target.checked }))} style={{ width: 16, height: 16, accentColor: GOLD, cursor: 'pointer' }} />
+            Members can self-join on Participate
           </label>
         </Field>
         {error && <p style={{ color: '#ff8a8a', fontSize: '0.82rem', marginBottom: '0.75rem' }}>{error}</p>}
@@ -428,6 +440,11 @@ function CollectionSection({
             OFF PROFILE
           </span>
         )}
+        {collection.self_join && (
+          <span title="Members can self-join these groups on the Participate page" style={{ fontSize: '0.6rem', color: '#D239F8', opacity: 0.7, border: '1px solid rgba(210,57,248,0.35)', borderRadius: '9999px', padding: '0.1rem 0.45rem', letterSpacing: '0.05em' }}>
+            SELF-JOIN
+          </span>
+        )}
         <span style={{ fontSize: '0.72rem', opacity: 0.4 }}>{groups.length} group{groups.length !== 1 ? 's' : ''}</span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.4rem' }}>
           <button onClick={onEditCollection} style={{ background: 'none', border: '1px solid rgba(200,168,72,0.2)', borderRadius: '0.4rem', color: GOLD, cursor: 'pointer', padding: '0.25rem 0.5rem', fontSize: '0.7rem', opacity: 0.7 }}>Edit</button>
@@ -467,6 +484,7 @@ function CollectionSection({
 export function GroupsManager({ members }: { members: AssignableMember[] }) {
   const [groups, setGroups] = useState<Group[]>([])
   const [collections, setCollections] = useState<Collection[]>([])
+  const [shiftTypes, setShiftTypes] = useState<ShiftTypeOption[]>([])
   const [loading, setLoading] = useState(true)
 
   // Group create/edit. `creatingIn` holds the collection id a new group lands in.
@@ -485,8 +503,9 @@ export function GroupsManager({ members }: { members: AssignableMember[] }) {
     Promise.all([
       fetch('/api/admin/groups').then(r => r.json()),
       fetch('/api/admin/group-collections').then(r => r.json()),
+      fetch('/api/admin/shift-types').then(r => r.json()),
     ])
-      .then(([g, c]) => { setGroups(g.groups ?? []); setCollections(c.collections ?? []) })
+      .then(([g, c, s]) => { setGroups(g.groups ?? []); setCollections(c.collections ?? []); setShiftTypes(s.shiftTypes ?? []) })
       .finally(() => setLoading(false))
   }, [])
 
@@ -621,7 +640,8 @@ export function GroupsManager({ members }: { members: AssignableMember[] }) {
         isNew
         collections={sortedCollections}
         groupIconOptions={groupIconOptions}
-        initial={{ name: '', description: '', icon: '', icon_image: '', join_policy: 'admin_assigned', visibility: 'listed', collection_id: creatingIn || firstCollectionId, apply_selectable: false }}
+        shiftTypes={shiftTypes}
+        initial={{ name: '', description: '', icon: '', icon_image: '', join_policy: 'admin_assigned', visibility: 'listed', collection_id: creatingIn || firstCollectionId, required_shift_type_id: '', required_shift_hours: '' }}
         onSave={handleCreate}
         onClose={() => setCreatingIn(null)}
         saving={saving}
@@ -631,7 +651,8 @@ export function GroupsManager({ members }: { members: AssignableMember[] }) {
         isNew={false}
         collections={sortedCollections}
         groupIconOptions={groupIconOptions}
-        initial={{ name: editing.name, description: editing.description ?? '', icon: editing.icon ?? '', icon_image: editing.icon_image ?? '', join_policy: editing.join_policy ?? 'admin_assigned', visibility: editing.visibility ?? 'listed', collection_id: editing.collection_id ?? firstCollectionId, apply_selectable: editing.apply_selectable ?? false }}
+        shiftTypes={shiftTypes}
+        initial={{ name: editing.name, description: editing.description ?? '', icon: editing.icon ?? '', icon_image: editing.icon_image ?? '', join_policy: editing.join_policy ?? 'admin_assigned', visibility: editing.visibility ?? 'listed', collection_id: editing.collection_id ?? firstCollectionId, required_shift_type_id: editing.required_shift_type_id ?? '', required_shift_hours: editing.required_shift_hours != null ? String(editing.required_shift_hours) : '' }}
         onSave={(f) => handleUpdate(editing, f)}
         onClose={() => setEditing(null)}
         saving={saving}
@@ -642,7 +663,7 @@ export function GroupsManager({ members }: { members: AssignableMember[] }) {
       {/* Collection modals */}
       {creatingCol && <CollectionModal
         isNew
-        initial={{ name: '', description: '', selection: 'multi', show_on_profile: true }}
+        initial={{ name: '', description: '', selection: 'multi', show_on_profile: true, self_join: false }}
         onSave={handleCreateCol}
         onClose={() => setCreatingCol(false)}
         saving={savingCol}
@@ -650,7 +671,7 @@ export function GroupsManager({ members }: { members: AssignableMember[] }) {
       />}
       {editingCol && <CollectionModal
         isNew={false}
-        initial={{ name: editingCol.name, description: editingCol.description ?? '', selection: editingCol.selection, show_on_profile: editingCol.show_on_profile }}
+        initial={{ name: editingCol.name, description: editingCol.description ?? '', selection: editingCol.selection, show_on_profile: editingCol.show_on_profile, self_join: editingCol.self_join }}
         onSave={(f) => handleUpdateCol(editingCol, f)}
         onClose={() => setEditingCol(null)}
         saving={savingCol}
