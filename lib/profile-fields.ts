@@ -68,6 +68,13 @@ export type ProfileField = {
    * and the profile UI see stored + derived fields in one namespace.
    */
   system?: boolean
+  /**
+   * Built-in core field that always exists and can't be reconfigured, disabled,
+   * or removed by admins (e.g. Bio → the profile's About section). Unlike system
+   * fields it's still member-editable and stored (member_profiles.values); it's
+   * simply locked out of the Profile Fields manager's editable list.
+   */
+  locked?: boolean
   /** Disabled fields are ignored everywhere (kept for re-enable). */
   enabled: boolean
 }
@@ -122,18 +129,29 @@ const STORED_DEFAULT_FIELDS: ProfileField[] = [
   { key: 'eventExperience', label: 'Event Experience', description: 'Which years have you camped with Glåüm?', type: 'multi_select', options: ['2022', '2023', '2024', '2025'], public: true, memberEditable: true, applicationEligible: true, distinctionEligible: true, enabled: true },
   { key: 'skills',          label: 'Skills',           description: 'What can you bring to camp?', type: 'multi_select', options: [], public: true, memberEditable: true, applicationEligible: true, distinctionEligible: true, enabled: true },
   { key: 'languages',       label: 'Languages',        type: 'multi_select', options: [], public: true, memberEditable: true, applicationEligible: true, distinctionEligible: false, enabled: true },
-  { key: 'bio',             label: 'Bio',              description: 'A short introduction — shown as the "About" section on your profile.', type: 'textarea', public: true, memberEditable: true, applicationEligible: true, distinctionEligible: false, enabled: true },
   { key: 'quote',           label: 'Quote',            description: 'A short line shown under your name.', type: 'text', public: true, memberEditable: true, applicationEligible: true, distinctionEligible: false, enabled: true },
   { key: 'dietaryPreferences', label: 'Dietary Preferences', type: 'text', public: false, memberEditable: true, applicationEligible: true, distinctionEligible: false, enabled: true },
 ]
 
-export const DEFAULT_PROFILE_FIELDS: ProfileField[] = [...STORED_DEFAULT_FIELDS, ...SYSTEM_FIELDS]
+// Locked core fields — always present, canonical config enforced, never
+// admin-configurable or deletable. Still member-editable + stored. Bio backs the
+// profile's About section, so every member always has it.
+const LOCKED_STORED_FIELDS: ProfileField[] = [
+  { key: 'bio', label: 'Bio', description: 'A short introduction — shown as the "About" section on your profile.', type: 'textarea', public: true, memberEditable: true, applicationEligible: true, distinctionEligible: false, locked: true, enabled: true },
+  { key: 'quote', label: 'Quote', description: 'A short line shown under your name.', type: 'text', public: true, memberEditable: true, applicationEligible: true, distinctionEligible: false, locked: true, enabled: true },
+]
+
+export const DEFAULT_PROFILE_FIELDS: ProfileField[] = [...LOCKED_STORED_FIELDS, ...STORED_DEFAULT_FIELDS, ...SYSTEM_FIELDS]
 
 /** The system fields, exposed for re-injection + read-only display in the manager. */
 export const SYSTEM_PROFILE_FIELDS: ProfileField[] = SYSTEM_FIELDS
 
+/** Locked core fields, exposed for read-only display in the manager. */
+export const LOCKED_PROFILE_FIELDS: ProfileField[] = LOCKED_STORED_FIELDS
+
 const VALID_TYPES = new Set<ProfileFieldType>(PROFILE_FIELD_TYPES.map(t => t.value))
 const SYSTEM_KEYS = new Set(SYSTEM_FIELDS.map(f => f.key))
+const LOCKED_BY_KEY = new Map(LOCKED_STORED_FIELDS.map(f => [f.key, f]))
 
 function parseDefault(v: unknown, type: ProfileFieldType): ProfileFieldDefault | undefined {
   if (v == null) return undefined
@@ -147,6 +165,10 @@ function parseField(raw: unknown): ProfileField | null {
   if (!raw || typeof raw !== 'object') return null
   const r = raw as Record<string, unknown>
   if (typeof r.key !== 'string' || !r.key) return null
+  // Locked core fields ignore any saved overrides — the canonical definition wins,
+  // so admins can never disable, rename, retype, or un-public them.
+  const lockedCanonical = LOCKED_BY_KEY.get(r.key)
+  if (lockedCanonical) return { ...lockedCanonical }
   if (typeof r.label !== 'string' || !r.label) return null
   const type = VALID_TYPES.has(r.type as ProfileFieldType) ? (r.type as ProfileFieldType) : 'text'
   const system = r.system === true || SYSTEM_KEYS.has(r.key)
@@ -186,8 +208,10 @@ export function parseProfileFields(raw?: string | null): ProfileField[] {
   // De-dupe by key (first wins), then ensure all system fields exist.
   const seen = new Set<string>()
   const fields = parsed.filter(f => (seen.has(f.key) ? false : (seen.add(f.key), true)))
+  const missingLocked = LOCKED_STORED_FIELDS.filter(f => !seen.has(f.key))
   const missingSystem = SYSTEM_FIELDS.filter(f => !seen.has(f.key))
-  return [...fields, ...missingSystem]
+  // Locked core fields lead; system (derived) fields trail.
+  return [...missingLocked, ...fields, ...missingSystem]
 }
 
 // ── Helpers shared by later phases ──────────────────────────────────────────────

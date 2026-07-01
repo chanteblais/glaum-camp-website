@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { isImageIcon } from '@/lib/icon-src'
 
 type RoleRequest = {
   clerk_user_id: string
@@ -65,8 +66,13 @@ export function RoleRequestsSection() {
           {/* Role */}
           <div style={{ flex: 1, minWidth: '140px' }}>
             {req.department_name && (
-              <p style={{ fontSize: '0.68rem', color: '#C8A848', opacity: 0.55, margin: '0 0 0.15rem', letterSpacing: '0.04em' }}>
-                {req.department_icon && `${req.department_icon} `}{req.department_name}
+              <p style={{ fontSize: '0.68rem', color: '#C8A848', opacity: 0.55, margin: '0 0 0.15rem', letterSpacing: '0.04em', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                {req.department_icon && (
+                  isImageIcon(req.department_icon)
+                    ? <img src={req.department_icon} alt="" aria-hidden style={{ width: '0.8rem', height: '0.8rem', objectFit: 'contain' }} />
+                    : <span>{req.department_icon}</span>
+                )}
+                {req.department_name}
               </p>
             )}
             <p style={{ fontSize: '0.88rem', color: '#D239F8', margin: 0 }}>{req.role_name}</p>

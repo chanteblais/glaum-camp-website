@@ -76,7 +76,7 @@ Sign-out flow:
 | `/api/apply` | POST | Submit application |
 | `/api/volunteer` | POST | Submit volunteer signup |
 | `/api/signup` | GET/POST | Fetch departments/roles/shifts + upsert member role+shift selection. Sets `role_approval_status = 'pending'` for roles with `requires_approval = true`. Preserves existing approval status on shift-only updates. |
-| `/api/groups/membership` | GET/POST | Self-service opt-in groups for the current member. GET lists the groups offered by the member form's visible `group_select` fields (unset list = all) + the member's joined state; POST `{ group_id, joined }` joins (`source='application'`) or leaves. Powers the **Your Contributions** section on `/signup`. |
+| `/api/groups/membership` | GET/POST | Self-service opt-in groups for the current member. GET lists groups flagged `apply_selectable` whose collection has `show_on_profile` on (no collection ⇒ visible) + the member's joined state; POST `{ group_id, joined }` joins (`source='application'`) or leaves (re-checks the same gate). Separate from the apply form's `group_select` fields. Powers the **Your Contributions** section on `/signup`. |
 | `/api/profile/application` | PATCH | Update profile fields |
 | `/api/profile/avatar` | POST | Upload avatar to Supabase Storage |
 | `/api/profile/cancel` | POST | Cancel own application |
@@ -111,7 +111,9 @@ Sign-out flow:
 | `/api/admin/groups` | GET/POST | List (with member counts) / create groups |
 | `/api/admin/groups/[id]` | PATCH/DELETE | Update / delete group |
 | `/api/admin/groups/[id]/members` | GET/POST/DELETE | Group roster / add member / remove member (`?clerk_user_id=`) |
-| `/api/admin/groups/[id]/icon` | POST/DELETE | Upload / clear a group's icon image (`group-badges` bucket; sets `groups.icon_image`). Mirrors the avatar route. |
+| `/api/admin/groups/[id]/icon` | POST/DELETE | Upload / clear a group's icon image (`group-badges` bucket, `groups/` prefix; sets `groups.icon_image`). Mirrors the avatar route. |
+| `/api/admin/distinctions/[id]/icon` | POST | Upload distinction medal art (`group-badges` bucket, `distinctions/` prefix; returns URL, stored in `config_distinctions`). Used by the shared `AssetImagePicker`. |
+| `/api/admin/departments/[id]/icon` | POST | Upload a department icon (`group-badges` bucket, `departments/` prefix; returns URL, stored in `departments.icon`). `[id]` is the row id or a client-generated key for not-yet-saved departments. |
 | `/api/admin/schedule` | GET/POST | List / create schedule events |
 | `/api/admin/schedule/[id]` | PATCH/DELETE | Update / delete event |
 | `/api/admin/schedule/icon` | POST | Upload custom event icon |

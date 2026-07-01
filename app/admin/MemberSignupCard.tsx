@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { isImageIcon } from '@/lib/icon-src'
 
 type Props = {
   clerkUserId: string
@@ -66,8 +67,13 @@ export function MemberSignupCard({ clerkUserId, role, shift }: Props) {
           {currentRole ? (
             <>
               {currentRole.department && (
-                <p style={{ fontSize: '0.72rem', color: '#C8A848', opacity: 0.5, margin: '0 0 0.15rem' }}>
-                  {currentRole.department_icon && `${currentRole.department_icon} `}{currentRole.department}
+                <p style={{ fontSize: '0.72rem', color: '#C8A848', opacity: 0.5, margin: '0 0 0.15rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                  {currentRole.department_icon && (
+                    isImageIcon(currentRole.department_icon)
+                      ? <img src={currentRole.department_icon} alt="" aria-hidden style={{ width: '0.85rem', height: '0.85rem', objectFit: 'contain' }} />
+                      : <span>{currentRole.department_icon}</span>
+                  )}
+                  {currentRole.department}
                 </p>
               )}
               <p style={{ fontSize: '0.92rem', color: '#F3EDE6', margin: 0 }}>{currentRole.name}</p>

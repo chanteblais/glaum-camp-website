@@ -9,6 +9,7 @@ import { ProfileFieldsManager } from '../ProfileFieldsManager'
 import { DistinctionsManager } from '../DistinctionsManager'
 import { AttunementTasksManager } from '../AttunementTasksManager'
 import { DepartmentsManager } from '../DepartmentsManager'
+import { GroupsManager } from '../GroupsManager'
 import { AdminsManager } from '../AdminsManager'
 import { PollManagersManager } from '../PollManagersManager'
 import { DebugSection } from '../DebugSection'
@@ -69,6 +70,13 @@ export default async function ConfigurePage() {
     email: a.email,
     isAdmin: clerkUsers[i]?.publicMetadata?.role === 'admin',
     canManagePolls: clerkUsers[i]?.publicMetadata?.canManagePolls === true,
+  }))
+
+  // Approved members shaped for the Groups roster (assign members to groups).
+  const groupMembers = approvedWithClerk.map(a => ({
+    clerk_user_id: a.clerk_user_id!,
+    displayName: [a.preferred_name || a.first_name, a.last_name].filter(Boolean).join(' '),
+    email: a.email,
   }))
 
   return (
@@ -149,7 +157,14 @@ export default async function ConfigurePage() {
           title="Departments"
           summary="Roles grouped by department"
         >
-          <DepartmentsManager />
+          <DepartmentsManager groupIconOptions={groupIconOptions} />
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          title="Groups"
+          summary="Group collections and the groups within them — plus who's assigned to each"
+        >
+          <GroupsManager members={groupMembers} />
         </CollapsibleSection>
 
         {/* ═══════════════ ACCESS & SYSTEM ═══════════════ */}

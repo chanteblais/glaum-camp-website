@@ -3,8 +3,7 @@ import { redirect, notFound } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { Header } from '@/components/Header'
 import { supabaseResizedUrl } from '@/lib/supabase-image'
-import { getMemberGroups } from '@/lib/groups'
-import { getBadgeVersion } from '@/lib/badge-version'
+import { getMemberGroups, type MemberGroup } from '@/lib/groups'
 import { buildMemberFacts } from '@/lib/member-facts'
 import { parseDistinctions, evaluateDistinctions } from '@/lib/distinctions'
 import { resolveMember, getMemberProfileValues } from '@/lib/members'
@@ -15,6 +14,13 @@ import { CabinetOfDistinctions } from '@/app/profile/CabinetOfDistinctions'
 const GOLD = '#C8A848'
 const PURPLE = '#D239F8'
 const CREAM = '#F3EDE6'
+// Warm, well-lit cream for value text (names, group titles, bio) — matches the
+// golden-lit tone of the profile mock more closely than the cooler CREAM.
+const WARM = '#D9CBA8'
+// About-narrative tone — the warm dusty rose-tan used for commitment
+// descriptions on the member's own /profile (CommitmentsSection Row), kept in
+// sync so the "About" reads the same across both profiles.
+const ROSE = '#B0947A'
 
 // A patch-style value is an uploaded image (URL); anything else is an emoji glyph.
 const isImageIcon = (v: string) => /^https?:\/\//.test(v) || v.startsWith('/')
@@ -26,7 +32,7 @@ function cardStyle(): React.CSSProperties {
     borderRadius: '1rem',
     background: 'rgba(10,0,20,0.55)',
     boxShadow: '0 0 0 1px rgba(200,168,72,0.06), 0 18px 50px rgba(0,0,0,0.35)',
-    padding: '1.75rem 1.9rem 1.9rem',
+    padding: '0.9rem 1.05rem 1.05rem',
   }
 }
 
@@ -69,7 +75,7 @@ export default async function MemberPage({ params }: { params: { id: string } })
 
   const { data: member } = await supabaseAdmin
     .from('applications')
-    .select('id, first_name, preferred_name, pronouns, avatar_url, clerk_user_id, submitted_at, status, camped_before, public_bio, public_skills')
+    .select('id, first_name, preferred_name, pronouns, avatar_url, clerk_user_id, submitted_at, status, camped_before')
     .eq('status', 'approved')
     .eq(isUuid ? 'id' : 'clerk_user_id', params.id)
     .maybeSingle()
@@ -80,12 +86,12 @@ export default async function MemberPage({ params }: { params: { id: string } })
   const { data: campSignup } = member.clerk_user_id
     ? await supabaseAdmin
         .from('camp_signups')
-        .select('role_id, role_approval_status, roles(name, description, purpose, department_id, departments(name, icon))')
+        .select('role_id, role_approval_status, roles(name, description, purpose, department_id, departments(name, icon, description))')
         .eq('clerk_user_id', member.clerk_user_id)
         .maybeSingle()
     : { data: null }
 
-  const roleInfo = campSignup?.roles as { name?: string; description?: string | null; purpose?: string | null; departments?: { name?: string; icon?: string } | null } | null
+  const roleInfo = campSignup?.roles as { name?: string; description?: string | null; purpose?: string | null; departments?: { name?: string; icon?: string; description?: string | null } | null } | null
   const roleApproved = !!campSignup?.role_id && campSignup?.role_approval_status !== 'pending'
 
   // Group affiliations — the member's "Contributions" (Setup / Decor / Teardown …).
@@ -111,39 +117,83 @@ export default async function MemberPage({ params }: { params: { id: string } })
   const memberSince = member.submitted_at ? new Date(member.submitted_at as string).getFullYear() : null
   const deptName = roleApproved ? roleInfo?.departments?.name ?? null : null
   const deptIcon = roleInfo?.departments?.icon ?? null
+  const deptDesc = roleApproved ? roleInfo?.departments?.description ?? null : null
   const roleName = roleApproved ? roleInfo?.name ?? null : null
+  // Short description shown under each role (mirrors the designation short desc).
+  const roleDesc = roleApproved ? roleInfo?.description ?? null : null
 
-  const badgeVersion = await getBadgeVersion()
-  const showBadge = !!roleName && !!deptName
+  // Optional quote shown under the name (profile field key `quote`).
+  const quoteText = typeof profileValues['quote'] === 'string' ? (profileValues['quote'] as string).trim() : ''
 
-  const skills = ((member.public_skills as string | null) ?? '')
-    .split(',').map(s => s.trim()).filter(Boolean)
-  const bio = (member.public_bio as string | null)?.trim() || null
+  // Contributions = group memberships, grouped by their collection (visible ones
+  // only). Nothing is hardcoded — collections and their order come from the data.
+  // When there's a single collection its name titles the column (matching the
+  // "Contributions" mock); multiple collections each get their own sub-label.
+  const visibleGroups = memberGroups.filter(g => g.showOnProfile)
+  const contributionCollections = groupByCollection(visibleGroups)
+  const contribTitle = contributionCollections.length === 1 && contributionCollections[0].name
+    ? contributionCollections[0].name
+    : 'Contributions'
 
-  // Public registry-defined profile fields with a value (Phase 4).
+  // Bio + skills come from the canonical profile values (member_profiles.values),
+  // the same source the member's own /profile reads — NOT the legacy
+  // applications.public_bio / public_skills columns (stale since the
+  // "profile = source of truth" refactor).
+  const bio = typeof profileValues['bio'] === 'string' ? (profileValues['bio'] as string).trim() || null : null
+  const skillsVal = profileValues['skills']
+  const skills = Array.isArray(skillsVal)
+    ? skillsVal.map(v => String(v).trim()).filter(Boolean)
+    : typeof skillsVal === 'string'
+      ? skillsVal.split(',').map(s => s.trim()).filter(Boolean)
+      : []
+
+  // Public registry-defined profile fields with a value (Phase 4). bio / quote /
+  // skills are excluded — they render in their own dedicated spots (About column,
+  // under-name quote, Skills & Gifts), so listing them here would double up.
+  const DEDICATED_FIELD_KEYS = new Set(['bio', 'quote', 'skills'])
   const { data: pfRow } = await supabaseAdmin
     .from('page_content').select('value').eq('key', 'config_profile_fields').maybeSingle()
   const publicProfileFields = storedFields(parseProfileFields(pfRow?.value))
-    .filter(f => f.public)
+    .filter(f => f.public && !DEDICATED_FIELD_KEYS.has(f.key))
     .map(f => ({ field: f, value: profileValues[f.key] }))
     .filter(({ value }) => value != null && value !== '' && !(Array.isArray(value) && value.length === 0))
+
+  const hasMiddle = !!bio || !!(deptName || roleName) || visibleGroups.length > 0
+  // All visible contribution groups flattened for the horizontal row.
+  const contribGroups = contributionCollections.flatMap(c => c.groups)
 
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
       <Header />
+      <style dangerouslySetInnerHTML={{ __html: `
+        .pub-hero { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 2.5rem; }
+        .pub-hero-id { min-width: 0; }
+        .pub-mid { display: grid; gap: 0.85rem; align-items: stretch; }
+        .pub-mid-right { display: flex; flex-direction: column; gap: 0.85rem; }
+        .pub-roles { display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; justify-items: center; gap: 1.4rem; }
+        @media (max-width: 720px) {
+          .pub-hero { grid-template-columns: 1fr; justify-items: center; text-align: center; gap: 1.4rem; }
+          .pub-hero-id { text-align: center; }
+        }
+        @media (max-width: 820px) {
+          .pub-mid { grid-template-columns: 1fr !important; }
+          .pub-roles { grid-template-columns: 1fr; gap: 1.1rem; }
+          .pub-roles > :nth-child(2) { display: none; }
+        }
+      ` }} />
       <img src="/hands-left.svg"  alt="" aria-hidden role="presentation" style={{ position: 'fixed', left: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
       <img src="/hands-right.svg" alt="" aria-hidden role="presentation" style={{ position: 'fixed', right: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
 
-      <main aria-labelledby="member-heading" style={{ maxWidth: '880px', margin: '0 auto', padding: '6rem 1.5rem 7rem', position: 'relative', zIndex: 1 }}>
+      <main aria-labelledby="member-heading" style={{ maxWidth: '1080px', margin: '0 auto', padding: '6rem 1.5rem 7rem', position: 'relative', zIndex: 1 }}>
 
-        {/* ── Hero ─────────────────────────────────────────────────────────── */}
-        <header style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: '4rem' }}>
+        {/* ── Hero: portrait (left) · identity (right) ─────────────────────── */}
+        <header className="pub-hero" style={{ marginBottom: '0.85rem' }}>
           <div style={{
             width: '260px', height: '260px', borderRadius: '50%',
-            border: '3px solid #6F491F',
+            border: '5px solid #6F491F',
             boxShadow: '0 0 0 1px rgba(60,35,10,0.6), 0 0 20px rgba(111,73,31,0.25), 0 8px 32px rgba(0,0,0,0.55)',
             background: 'rgba(200,168,72,0.08)', overflow: 'hidden', flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.75rem',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             {member.avatar_url ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -155,98 +205,88 @@ export default async function MemberPage({ params }: { params: { id: string } })
             )}
           </div>
 
-          <p style={{ fontSize: '0.65rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: PURPLE, marginBottom: '0.45rem', opacity: 0.85 }}>
-            Approved Camper
-          </p>
-          <h1 id="member-heading" style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2.1rem, 6vw, 3.1rem)', color: GOLD, marginBottom: '0.2rem', textShadow: '0 0 40px rgba(210,57,248,0.4)' }}>
-            {displayName}
-          </h1>
-          {member.pronouns && (
-            <p style={{ fontSize: '0.85rem', opacity: 0.5, marginBottom: '0.3rem' }}>{member.pronouns as string}</p>
-          )}
-          {memberSince && (
-            <p style={{ fontSize: '0.8rem', letterSpacing: '0.12em', color: CREAM, opacity: 0.65, marginTop: '0.35rem' }}>
-              Member since {memberSince}
-            </p>
-          )}
-
-          <a
-            href={`/messages/${member.clerk_user_id}`}
-            aria-label={`Send a message to ${displayName}`}
-            style={{
-              display: 'inline-block', marginTop: '1.4rem', padding: '0.5rem 1.4rem',
-              borderRadius: '9999px', border: '1px solid rgba(210,57,248,0.35)',
-              color: PURPLE, fontSize: '0.78rem', letterSpacing: '0.1em',
-              textDecoration: 'none', opacity: 0.9, fontFamily: 'TokyoDreams, serif',
-            }}
-          >
-            <span aria-hidden="true">✉ </span>Message
-          </a>
+          <div className="pub-hero-id">
+            <h1 id="member-heading" style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 4.5vw, 3rem)', color: GOLD, margin: '0 0 0.35rem', textShadow: '0 0 40px rgba(210,57,248,0.4)' }}>
+              {displayName}
+              <span aria-hidden style={{ color: GOLD, fontSize: '0.5em', opacity: 0.8, marginLeft: '0.5rem', verticalAlign: '0.25em' }}>✦</span>
+            </h1>
+            {member.pronouns && (
+              <p style={{ fontSize: '0.9rem', color: PURPLE, opacity: 0.9, margin: '0 0 0.55rem' }}>{member.pronouns as string}</p>
+            )}
+            {memberSince && (
+              <p style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.82rem', letterSpacing: '0.05em', color: WARM, opacity: 0.85, margin: '0 0 0.55rem' }}>
+                <CalendarGlyph /> Member since {memberSince}
+              </p>
+            )}
+            {quoteText && (
+              <p style={{ fontSize: '1rem', fontStyle: 'italic', color: '#C9B68F', opacity: 0.9, lineHeight: 1.5, fontFamily: 'var(--font-cormorant-garamond), serif', maxWidth: '22rem', margin: '0.15rem 0 0' }}>
+                “{quoteText}”
+              </p>
+            )}
+            <div style={{ marginTop: '1rem', display: 'flex', flexWrap: 'wrap', gap: '0.7rem' }}>
+              <span style={{ display: 'inline-block', padding: '0.42rem 1.3rem', borderRadius: '9999px', backgroundColor: 'rgba(210,57,248,0.15)', border: '1px solid rgba(210,57,248,0.3)', fontSize: '0.72rem', letterSpacing: '0.12em', color: PURPLE }}>
+                ✦ APPROVED CAMPER ✦
+              </span>
+              <a href={`/messages/${member.clerk_user_id}`} aria-label={`Send a message to ${displayName}`} style={{ display: 'inline-block', padding: '0.42rem 1.3rem', borderRadius: '9999px', border: '1px solid rgba(210,57,248,0.35)', color: PURPLE, fontSize: '0.72rem', letterSpacing: '0.08em', textDecoration: 'none', opacity: 0.9, fontFamily: 'TokyoDreams, serif' }}>
+                <span aria-hidden="true">✉ </span>Message
+              </a>
+            </div>
+          </div>
         </header>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        {/* ── About (left) · Roles + Contributions (right) ─────────────────── */}
+        {hasMiddle && (
+          <div className="pub-mid" style={{ marginBottom: '0.85rem', gridTemplateColumns: bio ? '0.52fr 1.7fr' : '1fr' }}>
+            {bio && (
+              <section style={{ ...cardStyle(), display: 'flex', flexDirection: 'column', padding: '2.1rem 2.2rem' }}>
+                <ColHeading title="About" />
+                <p style={{ fontSize: '0.88rem', lineHeight: 1.85, color: ROSE, whiteSpace: 'pre-line' }}>{bio}</p>
+              </section>
+            )}
 
-          {/* ── About ──────────────────────────────────────────────────────── */}
-          {bio && (
-            <section style={cardStyle()}>
-              <SectionHeading title="About" />
-              <p style={{
-                fontSize: '1rem', lineHeight: 1.85, color: CREAM, opacity: 0.92,
-                textAlign: 'center', maxWidth: '52ch', margin: '0 auto', whiteSpace: 'pre-line',
-              }}>
-                {bio}
-              </p>
-            </section>
-          )}
+            <div className="pub-mid-right">
+              {(deptName || roleName) && (
+                <section style={cardStyle()}>
+                  <ColHeading title="Roles & Responsibilities" />
+                  {deptName && roleName ? (
+                    <div className="pub-roles">
+                      <DetailRow large centered icon="/handicon.png" kicker="Primary role" title={roleName} desc={roleDesc} />
+                      <RoleSeparator />
+                      <DetailRow large centered icon={deptIcon || '✦'} kicker="Department" title={deptName} desc={deptDesc} />
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      {roleName && <DetailRow large icon="/handicon.png" kicker="Primary role" title={roleName} desc={roleDesc} />}
+                      {deptName && <DetailRow large icon={deptIcon || '✦'} kicker="Department" title={deptName} desc={deptDesc} />}
+                    </div>
+                  )}
+                </section>
+              )}
 
-          {/* ── Roles & Responsibilities ───────────────────────────────────── */}
-          {(deptName || roleName) ? (
-            <section style={cardStyle()}>
-              <SectionHeading title="Roles & Responsibilities" />
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'stretch', justifyContent: 'center' }}>
-                {deptName && (
-                  <RoleCard icon={deptIcon || '✦'} kicker="Department" title={deptName} />
-                )}
-                {roleName && (
-                  <RoleCard icon="✦" kicker="Primary role" title={roleName} subtitle={roleInfo?.purpose ?? null} />
-                )}
-                {showBadge && (
-                  <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 0.5rem' }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={`/api/badge?role=${encodeURIComponent(roleName as string)}&dept=${encodeURIComponent(deptName as string)}&v=${badgeVersion}`}
-                      alt={`${displayName}'s ${roleName} role badge`}
-                      width={130} height={151}
-                      style={{ display: 'block', filter: 'drop-shadow(0 8px 24px rgba(0,0,0,0.55))' }}
-                    />
+              {contribGroups.length > 0 && (
+                <section style={cardStyle()}>
+                  <ColHeading title={contribTitle} />
+                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'center', gap: '0.6rem 1.4rem' }}>
+                    {contribGroups.flatMap((g, i) => [
+                      ...(i > 0 ? [<span key={`cs-${g.id}`} aria-hidden style={{ alignSelf: 'center', color: PURPLE, fontSize: '0.7rem', opacity: 0.8 }}>✦</span>] : []),
+                      <div key={g.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', width: '92px' }}>
+                        <IconMedallion icon={g.icon || g.icon_image || '✦'} size={76} />
+                        <span style={{ fontSize: '0.85rem', color: WARM, fontFamily: 'var(--font-cormorant-garamond), serif', fontWeight: 600, textAlign: 'center' }}>{g.name}</span>
+                      </div>,
+                    ])}
                   </div>
-                )}
-              </div>
-            </section>
-          ) : null}
+                </section>
+              )}
+            </div>
+          </div>
+        )}
 
-          {/* ── Contributions ──────────────────────────────────────────────── */}
-          {memberGroups.length > 0 && (
-            <section style={cardStyle()}>
-              <SectionHeading title="Contributions" />
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.7rem', justifyContent: 'center' }}>
-                {memberGroups.map(g => {
-                  const icon = g.icon || g.icon_image || '✦'
-                  return (
-                    <span key={g.id} style={{
-                      display: 'inline-flex', alignItems: 'center', gap: '0.55rem',
-                      padding: '0.5rem 1.1rem', borderRadius: '9999px',
-                      border: '1px solid rgba(200,168,72,0.3)', background: 'rgba(200,168,72,0.06)',
-                      color: CREAM, fontSize: '0.9rem',
-                    }}>
-                      {isImageIcon(icon)
-                        ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={icon} alt="" style={{ width: 22, height: 22, objectFit: 'contain', flexShrink: 0 }} />
-                        : <span aria-hidden style={{ fontSize: '1.05rem', lineHeight: 1 }}>{icon}</span>}
-                      {g.name}
-                    </span>
-                  )
-                })}
-              </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+
+          {/* ── Distinctions — the cabinet of honours (sits directly under the top row) ─ */}
+          {earnedDistinctions.length > 0 && (
+            <section>
+              <CabinetOfDistinctions distinctions={earnedDistinctions} title="Distinctions" compact />
             </section>
           )}
 
@@ -289,48 +329,119 @@ export default async function MemberPage({ params }: { params: { id: string } })
             </section>
           )}
 
-          {/* ── Distinctions — the cabinet of honours ──────────────────────── */}
-          {earnedDistinctions.length > 0 && (
-            <section>
-              <CabinetOfDistinctions distinctions={earnedDistinctions} />
-            </section>
-          )}
         </div>
       </main>
     </div>
   )
 }
 
-// One elegant role/department card with a small icon medallion.
-function RoleCard({ icon, kicker, title, subtitle }: {
-  icon: string
-  kicker: string
-  title: string
-  subtitle?: string | null
-}) {
+// Group a member's visible groups by their collection, ordered by the
+// collection's sort order (groups already arrive sorted within each).
+function groupByCollection(groups: MemberGroup[]) {
+  const map = new Map<string, { id: string | null; name: string | null; sort: number; groups: MemberGroup[] }>()
+  for (const g of groups) {
+    const key = g.collectionId ?? '__none__'
+    if (!map.has(key)) map.set(key, { id: g.collectionId, name: g.collectionName, sort: g.collectionSort, groups: [] })
+    map.get(key)!.groups.push(g)
+  }
+  return Array.from(map.values()).sort((a, b) => a.sort - b.sort)
+}
+
+// Gold caps column heading flanked by ✦ ornaments (✦ TITLE ✦), matching the
+// registry-card headers in the mock. Used inside the tri-column card.
+function ColHeading({ title }: { title: string }) {
   return (
-    <div style={{
-      flex: '1 1 220px', minWidth: '200px', maxWidth: '320px',
-      display: 'flex', alignItems: 'center', gap: '0.9rem',
-      padding: '1rem 1.2rem', borderRadius: '0.85rem',
-      border: '1px solid rgba(200,168,72,0.2)', background: 'rgba(200,168,72,0.04)',
-    }}>
-      <span aria-hidden style={{
-        width: 46, height: 46, flexShrink: 0, borderRadius: '50%',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'radial-gradient(circle at 38% 30%, rgba(210,57,248,0.16), rgba(8,0,18,0.85) 72%)',
-        border: '1.5px solid rgba(200,168,72,0.7)', fontSize: '1.25rem',
-        boxShadow: 'inset 0 0 12px rgba(200,168,72,0.15)',
-      }}>
-        {isImageIcon(icon)
-          ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={icon} alt="" style={{ width: '70%', height: '70%', objectFit: 'contain' }} />
-          : icon}
-      </span>
-      <div style={{ minWidth: 0 }}>
-        <p style={{ fontSize: '0.6rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: GOLD, opacity: 0.7, marginBottom: '0.2rem' }}>{kicker}</p>
-        <p style={{ fontSize: '1rem', color: CREAM, lineHeight: 1.3, fontFamily: 'var(--font-cormorant-garamond), serif', fontWeight: 600 }}>{title}</p>
-        {subtitle && <p style={{ fontSize: '0.76rem', opacity: 0.5, marginTop: '0.2rem', lineHeight: 1.4 }}>{subtitle}</p>}
-      </div>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem', margin: '0 0 0.9rem' }}>
+      <span aria-hidden style={{ color: GOLD, fontSize: '0.72rem', opacity: 0.8 }}>✦</span>
+      <h2 style={{
+        fontFamily: 'var(--font-cormorant-garamond), serif', fontSize: '0.92rem', fontWeight: 600,
+        letterSpacing: '0.14em', textTransform: 'uppercase', color: GOLD, textAlign: 'center',
+        margin: 0, textShadow: '0 0 18px rgba(200,168,72,0.25)', whiteSpace: 'nowrap',
+      }}>{title}</h2>
+      <span aria-hidden style={{ color: GOLD, fontSize: '0.72rem', opacity: 0.8 }}>✦</span>
     </div>
+  )
+}
+
+// The ── ✦ ── flourish shown beneath the About narrative, echoing the divider
+// under the designation on the member's own profile.
+function Flourish() {
+  return (
+    <div aria-hidden style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem', marginTop: '1.15rem' }}>
+      <span style={{ width: '30px', height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.55))' }} />
+      <span style={{ color: GOLD, fontSize: '0.6rem', opacity: 0.85 }}>✦</span>
+      <span style={{ width: '30px', height: '1px', background: 'linear-gradient(90deg, rgba(200,168,72,0.55), transparent)' }} />
+    </div>
+  )
+}
+
+// The brass ring medallion that holds an emoji glyph or an uploaded icon image.
+function IconMedallion({ icon, size = 44 }: { icon: string; size?: number }) {
+  return (
+    <span aria-hidden style={{
+      width: size, height: size, flexShrink: 0, borderRadius: '50%', overflow: 'hidden',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'radial-gradient(circle at 42% 38%, rgba(200,168,72,0.14), rgba(8,0,18,0.85))',
+      border: '1.5px solid #C07C26', fontSize: size >= 74 ? '1.85rem' : size >= 64 ? '1.55rem' : size >= 52 ? '1.3rem' : '1.1rem',
+    }}>
+      {isImageIcon(icon)
+        ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={icon} alt="" style={{ height: '74%', width: 'auto', maxWidth: 'none', display: 'block' }} />
+        : icon}
+    </span>
+  )
+}
+
+// Vertical ✦ separator between the side-by-side Department / Primary Role, with
+// the line tapering off toward the ends — echoes the mock's ornamental dividers.
+function RoleSeparator() {
+  return (
+    <div aria-hidden style={{ alignSelf: 'stretch', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '2.75rem' }}>
+      <span style={{ width: '1px', flex: 1, background: 'linear-gradient(to bottom, transparent, rgba(200,168,72,0.4))' }} />
+      <span style={{ color: GOLD, fontSize: '0.6rem', opacity: 0.85, padding: '0.3rem 0' }}>✦</span>
+      <span style={{ width: '1px', flex: 1, background: 'linear-gradient(to top, transparent, rgba(200,168,72,0.4))' }} />
+    </div>
+  )
+}
+
+// A medallion + label row — department, role, or a single contribution group.
+// `large` bumps the medallion + text (used for the Roles & Responsibilities pair).
+function DetailRow({ icon, title, kicker, desc, large, centered }: {
+  icon: string
+  title: string
+  kicker?: string
+  desc?: string | null
+  large?: boolean
+  centered?: boolean
+}) {
+  const text = (
+    <div style={{ minWidth: 0 }}>
+      {kicker && <p style={{ fontSize: large ? '0.66rem' : '0.62rem', letterSpacing: '0.16em', textTransform: 'uppercase', color: PURPLE, opacity: 0.9, marginBottom: large ? '0.15rem' : '0.25rem' }}>{kicker}</p>}
+      <p style={{ fontSize: large ? '1.1rem' : '0.94rem', color: WARM, lineHeight: 1.25, fontFamily: 'var(--font-cormorant-garamond), serif', fontWeight: 600 }}>{title}</p>
+      {desc && <p style={{ fontSize: '0.76rem', color: WARM, opacity: 0.55, fontStyle: 'italic', marginTop: '0.3rem', lineHeight: 1.45, whiteSpace: 'pre-line' }}>{desc}</p>}
+    </div>
+  )
+  if (centered) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '0.6rem', maxWidth: '16rem' }}>
+        <IconMedallion icon={icon} size={large ? 70 : 50} />
+        {text}
+      </div>
+    )
+  }
+  return (
+    <div style={{ display: 'flex', alignItems: desc ? 'flex-start' : 'center', gap: large ? '0.7rem' : '0.85rem' }}>
+      <IconMedallion icon={icon} size={large ? 70 : 50} />
+      {text}
+    </div>
+  )
+}
+
+// Small calendar glyph for the "Member since" line.
+function CalendarGlyph() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="1.8" aria-hidden style={{ opacity: 0.8, flexShrink: 0 }}>
+      <rect x="3" y="4.5" width="18" height="17" rx="2.5" />
+      <path d="M3 9h18M8 2.5v4M16 2.5v4" strokeLinecap="round" />
+    </svg>
   )
 }

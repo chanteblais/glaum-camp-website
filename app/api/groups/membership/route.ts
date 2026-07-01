@@ -3,42 +3,45 @@ import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
 // Member-facing self-service for opt-in groups (e.g. Setup / Teardown / Decor).
-// The set a member may self-manage = the groups offered by visible `group_select`
-// fields in the member form (options list; unset = all groups) — the same source
-// of truth the apply flow uses. The legacy per-group `apply_selectable` column is
-// no longer authoritative. Admin-only groups aren't exposed here.
+// The set a member may self-manage = groups whose collection is visible
+// (group_collections.show_on_profile) AND that are marked selectable
+// (groups.apply_selectable). Collection visibility is the source of truth here;
+// the apply-form `group_select` field governs the application wizard only.
+// Groups with no collection default to visible so orphaned groups still surface.
 
-// Returns { allowAll, ids } describing which groups members may opt into.
-async function selectableGroupIds(): Promise<{ allowAll: boolean; ids: Set<string> }> {
-  const { data: cfgRow } = await supabaseAdmin
-    .from('page_content')
-    .select('value')
-    .eq('key', 'config_member_form')
-    .maybeSingle()
+// Returns the set of group ids members may opt into on the Participate page.
+async function selectableGroupIds(): Promise<Set<string>> {
+  const { data: groups, error } = await supabaseAdmin
+    .from('groups')
+    .select('id, apply_selectable, collection_id, group_collections(show_on_profile)')
+
+  // Table missing (pre-migration) → nothing selectable rather than a 500.
+  if (error) return new Set<string>()
+
+  type Row = {
+    id: string
+    apply_selectable: boolean | null
+    collection_id: string | null
+    // Supabase types the embed as an array; runtime returns a single row for a to-one FK.
+    group_collections: { show_on_profile: boolean } | { show_on_profile: boolean }[] | null
+  }
 
   const ids = new Set<string>()
-  let allowAll = false
-  try {
-    const cfg = cfgRow?.value
-      ? (JSON.parse(cfgRow.value) as { steps?: { fields?: { type?: string; visible?: boolean; options?: string[] }[] }[] })
-      : null
-    for (const step of cfg?.steps ?? []) {
-      for (const f of step.fields ?? []) {
-        if (f?.type !== 'group_select' || f.visible === false) continue
-        if (f.options === undefined || f.options === null) allowAll = true
-        else for (const id of f.options) ids.add(id)
-      }
-    }
-  } catch { /* malformed config → nothing selectable */ }
-  return { allowAll, ids }
+  for (const g of (groups ?? []) as unknown as Row[]) {
+    if (!g.apply_selectable) continue
+    const col = Array.isArray(g.group_collections) ? g.group_collections[0] : g.group_collections
+    const collectionVisible = col?.show_on_profile ?? true
+    if (collectionVisible) ids.add(g.id)
+  }
+  return ids
 }
 
 export async function GET() {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { allowAll, ids } = await selectableGroupIds()
-  if (!allowAll && ids.size === 0) return NextResponse.json({ groups: [] })
+  const ids = await selectableGroupIds()
+  if (ids.size === 0) return NextResponse.json({ groups: [] })
 
   const { data: groups, error } = await supabaseAdmin
     .from('groups')
@@ -53,7 +56,7 @@ export async function GET() {
     .eq('clerk_user_id', userId)
   const joined = new Set((mine ?? []).map(m => m.group_id))
 
-  const offered = (groups ?? []).filter(g => allowAll || ids.has(g.id))
+  const offered = (groups ?? []).filter(g => ids.has(g.id))
   return NextResponse.json({
     groups: offered.map(g => ({ ...g, joined: joined.has(g.id) })),
   })
@@ -68,9 +71,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'group_id and joined are required' }, { status: 400 })
   }
 
-  // Only groups offered by the member form's group_select fields are self-manageable.
-  const { allowAll, ids } = await selectableGroupIds()
-  if (!allowAll && !ids.has(group_id)) {
+  // Only selectable groups in a visible collection are self-manageable.
+  const ids = await selectableGroupIds()
+  if (!ids.has(group_id)) {
     return NextResponse.json({ error: 'This group cannot be self-managed' }, { status: 403 })
   }
 

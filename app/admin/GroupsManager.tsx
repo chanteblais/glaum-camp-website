@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { AssetImagePicker, type GroupIconOption } from './AssetImagePicker'
 
 type Group = {
   id: string
@@ -12,7 +13,17 @@ type Group = {
   sort_order: number
   join_policy: string
   visibility: string
+  collection_id: string | null
   member_count: number
+}
+
+type Collection = {
+  id: string
+  name: string
+  description: string | null
+  selection: 'single' | 'multi'
+  show_on_profile: boolean
+  sort_order: number
 }
 
 type RosterMember = {
@@ -32,7 +43,7 @@ export type AssignableMember = {
   email: string
 }
 
-type GroupForm = { name: string; description: string; icon: string; join_policy: string; visibility: string }
+type GroupForm = { name: string; description: string; icon: string; icon_image: string; join_policy: string; visibility: string; collection_id: string; apply_selectable: boolean }
 
 const selectStyle: React.CSSProperties = {
   width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(200,168,72,0.2)',
@@ -62,71 +73,10 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   )
 }
 
-// ── Icon image upload ───────────────────────────────────────────────────────
-// Optional per-group icon image, rendered scattered on the member profile.
-// Uploads immediately (persists server-side) and reports the new URL upward so
-// the group row stays in sync.
-
-function IconField({ groupId, initial, onChange }: {
-  groupId: string
-  initial: string | null
-  onChange: (url: string | null) => void
-}) {
-  const inputRef = useRef<HTMLInputElement>(null)
-  const [preview, setPreview] = useState<string | null>(initial)
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-
-  async function upload(file: File) {
-    setBusy(true); setErr(null)
-    const fd = new FormData()
-    fd.append('icon', file)
-    const res = await fetch(`/api/admin/groups/${groupId}/icon`, { method: 'POST', body: fd })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) { setErr(data.error ?? 'Upload failed'); setBusy(false); return }
-    setPreview(data.icon_image)
-    onChange(data.icon_image)
-    setBusy(false)
-  }
-
-  async function remove() {
-    setBusy(true); setErr(null)
-    const res = await fetch(`/api/admin/groups/${groupId}/icon`, { method: 'DELETE' })
-    if (res.ok) { setPreview(null); onChange(null) }
-    setBusy(false)
-    if (inputRef.current) inputRef.current.value = ''
-  }
-
-  return (
-    <Field label="Icon (optional)" hint="A patch-style image shown scattered on members' profiles. PNG with transparency works best.">
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-        <div style={{ width: 64, height: 64, flexShrink: 0, borderRadius: '0.5rem', border: '1px solid rgba(200,168,72,0.2)', background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-          {preview
-            ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-            : <span style={{ fontSize: '0.6rem', opacity: 0.35, textAlign: 'center' }}>none</span>}
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-          <button type="button" onClick={() => inputRef.current?.click()} disabled={busy} style={{ padding: '0.4rem 0.9rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.3)', background: 'transparent', color: '#FFFACD', cursor: busy ? 'wait' : 'pointer', fontSize: '0.78rem', opacity: busy ? 0.5 : 1 }}>
-            {busy ? 'Uploading…' : preview ? 'Replace image' : 'Upload image'}
-          </button>
-          {preview && (
-            <button type="button" onClick={remove} disabled={busy} style={{ padding: '0.3rem 0.9rem', borderRadius: '9999px', border: '1px solid rgba(255,80,80,0.2)', background: 'transparent', color: '#ff8a8a', cursor: 'pointer', fontSize: '0.72rem', opacity: 0.8 }}>
-              Remove
-            </button>
-          )}
-        </div>
-        <input ref={inputRef} type="file" accept="image/png,image/webp,image/svg+xml,image/jpeg,image/gif" style={{ display: 'none' }}
-          onChange={e => { const f = e.target.files?.[0]; if (f) upload(f) }} />
-      </div>
-      {err && <p style={{ color: '#ff8a8a', fontSize: '0.75rem', marginTop: '0.4rem' }}>{err}</p>}
-    </Field>
-  )
-}
-
 // ── Group Modal ───────────────────────────────────────────────────────────────
 
 function GroupModal({
-  initial, isNew, onSave, onClose, saving, error, groupId, initialIcon, onIconChange,
+  initial, isNew, onSave, onClose, saving, error, groupId, collections, groupIconOptions,
 }: {
   initial: GroupForm
   isNew: boolean
@@ -135,21 +85,29 @@ function GroupModal({
   saving: boolean
   error: string | null
   groupId?: string
-  initialIcon?: string | null
-  onIconChange?: (url: string | null) => void
+  collections: Collection[]
+  groupIconOptions: GroupIconOption[]
 }) {
   const [form, setForm] = useState(initial)
-  const set = (k: keyof GroupForm, v: string) => setForm(f => ({ ...f, [k]: v }))
+  const set = <K extends keyof GroupForm>(k: K, v: GroupForm[K]) => setForm(f => ({ ...f, [k]: v }))
+  // Stable storage key for uploads: the row id when editing, else a fresh key so
+  // an icon can be uploaded before the group is saved.
+  const [uploadKey] = useState(() => groupId ?? (globalThis.crypto?.randomUUID?.() ?? `new-${Date.now()}`))
 
   return (
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 50 }} />
-      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 51, background: '#1a1410', border: '1px solid rgba(200,168,72,0.25)', borderRadius: '1rem', padding: '2rem', width: '90%', maxWidth: '480px' }}>
+      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 51, background: '#1a1410', border: '1px solid rgba(200,168,72,0.25)', borderRadius: '1rem', padding: '2rem', width: '90%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto' }}>
         <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.1rem', color: GOLD, marginBottom: '1.5rem' }}>
           {isNew ? 'New Group' : 'Edit Group'}
         </p>
         <Field label="Name">
           <input style={inputStyle} value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Setup" maxLength={40} />
+        </Field>
+        <Field label="Collection" hint="The group collection this group belongs to.">
+          <select style={selectStyle} value={form.collection_id} onChange={e => set('collection_id', e.target.value)}>
+            {collections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
         </Field>
         <Field label="Description (optional)">
           <textarea style={{ ...inputStyle, resize: 'vertical', minHeight: '72px' }} value={form.description} onChange={e => set('description', e.target.value)} placeholder="What is this group for? Shown to applicants when offered on the form." />
@@ -169,13 +127,29 @@ function GroupModal({
             <option value="hidden">Hidden (invite / admin-add only)</option>
           </select>
         </Field>
-        {groupId
-          ? <IconField groupId={groupId} initial={initialIcon ?? null} onChange={url => onIconChange?.(url)} />
-          : <p style={{ fontSize: '0.72rem', opacity: 0.4, lineHeight: 1.5, marginBottom: '1rem' }}>
-              Save the group first, then re-open it to add an icon.
-            </p>}
+        <Field label="Icon (optional)" hint="A patch-style image shown scattered on members' profiles. Choose an included image or upload your own.">
+          <AssetImagePicker
+            value={form.icon_image || undefined}
+            onChange={v => set('icon_image', v ?? '')}
+            uploadUrl={`/api/admin/groups/${encodeURIComponent(uploadKey)}/icon`}
+            groupIconOptions={groupIconOptions}
+            primaryCategory="icon"
+            label="Group icon"
+          />
+        </Field>
+        <Field label="Members can opt in" hint="When on, this group appears on the member Participate page for self-join — as long as its collection is set to show on profiles. Turn off for admin-assigned-only groups.">
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', fontSize: '0.85rem', color: '#F3EDE6' }}>
+            <input type="checkbox" checked={form.apply_selectable} onChange={e => set('apply_selectable', e.target.checked)} style={{ width: 16, height: 16, accentColor: GOLD, cursor: 'pointer' }} />
+            Members can opt in (self-join on Participate)
+          </label>
+          <p style={{ fontSize: '0.72rem', margin: '0.4rem 0 0', lineHeight: 1.5, opacity: 0.6, color: form.apply_selectable ? GOLD : '#F3EDE6' }}>
+            {form.apply_selectable
+              ? 'On — members can self-join this group on the Participate page (its collection must be visible on profiles).'
+              : 'Off — admin-assigned only; members cannot self-join.'}
+          </p>
+        </Field>
         <p style={{ fontSize: '0.72rem', opacity: 0.4, lineHeight: 1.5, marginBottom: '1.25rem' }}>
-          To let applicants opt into groups, add a <strong style={{ opacity: 0.8 }}>Group selection</strong> field in the Application Builder and choose which groups it offers.
+          To let <em>applicants</em> opt into groups during the application, also add a <strong style={{ opacity: 0.8 }}>Group selection</strong> field in the Application Builder.
         </p>
         {error && <p style={{ color: '#ff8a8a', fontSize: '0.82rem', marginBottom: '0.75rem' }}>{error}</p>}
         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
@@ -352,34 +326,178 @@ function GroupRow({
   )
 }
 
+// ── Collection Modal ──────────────────────────────────────────────────────────
+
+type CollectionForm = { name: string; description: string; selection: 'single' | 'multi'; show_on_profile: boolean }
+
+function CollectionModal({
+  initial, isNew, onSave, onClose, saving, error,
+}: {
+  initial: CollectionForm
+  isNew: boolean
+  onSave: (f: CollectionForm) => void
+  onClose: () => void
+  saving: boolean
+  error: string | null
+}) {
+  const [form, setForm] = useState(initial)
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 50 }} />
+      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 51, background: '#1a1410', border: '1px solid rgba(200,168,72,0.25)', borderRadius: '1rem', padding: '2rem', width: '90%', maxWidth: '480px' }}>
+        <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.1rem', color: GOLD, marginBottom: '0.4rem' }}>
+          {isNew ? 'New Group Collection' : 'Edit Group Collection'}
+        </p>
+        <p style={{ fontSize: '0.75rem', opacity: 0.45, lineHeight: 1.5, marginBottom: '1.5rem' }}>
+          A collection is what you name the whole set (e.g. <em>Contributions</em>, <em>Volunteer Teams</em>, <em>Committees</em>). You add the selectable groups inside it.
+        </p>
+        <Field label="Name">
+          <input style={inputStyle} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Contributions" maxLength={40} />
+        </Field>
+        <Field label="Description (optional)">
+          <textarea style={{ ...inputStyle, resize: 'vertical', minHeight: '64px' }} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Shown to members where this collection appears." />
+        </Field>
+        <Field label="How many can a member choose?" hint="Multiple: members can belong to several groups here (e.g. Setup and Decor). One: exactly one (e.g. a cabin or a size).">
+          <select style={selectStyle} value={form.selection} onChange={e => setForm(f => ({ ...f, selection: e.target.value as 'single' | 'multi' }))}>
+            <option value="multi">Multiple groups</option>
+            <option value="single">One group only</option>
+          </select>
+        </Field>
+        <Field label="Show on profile" hint="When on, a member's groups in this collection appear on their profile. Turn off for operational collections you don't want shown publicly.">
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', fontSize: '0.85rem', color: '#F3EDE6' }}>
+            <input type="checkbox" checked={form.show_on_profile} onChange={e => setForm(f => ({ ...f, show_on_profile: e.target.checked }))} style={{ width: 16, height: 16, accentColor: GOLD, cursor: 'pointer' }} />
+            {form.show_on_profile ? 'Visible on member profiles' : 'Hidden from member profiles'}
+          </label>
+        </Field>
+        {error && <p style={{ color: '#ff8a8a', fontSize: '0.82rem', marginBottom: '0.75rem' }}>{error}</p>}
+        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{ padding: '0.6rem 1.2rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.2)', background: 'transparent', color: '#F3EDE6', cursor: 'pointer', fontSize: '0.82rem', opacity: 0.7 }}>Cancel</button>
+          <button onClick={() => onSave(form)} disabled={saving || !form.name} style={{ padding: '0.6rem 1.2rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.45)', background: 'transparent', color: '#FFFACD', cursor: 'pointer', fontSize: '0.82rem', opacity: saving || !form.name ? 0.4 : 1 }}>
+            {saving ? 'Saving…' : 'Save collection'}
+          </button>
+        </div>
+      </div>
+    </>
+  )
+}
+
 // ── Main ────────────────────────────────────────────────────────────────────
+
+// ── Collection Section (a collection header + its nested group rows) ──────────
+
+function CollectionSection({
+  collection, groups, members, onAddGroup, onEditGroup, onDeleteGroup, onEditCollection, onDeleteCollection, onReorder,
+}: {
+  collection: Collection
+  groups: Group[]
+  members: AssignableMember[]
+  onAddGroup: () => void
+  onEditGroup: (g: Group) => void
+  onDeleteGroup: (id: string) => void
+  onEditCollection: () => void
+  onDeleteCollection: () => void
+  onReorder: (orderedIds: string[]) => void
+}) {
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
+  const reset = () => { setDragId(null); setDragOverId(null) }
+
+  function handleDrop(targetId: string) {
+    if (!dragId || dragId === targetId) return reset()
+    const ids = groups.map(g => g.id)
+    const from = ids.indexOf(dragId)
+    const to = ids.indexOf(targetId)
+    if (from === -1 || to === -1) return reset()
+    const reordered = [...groups]
+    const [moved] = reordered.splice(from, 1)
+    reordered.splice(to, 0, moved)
+    onReorder(reordered.map(g => g.id))
+    reset()
+  }
+
+  return (
+    <div style={{ border: '1px solid rgba(200,168,72,0.15)', borderRadius: '1rem', padding: '1rem 1.1rem 1.2rem', background: 'rgba(200,168,72,0.02)' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.65rem', marginBottom: '0.9rem' }}>
+        <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1rem', color: GOLD, margin: 0 }}>{collection.name}</p>
+        <span style={{ fontSize: '0.6rem', color: GOLD, opacity: 0.55, border: '1px solid rgba(200,168,72,0.25)', borderRadius: '9999px', padding: '0.1rem 0.45rem', letterSpacing: '0.05em' }}>
+          {collection.selection === 'single' ? 'PICK ONE' : 'PICK MANY'}
+        </span>
+        {!collection.show_on_profile && (
+          <span title="Members' groups here are hidden from their profile" style={{ fontSize: '0.6rem', color: GOLD, opacity: 0.5, border: '1px solid rgba(200,168,72,0.25)', borderRadius: '9999px', padding: '0.1rem 0.45rem', letterSpacing: '0.05em' }}>
+            OFF PROFILE
+          </span>
+        )}
+        <span style={{ fontSize: '0.72rem', opacity: 0.4 }}>{groups.length} group{groups.length !== 1 ? 's' : ''}</span>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.4rem' }}>
+          <button onClick={onEditCollection} style={{ background: 'none', border: '1px solid rgba(200,168,72,0.2)', borderRadius: '0.4rem', color: GOLD, cursor: 'pointer', padding: '0.25rem 0.5rem', fontSize: '0.7rem', opacity: 0.7 }}>Edit</button>
+          <button onClick={onDeleteCollection} style={{ background: 'none', border: '1px solid rgba(255,80,80,0.2)', borderRadius: '0.4rem', color: '#ff8a8a', cursor: 'pointer', padding: '0.25rem 0.5rem', fontSize: '0.7rem', opacity: 0.7 }}>Del</button>
+        </div>
+      </div>
+      {collection.description && (
+        <p style={{ fontSize: '0.77rem', opacity: 0.45, margin: '-0.4rem 0 0.9rem' }}>{collection.description}</p>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '0.9rem' }}>
+        {groups.length === 0 ? (
+          <p style={{ fontSize: '0.8rem', opacity: 0.35, fontStyle: 'italic' }}>No groups yet. Add the selectable options for this collection.</p>
+        ) : groups.map(group => (
+          <GroupRow
+            key={group.id}
+            group={group}
+            members={members}
+            isDragOver={dragOverId === group.id}
+            onEdit={() => onEditGroup(group)}
+            onDelete={() => onDeleteGroup(group.id)}
+            onDragStart={() => setDragId(group.id)}
+            onDragOver={(e) => { e.preventDefault(); setDragOverId(group.id) }}
+            onDrop={() => handleDrop(group.id)}
+            onDragEnd={reset}
+          />
+        ))}
+      </div>
+
+      <button onClick={onAddGroup} style={{ padding: '0.45rem 1.1rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.25)', background: 'transparent', color: '#FFFACD', cursor: 'pointer', fontSize: '0.78rem', letterSpacing: '0.03em', opacity: 0.85 }}>
+        + Add group to {collection.name}
+      </button>
+    </div>
+  )
+}
 
 export function GroupsManager({ members }: { members: AssignableMember[] }) {
   const [groups, setGroups] = useState<Group[]>([])
+  const [collections, setCollections] = useState<Collection[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Group create/edit. `creatingIn` holds the collection id a new group lands in.
   const [editing, setEditing] = useState<Group | null>(null)
-  const [creating, setCreating] = useState(false)
+  const [creatingIn, setCreatingIn] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const [dragIndex, setDragIndex] = useState<number | null>(null)
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  // Collection create/edit.
+  const [editingCol, setEditingCol] = useState<Collection | null>(null)
+  const [creatingCol, setCreatingCol] = useState(false)
+  const [savingCol, setSavingCol] = useState(false)
+  const [colError, setColError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/admin/groups')
-      .then(r => r.json())
-      .then(d => setGroups(d.groups ?? []))
+    Promise.all([
+      fetch('/api/admin/groups').then(r => r.json()),
+      fetch('/api/admin/group-collections').then(r => r.json()),
+    ])
+      .then(([g, c]) => { setGroups(g.groups ?? []); setCollections(c.collections ?? []) })
       .finally(() => setLoading(false))
   }, [])
 
+  // ── Groups ────────────────────────────────────────────────────────────────
   async function handleCreate(form: GroupForm) {
     setSaving(true); setError(null)
     const res = await fetch('/api/admin/groups', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, sort_order: groups.length }) })
     const data = await res.json()
     if (!res.ok) { setError(data.error); setSaving(false); return }
     setGroups(prev => [...prev, data.group])
-    setCreating(false); setSaving(false)
+    setCreatingIn(null); setSaving(false)
   }
 
   async function handleUpdate(group: Group, form: GroupForm) {
@@ -397,60 +515,146 @@ export function GroupsManager({ members }: { members: AssignableMember[] }) {
     if (res.ok) setGroups(prev => prev.filter(g => g.id !== id))
   }
 
-  function handleDrop(toIndex: number) {
-    if (dragIndex === null || dragIndex === toIndex) { setDragIndex(null); setDragOverIndex(null); return }
-    const reordered = [...groups]
-    const [moved] = reordered.splice(dragIndex, 1)
-    reordered.splice(toIndex, 0, moved)
-    const withOrder = reordered.map((g, i) => ({ ...g, sort_order: i }))
-    setGroups(withOrder)
-    setDragIndex(null); setDragOverIndex(null)
-    withOrder.forEach(g => fetch(`/api/admin/groups/${g.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sort_order: g.sort_order }) }))
+  // Reorder within a collection, preserving that collection's pool of sort_order
+  // values so global ordering elsewhere stays stable.
+  function handleReorder(collectionId: string, orderedIds: string[]) {
+    const inCol = groups.filter(g => g.collection_id === collectionId).sort((a, b) => a.sort_order - b.sort_order)
+    const pool = inCol.map(g => g.sort_order)
+    const orderMap = new Map(orderedIds.map((id, i) => [id, pool[i]]))
+    setGroups(prev => prev.map(g => orderMap.has(g.id) ? { ...g, sort_order: orderMap.get(g.id)! } : g))
+    orderMap.forEach((sort, id) => fetch(`/api/admin/groups/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sort_order: sort }) }))
+  }
+
+  // ── Collections ─────────────────────────────────────────────────────────────
+  async function handleCreateCol(form: CollectionForm) {
+    setSavingCol(true); setColError(null)
+    const res = await fetch('/api/admin/group-collections', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, sort_order: collections.length }) })
+    const data = await res.json()
+    if (!res.ok) { setColError(data.error); setSavingCol(false); return }
+    setCollections(prev => [...prev, data.collection])
+    setCreatingCol(false); setSavingCol(false)
+  }
+
+  async function handleUpdateCol(col: Collection, form: CollectionForm) {
+    setSavingCol(true); setColError(null)
+    const res = await fetch(`/api/admin/group-collections/${col.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+    const data = await res.json()
+    if (!res.ok) { setColError(data.error); setSavingCol(false); return }
+    setCollections(prev => prev.map(c => c.id === col.id ? { ...c, ...data.collection } : c))
+    setEditingCol(null); setSavingCol(false)
+  }
+
+  async function handleDeleteCol(id: string) {
+    if (!confirm('Delete this group collection? It must be empty first.')) return
+    const res = await fetch(`/api/admin/group-collections/${id}`, { method: 'DELETE' })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) { alert(data.error ?? 'Could not delete collection.'); return }
+    setCollections(prev => prev.filter(c => c.id !== id))
   }
 
   if (loading) return <p style={{ opacity: 0.4, fontSize: '0.85rem' }}>Loading…</p>
 
+  const sortedCollections = [...collections].sort((a, b) => a.sort_order - b.sort_order)
+  const groupsFor = (cid: string) => groups.filter(g => g.collection_id === cid).sort((a, b) => a.sort_order - b.sort_order)
+  const uncollected = groups.filter(g => !g.collection_id).sort((a, b) => a.sort_order - b.sort_order)
+  const firstCollectionId = sortedCollections[0]?.id ?? ''
+  // Existing group icons offered as reusable options in the picker's Icons tab.
+  const groupIconOptions: GroupIconOption[] = groups
+    .filter(g => g.icon_image)
+    .map(g => ({ name: g.name, image: g.icon_image as string }))
+
   return (
     <div>
-      {groups.length === 0 && (
-        <p style={{ opacity: 0.4, fontSize: '0.85rem', fontStyle: 'italic', marginBottom: '1.5rem' }}>No groups yet. Create one to start assigning members.</p>
+      {collections.length === 0 && (
+        <p style={{ opacity: 0.4, fontSize: '0.85rem', fontStyle: 'italic', marginBottom: '1.5rem' }}>
+          No group collections yet. Create one (e.g. “Contributions”) to start adding groups.
+        </p>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginBottom: '1.5rem' }}>
-        {groups.map((group, i) => (
-          <GroupRow
-            key={group.id}
-            group={group}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem', marginBottom: '1.5rem' }}>
+        {sortedCollections.map(col => (
+          <CollectionSection
+            key={col.id}
+            collection={col}
+            groups={groupsFor(col.id)}
             members={members}
-            isDragOver={dragOverIndex === i}
-            onEdit={() => { setEditing(group); setError(null) }}
-            onDelete={() => handleDelete(group.id)}
-            onDragStart={() => setDragIndex(i)}
-            onDragOver={(e) => { e.preventDefault(); setDragOverIndex(i) }}
-            onDrop={() => handleDrop(i)}
-            onDragEnd={() => { setDragIndex(null); setDragOverIndex(null) }}
+            onAddGroup={() => { setCreatingIn(col.id); setError(null) }}
+            onEditGroup={(g) => { setEditing(g); setError(null) }}
+            onDeleteGroup={handleDelete}
+            onEditCollection={() => { setEditingCol(col); setColError(null) }}
+            onDeleteCollection={() => handleDeleteCol(col.id)}
+            onReorder={(ids) => handleReorder(col.id, ids)}
           />
         ))}
+
+        {uncollected.length > 0 && (
+          <div style={{ border: '1px dashed rgba(255,140,140,0.25)', borderRadius: '1rem', padding: '1rem 1.1rem 1.2rem' }}>
+            <p style={{ fontSize: '0.82rem', color: '#ffb0b0', opacity: 0.8, margin: '0 0 0.85rem' }}>
+              Ungrouped — these groups have no collection. Edit each to assign one.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              {uncollected.map(group => (
+                <GroupRow
+                  key={group.id}
+                  group={group}
+                  members={members}
+                  isDragOver={false}
+                  onEdit={() => { setEditing(group); setError(null) }}
+                  onDelete={() => handleDelete(group.id)}
+                  onDragStart={() => {}}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => {}}
+                  onDragEnd={() => {}}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      <button onClick={() => { setCreating(true); setError(null) }} style={{ padding: '0.6rem 1.4rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.3)', background: 'transparent', color: '#FFFACD', cursor: 'pointer', fontSize: '0.82rem', letterSpacing: '0.05em' }}>
-        + Add group
+      <button onClick={() => { setCreatingCol(true); setColError(null) }} style={{ padding: '0.6rem 1.4rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.3)', background: 'transparent', color: '#FFFACD', cursor: 'pointer', fontSize: '0.82rem', letterSpacing: '0.05em' }}>
+        + New Group Collection
       </button>
 
-      {creating && <GroupModal isNew initial={{ name: '', description: '', icon: '', join_policy: 'admin_assigned', visibility: 'listed' }} onSave={handleCreate} onClose={() => setCreating(false)} saving={saving} error={error} />}
+      {/* Group modals */}
+      {creatingIn !== null && <GroupModal
+        isNew
+        collections={sortedCollections}
+        groupIconOptions={groupIconOptions}
+        initial={{ name: '', description: '', icon: '', icon_image: '', join_policy: 'admin_assigned', visibility: 'listed', collection_id: creatingIn || firstCollectionId, apply_selectable: false }}
+        onSave={handleCreate}
+        onClose={() => setCreatingIn(null)}
+        saving={saving}
+        error={error}
+      />}
       {editing && <GroupModal
         isNew={false}
-        initial={{ name: editing.name, description: editing.description ?? '', icon: editing.icon ?? '', join_policy: editing.join_policy ?? 'admin_assigned', visibility: editing.visibility ?? 'listed' }}
+        collections={sortedCollections}
+        groupIconOptions={groupIconOptions}
+        initial={{ name: editing.name, description: editing.description ?? '', icon: editing.icon ?? '', icon_image: editing.icon_image ?? '', join_policy: editing.join_policy ?? 'admin_assigned', visibility: editing.visibility ?? 'listed', collection_id: editing.collection_id ?? firstCollectionId, apply_selectable: editing.apply_selectable ?? false }}
         onSave={(f) => handleUpdate(editing, f)}
         onClose={() => setEditing(null)}
         saving={saving}
         error={error}
         groupId={editing.id}
-        initialIcon={editing.icon_image}
-        onIconChange={(url) => {
-          setEditing(g => g ? { ...g, icon_image: url } : g)
-          setGroups(prev => prev.map(g => g.id === editing.id ? { ...g, icon_image: url } : g))
-        }}
+      />}
+
+      {/* Collection modals */}
+      {creatingCol && <CollectionModal
+        isNew
+        initial={{ name: '', description: '', selection: 'multi', show_on_profile: true }}
+        onSave={handleCreateCol}
+        onClose={() => setCreatingCol(false)}
+        saving={savingCol}
+        error={colError}
+      />}
+      {editingCol && <CollectionModal
+        isNew={false}
+        initial={{ name: editingCol.name, description: editingCol.description ?? '', selection: editingCol.selection, show_on_profile: editingCol.show_on_profile }}
+        onSave={(f) => handleUpdateCol(editingCol, f)}
+        onClose={() => setEditingCol(null)}
+        saving={savingCol}
+        error={colError}
       />}
     </div>
   )

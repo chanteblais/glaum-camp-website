@@ -12,7 +12,6 @@ import { MANAGE_CATEGORIES } from './admin-sections'
 import { ScheduleManager } from './ScheduleManager'
 import { LeadUpGatheringsManager } from './LeadUpGatheringsManager'
 import { AnnouncementsManager } from './AnnouncementsManager'
-import { GroupsManager } from './GroupsManager'
 import { getGroupNamesByUser } from '@/lib/groups'
 import { RoleRequestsSection } from './RoleRequestsSection'
 import { RoleSuggestionsSection } from './RoleSuggestionsSection'
@@ -217,24 +216,6 @@ export default async function AdminPage() {
           summary="Submitted by members"
         >
           <RoleSuggestionsSection />
-        </CollapsibleSection>
-
-        {/* ═══════════════ GROUPS ═══════════════ */}
-        <CategoryHeading id="groups" />
-
-        <CollapsibleSection
-          title="Groups"
-          summary="See and assign who's in each group (e.g. Setup, Teardown, Decor)"
-        >
-          <GroupsManager
-            members={approved
-              .filter(a => a.clerk_user_id)
-              .map(a => ({
-                clerk_user_id: a.clerk_user_id!,
-                displayName: [a.preferred_name || a.first_name, a.last_name].filter(Boolean).join(' '),
-                email: a.email,
-              }))}
-          />
         </CollapsibleSection>
 
         {/* ═══════════════ PROGRAM ═══════════════ */}

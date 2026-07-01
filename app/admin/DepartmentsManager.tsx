@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { AssetImagePicker, type GroupIconOption } from './AssetImagePicker'
+import { isImageIcon } from '@/lib/icon-src'
 
 type Role = {
   id: string
@@ -81,16 +83,22 @@ function SectionDivider({ label }: { label: string }) {
 // ── Department Modal ──────────────────────────────────────────────────────────
 
 function DeptModal({
-  initial, onSave, onClose, saving, error,
+  initial, onSave, onClose, saving, error, deptId, groupIconOptions,
 }: {
   initial: { name: string; description: string; icon: string }
   onSave: (f: { name: string; description: string; icon: string }) => void
   onClose: () => void
   saving: boolean
   error: string | null
+  /** Existing department id (edit), or undefined for a new one. */
+  deptId?: string
+  groupIconOptions: GroupIconOption[]
 }) {
   const [form, setForm] = useState(initial)
   const set = (k: keyof typeof form, v: string) => setForm(f => ({ ...f, [k]: v }))
+  // Stable storage key for uploads: the row id when editing, else a fresh key so
+  // an icon can be uploaded before the department is saved.
+  const [uploadKey] = useState(() => deptId ?? (globalThis.crypto?.randomUUID?.() ?? `new-${Date.now()}`))
 
   return (
     <>
@@ -108,8 +116,15 @@ function DeptModal({
         <Field label="Description (optional)">
           <textarea style={{ ...inputStyle, resize: 'vertical', minHeight: '72px' }} value={form.description} onChange={e => set('description', e.target.value)} placeholder="What does this department handle?" />
         </Field>
-        <Field label="Icon (optional — emoji or short text)">
-          <input style={inputStyle} value={form.icon} onChange={e => set('icon', e.target.value)} placeholder="e.g. 🍳" />
+        <Field label="Icon (optional)">
+          <AssetImagePicker
+            value={form.icon || undefined}
+            onChange={v => set('icon', v ?? '')}
+            uploadUrl={`/api/admin/departments/${encodeURIComponent(uploadKey)}/icon`}
+            groupIconOptions={groupIconOptions}
+            primaryCategory="icon"
+            label="Department icon"
+          />
         </Field>
         {error && <p style={{ color: '#ff8a8a', fontSize: '0.82rem', marginBottom: '0.75rem' }}>{error}</p>}
         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
@@ -375,7 +390,7 @@ function DeptRow({
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.9rem 1rem', cursor: 'grab', background: 'rgba(200,168,72,0.06)', borderBottom: open ? '1px solid rgba(200,168,72,0.12)' : 'none' }}>
         <span style={{ color: '#C8A848', opacity: 0.25, fontSize: '1rem', userSelect: 'none', flexShrink: 0 }}>⠿</span>
         {dept.icon && (
-          dept.icon.startsWith('/')
+          isImageIcon(dept.icon)
             ? <img src={dept.icon} alt="" aria-hidden style={{ width: '1.4rem', height: '1.4rem', objectFit: 'contain', flexShrink: 0 }} />
             : <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>{dept.icon}</span>
         )}
@@ -427,7 +442,7 @@ function DeptRow({
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
-export function DepartmentsManager() {
+export function DepartmentsManager({ groupIconOptions = [] }: { groupIconOptions?: GroupIconOption[] }) {
   const [departments, setDepartments] = useState<Department[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -549,8 +564,8 @@ export function DepartmentsManager() {
         + Add department
       </button>
 
-      {creatingDept && <DeptModal initial={{ name: '', description: '', icon: '' }} onSave={handleCreateDept} onClose={() => setCreatingDept(false)} saving={deptSaving} error={deptError} />}
-      {editingDept && <DeptModal initial={{ name: editingDept.name, description: editingDept.description ?? '', icon: editingDept.icon ?? '' }} onSave={(f) => handleUpdateDept(editingDept, f)} onClose={() => setEditingDept(null)} saving={deptSaving} error={deptError} />}
+      {creatingDept && <DeptModal initial={{ name: '', description: '', icon: '' }} onSave={handleCreateDept} onClose={() => setCreatingDept(false)} saving={deptSaving} error={deptError} groupIconOptions={groupIconOptions} />}
+      {editingDept && <DeptModal initial={{ name: editingDept.name, description: editingDept.description ?? '', icon: editingDept.icon ?? '' }} onSave={(f) => handleUpdateDept(editingDept, f)} onClose={() => setEditingDept(null)} saving={deptSaving} error={deptError} deptId={editingDept.id} groupIconOptions={groupIconOptions} />}
       {creatingRole && <RoleModal initial={blankRoleForm()} onSave={(f) => handleCreateRole(creatingRole.deptId, f)} onClose={() => setCreatingRole(null)} saving={roleSaving} error={roleError} />}
       {editingRole && (
         <RoleModal

@@ -61,7 +61,16 @@ catalog into an admin-defined field registry.
 Lives exactly like `config_distinctions` / `config_attunement_tasks`. Each entry:
 `key`, `label`, `type`, `options`, `default`, `public`, `memberEditable`, `applicationEligible`,
 `distinctionEligible`, and a `system: true` flag for read-only derived fields. Defined in
-`lib/profile-fields.ts`.
+`lib/profile-fields.ts`. Default stored fields include `bio` (rendered as the **About** card on
+`/profile`) and `quote` (rendered under the member's name).
+
+- The **`public`** flag is surfaced in `ProfileFieldsManager` as the **"Visible"** toggle: on =
+  shown on the member-facing profile; **off = admin-only**, surfaced only in the member's
+  application detail (`/admin/[id]` → Profile Details). It is never public-facing when off.
+- The **`key`** is the stable identity that `member_profiles.values` are stored under, so
+  `ProfileFieldsManager` **does not re-key a field when its label is renamed** (only brand-new,
+  this-session fields auto-derive the key from the label). Editing the key box directly re-keys and
+  disconnects existing answers (old values remain under the old key — recoverable).
 
 ### The critical abstraction: one merged namespace
 
@@ -121,8 +130,11 @@ everything reversible until the new store is proven.
   to `member_profiles` (coerced + validated against the registry). New `app/profile/ProfileDetails.tsx`
   (client) renders an editable "Profile Details" card on `/profile` (one control per field type:
   text/textarea/number/date/boolean/single/multi-select), with manual Save + unsaved/saved state;
-  renders nothing when the registry has no member-visible fields. `members/[id]` shows a read-only
-  **Profile** section for `public` stored fields with values. **Deferred to Phase 5:** reading core
+  renders nothing when the registry has no member-visible fields. In addition, `/profile` renders
+  the `bio` value as a styled **About** card and the `quote` value under the member's name (read
+  presentations of the same stored fields). `members/[id]` shows a read-only **Profile** section for
+  `public` (Visible) stored fields with values; **`/admin/[id]` shows a Profile Details section with
+  _all_ stored values including non-Visible (admin-only) fields.** **Deferred to Phase 5:** reading core
   *identity* (name/photo) from `members` instead of `applications` — left until the systematic
   cutover so it's done once, everywhere.
 - [x] **Phase 5 — Decommission application-as-profile.** *(Substantively done — all cross-member

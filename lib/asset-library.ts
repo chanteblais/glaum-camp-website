@@ -61,6 +61,42 @@ export const BUILTIN_ASSETS: AssetLibraryItem[] = [
     source: 'builtin',
     tags: ['tree', 'laurel', 'elder', 'hands', 'nature'],
   },
+  {
+    id: 'ornate-urn',
+    label: 'Ornate Urn',
+    src: '/asset-library/icons/ornate-urn.webp',
+    kind: 'raster',
+    category: 'icon',
+    source: 'builtin',
+    tags: ['urn', 'vase', 'ornament', 'fleur-de-lis', 'flourish', 'pedestal', 'decorative'],
+  },
+  {
+    id: 'raised-hand',
+    label: 'Raised Hand',
+    src: '/asset-library/icons/raised-hand.webp',
+    kind: 'raster',
+    category: 'icon',
+    source: 'builtin',
+    tags: ['hand', 'palm', 'raised', 'open-hand', 'gesture'],
+  },
+  {
+    id: 'classical-temple',
+    label: 'Classical Temple',
+    src: '/asset-library/icons/classical-temple.webp',
+    kind: 'raster',
+    category: 'icon',
+    source: 'builtin',
+    tags: ['temple', 'columns', 'pillars', 'pediment', 'building', 'classical', 'institution'],
+  },
+  {
+    id: 'flaming-chalice',
+    label: 'Flaming Chalice',
+    src: '/asset-library/icons/flaming-chalice.webp',
+    kind: 'raster',
+    category: 'icon',
+    source: 'builtin',
+    tags: ['flame', 'fire', 'chalice', 'goblet', 'brazier', 'lotus', 'pedestal'],
+  },
 ]
 
 /** Built-in assets usable in a given category. */

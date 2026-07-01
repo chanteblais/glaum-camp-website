@@ -3,17 +3,23 @@ import type { EarnedDistinction } from '@/lib/distinctions'
 // Cabinet of Distinctions — a gallery of earned honours rendered as collectible
 // engraved medals. These are honours, NOT controls: nothing here is clickable.
 // Distinctions are derived from member facts via evaluateDistinctions(); this
-// component only renders the result.
+// component only renders the result. `compact` renders a smaller, softer-bordered
+// variant (used on the public member profile).
 
-function Medal({ d }: { d: EarnedDistinction }) {
+function Medal({ d, frame = 88, glyphSize = '2.1rem', labelSize = '0.66rem' }: {
+  d: EarnedDistinction
+  frame?: number
+  glyphSize?: string
+  labelSize?: string
+}) {
   return (
     <div className="cabinet-medal" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', minWidth: 0 }}>
       {/* Engraved oval frame */}
       <div
         title={d.description ?? d.label}
         style={{
-          width: '88px',
-          height: '88px',
+          width: `${frame}px`,
+          height: `${frame}px`,
           borderRadius: '50%',
           flexShrink: 0,
           display: 'flex',
@@ -44,7 +50,7 @@ function Medal({ d }: { d: EarnedDistinction }) {
             style={{ height: '132%', width: 'auto', maxWidth: 'none', display: 'block', filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.5))' }}
           />
         ) : (
-          <span style={{ fontSize: '2.1rem', lineHeight: 1, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.6))' }}>
+          <span style={{ fontSize: glyphSize, lineHeight: 1, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.6))' }}>
             {d.glyph ?? '✦'}
           </span>
         )}
@@ -53,7 +59,7 @@ function Medal({ d }: { d: EarnedDistinction }) {
       {/* Label */}
       <p style={{
         marginTop: '0.35rem',
-        fontSize: '0.66rem',
+        fontSize: labelSize,
         letterSpacing: '0.12em',
         textTransform: 'uppercase',
         color: '#EDE0C8',
@@ -86,16 +92,24 @@ function Medal({ d }: { d: EarnedDistinction }) {
   )
 }
 
-export function CabinetOfDistinctions({ distinctions, title = 'Cabinet of Distinctions' }: { distinctions: EarnedDistinction[]; title?: string }) {
+export function CabinetOfDistinctions({ distinctions, title = 'Cabinet of Distinctions', compact = false }: {
+  distinctions: EarnedDistinction[]
+  title?: string
+  compact?: boolean
+}) {
   if (distinctions.length === 0) return null
+
+  const frame = compact ? 92 : 88
+  const cell = compact ? 106 : 100
+  const cellSm = compact ? 92 : 88
 
   return (
     <div style={{
-      border: '1.5px solid rgba(200,168,72,0.7)',
+      border: compact ? '1px solid rgba(200,168,72,0.28)' : '1.5px solid rgba(200,168,72,0.7)',
       borderRadius: '1rem',
       background: 'rgba(10,0,20,0.6)',
       overflow: 'hidden',
-      boxShadow: '0 0 0 1px rgba(200,168,72,0.12), 0 0 24px rgba(200,168,72,0.08)',
+      boxShadow: compact ? '0 0 0 1px rgba(200,168,72,0.06)' : '0 0 0 1px rgba(200,168,72,0.12), 0 0 24px rgba(200,168,72,0.08)',
     }}>
       <style>{`
         .cabinet-grid {
@@ -103,35 +117,45 @@ export function CabinetOfDistinctions({ distinctions, title = 'Cabinet of Distin
           flex-wrap: wrap;
           justify-content: center;
           align-items: flex-start;
-          gap: 0.5rem 1.25rem;
-          padding: 0.1rem 2.5rem 0.5rem;
+          gap: ${compact ? '0.4rem 0.9rem' : '0.5rem 1.25rem'};
+          padding: ${compact ? '0.1rem 1.5rem 0.4rem' : '0.1rem 2.5rem 0.5rem'};
         }
-        .cabinet-medal { width: 100px; }
+        .cabinet-medal { width: ${cell}px; }
         @media (max-width: 600px) {
           .cabinet-grid { gap: 0.5rem 0.75rem; padding: 0.1rem 1.25rem 0.5rem; }
-          .cabinet-medal { width: 88px; }
+          .cabinet-medal { width: ${cellSm}px; }
         }
       `}</style>
 
       {/* Header */}
-      <div style={{ padding: '0.6rem 1.5rem 0.1rem', textAlign: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.8rem', marginBottom: '0.25rem' }}>
-          <span aria-hidden style={{ color: '#C8A848', fontSize: '0.75rem', opacity: 0.9 }}>✦</span>
+      <div style={{ padding: compact ? '0.55rem 1.25rem 0' : '0.6rem 1.5rem 0.1rem', textAlign: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.8rem', marginBottom: compact ? '0.1rem' : '0.25rem' }}>
+          <span aria-hidden style={{ color: '#C8A848', fontSize: '0.72rem', opacity: 0.9 }}>✦</span>
           <span aria-hidden style={{ width: '46px', height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.6))' }} />
-          <p style={{ fontFamily: 'var(--font-cormorant-garamond), serif', fontSize: '1.15rem', fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', margin: 0, textShadow: '0 0 18px rgba(200,168,72,0.35)', whiteSpace: 'nowrap' }}>
+          <p style={{ fontFamily: 'var(--font-cormorant-garamond), serif', fontSize: compact ? '1rem' : '1.15rem', fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', margin: 0, textShadow: '0 0 18px rgba(200,168,72,0.35)', whiteSpace: 'nowrap' }}>
             {title}
           </p>
           <span aria-hidden style={{ width: '46px', height: '1px', background: 'linear-gradient(90deg, rgba(200,168,72,0.6), transparent)' }} />
-          <span aria-hidden style={{ color: '#C8A848', fontSize: '0.75rem', opacity: 0.9 }}>✦</span>
+          <span aria-hidden style={{ color: '#C8A848', fontSize: '0.72rem', opacity: 0.9 }}>✦</span>
         </div>
-        <p style={{ fontSize: '0.82rem', opacity: 0.5, margin: 0, fontStyle: 'italic' }}>
-          Earned recognitions and contributions.
-        </p>
+        {!compact && (
+          <p style={{ fontSize: '0.82rem', opacity: 0.5, margin: 0, fontStyle: 'italic' }}>
+            Earned recognitions and contributions.
+          </p>
+        )}
       </div>
 
       {/* Medal gallery */}
       <div className="cabinet-grid">
-        {distinctions.map(d => <Medal key={d.id} d={d} />)}
+        {distinctions.map(d => (
+          <Medal
+            key={d.id}
+            d={d}
+            frame={frame}
+            glyphSize={compact ? '2rem' : '2.1rem'}
+            labelSize={compact ? '0.66rem' : '0.66rem'}
+          />
+        ))}
       </div>
     </div>
   )

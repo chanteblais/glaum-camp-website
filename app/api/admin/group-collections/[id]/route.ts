@@ -18,26 +18,27 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const body = await req.json()
     const update: Record<string, unknown> = {}
     if (body.name !== undefined) update.name = body.name
-    if (body.description !== undefined) update.description = body.description
-    if (body.icon !== undefined) update.icon = body.icon === '' ? null : body.icon
-    if (body.icon_image !== undefined) update.icon_image = body.icon_image === '' ? null : body.icon_image
-    if (body.apply_selectable !== undefined) update.apply_selectable = !!body.apply_selectable
+    if (body.description !== undefined) update.description = body.description === '' ? null : body.description
     if (body.sort_order !== undefined) update.sort_order = body.sort_order
-    if (body.join_policy !== undefined) update.join_policy = body.join_policy
-    if (body.visibility !== undefined) update.visibility = body.visibility
-    if (body.collection_id !== undefined) update.collection_id = body.collection_id === '' ? null : body.collection_id
+    if (body.show_on_profile !== undefined) update.show_on_profile = !!body.show_on_profile
+    if (body.selection !== undefined) {
+      if (body.selection !== 'single' && body.selection !== 'multi') {
+        return NextResponse.json({ error: 'selection must be single or multi' }, { status: 400 })
+      }
+      update.selection = body.selection
+    }
 
     const { data, error } = await supabaseAdmin
-      .from('groups')
+      .from('group_collections')
       .update(update)
       .eq('id', params.id)
       .select()
       .single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json({ group: data })
+    return NextResponse.json({ collection: data })
   } catch (err) {
-    console.error('[PATCH /api/admin/groups/[id]]', err)
+    console.error('[PATCH /api/admin/group-collections/[id]]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -45,8 +46,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
   if (!(await requireAdmin())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  // group_members rows cascade-delete via the FK.
-  const { error } = await supabaseAdmin.from('groups').delete().eq('id', params.id)
+  // Refuse to delete a collection that still holds groups — the admin must move
+  // or delete those groups first. Prevents silently orphaning leaves (which the
+  // FK's ON DELETE SET NULL would otherwise do).
+  const { count } = await supabaseAdmin
+    .from('groups')
+    .select('id', { count: 'exact', head: true })
+    .eq('collection_id', params.id)
+
+  if ((count ?? 0) > 0) {
+    return NextResponse.json(
+      { error: `This collection still has ${count} group${count === 1 ? '' : 's'}. Move or delete them first.` },
+      { status: 400 },
+    )
+  }
+
+  const { error } = await supabaseAdmin.from('group_collections').delete().eq('id', params.id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ success: true })
 }

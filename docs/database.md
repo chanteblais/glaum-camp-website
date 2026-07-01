@@ -1,6 +1,6 @@
 # Database Schema
 
-All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations in `supabase-migrations/` document incremental changes (latest: `035`). Confirm `025` (column renames), `029` (the `application-files` bucket), `033` (group messaging), `034` (group icon images + `group-badges` bucket), and `035` (rename `badge_image` → `icon_image`) are applied before relying on those features.
+All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations in `supabase-migrations/` document incremental changes (latest: `043`). Confirm `025` (column renames), `029` (the `application-files` bucket), `033` (group messaging), `034`/`035` (group icon images + `group-badges` bucket, `badge_image` → `icon_image`), `036`–`038` (public profile fields, members/profiles, member distinctions), `039`–`041` (lead-up gatherings + notify/image), and `042`–`043` (group collections + per-collection profile visibility) are applied before relying on those features.
 
 ---
 
@@ -62,6 +62,51 @@ One row per person who has submitted a camp application.
 
 ---
 
+### `members`
+
+Canonical identity — **one row per person** (migration `037`, Phase 1 of profile-as-source-of-truth; see [profile-architecture.md](profile-architecture.md)). Splits the two roles `applications` played: `applications` stays the submission/review artifact, `members` becomes the canonical identity + membership record the app reads. Backfilled one member per distinct person (by `clerk_user_id`, else `lower(email)`) from the most recent application; additive & idempotent. Reads resolve via `lib/members.ts` (`resolveMember`).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `clerk_user_id` | TEXT UNIQUE | Stable join key once the account exists; **nullable** until first sign-in (multiple NULLs allowed). |
+| `email` | TEXT | Indexed on `lower(email)`. |
+| `first_name` / `last_name` / `preferred_name` / `pronouns` / `phone` / `avatar_url` | TEXT | Locked core identity columns (real columns, not in the JSONB bag) — queried for display everywhere. |
+| `status` | TEXT | `pending` \| `approved` \| `rejected` \| `cancelled`. The canonical membership gate (mirrors `applications.status`). Default `pending`. |
+| `application_id` | UUID FK | → `applications(id)`, `ON DELETE SET NULL`. Originating application (nullable). |
+| `created_at` / `updated_at` | TIMESTAMPTZ | |
+
+---
+
+### `member_profiles`
+
+Configurable profile values, **1:1 with `members`** (migration `037`). Keyed by registry field key (`page_content.config_profile_fields`), e.g. `{"eventExperience":["2024"]}`. Seeded from each member's application `custom_answers`; typed built-in columns (`about_you`, `special_skills`, …) stay in `applications` and migrate field-by-field in later phases. Read via `lib/members.ts` (`getMemberProfileValues`).
+
+| Column | Type | Notes |
+|---|---|---|
+| `member_id` | UUID PK / FK | → `members(id)`, `ON DELETE CASCADE`. |
+| `values` | JSONB NOT NULL | Profile values keyed by registry field key. Default `{}`. |
+| `updated_at` | TIMESTAMPTZ | |
+
+---
+
+### `member_distinctions`
+
+Manually attributed distinctions — the **exception** to "distinctions are derived, never stored" (migration `038`). Records distinctions an admin grants **by hand** (honorary / one-off awards or overrides). `evaluateDistinctions` **unions** these with rule-derived ones: a distinction is earned if its conditions pass **or** it appears here for the member (a rule with no conditions is "manual only"). Read via `lib/distinction-awards.ts` (`getMemberAwards`).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `member_id` | UUID FK | → `members(id)`, `ON DELETE CASCADE`. |
+| `distinction_id` | TEXT NOT NULL | Matches `DistinctionRule.id` in `page_content.config_distinctions`. |
+| `note` | TEXT | Optional admin note. |
+| `granted_by` | TEXT | `clerk_user_id` of the granting admin. |
+| `granted_at` | TIMESTAMPTZ | |
+
+**Unique constraint:** `(member_id, distinction_id)` — one grant per distinction per member.
+
+---
+
 ### `volunteers`
 
 One row per outside volunteer (non-member who signs up to help).
@@ -91,7 +136,7 @@ Groups of related camp roles.
 | `id` | UUID PK | |
 | `name` | TEXT | Max 40 chars |
 | `description` | TEXT | |
-| `icon` | TEXT | Emoji or image path (e.g. `/dusk_attendant.png`). Rendered as `<img>` everywhere if starts with `/` |
+| `icon` | TEXT | Emoji **or** image reference (asset-library path like `/asset-library/icons/…` or an uploaded `group-badges` URL). Chosen via the shared `AssetImagePicker` in the Departments admin (`/api/admin/departments/[id]/icon`); rendered as `<img>` vs text by `isImageIcon` (`lib/icon-src.ts`) at every render site |
 | `sort_order` | INT | |
 
 ---
@@ -111,11 +156,29 @@ Individual camp roles within a department.
 
 ---
 
+### `group_collections`
+
+The configurable container **above** `groups` (migration `042`; `show_on_profile` added in `043`). An organizer names a collection ("Contributions", "Volunteer Teams", "Committees", "Guilds") and defines the selectable child groups beneath it — the platform hardcodes no group semantics. Additive/non-breaking: every existing surface keys off leaf `groups`, and `042` backfills all uncollected groups into a default **"Contributions"** collection (Glåüm seed framing; organizers rename it — see [generalizability-log.md](generalizability-log.md)). Read via `lib/group-collections.ts` (`getGroupCollections`); managed in **Admin → Configure → Structure → Groups** (`GroupsManager.tsx`).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `name` | TEXT NOT NULL | Organizer-named (e.g. "Contributions") |
+| `description` | TEXT | |
+| `selection` | TEXT | `'multi'` (default — a member may hold several child groups) or `'single'` (exactly one, e.g. cabin / T-shirt size). `CHECK (selection IN ('single','multi'))`. |
+| `show_on_profile` | BOOL | Added in `043`, default `true`. Whether members' groups in this collection appear on their profile (own `/profile` + public `/members/[id]`) **and** are offered for Participate self-join (paired with the group's `apply_selectable`). Governs profile **display** + self-join only — distinctions, attunement, schedule filtering and admin rosters still see all membership. |
+| `sort_order` | INT | |
+| `created_at` | TIMESTAMPTZ | |
+
+Groups link up via `groups.collection_id` (FK `ON DELETE SET NULL`); orphaned groups surface in a synthetic "uncollected" bucket in the admin.
+
+---
+
 ### `groups`
 
 Configurable groups members belong to (e.g. Setup, Teardown, Decor). Added in migration `030`. **Replaced** the old contribution-types (`setup_preference`) mechanism: members are admin-assigned via Admin → Groups. Applicants can also opt in if an admin adds a **Group selection** field (`type: 'group_select'`) to the member application in the Application Builder. Each such field carries its own configurable list of offered groups in `FieldConfig.options` (group ids; **unset = all groups**, picked via a checklist in the builder). Picks write to `group_choices` → `group_members` (source `'application'`) on submit; `/api/apply` independently re-validates choices against the visible group_select fields' configured ids. Member-facing "contributions" (profile Commitments, attunement task, personal-schedule filtering, members directory) and the admin overview/registry now read group membership via `lib/groups.ts` (`getMemberGroups`, `getGroupNamesByUser`).
 
-**Post-approval self-service:** approved members can join/leave the same offered groups after the fact via the **Your Contributions** section on `/signup` (Participate), backed by `GET/POST /api/groups/membership` (which derives the selectable set from the form's `group_select` fields — the legacy `apply_selectable` column is *not* used). **Icon images:** an optional per-group `icon_image` (migration `034`, renamed from `badge_image` in `035`) is the circle icon of the member's **Active Commitments** row on the profile (`CommitmentsSection.tsx` via `groupCommitmentMeta`), and can be reused as **distinction medal art**; admins upload it in the Groups edit modal.
+**Post-approval self-service:** approved members can join/leave **opt-in groups** after the fact via the **Your Contributions** section on `/signup` (Participate), backed by `GET/POST /api/groups/membership`. That endpoint offers a group when it is flagged `apply_selectable` **and** its collection's `show_on_profile` is on (no collection ⇒ defaults visible) — a gate **separate** from the apply form's `group_select` fields (which govern the wizard only), and unaffected by `visibility`. **Icon images:** an optional per-group `icon_image` (migration `034`, renamed from `badge_image` in `035`) is the circle icon of the member's **Active Commitments** row on the profile (`CommitmentsSection.tsx` via `groupCommitmentMeta`), and can be reused as **distinction medal art**; admins upload it in the Groups edit modal.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -124,10 +187,11 @@ Configurable groups members belong to (e.g. Setup, Teardown, Decor). Added in mi
 | `description` | TEXT | Shown to applicants when the group is offered by a Group selection field |
 | `icon` | TEXT | Emoji |
 | `icon_image` | TEXT | Optional public URL of a patch-style icon image (in the `group-badges` bucket — legacy bucket name). Added as `badge_image` in migration `034`, renamed to `icon_image` in `035`. Used as the circle icon of the member's Active Commitments row (`CommitmentsSection.tsx`) and reusable as distinction medal art; admin-uploaded via the Groups edit modal (`POST/DELETE /api/admin/groups/[id]/icon`). |
-| `apply_selectable` | BOOL | **Legacy/unused.** Which groups appear on the application (and in member self-service) is now controlled per-field by the **Group selection** field's `options` (see below), not this column. |
+| `apply_selectable` | BOOL | **Member opt-in gate.** "Members can opt in" in GroupsManager. When true **and** the group's collection has `show_on_profile` on, the group is offered for self-join in the Participate **Your Contributions** section (`/api/groups/membership`). Independent of the apply form's **Group selection** (`group_select`) field, which governs the application wizard only. |
 | `sort_order` | INT | |
 | `join_policy` | TEXT | Governance, added in `033`. `'admin_assigned'` (default — admin manages membership; today's crews) or `'open'` (members self-join/leave). (`'request'` is reserved for when leads exist.) Set in GroupsManager; `open` enables self-join via **Messages → Find a group** (`/api/groups/[id]/join` · `/leave`). |
-| `visibility` | TEXT | Added in `033`. `'listed'` (default — open groups appear in the Find-a-group picker) or `'hidden'` (invite/admin-add only, not discoverable). Set in GroupsManager. |
+| `visibility` | TEXT | Added in `033`. `'listed'` (default — open groups appear in the Find-a-group picker) or `'hidden'` (invite/admin-add only, not discoverable). Set in GroupsManager. Note: this gates the **Messages → Find a group** picker only; it does **not** affect Participate self-join (that's `apply_selectable` + collection `show_on_profile`). |
+| `collection_id` | UUID FK | → `group_collections(id)`, `ON DELETE SET NULL` (migration `042`). The parent collection; pre-`042` groups were backfilled into the default "Contributions" collection. |
 | `created_at` | TIMESTAMPTZ | |
 
 Each group also gets a message **thread** — one `conversations` row (`type='group'`, `group_id` set), created on group creation (`POST /api/admin/groups`) and backfilled for existing groups by migration `033`. See [group-messaging.md](group-messaging.md) and the Group Threads feature.
@@ -271,7 +335,9 @@ Admin-editable copy for the homepage. One row per key.
 - `community_contribution_types` — **Retired** in migration `030` (Groups replaced contribution types). No longer read; the Application Builder "Contribution Types" tab and the `setup_preference` application field were removed. Any existing row is orphaned/harmless. `parseContributionTypes`/`DEFAULT_CONTRIBUTION_TYPES` remain in `lib/application-options.ts` only as the `ContributionType` shape (`{ value, icon, description }`) reused for group commitment metadata.
 - `config_attunement_tasks` — JSON array of `AttunementTask` objects (`{ id, label, requirement, enabled }`) driving the profile **Attunement Status** checklist. `requirement` is one of `role | shift | contribution | photo | approved` and auto-completes the item (logic in `app/profile/page.tsx`). Managed via Admin → Manage → Attunement Tasks (`AttunementTasksManager.tsx`). Falls back to `DEFAULT_ATTUNEMENT_TASKS` in `lib/site-config.ts` (mirrors the original five items).
 - `config_shift_signup_open` — string `'true'`/`'false'` (defaults open when absent). When `'false'`, the `/signup` shift picker is hidden behind a "times not confirmed" notice, `/api/signup` POST rejects new/changed shift selections (cancelling an existing shift is still allowed), and any `shift`-requirement attunement task is hidden from the profile checklist (`app/profile/page.tsx`). Toggled via Admin → Manage → Schedule (`ShiftSignupToggle.tsx`). Read by `app/api/signup/route.ts` (returns `shiftSignupOpen` on GET).
-- `config_distinctions` — JSON array of `DistinctionRule` objects (`{ id, label, description?, image?, glyph?, yearFact?, conditions[], enabled }`) driving the profile **Cabinet of Distinctions**. Each rule's `conditions` (`{ fact, op, value }`, all must pass) are evaluated against derived member facts — **earned medals are never stored** (see [features.md](features.md#distinctions)). Managed via Admin → Distinctions (`DistinctionsManager.tsx`). Parsed/evaluated by `lib/distinctions.ts` (`parseDistinctions`/`evaluateDistinctions`); facts come from `lib/member-facts.ts` (`buildMemberFacts`). Falls back to `DEFAULT_DISTINCTIONS`.
+- `config_distinctions` — JSON array of `DistinctionRule` objects (`{ id, label, description?, image?, glyph?, engraving?, yearFact?, conditions[], enabled }`) driving the profile **Cabinet of Distinctions**. `image` is an asset-library path or uploaded URL; `engraving` is an optional short static caption (≤32 chars) shown under the medal. Each rule's `conditions` (`{ fact, op, value }`, all must pass) are evaluated against derived member facts — **earned medals are never stored** (see [features.md](features.md#distinctions)). Managed via Admin → Distinctions (`DistinctionsManager.tsx`). Parsed/evaluated by `lib/distinctions.ts` (`parseDistinctions`/`evaluateDistinctions`); facts come from `lib/member-facts.ts` (`buildMemberFacts`). Falls back to `DEFAULT_DISTINCTIONS`.
+
+- `config_profile_fields` — JSON array of `ProfileField` objects (`{ key, label, type, options?, default?, public, memberEditable, applicationEligible, distinctionEligible, askExisting?, required?, system?, enabled }`) — the **Profile Field registry** defining each member profile detail field (bio, quote, + admin-added). Managed via Admin → Configure → **Profile Fields** (`ProfileFieldsManager.tsx`); parsed by `parseProfileFields` in `lib/profile-fields.ts`, falling back to `DEFAULT_PROFILE_FIELDS`. `public` = **Visible** on the member profile (off = admin-only, shown on `/admin/[id]`); `key` is the stable identity that member answers are stored under in `member_profiles.values`. See [profile-architecture.md](profile-architecture.md) and [features.md](features.md).
 
 ---
 
@@ -378,7 +444,7 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `avatars` | Member profile photos (uploaded via `AvatarUpload`; also the application Photo field → `/api/profile/avatar`) | Public |
 | `schedule-icons` | Custom icons for schedule events | Public (must be configured) |
 | `application-files` | Attachments for admin-added **File upload** application fields (`/api/apply/file`) | Public — **must be created** (migration `029`, or create in the Supabase dashboard like `avatars`) |
-| `group-badges` | Per-group icon images (`/api/admin/groups/[id]/icon` → `groups.icon_image`) | Public — **must be created** (migration `034`, or create in the Supabase dashboard like `avatars`) |
+| `group-badges` | Icon/badge art for the shared asset library — group icons (`groups/` prefix → `groups.icon_image`), distinction medals (`distinctions/`), and department icons (`departments/`), each via `/api/admin/{groups,distinctions,departments}/[id]/icon`. Legacy bucket name. | Public — **must be created** (migration `034`, or create in the Supabase dashboard like `avatars`) |
 
 ---
 

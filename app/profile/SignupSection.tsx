@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { SuggestRoleModal } from './SuggestRoleModal'
+import { isImageIcon } from '@/lib/icon-src'
 
 type Role = {
   id: string
@@ -176,7 +177,7 @@ function CurrentSignupCards({
             <>
               {dept && (
                 <p style={{ fontSize: '0.72rem', color: '#C8A848', opacity: 0.75, margin: '0 0 0.2rem', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  {dept.icon && (dept.icon.startsWith('/') ? <img src={dept.icon} alt="" aria-hidden style={{ width: '1rem', height: '1rem', objectFit: 'contain', flexShrink: 0 }} /> : <span>{dept.icon}</span>)}
+                  {dept.icon && (isImageIcon(dept.icon) ? <img src={dept.icon} alt="" aria-hidden style={{ width: '1rem', height: '1rem', objectFit: 'contain', flexShrink: 0 }} /> : <span>{dept.icon}</span>)}
                   {dept.name}
                 </p>
               )}
@@ -386,7 +387,7 @@ function DeptCard({
           display: 'flex', alignItems: 'center', gap: '0.65rem',
         }}
       >
-        {dept.icon && (dept.icon.startsWith('/') ? <img src={dept.icon} alt="" aria-hidden style={{ width: '1.4rem', height: '1.4rem', objectFit: 'contain', flexShrink: 0 }} /> : <span style={{ fontSize: '1.2rem', flexShrink: 0 }}>{dept.icon}</span>)}
+        {dept.icon && (isImageIcon(dept.icon) ? <img src={dept.icon} alt="" aria-hidden style={{ width: '1.4rem', height: '1.4rem', objectFit: 'contain', flexShrink: 0 }} /> : <span style={{ fontSize: '1.2rem', flexShrink: 0 }}>{dept.icon}</span>)}
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ fontSize: '0.9rem', color: '#C8A848', margin: 0, fontWeight: 600, letterSpacing: '0.03em' }}>
             {dept.name}

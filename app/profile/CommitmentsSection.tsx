@@ -1,4 +1,5 @@
 import { EventIcon } from '@/components/EventIcon'
+import { isImageIcon } from '@/lib/icon-src'
 import type { ContributionType } from '@/lib/application-options'
 import { DEFAULT_CONTRIBUTION_TYPES } from '@/lib/application-options'
 
@@ -143,7 +144,7 @@ export function CommitmentsSection({ contributions, role, dept, shift, roleAppro
             <Row
               circleContent={
                 dept?.icon
-                  ? dept.icon.startsWith('/')
+                  ? isImageIcon(dept.icon)
                     ? <img src={dept.icon} alt="" aria-hidden style={{ width: '62%', height: '62%', objectFit: 'contain', opacity: 0.85 }} />
                     : <span style={{ fontSize: compact ? '1.1rem' : '1.4rem', lineHeight: 1 }}>{dept.icon}</span>
                   : <img src="/handicon.png" alt="" aria-hidden style={{ width: '62%', height: '62%', objectFit: 'contain', opacity: 0.85 }} />

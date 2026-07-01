@@ -10,7 +10,6 @@ export type AdminCategory = {
 // Manage — operate on people and live activity.
 export const MANAGE_CATEGORIES: AdminCategory[] = [
   { id: 'people', label: 'People' },
-  { id: 'groups', label: 'Groups' },
   { id: 'program', label: 'Program' },
   { id: 'communication', label: 'Communication' },
 ]

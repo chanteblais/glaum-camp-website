@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from 'react'
 import {
   PROFILE_FIELD_TYPES,
   SYSTEM_PROFILE_FIELDS,
+  LOCKED_PROFILE_FIELDS,
   type ProfileField,
   type ProfileFieldType,
 } from '@/lib/profile-fields'
@@ -138,14 +139,16 @@ export function ProfileFieldsManager({ initialFields }: { initialFields: Profile
 
   function update(next: ProfileField[]) { setFields(next); save(next) }
 
-  // Stored (admin-defined) fields are editable + reorderable; system fields are
-  // shown read-only below as a reference for the distinction rule builder.
-  const stored = fields.filter(f => !f.system)
+  // Stored (admin-defined) fields are editable + reorderable. Locked core fields
+  // (e.g. Bio) and system (derived) fields are shown read-only below and are never
+  // editable/deletable here.
+  const stored = fields.filter(f => !f.system && !f.locked)
+  const locked = fields.filter(f => f.locked)
   const system = fields.filter(f => f.system)
 
   // Patch / move / delete operate on the stored slice but write back the full
-  // list (stored first, then system) so system fields are preserved untouched.
-  const commitStored = (nextStored: ProfileField[]) => update([...nextStored, ...system])
+  // list (stored, then locked, then system) so those are preserved untouched.
+  const commitStored = (nextStored: ProfileField[]) => update([...nextStored, ...locked, ...system])
   const patch = (idx: number, change: Partial<ProfileField>) =>
     commitStored(stored.map((f, i) => i === idx ? { ...f, ...change } : f))
 
@@ -189,6 +192,7 @@ export function ProfileFieldsManager({ initialFields }: { initialFields: Profile
 
         {stored.map((field, idx) => {
           const keyConflict = stored.some((o, i) => i !== idx && o.key === field.key) ||
+            locked.some(l => l.key === field.key) ||
             system.some(s => s.key === field.key)
           return (
             <div
@@ -302,6 +306,29 @@ export function ProfileFieldsManager({ initialFields }: { initialFields: Profile
           letterSpacing: '0.08em', cursor: 'pointer', opacity: 0.6,
         }}
       >+ Add profile field</button>
+
+      {/* Built-in core fields — always present, member-filled, not configurable */}
+      <div style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(200,168,72,0.12)', paddingTop: '1rem' }}>
+        <p style={{ ...tinyLabel, opacity: 0.45, marginBottom: '0.6rem' }}>Built-in fields (always shown · members fill these · not configurable)</p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+          {(locked.length ? locked : LOCKED_PROFILE_FIELDS).map(f => (
+            <span
+              key={f.key}
+              title={`${f.type} · built-in, always shown`}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                padding: '0.25rem 0.7rem', borderRadius: '9999px',
+                border: '1px solid rgba(200,168,72,0.28)', background: 'rgba(200,168,72,0.05)',
+                fontSize: '0.74rem', opacity: 0.85,
+              }}
+            >
+              <span aria-hidden style={{ opacity: 0.6 }}>🔒</span>
+              {f.label}
+              <span style={{ fontFamily: 'monospace', fontSize: '0.62rem', opacity: 0.45 }}>{f.key}</span>
+            </span>
+          ))}
+        </div>
+      </div>
 
       {/* System fields — read-only reference */}
       <div style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(200,168,72,0.12)', paddingTop: '1rem' }}>

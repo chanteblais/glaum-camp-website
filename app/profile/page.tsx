@@ -20,7 +20,7 @@ import { resolveMember, getMemberProfileValues } from '@/lib/members'
 import { getMemberAwards } from '@/lib/distinction-awards'
 import { CabinetOfDistinctions } from './CabinetOfDistinctions'
 import { ProfileDetails } from './ProfileDetails'
-import { RichText } from '@/lib/markdown-lite'
+import { isImageIcon } from '@/lib/icon-src'
 
 // ── Identity stat list (mirrors the mockup's right-column at-a-glance facts) ──
 function StatIcon({ name }: { name: 'calendar' | 'star' | 'shield' | 'hand' }) {
@@ -87,8 +87,11 @@ export default async function ProfilePage() {
   // `contributions` = group names; `groupMeta` carries each group's icon/description
   // for the commitments card (keyed by name, the shape CommitmentsSection expects).
   const memberGroups = await getMemberGroups(application?.clerk_user_id ?? userId)
+  // Full list drives attunement + distinction facts; the profile card shows only
+  // groups whose collection is marked visible (show_on_profile).
   const contributions = memberGroups.map(g => g.name)
-  const groupMeta = groupCommitmentMeta(memberGroups)
+  const visibleGroups = memberGroups.filter(g => g.showOnProfile)
+  const groupMeta = groupCommitmentMeta(visibleGroups)
 
   // Attunement checklist — admin-configured tasks, each auto-completed from its
   // requirement type (Admin → Manage → Attunement Tasks).
@@ -146,8 +149,8 @@ export default async function ProfilePage() {
 
   // ── Header pieces (alignment-neutral; the layout wrapper sets alignment) ──
   const isApproved = application?.status === 'approved'
-  // Member-authored profile details surfaced in the header / About card.
-  const bioText = typeof profileValues['bio'] === 'string' ? (profileValues['bio'] as string).trim() : ''
+  // Member-authored quote surfaced under the name in the header. (The bio/About
+  // narrative shows only on the public profile; here it's edited in Profile Details.)
   const quoteText = typeof profileValues['quote'] === 'string' ? (profileValues['quote'] as string).trim() : ''
   const commitmentCount = contributions.length + (shiftInfo ? 1 : 0)
   const attunementDone = attunementTasks.length > 0 && attunementTasks.every(t => t.done)
@@ -227,10 +230,10 @@ export default async function ProfilePage() {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: '0 0 22px rgba(200,168,72,0.22), inset 0 0 0 1px rgba(255,249,232,0.1)',
         }}>
-          {roleInfo?.departments?.icon && !roleInfo.departments.icon.startsWith('/')
+          {roleInfo?.departments?.icon && !isImageIcon(roleInfo.departments.icon)
             ? <span style={{ fontSize: '2.1rem', lineHeight: 1 }}>{roleInfo.departments.icon}</span>
             // eslint-disable-next-line @next/next/no-img-element
-            : <img src={roleInfo?.departments?.icon?.startsWith('/') ? roleInfo.departments.icon : '/handicon.png'} alt="" aria-hidden style={{ width: '58%', height: '58%', objectFit: 'contain', opacity: 0.85 }} />}
+            : <img src={isImageIcon(roleInfo?.departments?.icon) ? roleInfo!.departments!.icon! : '/handicon.png'} alt="" aria-hidden style={{ width: '76%', height: '76%', objectFit: 'contain', opacity: 0.92 }} />}
         </div>
       </div>
       <p style={{ fontSize: '0.64rem', letterSpacing: '0.34em', textTransform: 'uppercase', color: '#D239F8', marginBottom: '0.35rem', opacity: 0.85 }}>
@@ -245,9 +248,9 @@ export default async function ProfilePage() {
         <span aria-hidden style={{ color: '#C8A848', fontSize: '0.6rem', opacity: 0.9, lineHeight: 1 }}>✦</span>
         <span aria-hidden style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(200,168,72,0.65), transparent)' }} />
       </div>
-      {(roleInfo?.purpose || roleInfo?.description) && (
+      {(roleInfo?.description || roleInfo?.purpose) && (
         <p style={{ fontSize: '0.95rem', color: '#C9B68F', opacity: 0.88, lineHeight: 1.45, margin: '0 auto 1.05rem', maxWidth: '15rem', fontFamily: 'var(--font-cormorant-garamond), serif', fontStyle: 'italic' }}>
-          {roleInfo.purpose || roleInfo.description}
+          {roleInfo.description || roleInfo.purpose}
         </p>
       )}
       {memberFacts.department && (() => {
@@ -436,24 +439,11 @@ export default async function ProfilePage() {
         {application && application.status === 'approved' && (
           <>
 
-            {bioText && (
-              <div style={{ marginBottom: '1.5rem', padding: '1.75rem 2rem', border: '1px solid rgba(200,168,72,0.18)', borderRadius: '1rem', background: 'rgba(200,168,72,0.03)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.7rem', marginBottom: '1rem' }}>
-                  <span aria-hidden style={{ color: '#C8A848', fontSize: '0.7rem', opacity: 0.8 }}>✦</span>
-                  <p style={{ fontFamily: 'var(--font-cormorant-garamond), serif', fontSize: '1rem', fontWeight: 600, letterSpacing: '0.24em', textTransform: 'uppercase', color: '#C8A848', margin: 0 }}>About</p>
-                  <span aria-hidden style={{ color: '#C8A848', fontSize: '0.7rem', opacity: 0.8 }}>✦</span>
-                </div>
-                <div style={{ maxWidth: '40rem', margin: '0 auto' }}>
-                  <RichText text={bioText} baseStyle={{ fontSize: '0.95rem', opacity: 0.8 }} wrapperStyle={{ marginBottom: 0 }} />
-                </div>
-              </div>
-            )}
-
             <div className="profile-main-grid">
               <CommitmentsSection
                 title="Active Commitments"
                 hideRole
-                contributions={contributions}
+                contributions={visibleGroups.map(g => g.name)}
                 role={roleInfo ? { name: roleInfo.name ?? '', description: roleInfo.description ?? null, purpose: roleInfo.purpose ?? null } : null}
                 dept={roleInfo?.departments ? { name: roleInfo.departments.name ?? '', icon: roleInfo.departments.icon ?? null } : null}
                 shift={shiftInfo ? { title: shiftInfo.title ?? '', day: shiftInfo.day ?? '', time: shiftInfo.time ?? '', icon_type: shiftInfo.icon_type ?? 'star' } : null}
@@ -468,7 +458,7 @@ export default async function ProfilePage() {
 
             {earnedDistinctions.length > 0 && (
               <div style={{ marginBottom: '1.5rem' }}>
-                <CabinetOfDistinctions distinctions={earnedDistinctions} />
+                <CabinetOfDistinctions distinctions={earnedDistinctions} title="Distinctions" />
               </div>
             )}
             <div style={{ marginBottom: '1.5rem' }}>
