@@ -65,13 +65,13 @@ function Medal({ d }: { d: EarnedDistinction }) {
       </p>
       {d.engraving && (
         <p style={{
-          marginTop: '0.2rem',
+          marginTop: '0.05rem',
           fontSize: '0.62rem',
           letterSpacing: '0.04em',
           color: '#C8A848',
           opacity: 0.85,
           fontStyle: 'italic',
-          lineHeight: 1.35,
+          lineHeight: 1.0,
           fontFamily: 'var(--font-cormorant-garamond), serif',
         }}>
           {d.engraving}
@@ -86,7 +86,7 @@ function Medal({ d }: { d: EarnedDistinction }) {
   )
 }
 
-export function CabinetOfDistinctions({ distinctions }: { distinctions: EarnedDistinction[] }) {
+export function CabinetOfDistinctions({ distinctions, title = 'Cabinet of Distinctions' }: { distinctions: EarnedDistinction[]; title?: string }) {
   if (distinctions.length === 0) return null
 
   return (
@@ -119,7 +119,7 @@ export function CabinetOfDistinctions({ distinctions }: { distinctions: EarnedDi
           <span aria-hidden style={{ color: '#C8A848', fontSize: '0.75rem', opacity: 0.9 }}>✦</span>
           <span aria-hidden style={{ width: '46px', height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.6))' }} />
           <p style={{ fontFamily: 'var(--font-cormorant-garamond), serif', fontSize: '1.15rem', fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', margin: 0, textShadow: '0 0 18px rgba(200,168,72,0.35)', whiteSpace: 'nowrap' }}>
-            Cabinet of Distinctions
+            {title}
           </p>
           <span aria-hidden style={{ width: '46px', height: '1px', background: 'linear-gradient(90deg, rgba(200,168,72,0.6), transparent)' }} />
           <span aria-hidden style={{ color: '#C8A848', fontSize: '0.75rem', opacity: 0.9 }}>✦</span>

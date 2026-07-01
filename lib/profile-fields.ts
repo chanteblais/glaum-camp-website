@@ -122,7 +122,8 @@ const STORED_DEFAULT_FIELDS: ProfileField[] = [
   { key: 'eventExperience', label: 'Event Experience', description: 'Which years have you camped with Glåüm?', type: 'multi_select', options: ['2022', '2023', '2024', '2025'], public: true, memberEditable: true, applicationEligible: true, distinctionEligible: true, enabled: true },
   { key: 'skills',          label: 'Skills',           description: 'What can you bring to camp?', type: 'multi_select', options: [], public: true, memberEditable: true, applicationEligible: true, distinctionEligible: true, enabled: true },
   { key: 'languages',       label: 'Languages',        type: 'multi_select', options: [], public: true, memberEditable: true, applicationEligible: true, distinctionEligible: false, enabled: true },
-  { key: 'bio',             label: 'Bio',              description: 'A short introduction.', type: 'textarea', public: true, memberEditable: true, applicationEligible: true, distinctionEligible: false, enabled: true },
+  { key: 'bio',             label: 'Bio',              description: 'A short introduction — shown as the "About" section on your profile.', type: 'textarea', public: true, memberEditable: true, applicationEligible: true, distinctionEligible: false, enabled: true },
+  { key: 'quote',           label: 'Quote',            description: 'A short line shown under your name.', type: 'text', public: true, memberEditable: true, applicationEligible: true, distinctionEligible: false, enabled: true },
   { key: 'dietaryPreferences', label: 'Dietary Preferences', type: 'text', public: false, memberEditable: true, applicationEligible: true, distinctionEligible: false, enabled: true },
 ]
 

@@ -20,6 +20,7 @@ import { resolveMember, getMemberProfileValues } from '@/lib/members'
 import { getMemberAwards } from '@/lib/distinction-awards'
 import { CabinetOfDistinctions } from './CabinetOfDistinctions'
 import { ProfileDetails } from './ProfileDetails'
+import { RichText } from '@/lib/markdown-lite'
 
 // ── Identity stat list (mirrors the mockup's right-column at-a-glance facts) ──
 function StatIcon({ name }: { name: 'calendar' | 'star' | 'shield' | 'hand' }) {
@@ -145,6 +146,9 @@ export default async function ProfilePage() {
 
   // ── Header pieces (alignment-neutral; the layout wrapper sets alignment) ──
   const isApproved = application?.status === 'approved'
+  // Member-authored profile details surfaced in the header / About card.
+  const bioText = typeof profileValues['bio'] === 'string' ? (profileValues['bio'] as string).trim() : ''
+  const quoteText = typeof profileValues['quote'] === 'string' ? (profileValues['quote'] as string).trim() : ''
   const commitmentCount = contributions.length + (shiftInfo ? 1 : 0)
   const attunementDone = attunementTasks.length > 0 && attunementTasks.every(t => t.done)
   const attunementRemaining = attunementTasks.filter(t => !t.done).length
@@ -186,6 +190,11 @@ export default async function ProfilePage() {
             ✦ APPROVED CAMPER ✦
           </span>
         </div>
+      )}
+      {isApproved && quoteText && (
+        <p style={{ marginTop: '0.85rem', fontSize: '0.92rem', fontStyle: 'italic', color: '#C9B68F', opacity: 0.9, lineHeight: 1.5, fontFamily: 'var(--font-cormorant-garamond), serif' }}>
+          “{quoteText}”
+        </p>
       )}
       {isApproved && (
         <div style={{ marginTop: '1.1rem', maxWidth: '17rem', marginLeft: 'auto', marginRight: 'auto', textAlign: 'left' }}>
@@ -426,6 +435,19 @@ export default async function ProfilePage() {
 
         {application && application.status === 'approved' && (
           <>
+
+            {bioText && (
+              <div style={{ marginBottom: '1.5rem', padding: '1.75rem 2rem', border: '1px solid rgba(200,168,72,0.18)', borderRadius: '1rem', background: 'rgba(200,168,72,0.03)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.7rem', marginBottom: '1rem' }}>
+                  <span aria-hidden style={{ color: '#C8A848', fontSize: '0.7rem', opacity: 0.8 }}>✦</span>
+                  <p style={{ fontFamily: 'var(--font-cormorant-garamond), serif', fontSize: '1rem', fontWeight: 600, letterSpacing: '0.24em', textTransform: 'uppercase', color: '#C8A848', margin: 0 }}>About</p>
+                  <span aria-hidden style={{ color: '#C8A848', fontSize: '0.7rem', opacity: 0.8 }}>✦</span>
+                </div>
+                <div style={{ maxWidth: '40rem', margin: '0 auto' }}>
+                  <RichText text={bioText} baseStyle={{ fontSize: '0.95rem', opacity: 0.8 }} wrapperStyle={{ marginBottom: 0 }} />
+                </div>
+              </div>
+            )}
 
             <div className="profile-main-grid">
               <CommitmentsSection

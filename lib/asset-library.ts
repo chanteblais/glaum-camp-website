@@ -10,15 +10,31 @@
 //     learn where an asset came from.
 // Until uploads exist, the built-ins below ARE the whole library.
 //
-// NOTE: the Glåüm Elder emblem is community-specific branding. Shipping it as a
-// built-in is a single-tenant expedient for the dogfood; in multi-tenant it should
-// be a Glåüm-tenant UPLOAD, with built-ins reserved for generic/global art.
+// NOTE: the "Elder Tree" emblem originated as Glåüm-specific branding. Shipping
+// it as a built-in is a single-tenant expedient for the dogfood; in multi-tenant
+// it should be a tenant UPLOAD, with built-ins reserved for generic/global art.
+// Labels are kept generic so the library reads cleanly for any community.
 
 export type AssetKind = 'raster' | 'svg'
 
-// Where an asset can be used. One category for now; add more (group icons,
-// schedule icons, …) as features adopt the library.
-export type AssetCategory = 'distinction'
+// Image groups in the library. A picker shows its primary category first but lets
+// the user browse the others. Add categories (badges, schedule icons, …) as
+// features adopt the library.
+export type AssetCategory = 'distinction' | 'icon'
+
+// Display order + labels for category tabs. NOTE: keep labels generic (no
+// community-specific wording) — the built-in library is meant to be global.
+export const ASSET_CATEGORIES: { value: AssetCategory; label: string }[] = [
+  { value: 'distinction', label: 'Distinctions' },
+  { value: 'icon', label: 'Icons' },
+]
+
+// Categories ordered with `primary` first, so a picker surfaces the relevant
+// type up front while still exposing the rest.
+export function orderedCategories(primary: AssetCategory): { value: AssetCategory; label: string }[] {
+  return [...ASSET_CATEGORIES].sort((a, b) =>
+    a.value === primary ? -1 : b.value === primary ? 1 : 0)
+}
 
 export type AssetLibraryItem = {
   id: string
@@ -33,16 +49,17 @@ export type AssetLibraryItem = {
   tags?: string[]
 }
 
-// The built-in library. Append entries as curated art is added.
+// The built-in library. Append entries as curated art is added. Keep `label`s
+// generic (describe the art, not a specific community/honour).
 export const BUILTIN_ASSETS: AssetLibraryItem[] = [
   {
-    id: 'glaum-elder',
-    label: 'Glåüm Elder',
-    src: '/asset-library/distinctions/glaum-elder.webp',
+    id: 'elder-tree',
+    label: 'Elder Tree',
+    src: '/asset-library/distinctions/elder-tree.webp',
     kind: 'raster',
     category: 'distinction',
     source: 'builtin',
-    tags: ['tree', 'laurel', 'elder', 'nature'],
+    tags: ['tree', 'laurel', 'elder', 'hands', 'nature'],
   },
 ]
 

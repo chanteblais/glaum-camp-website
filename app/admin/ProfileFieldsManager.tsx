@@ -66,7 +66,7 @@ function FlagRow({ field, onChange }: {
   onChange: (change: Partial<ProfileField>) => void
 }) {
   const flags: { key: keyof ProfileField; label: string; title: string }[] = [
-    { key: 'public',              label: 'Public',       title: 'Visible on the member-facing profile' },
+    { key: 'public',              label: 'Visible',      title: 'Shown on the member’s profile. Off = visible to admins only (in the member’s application detail)' },
     { key: 'memberEditable',      label: 'Editable',     title: 'Members can edit their own value' },
     { key: 'applicationEligible', label: 'In apps',      title: 'Can be used as an application question' },
     { key: 'distinctionEligible', label: 'In rules',     title: 'Can be referenced by distinction rules' },
@@ -112,6 +112,10 @@ export function ProfileFieldsManager({ initialFields }: { initialFields: Profile
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Keys that already existed when the manager loaded — these may have member
+  // answers saved against them (member_profiles.values is keyed by field key), so
+  // their key must stay stable. Renaming such a field's LABEL never re-keys it.
+  const persistedKeys = useRef(new Set(initialFields.map(f => f.key)))
 
   const save = useCallback((next: ProfileField[]) => {
     if (timer.current) clearTimeout(timer.current)
@@ -204,11 +208,16 @@ export function ProfileFieldsManager({ initialFields }: { initialFields: Profile
                   <input
                     value={field.label}
                     onChange={e => {
-                      // Auto-track key from label only while the key still matches
-                      // the previous auto-suggestion (i.e. admin hasn't customized it).
+                      // Auto-track key from label only for NEW fields (added this
+                      // session) whose key still matches the auto-suggestion. Fields
+                      // loaded from the server keep their key so renaming the label
+                      // never orphans saved member answers keyed by it.
                       const prevAuto = keyFromLabel(field.label)
                       const change: Partial<ProfileField> = { label: e.target.value }
-                      if (field.key === prevAuto || field.key === '') change.key = keyFromLabel(e.target.value)
+                      const isNew = !persistedKeys.current.has(field.key)
+                      if (isNew && (field.key === prevAuto || field.key === '')) {
+                        change.key = keyFromLabel(e.target.value)
+                      }
                       patch(idx, change)
                     }}
                     placeholder="Display name (e.g. Event Experience)"
@@ -221,7 +230,7 @@ export function ProfileFieldsManager({ initialFields }: { initialFields: Profile
                       onChange={e => patch(idx, { key: e.target.value.replace(/\s+/g, '') })}
                       placeholder="eventExperience"
                       style={{ ...selectStyle, width: '9rem', color: keyConflict ? '#ff8a8a' : '#C9B68F', fontFamily: 'monospace' }}
-                      title={keyConflict ? 'Key must be unique' : 'Internal key — stable identity for stored values'}
+                      title={keyConflict ? 'Key must be unique' : 'Internal key — the stable identity for saved answers. Changing it disconnects existing member responses.'}
                     />
                   </span>
                 </div>

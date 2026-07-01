@@ -10,6 +10,8 @@ type AttunementTask = {
 
 type Props = {
   tasks: AttunementTask[]
+  /** Heading text (uppercased by the header style). Admin-configurable. */
+  title?: string
 }
 
 function Divider() {
@@ -22,7 +24,7 @@ function Divider() {
   )
 }
 
-export function AttunementStatus({ tasks }: Props) {
+export function AttunementStatus({ tasks, title = 'Attunement Status' }: Props) {
   const allDone = tasks.every(t => t.done)
   const remaining = tasks.filter(t => !t.done).length
 
@@ -106,7 +108,7 @@ export function AttunementStatus({ tasks }: Props) {
           <span aria-hidden style={{ color: 'rgba(132,92,34,0.82)', fontSize: '0.78rem', lineHeight: 1, textShadow: '0 1px 0 rgba(255,255,255,0.35)' }}>✦</span>
           <span aria-hidden style={{ width: '34px', height: '1px', background: 'linear-gradient(90deg, transparent, rgba(132,92,34,0.55))' }} />
           <p style={{ fontSize: '1rem', letterSpacing: '0.18em', fontWeight: 700, color: '#5A3A14', margin: 0, fontFamily: 'var(--font-cormorant-garamond), serif', textTransform: 'uppercase', WebkitTextStroke: '0.5px #5A3A14', textShadow: '0 1px 0 rgba(255,255,255,0.45)', textAlign: 'center', whiteSpace: 'nowrap' }}>
-            ATTUNEMENT STATUS
+            {title}
           </p>
           <span aria-hidden style={{ width: '34px', height: '1px', background: 'linear-gradient(90deg, rgba(132,92,34,0.55), transparent)' }} />
           <span aria-hidden style={{ color: 'rgba(132,92,34,0.82)', fontSize: '0.78rem', lineHeight: 1, textShadow: '0 1px 0 rgba(255,255,255,0.35)' }}>✦</span>

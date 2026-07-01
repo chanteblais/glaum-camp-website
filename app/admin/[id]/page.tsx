@@ -5,7 +5,8 @@ import { AdminActions } from '../AdminActions'
 import { RemoveMemberButton } from '../RemoveMemberButton'
 import { MemberSignupCard } from '../MemberSignupCard'
 import { mergeMemberConfig } from '@/lib/form-config'
-import { resolveMember } from '@/lib/members'
+import { resolveMember, getMemberProfileValues } from '@/lib/members'
+import { parseProfileFields, storedFields } from '@/lib/profile-fields'
 import { getMemberAwards } from '@/lib/distinction-awards'
 import { parseDistinctions } from '@/lib/distinctions'
 import { DistinctionAwards } from './DistinctionAwards'
@@ -93,6 +94,34 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
     id: r.id, label: r.label, glyph: r.glyph, image: r.image, manualOnly: r.conditions.length === 0,
   }))
   const memberAwards = member ? await getMemberAwards(member.id) : []
+
+  // Profile Details — the member's canonical profile-field values
+  // (member_profiles.values), rendered from the Profile Field registry. This is
+  // the ADMIN-only surface for fields marked not visible (public=false), which
+  // never appear on the member-facing profile.
+  const { data: pfCfgRow } = await supabaseAdmin
+    .from('page_content').select('value').eq('key', 'config_profile_fields').maybeSingle()
+  const profileFieldDefs = storedFields(parseProfileFields(pfCfgRow?.value))
+  const memberProfileValues = member ? await getMemberProfileValues(member.id) : {}
+  const profileDetailFields: RenderField[] = profileFieldDefs
+    .map(f => {
+      const raw = memberProfileValues[f.key]
+      const value: string | string[] = Array.isArray(raw)
+        ? raw.map(String)
+        : f.type === 'boolean'
+          ? (raw === true ? 'Yes' : raw === false ? 'No' : '')
+          : (raw == null ? '' : String(raw))
+      return {
+        key: f.key,
+        // Flag admin-only fields so reviewers know they're not shown publicly.
+        label: f.public ? f.label : `${f.label} · admin-only`,
+        value,
+        long: f.type === 'textarea',
+        isFile: false,
+        isAgreement: false,
+      }
+    })
+    .filter(f => (Array.isArray(f.value) ? f.value.length > 0 : String(f.value).trim() !== ''))
 
   // The only built-in field key whose column name differs from the key.
   const COLUMN_FOR: Record<string, string> = { dept_interests: 'department_interests' }
@@ -251,6 +280,16 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
             </Section>
           </div>
         ))}
+
+        {/* Profile Details — canonical profile-field values, incl. admin-only ones */}
+        {profileDetailFields.length > 0 && (
+          <>
+            <Divider />
+            <Section title="Profile Details">
+              <FieldList fields={profileDetailFields} />
+            </Section>
+          </>
+        )}
 
         {/* Actions at bottom too */}
         {app.status === 'pending' && (

@@ -86,7 +86,7 @@ function FieldEditor({ field, value, onChange }: {
   }
 }
 
-export function ProfileDetails() {
+export function ProfileDetails({ title = 'Profile Details' }: { title?: string } = {}) {
   const [fields, setFields] = useState<ProfileField[] | null>(null)
   const [values, setValues] = useState<Record<string, unknown>>({})
   const [dirty, setDirty] = useState(false)
@@ -154,7 +154,7 @@ export function ProfileDetails() {
   return (
     <div style={{ padding: '1.75rem 2rem', border: '1px solid rgba(200,168,72,0.18)', borderRadius: '1rem', background: 'rgba(200,168,72,0.03)' }}>
       <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.1rem', color: GOLD, margin: '0 0 0.35rem' }}>
-        Profile Details
+        {title}
       </p>
       <p style={{ fontSize: '0.8rem', opacity: 0.45, margin: '0 0 1.5rem', lineHeight: 1.6 }}>
         Keep your details up to date. Editable fields can be changed any time.

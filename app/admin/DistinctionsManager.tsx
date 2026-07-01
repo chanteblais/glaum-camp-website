@@ -8,7 +8,12 @@ import {
   type DistinctionOp,
   type DistinctionRule,
 } from '@/lib/distinctions'
-import { builtinAssets } from '@/lib/asset-library'
+import {
+  builtinAssets,
+  orderedCategories,
+  type AssetCategory,
+  type AssetLibraryItem,
+} from '@/lib/asset-library'
 import type { DistinctionCatalogEntry, DistinctionValueType } from '@/lib/profile-fields'
 
 const GOLD = '#C8A848'
@@ -28,12 +33,24 @@ const isCountOp = (op: DistinctionOp) => op === 'count_gte'
 // written into the rule's `image` field (and autosaved with the rest of the JSON).
 // Shows a live thumbnail of whatever `value` currently is — uploaded, a reused
 // group icon, or a pasted URL.
+// Image sizing inside a tile/preview. `fill` = size by height + clip (like the
+// Cabinet medal) — right for the heavily-padded circular badge art. `contain` =
+// whole image, never cropped — right for icons, which fill their frame and aren't
+// round, so they'd lose their tips/edges under `fill`.
+type TileFit = 'fill' | 'contain'
+function tileImgStyle(fit: TileFit): React.CSSProperties {
+  return fit === 'fill'
+    ? { height: '132%', width: 'auto', maxWidth: 'none', display: 'block' }
+    : { width: '94%', height: '94%', objectFit: 'contain', display: 'block' }
+}
+
 // A single selectable medal thumbnail.
-function MedalTile({ src, label, selected, onClick }: {
+function MedalTile({ src, label, selected, onClick, fit = 'contain' }: {
   src: string
   label: string
   selected: boolean
   onClick: () => void
+  fit?: TileFit
 }) {
   return (
     <button
@@ -50,7 +67,7 @@ function MedalTile({ src, label, selected, onClick }: {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt="" style={{ width: '92%', height: '92%', objectFit: 'contain' }} />
+        <img src={src} alt="" style={tileImgStyle(fit)} />
       </span>
       <span style={{ fontSize: '0.55rem', color: CREAM, opacity: selected ? 0.95 : 0.55, maxWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '0.02em' }}>
         {label}
@@ -59,18 +76,23 @@ function MedalTile({ src, label, selected, onClick }: {
   )
 }
 
-// Medal image picker: a gallery of included images (the built-in asset library +
-// reusable group icons) plus an "Upload your own" tile. Replaces the old glyph /
-// paste-URL controls — external admins just click an image or upload one.
-function MedalPicker({ ruleId, value, onChange, groupIconOptions }: {
+// Medal image picker: a small trigger showing the current selection that opens a
+// modal asset library. The library is grouped into categories (Distinctions,
+// Icons, …); the `primaryCategory` tab is shown first but the rest are browsable.
+// Replaces the old glyph / paste-URL controls — external admins click an included
+// image or upload their own. Built to scale as the library grows.
+function MedalPicker({ ruleId, value, onChange, groupIconOptions, primaryCategory = 'distinction' }: {
   ruleId: string
   value: string | undefined
   onChange: (url: string | undefined) => void
   groupIconOptions: GroupIconOption[]
+  primaryCategory?: AssetCategory
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [activeCat, setActiveCat] = useState<AssetCategory>(primaryCategory)
 
   async function upload(file: File) {
     setBusy(true); setErr(null)
@@ -81,61 +103,136 @@ function MedalPicker({ ruleId, value, onChange, groupIconOptions }: {
     if (!res.ok) { setErr(data.error ?? 'Upload failed'); setBusy(false); return }
     onChange(data.image)
     setBusy(false)
+    setOpen(false)
     if (inputRef.current) inputRef.current.value = ''
   }
 
-  const included = [
-    ...builtinAssets('distinction').map(a => ({ key: a.id, src: a.src, label: a.label })),
-    ...groupIconOptions.map(g => ({ key: g.image, src: g.image, label: `${g.name} icon` })),
-  ]
-  // A custom-uploaded image won't be in `included`; surface it as its own selected tile.
-  const showUploaded = !!value && !included.some(i => i.src === value)
+  type PickItem = { key: string; src: string; label: string; cat: AssetCategory }
+  // Items shown for a category: built-in library assets plus, for Icons, the
+  // community's reusable group icons (admin-named, so already generic).
+  function itemsFor(cat: AssetCategory): PickItem[] {
+    const builtins = builtinAssets(cat).map((a: AssetLibraryItem) => ({ key: a.id, src: a.src, label: a.label, cat }))
+    if (cat === 'icon') {
+      return [...builtins, ...groupIconOptions.map(g => ({ key: `group-${g.image}`, src: g.image, label: g.name, cat }))]
+    }
+    return builtins
+  }
+
+  const cats = orderedCategories(primaryCategory)
+  const allItems = cats.flatMap(c => itemsFor(c.value))
+  const selected = value ? allItems.find(i => i.src === value) : undefined
+  const selectedLabel = value ? (selected?.label ?? '') : 'No image'
+  const activeItems = itemsFor(activeCat)
+  // Badges (padded circular art) fill; icons/uploads use contain so nothing crops.
+  const fitFor = (cat: AssetCategory | undefined): TileFit => (cat === 'distinction' ? 'fill' : 'contain')
+  const activeFit = fitFor(activeCat)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
-      <span style={tinyLabel}>Medal image</span>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.55rem', alignItems: 'flex-start' }}>
-        {included.map(opt => (
-          <MedalTile key={opt.key} src={opt.src} label={opt.label} selected={value === opt.src} onClick={() => onChange(opt.src)} />
-        ))}
-        {showUploaded && (
-          <MedalTile src={value!} label="Your upload" selected onClick={() => { /* already selected */ }} />
-        )}
+      <span style={tinyLabel}>Badge image</span>
 
-        {/* Upload your own */}
-        <div style={{ width: 60, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}>
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            disabled={busy}
-            title="Upload your own image"
-            style={{
-              width: 60, height: 60, borderRadius: '0.5rem',
-              border: '1px dashed rgba(200,168,72,0.45)', background: 'rgba(255,255,255,0.03)',
-              color: '#FFFACD', cursor: busy ? 'wait' : 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem', lineHeight: 1,
-            }}
-          >
-            {busy ? '…' : '＋'}
-          </button>
-          <span style={{ fontSize: '0.55rem', color: CREAM, opacity: 0.55, letterSpacing: '0.02em' }}>
-            {busy ? 'Uploading' : 'Upload'}
-          </span>
+      {/* Trigger: current selection + open button */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+        <span style={{
+          width: 52, height: 52, flexShrink: 0, borderRadius: '0.5rem', overflow: 'hidden',
+          background: 'rgba(8,0,18,0.6)', border: '1px solid rgba(200,168,72,0.25)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          {value
+            ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={value} alt="" style={tileImgStyle(fitFor(selected?.cat))} />
+            : <span style={{ fontSize: '0.55rem', opacity: 0.3 }}>—</span>}
+        </span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', minWidth: 0 }}>
+          {selectedLabel && <span style={{ fontSize: '0.78rem', color: CREAM, opacity: 0.85, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedLabel}</span>}
+          <div style={{ display: 'flex', gap: '0.6rem' }}>
+            <button
+              type="button"
+              onClick={() => { setActiveCat(primaryCategory); setErr(null); setOpen(true) }}
+              style={{ ...selectStyle, cursor: 'pointer', color: '#FFFACD' }}
+            >
+              {value ? 'Change image' : 'Choose image'}
+            </button>
+            {value && (
+              <button
+                type="button"
+                onClick={() => onChange(undefined)}
+                title="Use no image"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: CREAM, opacity: 0.4, fontSize: '0.7rem', textDecoration: 'underline', padding: 0 }}
+              >
+                Clear
+              </button>
+            )}
+          </div>
         </div>
-
-        {/* Clear */}
-        {value && (
-          <button
-            type="button"
-            onClick={() => onChange(undefined)}
-            title="Use no image"
-            style={{ alignSelf: 'center', background: 'none', border: 'none', cursor: 'pointer', color: CREAM, opacity: 0.4, fontSize: '0.62rem', letterSpacing: '0.04em', textDecoration: 'underline', padding: '0.2rem' }}
-          >
-            Clear
-          </button>
-        )}
       </div>
-      {err && <span style={{ fontSize: '0.62rem', color: '#ff8a8a' }}>{err}</span>}
+
+      {/* Modal asset library */}
+      {open && (
+        <div
+          onClick={() => setOpen(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ background: '#1A0A24', border: '1px solid rgba(200,168,72,0.5)', borderRadius: '0.75rem', width: 'min(560px, 100%)', maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.6)' }}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.9rem 1.1rem', borderBottom: '1px solid rgba(200,168,72,0.2)' }}>
+              <span style={{ fontFamily: 'var(--font-cormorant-garamond), serif', fontSize: '1rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#C8A848' }}>Choose an image</span>
+              <button type="button" onClick={() => setOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: CREAM, opacity: 0.6, fontSize: '1.1rem', lineHeight: 1, padding: '0.2rem' }}>×</button>
+            </div>
+
+            {/* Category tabs */}
+            <div style={{ display: 'flex', gap: '0.4rem', padding: '0.7rem 1.1rem 0.4rem', flexWrap: 'wrap' }}>
+              {cats.map(c => (
+                <button
+                  key={c.value}
+                  type="button"
+                  onClick={() => setActiveCat(c.value)}
+                  style={{
+                    border: '1px solid rgba(200,168,72,0.3)', borderRadius: '9999px', cursor: 'pointer',
+                    padding: '0.25rem 0.85rem', fontSize: '0.72rem', letterSpacing: '0.04em',
+                    background: activeCat === c.value ? '#C8A848' : 'transparent',
+                    color: activeCat === c.value ? '#1A0A24' : CREAM,
+                    fontWeight: activeCat === c.value ? 600 : 400,
+                    opacity: activeCat === c.value ? 1 : 0.7,
+                  }}
+                >{c.label}</button>
+              ))}
+            </div>
+
+            {/* Grid */}
+            <div style={{ padding: '0.5rem 1.1rem 0.9rem', overflowY: 'auto', display: 'flex', flexWrap: 'wrap', gap: '0.7rem', alignContent: 'flex-start' }}>
+              {activeItems.length === 0 ? (
+                <span style={{ fontSize: '0.78rem', opacity: 0.45, fontStyle: 'italic', padding: '1rem 0' }}>No images in this category yet.</span>
+              ) : activeItems.map(opt => (
+                <MedalTile
+                  key={opt.key}
+                  src={opt.src}
+                  label={opt.label}
+                  selected={value === opt.src}
+                  fit={activeFit}
+                  onClick={() => { onChange(opt.src); setOpen(false) }}
+                />
+              ))}
+            </div>
+
+            {/* Footer: upload your own */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', padding: '0.8rem 1.1rem', borderTop: '1px solid rgba(200,168,72,0.2)' }}>
+              <button
+                type="button"
+                onClick={() => inputRef.current?.click()}
+                disabled={busy}
+                style={{ ...selectStyle, cursor: busy ? 'wait' : 'pointer', color: '#FFFACD', opacity: busy ? 0.5 : 1 }}
+              >
+                {busy ? 'Uploading…' : '＋ Upload your own'}
+              </button>
+              {err && <span style={{ fontSize: '0.7rem', color: '#ff8a8a' }}>{err}</span>}
+            </div>
+          </div>
+        </div>
+      )}
+
       <input ref={inputRef} type="file" accept="image/png,image/webp,image/svg+xml,image/jpeg,image/gif" style={{ display: 'none' }}
         onChange={e => { const f = e.target.files?.[0]; if (f) upload(f) }} />
     </div>
