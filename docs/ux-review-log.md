@@ -13,7 +13,16 @@ Scope: the remaining member surfaces — /messages inbox (threads left unopened 
 avoid marking reads), /signup (Participate), /profile. Mobile still blocked
 (Brave full-screen). **Clean bill overall — no code changes this pass.** Notes:
 
-### 18. Joining several groups stacks shift requirements · Severity: question for Chante · Status: proposed
+### 18. Joining several groups stacks shift requirements · Severity: question for Chante · Status: **resolved 2026-07-02** (decision + build, `feat/commitment-tiers`)
+
+**Decision (Chanté):** "Attuned" = the authored minimum only; commitments the
+member chose still show as a guide to meeting them. **Built:** checklist items now
+carry a tier — required (gates the seal) vs commitment (group/role-derived, shown
+under "Your Commitments" with a celebration line: "3h is the expectation — you've
+pledged 9h more. Many hands indeed."). Home banner counts them separately ("1
+outstanding task · 3 commitments"); Participate group rows disclose their
+commitment up front ("✦ carries a 3h Setup shift commitment"). Decision recorded in
+docs/shifts-redesign.md. Original finding follows:
 
 Chanté's own attunement checklist shows four unchecked shift items — "Shift
 Assigned 0/3h" (global Service) plus Decor/Setup/Teardown 0/3h each from her three

@@ -6,12 +6,17 @@ type AttunementTask = {
   done: boolean
   section?: 'photo' | 'contribution'
   href?: string
+  tier?: 'required' | 'commitment'
 }
 
 type Props = {
   tasks: AttunementTask[]
   /** Heading text (uppercased by the header style). Admin-configurable. */
   title?: string
+  /** The community-wide shift-hours minimum (authored attunement tasks). */
+  minimumHours?: number
+  /** Extra hours the member took on via group/role commitments. */
+  commitmentHours?: number
 }
 
 function Divider() {
@@ -24,11 +29,76 @@ function Divider() {
   )
 }
 
-export function AttunementStatus({ tasks, title = 'Attunement Status' }: Props) {
-  const allDone = tasks.every(t => t.done)
-  const remaining = tasks.filter(t => !t.done).length
+export function AttunementStatus({ tasks, title = 'Attunement Status', minimumHours = 0, commitmentHours = 0 }: Props) {
+  // Only the required tier (authored tasks — the community minimum) decides
+  // "Attuned". Commitments the member took on by joining groups/roles are a
+  // guide to what they signed up for, shown separately, never a blocker.
+  const required = tasks.filter(t => t.tier !== 'commitment')
+  const commitments = tasks.filter(t => t.tier === 'commitment')
+
+  const allDone = required.every(t => t.done)
+  const remaining = required.filter(t => !t.done).length
+  const commitmentsRemaining = commitments.filter(t => !t.done).length
 
   const statusLabel = remaining <= 1 ? 'Nearly Attuned' : 'Still Attuning'
+
+  const TaskRow = ({ task }: { task: AttunementTask }) => {
+    const isActionable = !task.done && (task.section || task.href)
+    return (
+      <div
+        onClick={() => {
+          if (!task.done && task.section) {
+            window.dispatchEvent(new CustomEvent('glaum:open-settings', { detail: { section: task.section } }))
+          } else if (!task.done && task.href) {
+            if (task.href.startsWith('#')) {
+              const id = task.href.slice(1)
+              const attempt = () => {
+                const target = document.getElementById(id)
+                if (target) { target.scrollIntoView({ behavior: 'smooth', block: 'start' }); return true }
+                return false
+              }
+              if (!attempt()) setTimeout(attempt, 100)
+            } else {
+              window.location.href = task.href
+            }
+          }
+        }}
+        style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', padding: '0.42rem 0.4rem', cursor: isActionable ? 'pointer' : 'default', borderRadius: '0.4rem', transition: 'background 0.15s', background: 'transparent' }}
+        onMouseEnter={e => { if (isActionable) e.currentTarget.style.background = 'rgba(122,85,32,0.1)' }}
+        onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+      >
+        <div style={{
+          width: '1.4rem', height: '1.4rem', borderRadius: '50%', flexShrink: 0,
+          border: task.done ? 'none' : '1.25px solid rgba(100,70,25,0.72)',
+          background: task.done
+            ? 'radial-gradient(circle at 38% 35%, #9C713C, #6F491F)'
+            : 'rgba(255,255,255,0.28)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: task.done ? '0 1px 2px rgba(100,65,20,0.24), inset 0 1px 0 rgba(255,255,255,0.2)' : 'inset 0 0 0 1px rgba(255,255,255,0.32)',
+        }}>
+          {task.done && (
+            <span style={{ fontSize: '0.7rem', color: '#FFF8E7', fontWeight: 700, lineHeight: 1 }}>✓</span>
+          )}
+        </div>
+        <span style={{
+          fontSize: '1rem',
+          color: task.done ? '#2F1F12' : '#4E3318',
+          opacity: task.done ? 0.94 : 0.8,
+          lineHeight: 1.35,
+          fontFamily: 'var(--font-cormorant-garamond), serif',
+          fontWeight: task.done ? 600 : 500,
+          letterSpacing: '0.01em',
+          textShadow: '0 1px 0 rgba(255,255,255,0.42)',
+          flex: 1,
+        }}>
+          {task.label}
+          {isActionable && (
+            <span style={{ fontSize: '0.78rem', color: '#9B6A2A', marginLeft: '0.5rem', fontStyle: 'italic' }}>tap to fix →</span>
+          )}
+        </span>
+      </div>
+    )
+  }
 
   return (
     <div style={{
@@ -118,69 +188,33 @@ export function AttunementStatus({ tasks, title = 'Attunement Status' }: Props) 
           <Divider />
         </div>
 
-        {/* Task list */}
+        {/* Required tier — the community minimum; the only items that gate "Attuned". */}
         <div style={{ padding: '0.5rem 1.6rem 0.55rem', position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-          {tasks.map(task => {
-            const isActionable = !task.done && (task.section || task.href)
-            return (
-            <div
-            key={task.id}
-            onClick={() => {
-              if (!task.done && task.section) {
-                window.dispatchEvent(new CustomEvent('glaum:open-settings', { detail: { section: task.section } }))
-              } else if (!task.done && task.href) {
-                if (task.href.startsWith('#')) {
-                  const id = task.href.slice(1)
-                  const attempt = () => {
-                    const target = document.getElementById(id)
-                    if (target) { target.scrollIntoView({ behavior: 'smooth', block: 'start' }); return true }
-                    return false
-                  }
-                  if (!attempt()) setTimeout(attempt, 100)
-                } else {
-                  window.location.href = task.href
-                }
-              }
-            }}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', padding: '0.42rem 0.4rem', cursor: isActionable ? 'pointer' : 'default', borderRadius: '0.4rem', transition: 'background 0.15s', background: 'transparent' }}
-            onMouseEnter={e => { if (isActionable) e.currentTarget.style.background = 'rgba(122,85,32,0.1)' }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-          >
-              <div style={{
-                width: '1.4rem', height: '1.4rem', borderRadius: '50%', flexShrink: 0,
-                border: task.done ? 'none' : '1.25px solid rgba(100,70,25,0.72)',
-                background: task.done
-                  ? 'radial-gradient(circle at 38% 35%, #9C713C, #6F491F)'
-                  : 'rgba(255,255,255,0.28)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: task.done ? '0 1px 2px rgba(100,65,20,0.24), inset 0 1px 0 rgba(255,255,255,0.2)' : 'inset 0 0 0 1px rgba(255,255,255,0.32)',
-              }}>
-                {task.done && (
-                  <span style={{ fontSize: '0.7rem', color: '#FFF8E7', fontWeight: 700, lineHeight: 1 }}>✓</span>
-                )}
-              </div>
-              <span style={{
-                fontSize: '1rem',
-                color: task.done ? '#2F1F12' : '#4E3318',
-                opacity: task.done ? 0.94 : 0.8,
-                lineHeight: 1.35,
-                fontFamily: 'var(--font-cormorant-garamond), serif',
-                fontWeight: task.done ? 600 : 500,
-                letterSpacing: '0.01em',
-                textShadow: '0 1px 0 rgba(255,255,255,0.42)',
-                flex: 1,
-              }}>
-                {task.label}
-                {isActionable && (
-                  <span style={{ fontSize: '0.78rem', color: '#9B6A2A', marginLeft: '0.5rem', fontStyle: 'italic' }}>tap to fix →</span>
-                )}
-              </span>
-            </div>
-            )
-          })}
+          {required.map(task => <TaskRow key={task.id} task={task} />)}
          </div>
         </div>
+
+        {/* Commitment tier — what the member signed up for beyond the minimum. */}
+        {commitments.length > 0 && (
+          <div style={{ padding: '0 1.6rem 0.55rem', position: 'relative', zIndex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.35rem 0 0.25rem' }}>
+              <span aria-hidden style={{ height: '1px', flex: 1, background: 'linear-gradient(90deg, transparent, rgba(122,85,32,0.45))' }} />
+              <p style={{ margin: 0, fontSize: '0.72rem', letterSpacing: '0.16em', textTransform: 'uppercase', color: '#7A5520', opacity: 0.9, fontFamily: 'var(--font-cormorant-garamond), serif', fontWeight: 700 }}>
+                Your Commitments
+              </p>
+              <span aria-hidden style={{ height: '1px', flex: 1, background: 'linear-gradient(90deg, rgba(122,85,32,0.45), transparent)' }} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem', alignItems: 'stretch' }}>
+              {commitments.map(task => <TaskRow key={task.id} task={task} />)}
+            </div>
+            {commitmentHours > 0 && (
+              <p style={{ margin: '0.3rem 0 0', textAlign: 'center', fontSize: '0.82rem', fontStyle: 'italic', color: '#6B4718', opacity: 0.85, fontFamily: 'var(--font-cormorant-garamond), serif' }}>
+                {minimumHours > 0 ? `${minimumHours}h is the expectation — ` : ''}you&rsquo;ve pledged {commitmentHours}h more. Many hands indeed.
+              </p>
+            )}
+          </div>
+        )}
 
         <div style={{ padding: '0 1.35rem', position: 'relative', zIndex: 1, marginTop: 'auto' }}>
           <Divider />
@@ -213,7 +247,11 @@ export function AttunementStatus({ tasks, title = 'Attunement Status' }: Props) 
                 <p style={{ fontSize: '1.2rem', fontWeight: 700, letterSpacing: '0.08em', color: '#7A4E0E', margin: '0 0 0.2rem', textTransform: 'uppercase', fontFamily: 'var(--font-cormorant-garamond), serif', textShadow: '0 0 12px rgba(180,120,30,0.5), 0 1px 0 rgba(255,255,255,0.3)' }}>
                   Fully Attuned
                 </p>
-                <p style={{ fontSize: '0.95rem', color: '#5C3D1A', margin: 0, fontFamily: 'var(--font-cormorant-garamond), serif', lineHeight: 1.4 }}>All preparations complete.</p>
+                <p style={{ fontSize: '0.95rem', color: '#5C3D1A', margin: 0, fontFamily: 'var(--font-cormorant-garamond), serif', lineHeight: 1.4 }}>
+                  {commitmentsRemaining > 0
+                    ? `${commitmentsRemaining} commitment${commitmentsRemaining !== 1 ? 's' : ''} still to fill.`
+                    : 'All preparations complete.'}
+                </p>
               </>
             ) : (
               <>

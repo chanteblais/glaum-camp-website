@@ -42,7 +42,7 @@ export async function GET() {
 
   const { data: groups, error } = await supabaseAdmin
     .from('groups')
-    .select('id, name, description, icon, icon_image, sort_order, collection_id, group_collections(name, sort_order)')
+    .select('id, name, description, icon, icon_image, sort_order, collection_id, required_shift_hours, group_collections(name, sort_order), shift_types:required_shift_type_id(name)')
     .order('sort_order', { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -60,14 +60,17 @@ export async function GET() {
     icon: string | null
     icon_image: string | null
     collection_id: string | null
-    // Supabase types the embed as an array; runtime returns a single row for a to-one FK.
+    required_shift_hours: number | null
+    // Supabase types the embeds as arrays; runtime returns a single row for a to-one FK.
     group_collections: { name: string; sort_order: number } | { name: string; sort_order: number }[] | null
+    shift_types: { name: string } | { name: string }[] | null
   }
 
   const offered = ((groups ?? []) as unknown as Row[])
     .filter(g => ids.has(g.id))
     .map(g => {
       const col = Array.isArray(g.group_collections) ? g.group_collections[0] : g.group_collections
+      const shiftType = Array.isArray(g.shift_types) ? g.shift_types[0] : g.shift_types
       return {
         id: g.id,
         name: g.name,
@@ -78,6 +81,9 @@ export async function GET() {
         collection_name: col?.name ?? null,
         collection_sort: col?.sort_order ?? 0,
         joined: joined.has(g.id),
+        // The shift commitment joining this group carries (null = none) — shown
+        // on the row so members know what they're taking on before they join.
+        shift_commitment: shiftType ? { hours: g.required_shift_hours ?? 1, type: shiftType.name } : null,
       }
     })
     // Order by collection, keeping the existing within-collection sort_order (stable sort).

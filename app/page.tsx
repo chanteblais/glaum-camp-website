@@ -6,7 +6,7 @@ import { Section, Kicker, GoldDivider } from '@/components/Section'
 import { ScheduleSection } from '@/components/ScheduleSection'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getMemberGroups } from '@/lib/groups'
-import { buildAttunementChecklist, memberGroupCounts } from '@/lib/attunement'
+import { buildAttunementChecklist, memberGroupCounts, requiredItems, commitmentItems } from '@/lib/attunement'
 import { getMemberShiftState, EMPTY_MEMBER_SHIFT_STATE } from '@/lib/shift-attunement'
 
 import { HomePageEditor } from './HomePageEditor'
@@ -252,7 +252,12 @@ let canManagePolls = false
     hoursByShiftType: shiftState.hoursByShiftType,
     derivedShiftRequirements: shiftState.derivedShiftRequirements,
   })
-  const allAttuned = attunementTasks.every(t => t.done)
+  // "Attuned" = the required tier only; commitments (group/role-derived shift
+  // hours) are surfaced as their own gentler line, never as a blocker.
+  const requiredTasks = requiredItems(attunementTasks)
+  const commitmentTasks = commitmentItems(attunementTasks)
+  const allAttuned = requiredTasks.every(t => t.done)
+  const commitmentsOutstanding = commitmentTasks.filter(t => !t.done).length
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
@@ -339,9 +344,9 @@ let canManagePolls = false
               </div>
             </div>
 
-            {/* ── ATTUNEMENT BANNER (only when incomplete) ── */}
-            {!allAttuned && (() => {
-              const outstanding = attunementTasks.filter(t => !t.done).length
+            {/* ── ATTUNEMENT BANNER (required tasks outstanding, or commitments to fill) ── */}
+            {(!allAttuned || commitmentsOutstanding > 0) && (() => {
+              const outstanding = requiredTasks.filter(t => !t.done).length
               return (
                 <a
                   href="/profile"
@@ -362,7 +367,9 @@ let canManagePolls = false
                     <span style={{ fontFamily: 'TokyoDreams, serif', letterSpacing: '0.04em' }}>Attunement</span>
                     <span style={{ opacity: 0.5, margin: '0 0.5rem' }}>·</span>
                     <span style={{ fontStyle: 'italic', opacity: 0.7 }}>
-                      {outstanding} outstanding {outstanding === 1 ? 'task' : 'tasks'}
+                      {!allAttuned
+                        ? `${outstanding} outstanding ${outstanding === 1 ? 'task' : 'tasks'}${commitmentsOutstanding > 0 ? ` · ${commitmentsOutstanding} commitment${commitmentsOutstanding === 1 ? '' : 's'}` : ''}`
+                        : `attuned — ${commitmentsOutstanding} commitment${commitmentsOutstanding === 1 ? '' : 's'} still to fill`}
                     </span>
                   </p>
                   <span style={{ fontSize: '0.75rem', color: '#C8A848', opacity: 0.45, flexShrink: 0 }}>View checklist →</span>
