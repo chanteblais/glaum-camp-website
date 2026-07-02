@@ -63,7 +63,7 @@ export async function GET() {
   const [eventsRes, holds, shiftState, flagRes, typesRes] = await Promise.all([
     supabaseAdmin
       .from('schedule_events')
-      .select('id, title, subtitle, day, time, event_date, start_time, end_time, capacity, shift_type_id, shift_types(name, icon)')
+      .select('id, title, subtitle, day, time, event_date, start_time, end_time, capacity, shift_type_id, needs_lead, shift_types(name, icon)')
       .eq('participation_type', 'shift')
       .eq('visible', true)
       .order('event_date', { ascending: true, nullsFirst: false })
@@ -102,6 +102,7 @@ export async function GET() {
       held,
       held_role: held ? (leadIds.includes(userId) ? 'lead' : 'member') : null,
       lead_names: leadIds.map(id => leadNames[id]).filter(Boolean),
+      needs_lead: e.needs_lead ?? false,
     }
   })
 
@@ -149,11 +150,15 @@ export async function POST(req: NextRequest) {
 
   const { data: event } = await supabaseAdmin
     .from('schedule_events')
-    .select('id, title, capacity, participation_type, visible')
+    .select('id, title, capacity, participation_type, visible, needs_lead')
     .eq('id', schedule_event_id)
     .single()
   if (!event || event.participation_type !== 'shift' || !event.visible) {
     return NextResponse.json({ error: 'Shift not found' }, { status: 404 })
+  }
+  // Lead role exists only on events the organizer opted in (049).
+  if (role === 'lead' && !event.needs_lead) {
+    return NextResponse.json({ error: 'This shift does not have a lead role' }, { status: 400 })
   }
 
   const { data: existing } = await supabaseAdmin

@@ -47,6 +47,9 @@ type ShiftSlot = {
   held: boolean
   held_role: 'member' | 'lead' | null
   lead_names: string[]
+  // Whether the organizer opted this shift into having a lead role (049) —
+  // gates every lead affordance for it.
+  needs_lead: boolean
 }
 
 // One owed shift-type requirement (derived from groups/roles + universal tasks).
@@ -214,6 +217,9 @@ function CurrentSignupCards({
                     <p style={{ fontSize: '0.72rem', color: '#D239F8', opacity: 0.75, margin: '0.15rem 0 0', letterSpacing: '0.04em' }}>
                       {shiftDateLabel(s)}{s.time ? ` · ${s.time}` : ''}{s.duration_hours > 0 ? ` · ${s.duration_hours}h` : ''}
                     </p>
+                    {/* Lead affordance only where the organizer asked for a lead
+                        (or to step back from one already held). */}
+                    {(s.needs_lead || s.held_role === 'lead') && (
                     <button
                       onClick={() => handleSetLead(s)}
                       disabled={leadingId === s.id}
@@ -226,6 +232,7 @@ function CurrentSignupCards({
                     >
                       {leadingId === s.id ? '…' : s.held_role === 'lead' ? 'Step back from lead' : 'Offer to lead ✦'}
                     </button>
+                    )}
                   </div>
                   <button
                     onClick={() => setPendingCancel(s)}
@@ -686,11 +693,15 @@ function ShiftCard({
                 ? `${slot.capacity - slot.signed_up} of ${slot.capacity} open`
                 : 'Open'}
       </p>
-      {slot.lead_names.length > 0 && (
+      {slot.lead_names.length > 0 ? (
         <p style={{ fontSize: '0.6rem', margin: '0.2rem 0 0', lineHeight: 1.35, overflowWrap: 'break-word', color: '#C8A848', opacity: 0.65 }}>
           ✦ Led by {slot.lead_names.join(' & ')}
         </p>
-      )}
+      ) : slot.needs_lead && !full ? (
+        <p style={{ fontSize: '0.6rem', margin: '0.2rem 0 0', lineHeight: 1.35, color: '#C8A848', opacity: 0.55, fontStyle: 'italic' }}>
+          ✦ needs a lead
+        </p>
+      ) : null}
     </button>
   )
 }
@@ -704,10 +715,14 @@ function ShiftConfirmModal({
   action: 'signup' | 'cancel'
   hue: { rgb: string; accent: string }
   typeName: string
-  onConfirm: () => void
+  onConfirm: (lead: boolean) => void
   onClose: () => void
 }) {
   const isCancel = action === 'cancel'
+  // Lead opt-in at the moment of signup — only offered when the organizer
+  // marked this shift as having a lead role, and nobody holds it yet.
+  const offerLead = !isCancel && slot.needs_lead && slot.lead_names.length === 0
+  const [wantsLead, setWantsLead] = useState(false)
   return (
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 60 }} />
@@ -734,6 +749,32 @@ function ShiftConfirmModal({
             {slot.capacity - slot.signed_up} of {slot.capacity} spots open
           </p>
         )}
+        {offerLead && (
+          <label style={{
+            display: 'flex', alignItems: 'flex-start', gap: '0.6rem', cursor: 'pointer',
+            marginTop: '1rem', padding: '0.7rem 0.85rem', borderRadius: '0.6rem',
+            border: '1px solid rgba(200,168,72,0.3)', background: 'rgba(200,168,72,0.06)',
+            userSelect: 'none',
+          }}>
+            <input
+              type="checkbox"
+              checked={wantsLead}
+              onChange={e => setWantsLead(e.target.checked)}
+              style={{ marginTop: '0.15rem', accentColor: '#C8A848', cursor: 'pointer' }}
+            />
+            <span style={{ fontSize: '0.82rem', color: '#F3EDE6', opacity: 0.85, lineHeight: 1.5 }}>
+              I&rsquo;d like to be the shift lead ✦
+              <span style={{ display: 'block', fontSize: '0.7rem', opacity: 0.55, marginTop: '0.15rem' }}>
+                This shift is looking for someone to steer it.
+              </span>
+            </span>
+          </label>
+        )}
+        {!isCancel && slot.needs_lead && slot.lead_names.length > 0 && (
+          <p style={{ fontSize: '0.72rem', color: '#C8A848', opacity: 0.6, margin: '0.6rem 0 0' }}>
+            ✦ Led by {slot.lead_names.join(' & ')}
+          </p>
+        )}
         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.4rem' }}>
           <button
             onClick={onClose}
@@ -742,7 +783,7 @@ function ShiftConfirmModal({
             Never mind
           </button>
           <button
-            onClick={onConfirm}
+            onClick={() => onConfirm(wantsLead)}
             style={{
               padding: '0.5rem 1.25rem', borderRadius: '9999px', cursor: 'pointer',
               fontSize: '0.8rem', letterSpacing: '0.05em', color: '#F3EDE6',
@@ -766,7 +807,7 @@ function ShiftsPicker({
   shiftTypes: ShiftTypeInfo[]
   signingId: string | null
   error: string | null
-  onSignUp: (id: string) => void
+  onSignUp: (id: string, lead: boolean) => void
   onCancel: (id: string) => void
 }) {
   const [pending, setPending] = useState<{ slot: ShiftSlot; action: 'signup' | 'cancel' } | null>(null)
@@ -884,10 +925,10 @@ function ShiftsPicker({
           action={pending.action}
           hue={hueFor(pending.slot, typesById)}
           typeName={pending.slot.shift_type_name}
-          onConfirm={() => {
+          onConfirm={(lead) => {
             const { slot, action } = pending
             setPending(null)
-            if (action === 'signup') onSignUp(slot.id)
+            if (action === 'signup') onSignUp(slot.id, lead)
             else onCancel(slot.id)
           }}
           onClose={() => setPending(null)}
@@ -949,13 +990,13 @@ export function SignupSection({ showPickers = true }: { showPickers?: boolean })
     } catch { /* keep current state */ }
   }
 
-  async function handleSignUpShift(id: string) {
+  async function handleSignUpShift(id: string, lead = false) {
     if (signingId) return
     setSigningId(id); setShiftError(null)
     const res = await fetch('/api/shift-signups', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ schedule_event_id: id }),
+      body: JSON.stringify({ schedule_event_id: id, ...(lead ? { role: 'lead' } : {}) }),
     })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))

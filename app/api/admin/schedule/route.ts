@@ -72,6 +72,8 @@ export async function POST(req: NextRequest) {
       requires_ack: participation_type === 'mandatory' ? (body.requires_ack ?? false) : false,
       event_date: body.event_date ?? null,
       event_category: body.event_category ?? 'at_camp',
+      // Lead roles only make sense on signable shifts (049).
+      needs_lead: participation_type === 'shift' ? (body.needs_lead ?? false) : false,
       ...legacy,
     }])
     .select()

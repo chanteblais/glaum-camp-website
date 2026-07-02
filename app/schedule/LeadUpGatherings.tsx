@@ -17,6 +17,7 @@ type LeadUpEvent = {
   rsvped: boolean
   leading: boolean
   lead_names: string[]
+  needs_lead: boolean
 }
 
 // "2026-07-08" → { weekday: "TUE", date: "Jul 8" }
@@ -160,7 +161,9 @@ export function LeadUpGatherings() {
                 >
                   {ev.rsvped ? '✓ Going' : "I'll be there"}
                 </button>
-                {ev.rsvped && (
+                {/* Lead offer only where the organizer asked for a lead (049) —
+                    or to step back from one already held. */}
+                {ev.rsvped && (ev.needs_lead || ev.leading) && (
                   <button
                     onClick={() => toggleLead(ev)}
                     disabled={pending === ev.id}

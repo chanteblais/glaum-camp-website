@@ -1,6 +1,6 @@
 # Database Schema
 
-All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations in `supabase-migrations/` document incremental changes (latest: `044`). Confirm `025` (column renames), `029` (the `application-files` bucket), `033` (group messaging), `034`/`035` (group icon images + `group-badges` bucket, `badge_image` → `icon_image`), `036`–`038` (public profile fields, members/profiles, member distinctions), `039`–`041` (lead-up gatherings + notify/image), and `042`–`044` (group collections + per-collection profile visibility + per-collection self-join) are applied before relying on those features.
+All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations in `supabase-migrations/` document incremental changes (latest: `049`; all of `025`–`049` **applied in prod** as of 2026-07-02). Confirm `025` (column renames), `029` (the `application-files` bucket), `033` (group messaging), `034`/`035` (group icon images + `group-badges` bucket, `badge_image` → `icon_image`), `036`–`038` (public profile fields, members/profiles, member distinctions), `039`–`041` (lead-up gatherings + notify/image), `042`–`044` (group collections + per-collection profile visibility + per-collection self-join), `045`–`047` (shifts redesign + shift times), and `048`/`049` (participation leads + per-event lead opt-in) are applied before relying on those features.
 
 ---
 
@@ -246,6 +246,7 @@ Public camp schedule entries. **Reworked by the shifts redesign** (see [shifts-r
 | `shift_type_id` | UUID FK → `shift_types.id` | Which kind of shift this slot is (shift events only). `ON DELETE SET NULL`. Migration `046` |
 | `requires_ack` | BOOL | Mandatory events only: whether members must acknowledge ("I'll be there"). Per-event toggle; ack flow not yet built member-side. Migration `045` |
 | `start_time` / `end_time` | TEXT | `"HH:MM"` 24-hour (shift events only). Duration = `shiftDurationHours` (`lib/shift-hours.ts`) — what counts toward hours requirements. Migration `047` |
+| `needs_lead` | BOOL | Whether this shift has a lead role (organizer's call at creation; shift events only). Gates all member lead affordances; the offer appears in the signup confirm. Migration `049` |
 | `capacity` | INT | Shift events only: max signups per slot. NULL = unlimited |
 | `event_type` | TEXT | **Legacy** (`'all_hands'`/`'camp_tending'`/`'service'`). No longer set by hand — derived (`'all_hands'` for mandatory) by `lib/event-type-compat.ts` for old readers. Drop in final cleanup |
 | `contribution_type` | TEXT | **Legacy** group-name tag. Now derived (= shift type name) by `lib/event-type-compat.ts`. Drop in final cleanup |
@@ -542,6 +543,7 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `046_shift_types_reshape.sql` | **Shifts redesign, corrected model.** `shift_types` registry (requirement-free kinds); `schedule_events.participation_type` + `shift_type_id`; optional `required_shift_type_id`/`required_shift_hours` on `groups` **and** `roles`. Backfills from `045`'s seed; leaves `event_types` dormant. |
 | `047_shift_times.sql` | `start_time`/`end_time` ("HH:MM") on `schedule_events` — shift durations for hours math (`lib/shift-hours.ts`). No backfill; times set in the schedule editor. |
 | `048_participation_leads.sql` | **Participation leads.** Adds `role` (`'member'`/`'lead'`, default `'member'`) to `member_shift_signups` **and** `lead_up_event_rsvps` — members offer to lead what they join; the role lives on the participation row (dies with the signup; co-leads = multiple lead rows; display-only). Additive + idempotent. |
+| `049_needs_lead.sql` | **Per-event lead opt-in.** `needs_lead BOOL` (default false) on `schedule_events` **and** `lead_up_events` — whether an event *has* a lead role is the organizer's call at creation; all member lead affordances (048) are gated on it, and the offer moves to signup/RSVP time. Additive + idempotent. |
 
 ---
 
@@ -562,6 +564,7 @@ Real-dated planning/brainstorming gatherings on the runway to the event — deli
 | `host` | TEXT | who's running it (optional) |
 | `image_url` | TEXT | optional banner image (public `lead-up-images` bucket); rendered on the /schedule cards + announcement email |
 | `visible` | BOOL | shown to members |
+| `needs_lead` | BOOL | whether this gathering has a lead role (organizer's call; gates the member "Offer to lead" affordance). Migration `049` |
 | `sort_order` | INT | tiebreak ordering (date is primary) |
 | `notified_at` | TIMESTAMPTZ | when members were last alerted (bell + email) via the admin "Notify members" button; NULL = never. Drives the manager's "Notified" state. |
 

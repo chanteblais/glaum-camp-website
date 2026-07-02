@@ -41,7 +41,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     // Verify the gathering exists, is visible, and hasn't already happened.
     const { data: event } = await supabaseAdmin
       .from('lead_up_events')
-      .select('id, event_date')
+      .select('id, event_date, needs_lead')
       .eq('id', params.id)
       .eq('visible', true)
       .maybeSingle()
@@ -61,6 +61,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       if (typeof body?.lead === 'boolean') lead = body.lead
     } catch {
       // No / invalid body — fall back to toggle.
+    }
+    // Lead role exists only on gatherings the organizer opted in (049).
+    if (lead === true && !event.needs_lead) {
+      return NextResponse.json({ error: 'This gathering does not have a lead role' }, { status: 400 })
     }
 
     const { data: existing } = await supabaseAdmin

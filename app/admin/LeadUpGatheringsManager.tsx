@@ -16,6 +16,7 @@ type LeadUpEvent = {
   host: string | null
   image_url: string | null
   visible: boolean
+  needs_lead: boolean
   sort_order: number
   notified_at: string | null
   rsvp_count?: number
@@ -26,7 +27,7 @@ type Draft = Omit<LeadUpEvent, 'id' | 'sort_order' | 'rsvp_count' | 'notified_at
 
 const blank = (): Draft => ({
   title: '', description: '', event_date: null, start_time: '', end_time: '',
-  location: '', link: '', host: '', image_url: null, visible: true,
+  location: '', link: '', host: '', image_url: null, visible: true, needs_lead: false,
 })
 
 const inputStyle: React.CSSProperties = {
@@ -222,6 +223,10 @@ function GatheringModal({ initial, isCreate, onSave, onClose, saving, error }: {
           <input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleImageUpload} style={{ display: 'none' }} />
           {imageError && <p style={{ color: '#ff8a8a', fontSize: '0.72rem', marginTop: '0.4rem' }}>{imageError}</p>}
         </Field>
+
+        <div style={{ marginBottom: '0.75rem' }}>
+          <Toggle checked={form.needs_lead} onChange={v => set('needs_lead', v)} label="Has a lead ✦ — members can offer to lead when they RSVP" />
+        </div>
 
         <div style={{ marginBottom: isCreate ? '0.75rem' : '1.25rem' }}>
           <Toggle checked={form.visible} onChange={v => set('visible', v)} label="Visible to members" />
@@ -466,7 +471,7 @@ export function LeadUpGatheringsManager() {
       {modal && (
         <GatheringModal
           initial={modal.mode === 'edit'
-            ? { title: modal.event.title, description: modal.event.description, event_date: modal.event.event_date, start_time: modal.event.start_time, end_time: modal.event.end_time, location: modal.event.location, link: modal.event.link, host: modal.event.host, image_url: modal.event.image_url, visible: modal.event.visible }
+            ? { title: modal.event.title, description: modal.event.description, event_date: modal.event.event_date, start_time: modal.event.start_time, end_time: modal.event.end_time, location: modal.event.location, link: modal.event.link, host: modal.event.host, image_url: modal.event.image_url, visible: modal.event.visible, needs_lead: modal.event.needs_lead ?? false }
             : blank()}
           isCreate={modal.mode === 'add'}
           onSave={handleSave}
