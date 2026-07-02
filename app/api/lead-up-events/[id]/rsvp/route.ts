@@ -33,14 +33,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // Verify the gathering exists and is visible.
+    // Verify the gathering exists, is visible, and hasn't already happened.
     const { data: event } = await supabaseAdmin
       .from('lead_up_events')
-      .select('id')
+      .select('id, event_date')
       .eq('id', params.id)
       .eq('visible', true)
       .maybeSingle()
     if (!event) return NextResponse.json({ error: 'Gathering not found' }, { status: 404 })
+    if (event.event_date && event.event_date < new Date().toISOString().slice(0, 10)) {
+      return NextResponse.json({ error: 'This gathering has already happened' }, { status: 400 })
+    }
 
     // Allow an explicit desired state; default to toggle.
     let desired: 'on' | 'off' | 'toggle' = 'toggle'

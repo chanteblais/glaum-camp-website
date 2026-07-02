@@ -35,6 +35,7 @@ export default async function Home() {
   let application: Record<string, unknown> | null = null
   let campSignup: Record<string, unknown> | null = null
   let upcomingEvents: { id: string; day: string; time: string; title: string; subtitle: string | null; icon_type: string; event_date: string | null; event_category: string }[] = []
+  let nextEventDate: string | null = null
   let leadUpEvents: { id: string; title: string; event_date: string | null; start_time: string | null; location: string | null; host: string | null; image_url: string | null }[] = []
   let spotlightPool: unknown[] = []
   let userFirstName: string | null = null
@@ -66,7 +67,7 @@ let canManagePolls = false
     application = appRaw?.status === 'cancelled' ? null : appRaw ?? null
 
     if (application?.status === 'approved') {
-      const [signupResult, eventsResult, leadUpResult, spotlightResult, announcementsResult, pollsResult, pollVotesResult, shoutoutsResult] = await Promise.all([
+      const [signupResult, eventsResult, leadUpResult, spotlightResult, announcementsResult, pollsResult, pollVotesResult, shoutoutsResult, nextEventResult] = await Promise.all([
         supabaseAdmin
           .from('camp_signups')
           .select('role_id, schedule_event_id, role_approval_status, roles(name, description, purpose, department_id, departments(name, icon)), schedule_events(title, day, time, icon_type)')
@@ -120,11 +121,22 @@ let canManagePolls = false
           .eq('visible', true)
           .order('created_at', { ascending: false })
           .limit(50),
+        // First dated future event regardless of the 14-day teaser window — lets
+        // the teaser say "schedule begins <date>" instead of a bare empty state.
+        supabaseAdmin
+          .from('schedule_events')
+          .select('event_date')
+          .eq('visible', true)
+          .gte('event_date', new Date().toISOString().slice(0, 10))
+          .order('event_date', { ascending: true })
+          .limit(1)
+          .maybeSingle(),
       ])
 
       campSignup = signupResult.data ?? null
       upcomingEvents = (eventsResult.data ?? []) as typeof upcomingEvents
       leadUpEvents = (leadUpResult.data ?? []) as typeof leadUpEvents
+      nextEventDate = (nextEventResult.data as { event_date: string | null } | null)?.event_date ?? null
       spotlightPool = spotlightResult.data ?? []
       announcements = (announcementsResult.data ?? []) as Announcement[]
 
@@ -374,6 +386,13 @@ let canManagePolls = false
                 event_category: 'lead_up',
                 image_url: e.image_url,
               }))
+              // When nothing falls inside the teaser window but dated events exist
+              // further out, say when the schedule starts instead of implying the
+              // schedule is empty.
+              const emptyText = nextEventDate
+                ? `The schedule begins ${new Date(nextEventDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}.`
+                : 'Nothing scheduled yet.'
+
               const EventList = ({ events, label, href }: { events: (typeof upcomingEvents[number] & { image_url?: string | null })[]; label: string; href: string }) => (
                 <div style={{ border: '1px solid rgba(200,168,72,0.25)', borderRadius: '1rem', background: 'rgba(10,0,20,0.5)', overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
                   <div style={{ padding: '1.25rem 1.5rem 1rem', borderBottom: '1px solid rgba(200,168,72,0.15)' }}>
@@ -384,7 +403,7 @@ let canManagePolls = false
                   <div style={{ padding: '0.5rem 0', flex: 1 }}>
                     {events.length === 0 ? (
                       <p style={{ fontSize: '0.85rem', opacity: 0.4, fontStyle: 'italic', textAlign: 'center', padding: '1.5rem' }}>
-                        Nothing scheduled yet.
+                        {emptyText}
                       </p>
                     ) : events.map((ev, i) => (
                       <div key={ev.id} style={{

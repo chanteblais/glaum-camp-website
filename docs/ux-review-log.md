@@ -7,6 +7,41 @@ Newest review at the top. Fixes are only applied once agreed.
 
 ---
 
+## Review — 2026-07-02 (fourth pass: member-facing flows)
+
+Scope: the member-facing side as an organizer's members see it — home dashboard,
+/schedule, /members — cross-checked against admin state. Mobile-width still blocked
+(Brave in macOS full-screen; un-fullscreen before next pass). Fixes landed on
+`ux/round-4`, verified in the browser.
+
+### 16. Members could RSVP to gatherings that already happened · Severity: medium-high · Status: **fixed 2026-07-02**
+
+The member API (`/api/lead-up-events`) had no date filter, so /schedule showed the
+past Jul 1 gathering with a live "I'll be there" button (the home teaser already
+filtered correctly — the two disagreed). **Fixed:** past gatherings drop out of the
+member API (dateless ones stay), and the RSVP endpoint itself now rejects past
+gatherings (400) so nothing can write an RSVP to history. The member-facing
+behaviour now matches the admin list's Past treatment.
+
+### 17. Home teaser claimed "Nothing scheduled yet" while a full schedule exists · Severity: medium · Status: **fixed 2026-07-02**
+
+The Upcoming Gatherings widget only shows events within the next 14 days; with camp
+3 weeks out it rendered "Nothing scheduled yet." — factually wrong (14 events exist)
+and mildly alarming for members. **Fixed:** when dated future events exist beyond
+the window, the empty state now reads "The schedule begins Wednesday, July 22."
+(derived from the first future event, so it stays correct for any community).
+
+### Notes (no action)
+
+- The Admin link lives in the avatar dropdown (with About), not the main nav —
+  deliberate-looking and fine for a single-admin community; revisit if more admins.
+- The stale "Shifts Currently Closed" announcement is the most prominent thing on
+  members' dashboards right now (content, Chante's call).
+- Member-facing pages otherwise read beautifully — the dated schedule calendar,
+  Many Hands directory with search/filters, and dashboard widgets all hang together.
+
+---
+
 ## Follow-up — 2026-07-02 (morning)
 
 ### 15. Deleting/recreating a profile field silently strands form answers · Severity: high (data loss) · Status: guardrail **fixed**; data repair **done 2026-07-02**
