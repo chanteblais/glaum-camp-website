@@ -131,12 +131,16 @@ Most content cards use a parchment aesthetic:
 
 ### Event Type Colors
 
-| `event_type` | Color |
+Colours key off `participation_type` + the shift type's palette slot (`lib/shift-colors.ts` — the single source shared by the main schedule, personal schedule, and shift picker):
+
+| Event | Color |
 |---|---|
-| `null` (general) | Purple |
-| `'all_hands'` | Teal |
-| `'camp_tending'` | Gold / amber |
-| `'service'` | Purple / pink |
+| `general` | Default purple (uncoloured) |
+| `mandatory` | Teal (`MANDATORY_HUE`, the old all-hands colour) |
+| `shift` | A hue from `SHIFT_HUES` by the shift type's registry position: ember orange → lake blue → moss green → glåüm magenta → rose pink → gold (cycles). Currently: Decor orange, Setup blue, Teardown green, Service magenta |
+| legacy `event_type` text (`'all_hands'`/`'camp_tending'`/`'service'`) | Old hardcoded styles kept as a fallback for undecorated rows |
+
+Per-shift-type configurable colour is a future hook — a colour field on the Shift Types registry would override the palette index.
 
 ### Department Icons
 

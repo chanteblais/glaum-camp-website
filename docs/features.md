@@ -145,19 +145,19 @@ Sections (approved members):
 - **Header** — a three-column registry band (`profile-header-grid`, `1fr auto 1fr`, within the centered content width): **Designation** (left), **portrait** (center, the focal point), **Member Information** (right). No badges live here.
   - **Designation column** — the role + department as *text*, not a medal: a brass emblem (the department `icon`/`icon_image`, else `/handicon.png`), a "DESIGNATION" kicker, the role name (`TokyoDreams`), a `── ✦ ──` divider, the role purpose/description, then the department ("Department of X" is split onto two lines) closed by a small flourish. Only shown when the member has an approved designation.
   - **Portrait** — `AvatarUpload` at an enlarged size (new `size` prop; 340px here vs the 260px default). Click to change photo.
-  - **Member Information column** — "MEMBER" kicker, name + settings gear (`ProfileSettings`), `APPROVED CAMPER` pill, email, then (when the member has filled in the `quote` profile field) an italic **quote** line, then an at-a-glance **stat list** (small gold line-icons + right-aligned values, built inline in `page.tsx` via `StatRow`/`StatIcon`): Member since (`joined_year`), Active Commitments (group + shift count), Distinctions Earned (count), Attunement Status (Fully Attuned / N left).
+  - **Member Information column** — "MEMBER" kicker, name + settings gear (`ProfileSettings`), the shared **`ApprovedCamperPill`** (`app/ApprovedCamperPill.tsx` — amethyst-glass status pill, same component the public profile uses), email, then (when the member has filled in the `quote` profile field) an italic **quote** line, then an at-a-glance **stat list** (small gold line-icons + right-aligned values, built inline in `page.tsx` via `StatRow`/`StatIcon`): Member since (`joined_year`), Active Commitments (group + held-shift count), Distinctions Earned (count), Attunement Status (Fully Attuned / N left).
 - **About** — a centered card shown when the member has filled in the `bio` profile field, rendered via `RichText` (`lib/markdown-lite.tsx`). Sits at the top of the approved body. Read-only presentation; the value is edited in the Profile Details card below.
-- **Active Commitments** (`CommitmentsSection.tsx`, left card) — the member's groups + shift as legible list rows: circle icon, title, one-line description, a pill (`GROUP`/`TEAM`/`SHIFT`/`LEAD`) and a chevron affordance. Rendered with the `hideRole` prop so the designation is **not** duplicated here (it lives in the header). Icon/description come from `getMemberGroups` → `groupCommitmentMeta` (`lib/groups.ts`): the row icon is the group's emoji `icon`, else its uploaded `icon_image` (rendered as a circle-filling `<img>`), else `✦`; the description falls back to the matching default contribution one-liner when the group has none. `showManageLink` (profile only) renders the centered "View all commitments ›" footer → `/signup`. Shared with `/members/[id]`, which keeps the role row (`hideRole` defaults false).
+- **Active Commitments** (`CommitmentsSection.tsx`, left card) — the member's groups + **all held shifts** (many-to-many, real-date labels from `event_date`) as legible list rows: circle icon, title, one-line description, a pill (`GROUP`/`TEAM`/`SHIFT`/`LEAD`) and a chevron affordance. Rendered with the `hideRole` prop so the designation is **not** duplicated here (it lives in the header). Icon/description come from `getMemberGroups` → `groupCommitmentMeta` (`lib/groups.ts`): the row icon is the group's emoji `icon`, else its uploaded `icon_image` (rendered as a circle-filling `<img>`), else `✦`; the description falls back to the matching default contribution one-liner when the group has none. `showManageLink` (profile only) renders the centered "View all commitments ›" footer → `/signup`. (This card is `/profile`-only; the public `/members/[id]` renders its own collection-grouped **Contributions** medallions instead — see Member Profile below.)
 - **Attunement Status** (`AttunementStatus.tsx`, right card) — parchment card with checklist. **Fully admin-managed** (Admin → Manage → Attunement Tasks, `AttunementTasksManager.tsx`); the list lives in `page_content.config_attunement_tasks` (JSON), parsed by `parseAttunementTasks` in `lib/site-config.ts`. Each task has a `requirement` that auto-completes it; the filtering + done/action logic lives in `buildAttunementChecklist` (`lib/attunement.ts`), the **single source of truth shared by `app/profile/page.tsx` and `app/page.tsx` (home dashboard banner)** so counts stay in sync. Honours each task's `enabled` flag and drops the `shift` task while shift signup is closed; hidden if no enabled tasks. The Commitments and Attunement cards are kept **equal height** (main grid `align-items: stretch`; each card fills the row and anchors its footer/verdict to the bottom). Requirement types (`ATTUNEMENT_REQUIREMENTS`):
   - `role` — `campSignup.role_id` set & non-pending; links to `/signup`
-  - `shift` — `campSignup.schedule_event_id` set; links to `/signup`
+  - `shift` — with a `shiftTypeId` + `requiredHours`: the **universal hours requirement** — done when the member's held hours of that shift type (summed slot durations, `lib/shift-attunement.ts` `getMemberShiftState`, over `member_shift_signups` ∪ the legacy single signup) reach the target; the label shows live `X/Yh` progress. Without a `shiftTypeId` ("Any shift"): legacy boolean — holds ≥1 shift. Links to `/signup`. **Derived lines:** group/role shift requirements (`required_shift_type_id`/`required_shift_hours`) are *not* authored tasks — they're appended to the checklist automatically for members who belong (max hours on same-type overlap; role only when approved), and disappear on leaving. All shift lines hide while shift signup is closed.
   - `collection` — **membership in a group collection.** The task carries a `collectionId` (which collection; **unset = any collection**, i.e. total group count) and a `requiredCount` (how many memberships needed, default 1). Done when the member belongs to ≥ `requiredCount` groups in that collection; links to `/signup` (where members self-join). In the admin builder the requirement dropdown lists each collection under a "Collection membership" group, with a **count input capped at the number of groups in the chosen collection** (can't require more than exist). Replaces the old `contribution` requirement, which is auto-migrated on parse to an any-collection task (count 1) — identical behaviour.
   - `photo` — checks `avatar_url`; opens ProfileSettings photo
   - `approved` — always done on this page (reassuring first step)
   - Default list (when key absent) mirrors the original five hardcoded items (the "Contribution Selected" default is now an any-collection membership task).
 - **Cabinet of Distinctions** (`CabinetOfDistinctions.tsx`, full-width band below the two cards) — a centered gallery of earned **engraved medals** (honours, *not* controls — nothing is clickable). Each medal renders the distinction's `image` (from the shared asset library — a built-in or an upload) inside a CSS medal frame (gold ring + purple glow), with an uppercase label, an optional short static **engraving** caption (gold italic, ≤32 chars), and an optional dynamic year. Art is sized by height + clipped to the circle so the emblem fills the frame; built-in art should be a transparent emblem with no baked rim (the frame supplies the ring). A `glyph` emoji is the fallback when a rule has no `image`. Shown only when ≥1 is earned. Distinctions are **derived, never stored** — see [Distinctions](#distinctions) below.
-- **Signup Section** (`SignupSection.tsx`) — role/shift picker; "Suggest a role" opens `SuggestRoleModal`.
-- **Personal Schedule** (`PersonalScheduleCalendar.tsx`) — events relevant to the member (`schedule_events.contribution_type` matched against the member's **group names**). "View full calendar →" → `/schedule`.
+- **Signup Section** (`SignupSection.tsx`) — role picker + the **multi-shift calendar picker** (see Shifts below); "Suggest a role" opens `SuggestRoleModal`. On `/profile` it renders cards-only (`showPickers=false`); the full pickers live on `/signup` (Participate).
+- **Personal Schedule** (`PersonalSchedule.tsx` → `PersonalScheduleCalendar.tsx`) — **mandatory events** (`participation_type='mandatory'`, everyone) + the **shifts the member holds** (`member_shift_signups` ∪ legacy single signup, deduped). Day columns derive from the events' real dates (`lib/schedule-days.ts`); cards are coloured by shift-type hue (`lib/shift-colors.ts`). "View full calendar →" → `/schedule`.
 - **Profile Details** (`ProfileDetails.tsx`, client) — an editable card for the member's registry-defined detail fields (bio, quote, and any admin-added custom fields), reading/writing `member_profiles.values` via `/api/profile/fields`. Only shows fields that are **Visible** (`public`) or member-editable; admin-only fields (not Visible) never appear here — they surface on `/admin/[id]`. Renders nothing until the registry has such fields. The fields are defined in the Profile Field registry (Admin → Configure → **Profile Fields**, `ProfileFieldsManager`); see [profile-architecture.md](profile-architecture.md).
 - **Settings** — gear icon opens `ProfileSettings` (edit profile fields, avatar). Groups are admin-assigned, so not edited here.
 
@@ -183,13 +183,16 @@ Linked from nav as "Many Hands".
 ### Member Profile (`/members/[id]`)
 
 **Who:** Approved members  
-**What:** View another member's profile.
+**What:** View another member's public profile — a ceremonial registry page with its **own** layout (not the same components as your own `/profile`).
 
-- Lookup by `clerk_user_id` (default) or UUID
-- Same badge + avatar header layout as `/profile`
-- Shows `CommitmentsSection` (role + shift) — `showManageLink` is `false` here
-- **"✉ Message" button** — links to `/messages/[clerk_user_id]` to start/continue a conversation
-- No editing controls
+- Lookup by `clerk_user_id` (default) or UUID.
+- **Hero:** circular portrait beside the identity block — name, pronouns, "Member since", quote, the shared **`ApprovedCamperPill`** (`app/ApprovedCamperPill.tsx`, amethyst-glass status pill), and a **"✉ Message"** button (→ `/messages/[clerk_user_id]`, with a hover lift via `.pub-msg-btn`).
+- **About:** the member's `bio` rendered as plain **left-aligned narrative text (no card)**, inset under the hero.
+- **Roles & Responsibilities** (card): department + primary role, plus supporting roles, as medallion rows (`DetailRow` / `IconMedallion`).
+- **Contributions** (card): the member's group memberships, **grouped under each collection's name** (only collections with `show_on_profile`), laid out **inline with a soft vertical divider** between collections and wrapping to its own row when they don't fit (`groupByCollection` + `ColHeading` + `IconMedallion`). Each group's medallion is its emoji `icon` / uploaded `icon_image` / `✦`.
+- **Distinctions:** `CabinetOfDistinctions` (compact) — earned medals, derived.
+- **Profile** + **Skills & Gifts:** public registry fields (see [profile-architecture.md](profile-architecture.md)).
+- Read-only; no editing controls.
 
 ---
 
@@ -325,17 +328,17 @@ Sections:
 - **Approve / Reject controls** (`AdminActions`) — visible for pending applications
 - **Remove member** (`RemoveMemberButton`) — visible for approved applications. Soft-removes: sets `status = 'cancelled'` with a reason, deletes the member's `camp_signups` (frees their role + shift), and notifies them (in-app + email). Reversible by re-approving.
 - **Role & Shift** (`MemberSignupCard`) — shown when the member has a `clerk_user_id`:
-  - Displays current role (department, role name, commitment level, approval status) and shift (title, time, day)
+  - Displays current role (department, role name, commitment level, approval status) and **every shift the member holds** (title, time, day — `member_shift_signups` ∪ legacy single, deduped)
   - **"Approve role"** button — appears when `role_approval_status === 'pending'`; calls `PATCH /api/admin/role-requests/[clerkUserId]`
   - **"Remove role"** button — clears `role_id` + `role_approval_status` from `camp_signups` via `PATCH /api/admin/signups/[clerkUserId]` with `{ clear_role: true }`
-  - **"Remove shift"** button — clears `schedule_event_id` via the same endpoint with `{ clear_shift: true }`
+  - Per-shift **"Remove"** button — `{ remove_shift: <eventId> }` deletes that `member_shift_signups` row (and clears the legacy column if it pointed there); `{ clear_shift: true }` clears all
   - Confirmation dialog shown before any removal; UI updates optimistically after success
 - **Full application fields** — all submitted built-in answers grouped by section
 - **Additional Responses** — answers to admin-added custom fields, with labels resolved from the form config (orphaned/deleted-field answers shown by key). File-upload answers render as download links; "Other" fill-ins shown as an "Other: …" line. Answers to the built-in Many Hands Agreement still show in their own Acknowledgements section.
 - **Profile Details** — the member's canonical profile-field values (`member_profiles.values`), rendered from the Profile Field registry. **This is the admin-only surface for fields marked _not_ Visible** (`public: false`) — those never appear on the member-facing profile and are tagged "· admin-only" here. Only shown when the member has values.
 
 **Key files:** `app/admin/[id]/page.tsx`, `app/admin/MemberSignupCard.tsx`, `app/admin/RemoveMemberButton.tsx`  
-**API:** `PATCH /api/admin/signups/[userId]` — accepts `{ clear_role: true }` or `{ clear_shift: true }`
+**API:** `PATCH /api/admin/signups/[userId]` — accepts `{ clear_role: true }`, `{ remove_shift: <eventId> }` (one shift), or `{ clear_shift: true }` (all shifts; both the many-to-many table and the legacy column)
 
 ---
 
@@ -409,6 +412,18 @@ Admin creates polls in the Admin Dashboard → Polls section (or via `+ Poll` in
 
 Generated at `/api/badge?role=...&dept=...` as a PNG. Displayed on profile and member pages. See [architecture.md](architecture.md) for generation details.
 
+### Shifts (multi-signup, hours requirements)
+
+Rebuilt 2026-07-01 — full design + history in [shifts-redesign.md](shifts-redesign.md).
+
+- **Model:** every schedule event has a `participation_type` (`general` / `shift` / `mandatory`). Shift events belong to a configurable **shift type** (`shift_types` registry — Setup, Teardown, Decor, Service, …; requirement-free kinds) and carry real `start_time`/`end_time` (duration = hours). Requirements are authored on whoever owes them: a **group/role** (`required_shift_type_id` + `required_shift_hours`, set in the group/role edit modals) or an **attunement task** (universal, e.g. "everyone owes 3h Service"). A shift type nothing requires is simply optional (e.g. a Tea shift).
+- **Member picker** (`/signup`, `SignupSection.tsx` `ShiftsPicker`): a calendar of day columns derived from the shifts' real dates; cards coloured by shift type; owed-hours chips (`Teardown 0/3h`) above; one tap opens a styled confirm modal (`ShiftConfirmModal`) to sign up / cancel. Members hold **any number** of shifts (`member_shift_signups`); capacity + `config_shift_signup_open` enforced server-side. Held shifts are listed (cancellable) in the "Your Shifts" card and appear on the personal schedule + Commitments card.
+- **API:** `GET/POST/DELETE /api/shift-signups` — slots with counts (many-to-many ∪ legacy single, deduped), the member's owed requirements (derived group/role merged with universal tasks, max hours per type), sign-up (admin notified), cancel (also clears the legacy `camp_signups.schedule_event_id` so hours never double-count).
+- **Attunement:** reflects it all — see the `shift` requirement + derived lines under Attunement Status.
+- **Admin:** shift types in Configure → Structure → **Shift Types**; slots created in the schedule editor (participation → shift type → start/end + capacity); per-member shifts on `/admin/[id]`; "has shift" indicator on the roster (boolean, not hours-satisfaction — future polish).
+- **Colours:** `lib/shift-colors.ts` — mandatory = teal; each shift type gets a palette hue by registry position (shared by both calendars + the picker; per-type configurable colour is a future hook).
+- **Pending cleanup:** legacy columns (`event_type`, `contribution_type`, `event_category`, `camp_signups.schedule_event_id`/`shift_id`), the dormant `event_types` table, dead `/api/admin/shifts` routes, and the `lib/event-type-compat.ts` shim await a final drop migration once the redesign is verified live.
+
 ### Role Selection & Approval Flow
 
 Members pick a role via `SignupSection` on `/profile`. The selection is submitted to `POST /api/signup`.
@@ -416,7 +431,7 @@ Members pick a role via `SignupSection` on `/profile`. The selection is submitte
 **Approval logic in `POST /api/signup`:**
 - If the role changed (`isRoleChange = true`) and `roles.requires_approval = true` → `role_approval_status` is set to `'pending'` and an admin notification is created
 - If the role changed and `requires_approval = false` → `role_approval_status` is set to `null` (immediately confirmed)
-- If the role did **not** change (e.g. member is only updating their shift) → the existing `role_approval_status` is **preserved unchanged**. This is critical: without this, a shift-only update would silently wipe a `'pending'` approval status, making the role appear confirmed without ever being reviewed.
+- If the role did **not** change → the existing `role_approval_status` is **preserved unchanged**. (Shift signups no longer flow through this endpoint — they use `/api/shift-signups` — so the historic wipe-on-shift-update hazard is gone; the guard remains for safety.)
 
 **`role_approval_status` values:**
 | Value | Meaning |
@@ -427,7 +442,7 @@ Members pick a role via `SignupSection` on `/profile`. The selection is submitte
 
 **Admin approval:** via `PATCH /api/admin/role-requests/[clerkUserId]` with `{ decision: 'approved' | 'rejected' }`. Approval sets `role_approval_status = 'approved'`. Rejection sets `role_id = null` and clears the status. Both send a `user_notifications` row to the member.
 
-The dedicated **Participate** page (`/signup`) hosts `SignupSection` (role + shift) and, below it, the **Your Contributions** group opt-in (`GroupCommitments` — see [Groups](#groups)). The Commitments card's "Manage commitments →" link points here.
+The dedicated **Participate** page (`/signup`) hosts `SignupSection` (role + shift) and, below it, the **Your Groups** group opt-in (`GroupCommitments` — see [Groups](#groups)). The Commitments card's "Manage commitments →" link points here.
 
 **Key file:** `app/api/signup/route.ts`
 
@@ -455,11 +470,11 @@ Every group also has a **message thread** for coordination — see [Group Thread
 
 **Applicant opt-in (optional):** admins can add a **Group selection** field (`group_select`) to the member application in the Application Builder. The field carries its own list of offered groups in `FieldConfig.options` (group ids; **unset = all groups**, chosen via a checklist in the builder). On submit, picks become `group_members` rows (`source = 'application'`); `/api/apply` re-validates choices against the visible `group_select` fields' configured ids. This governs the **apply form only** — it is a separate gate from the Participate self-service below (which uses the collection's `self_join` flag).
 
-**Member self-service:** approved members can join/leave **opt-in groups** anytime via the **Your Contributions** section on `/signup` (`GroupCommitments.tsx` → `GET/POST /api/groups/membership`). A group is offered here when its **collection has Self-join on** (`group_collections.self_join`, migration `044`; a group with no collection is not self-joinable). Self-join is a single **collection-level** toggle in the collection editor, fully **independent** of the collection's **Visible on profile** toggle (`show_on_profile`, profile display only). It's also a **different** gate from the application wizard's `group_select` field (apply form only), and group **`visibility`** (`listed`/`hidden`) does **not** affect this list (that governs the Find-a-group picker only). The offered groups are **grouped under their collection name** (uppercase gold header per collection, ordered by collection `sort_order`, groups by their own `sort_order` within). Toggling calls `router.refresh()` so the Commitments card + stat counts update. If nothing qualifies, the section shows "No opt-in groups are available right now." *(The old per-group "Members can opt in" flag `groups.apply_selectable` is dormant since `044`.)*
+**Member self-service:** approved members can join/leave **opt-in groups** anytime via the **Your Groups** section on `/signup` (`GroupCommitments.tsx` → `GET/POST /api/groups/membership`). A group is offered here when its **collection has Self-join on** (`group_collections.self_join`, migration `044`; a group with no collection is not self-joinable). Self-join is a single **collection-level** toggle in the collection editor, fully **independent** of the collection's **Visible on profile** toggle (`show_on_profile`, profile display only). It's also a **different** gate from the application wizard's `group_select` field (apply form only), and group **`visibility`** (`listed`/`hidden`) does **not** affect this list (that governs the Find-a-group picker only). The offered groups are **grouped under their collection name** (uppercase gold header per collection, ordered by collection `sort_order`, groups by their own `sort_order` within). Toggling calls `router.refresh()` so the Commitments card + stat counts update. If nothing qualifies, the section shows "No opt-in groups are available right now." *(The old per-group "Members can opt in" flag `groups.apply_selectable` is dormant since `044`.)*
 
 **Group visuals on the profile:** each group's icon appears as the circle icon of its **Active Commitments** row — the emoji `icon` if set, else the uploaded `icon_image` (rendered as a circle-filling `<img>`, scaled to crop the wide icon-frame margins), else `✦` (`groupCommitmentMeta` in `lib/groups.ts`). A group's `icon_image` can also be reused as **distinction medal art** (picked in the Distinctions admin builder). The old scattered-badge cluster (`ContributionBadges.tsx`) was removed in the profile refactor.
 
-**Where group membership is read:** member Commitments card, `collection` attunement tasks (membership counts per collection), Personal Schedule filtering (`schedule_events.contribution_type` matched to group names), the members directory, and Admin Overview/Registry — all via `lib/groups.ts` (`getMemberGroups`, `getGroupNamesByUser`). `schedule_events.contribution_type` still holds a group name (e.g. `'Setup'`) to surface an event for that group's members.
+**Where group membership is read:** member Commitments card, `collection` attunement tasks (membership counts per collection), **derived shift requirements** (a group's `required_shift_type_id`/`required_shift_hours` obligate its members — `lib/shift-attunement.ts`), the members directory, and Admin Overview/Registry — all via `lib/groups.ts` (`getMemberGroups`, `getGroupNamesByUser`). *(The old Personal Schedule `contribution_type` name-matching is retired — the personal schedule now shows the shifts a member actually holds.)*
 
 **Key files:** `app/admin/GroupsManager.tsx`, `app/profile/GroupCommitments.tsx`, `app/profile/CommitmentsSection.tsx`, `app/api/admin/groups/`, `app/api/groups/membership/route.ts`, `lib/groups.ts`, `lib/icon-image.ts`.
 

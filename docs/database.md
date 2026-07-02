@@ -153,6 +153,8 @@ Individual camp roles within a department.
 | `description` | TEXT | |
 | `capacity` | INT | Max number of people for this role |
 | `sort_order` | INT | |
+| `required_shift_type_id` | UUID FK → `shift_types.id` | Optional **shift requirement**: members holding this role owe hours of this shift type. `ON DELETE SET NULL`. Migration `046` |
+| `required_shift_hours` | NUMERIC(4,1) | Hours owed (with the above). Attunement derives + reflects it |
 
 ---
 
@@ -167,7 +169,7 @@ The configurable container **above** `groups` (migration `042`; `show_on_profile
 | `description` | TEXT | |
 | `selection` | TEXT | `'multi'` (default — a member may hold several child groups) or `'single'` (exactly one, e.g. cabin / T-shirt size). `CHECK (selection IN ('single','multi'))`. |
 | `show_on_profile` | BOOL | Added in `043`, default `true`. Whether members' groups in this collection appear on their profile (own `/profile` + public `/members/[id]`). Governs profile **display only** — distinctions, attunement, schedule filtering and admin rosters still see all membership. **Independent of `self_join`** (migration `044` split these two concerns apart). |
-| `self_join` | BOOL | Added in `044`, default `false`. Whether members may self-join/leave this collection's groups on the Participate page (`/signup` → **Your Contributions**, `/api/groups/membership`). A single **collection-level** eligibility gate — every group in a self-join collection is self-joinable; the old per-group `apply_selectable` flag is no longer consulted. Orthogonal to `show_on_profile`. `044` backfills `true` for collections that had a self-joinable group under the old model. |
+| `self_join` | BOOL | Added in `044`, default `false`. Whether members may self-join/leave this collection's groups on the Participate page (`/signup` → **Your Groups**, `/api/groups/membership`). A single **collection-level** eligibility gate — every group in a self-join collection is self-joinable; the old per-group `apply_selectable` flag is no longer consulted. Orthogonal to `show_on_profile`. `044` backfills `true` for collections that had a self-joinable group under the old model. |
 | `sort_order` | INT | |
 | `created_at` | TIMESTAMPTZ | |
 
@@ -179,7 +181,7 @@ Groups link up via `groups.collection_id` (FK `ON DELETE SET NULL`); orphaned gr
 
 Configurable groups members belong to (e.g. Setup, Teardown, Decor). Added in migration `030`. **Replaced** the old contribution-types (`setup_preference`) mechanism: members are admin-assigned via Admin → Groups. Applicants can also opt in if an admin adds a **Group selection** field (`type: 'group_select'`) to the member application in the Application Builder. Each such field carries its own configurable list of offered groups in `FieldConfig.options` (group ids; **unset = all groups**, picked via a checklist in the builder). Picks write to `group_choices` → `group_members` (source `'application'`) on submit; `/api/apply` independently re-validates choices against the visible group_select fields' configured ids. Member-facing "contributions" (profile Commitments, attunement task, personal-schedule filtering, members directory) and the admin overview/registry now read group membership via `lib/groups.ts` (`getMemberGroups`, `getGroupNamesByUser`).
 
-**Post-approval self-service:** approved members can join/leave **opt-in groups** after the fact via the **Your Contributions** section on `/signup` (Participate), backed by `GET/POST /api/groups/membership`. That endpoint offers a group when its **collection has `self_join` on** (migration `044`; a group with no collection is not self-joinable) — a single collection-level gate, **separate** from the apply form's `group_select` fields (which govern the wizard only), from the collection's `show_on_profile` (profile display only), and from group `visibility` (Find-a-group picker only). **Icon images:** an optional per-group `icon_image` (migration `034`, renamed from `badge_image` in `035`) is the circle icon of the member's **Active Commitments** row on the profile (`CommitmentsSection.tsx` via `groupCommitmentMeta`), and can be reused as **distinction medal art**; admins upload it in the Groups edit modal.
+**Post-approval self-service:** approved members can join/leave **opt-in groups** after the fact via the **Your Groups** section on `/signup` (Participate), backed by `GET/POST /api/groups/membership`. That endpoint offers a group when its **collection has `self_join` on** (migration `044`; a group with no collection is not self-joinable) — a single collection-level gate, **separate** from the apply form's `group_select` fields (which govern the wizard only), from the collection's `show_on_profile` (profile display only), and from group `visibility` (Find-a-group picker only). **Icon images:** an optional per-group `icon_image` (migration `034`, renamed from `badge_image` in `035`) is the circle icon of the member's **Active Commitments** row on the profile (`CommitmentsSection.tsx` via `groupCommitmentMeta`), and can be reused as **distinction medal art**; admins upload it in the Groups edit modal.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -193,6 +195,8 @@ Configurable groups members belong to (e.g. Setup, Teardown, Decor). Added in mi
 | `join_policy` | TEXT | Governance, added in `033`. `'admin_assigned'` (default — admin manages membership; today's crews) or `'open'` (members self-join/leave). (`'request'` is reserved for when leads exist.) Set in GroupsManager; `open` enables self-join via **Messages → Find a group** (`/api/groups/[id]/join` · `/leave`). |
 | `visibility` | TEXT | Added in `033`. `'listed'` (default — open groups appear in the Find-a-group picker) or `'hidden'` (invite/admin-add only, not discoverable). Set in GroupsManager. Note: this gates the **Messages → Find a group** picker only; it does **not** affect Participate self-join (that's the collection's `self_join`). |
 | `collection_id` | UUID FK | → `group_collections(id)`, `ON DELETE SET NULL` (migration `042`). The parent collection; pre-`042` groups were backfilled into the default "Contributions" collection. |
+| `required_shift_type_id` | UUID FK → `shift_types.id` | Optional **shift requirement**: group members owe hours of this shift type (e.g. Teardown crew → 3h of Teardown). Set in the group edit modal. `ON DELETE SET NULL`. Migration `046` |
+| `required_shift_hours` | NUMERIC(4,1) | Hours owed (with the above). Attunement derives + reflects it as an `X/Yh` line |
 | `created_at` | TIMESTAMPTZ | |
 
 Each group also gets a message **thread** — one `conversations` row (`type='group'`, `group_id` set), created on group creation (`POST /api/admin/groups`) and backfilled for existing groups by migration `033`. See [group-messaging.md](group-messaging.md) and the Group Threads feature.
@@ -222,42 +226,83 @@ This table is the **source of truth for group thread access** — group messagin
 
 ### `schedule_events`
 
-Public camp schedule entries.
+Public camp schedule entries. **Reworked by the shifts redesign** (see [shifts-redesign.md](shifts-redesign.md)): every event now carries a `participation_type`, and shift-behaved events belong to a `shift_types` row and carry structured start/end times.
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | UUID PK | |
-| `day` | TEXT | Day label (e.g. `"Thursday"`) |
-| `time` | TEXT | Display time string |
+| `day` | TEXT | Weekday label (e.g. `"Thursday"`) — **derived from `event_date`** on save (admin API), never set by hand |
+| `time` | TEXT | Display time string. For shift events it's derived from `start_time`/`end_time` (`formatShiftRange`) |
 | `title` | TEXT | |
 | `subtitle` | TEXT | |
 | `detail_desc` | TEXT | Expanded description |
-| `icon_type` | TEXT | Emoji or icon identifier |
+| `icon_type` | TEXT | Icon identifier: a built-in glyph name (legacy) or an image URL from the asset library / upload (`AssetImagePicker`) |
 | `visible` | BOOL | Whether shown on public schedule |
 | `highlight` | BOOL | Whether visually highlighted |
-| `is_recurring` | BOOL | |
-| `capacity` | INT | |
-| `event_type` | TEXT | `null` (general) / `'all_hands'` / `'camp_tending'` / `'service'` |
+| `is_recurring` | BOOL | Daily recurring (no date) |
 | `sort_order` | INT | |
-| `contribution_type` | TEXT | A **group name** (e.g. `'Setup'` / `'Teardown'` / `'Decor'`) — shows the event on the personal schedule of members in that group (matched by group name in `lib/groups.ts`) |
-| `event_date` | DATE | Actual calendar date. Used to filter Upcoming Gatherings to next 14 days. NULL = always show |
-| `event_category` | TEXT | `'at_camp'` (default) / `'pre_camp'` — splits dashboard into separate sections |
+| `event_date` | DATE | The event's real calendar date. **Required for non-recurring events** (editor enforces); drives calendar day columns, admin list ordering, and Upcoming Gatherings filtering |
+| `participation_type` | TEXT | `'general'` (optional/info) / `'shift'` (signable slots) / `'mandatory'` (everyone attends). Migration `046` |
+| `shift_type_id` | UUID FK → `shift_types.id` | Which kind of shift this slot is (shift events only). `ON DELETE SET NULL`. Migration `046` |
+| `requires_ack` | BOOL | Mandatory events only: whether members must acknowledge ("I'll be there"). Per-event toggle; ack flow not yet built member-side. Migration `045` |
+| `start_time` / `end_time` | TEXT | `"HH:MM"` 24-hour (shift events only). Duration = `shiftDurationHours` (`lib/shift-hours.ts`) — what counts toward hours requirements. Migration `047` |
+| `capacity` | INT | Shift events only: max signups per slot. NULL = unlimited |
+| `event_type` | TEXT | **Legacy** (`'all_hands'`/`'camp_tending'`/`'service'`). No longer set by hand — derived (`'all_hands'` for mandatory) by `lib/event-type-compat.ts` for old readers. Drop in final cleanup |
+| `contribution_type` | TEXT | **Legacy** group-name tag. Now derived (= shift type name) by `lib/event-type-compat.ts`. Drop in final cleanup |
+| `event_category` | TEXT | **Legacy** `'at_camp'`/`'pre_camp'` — pre-camp superseded by Lead-Up Gatherings; no longer editable in the admin. Drop in final cleanup |
+| `event_type_id` | UUID FK | **Dormant** — migration `045`'s first-draft registry (`event_types`), superseded by `046`'s `shift_types` model. Drop in final cleanup |
 
-`event_type` drives event color coding — see [design-system.md → Event Type Colors](design-system.md#event-type-colors).
+Colours key off `participation_type` + the shift type's palette slot — see [design-system.md → Event Type Colors](design-system.md#event-type-colors).
+
+---
+
+### `shift_types`
+
+The configurable registry of shift **kinds** (Setup, Teardown, Decor, Service, …). Migration `046`. Deliberately **requirement-free**: a type on its own is just *available* (e.g. an optional Tea shift). Requirements are authored on whoever owes them — a group/role (`required_shift_type_id` + `required_shift_hours`) or an attunement `shift` task (everyone). Managed in Admin → Configure → Structure → **Shift Types** (`ShiftTypesManager.tsx`); API `/api/admin/shift-types`. Each type's registry position (sort order) doubles as its colour palette slot (`lib/shift-colors.ts`).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `name` | TEXT NOT NULL | e.g. "Service" |
+| `icon` | TEXT | Emoji |
+| `sort_order` | INT | Also the colour palette index |
+| `backfill_key` | TEXT UNIQUE | Provenance of migration-seeded rows; NULL for admin-created |
+
+---
+
+### `member_shift_signups`
+
+Many-to-many shift holds — a member can sign up for **any number** of shift events (replaces the single `camp_signups.schedule_event_id`). Written by the member `/api/shift-signups` API (POST/DELETE) and the admin `remove_shift`/`clear_shift` actions. A member's held hours per shift type (summed `shiftDurationHours` of their slots, `lib/shift-attunement.ts`) are what satisfy hour requirements.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `clerk_user_id` | TEXT NOT NULL | Join key (matches `group_members` / `camp_signups`) |
+| `schedule_event_id` | UUID FK → `schedule_events.id` ON DELETE CASCADE | |
+| `created_at` | TIMESTAMPTZ | |
+
+`UNIQUE (clerk_user_id, schedule_event_id)` — re-signing the same slot is a no-op.
+
+---
+
+### `event_types` *(dormant)*
+
+Migration `045`'s first-draft registry (behaviour + binding + hours **on the type**) — superseded within the same day by the corrected model (`shift_types` + requirements on groups/roles/attunement, migration `046`). No code reads it. Dropped in the final cleanup migration along with `schedule_events.event_type_id`.
 
 ---
 
 ### `camp_signups`
 
-One row per approved camper's role+shift assignment.
+One row per approved camper's **role** assignment (the shift half is superseded).
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | UUID PK | |
 | `clerk_user_id` | TEXT | |
 | `role_id` | UUID FK → `roles.id` | |
-| `schedule_event_id` | UUID FK → `schedule_events.id` | |
+| `schedule_event_id` | UUID FK → `schedule_events.id` | **Legacy single shift** — superseded by `member_shift_signups` (many-to-many). Still read (unioned, deduped) for back-compat; never written by the new member flow; cancelling a shift clears it too. Drop in final cleanup |
 | `role_approval_status` | TEXT | Approval state for the specific role claim |
+| `shift_id` | UUID FK | **Dead** — pointed at the removed original `shifts` table. Drop in final cleanup |
 
 > **Note:** There is no Supabase FK between `camp_signups` and `applications`. Always fetch both tables separately and join in JS.
 
@@ -334,8 +379,9 @@ Admin-editable copy for the homepage. One row per key.
 - `member_attendance_options` — JSON array of strings. Radio options for the attendance question in the application form. Falls back to `DEFAULT_ATTENDANCE_OPTIONS` in `lib/site-config.ts`.
 - `member_membership_types` — JSON array of strings. Options for the membership type dropdown in profile settings. Falls back to `MEMBERSHIP_TYPE_OPTIONS` in `lib/application-options.ts`.
 - `community_contribution_types` — **Retired** in migration `030` (Groups replaced contribution types). No longer read; the Application Builder "Contribution Types" tab and the `setup_preference` application field were removed. Any existing row is orphaned/harmless. `parseContributionTypes`/`DEFAULT_CONTRIBUTION_TYPES` remain in `lib/application-options.ts` only as the `ContributionType` shape (`{ value, icon, description }`) reused for group commitment metadata.
-- `config_attunement_tasks` — JSON array of `AttunementTask` objects (`{ id, label, requirement, enabled }`) driving the profile **Attunement Status** checklist. `requirement` is one of `role | shift | contribution | photo | approved` and auto-completes the item (logic in `app/profile/page.tsx`). Managed via Admin → Manage → Attunement Tasks (`AttunementTasksManager.tsx`). Falls back to `DEFAULT_ATTUNEMENT_TASKS` in `lib/site-config.ts` (mirrors the original five items).
-- `config_shift_signup_open` — string `'true'`/`'false'` (defaults open when absent). When `'false'`, the `/signup` shift picker is hidden behind a "times not confirmed" notice, `/api/signup` POST rejects new/changed shift selections (cancelling an existing shift is still allowed), and any `shift`-requirement attunement task is hidden from the profile checklist (`app/profile/page.tsx`). Toggled via Admin → Manage → Schedule (`ShiftSignupToggle.tsx`). Read by `app/api/signup/route.ts` (returns `shiftSignupOpen` on GET).
+- `config_attunement_tasks` — JSON array of `AttunementTask` objects (`{ id, label, requirement, enabled, collectionId?, requiredCount?, shiftTypeId?, requiredHours? }`) driving the profile **Attunement Status** checklist. `requirement` is one of `role | shift | collection | photo | approved` and auto-completes the item (logic in `buildAttunementChecklist`, `lib/attunement.ts`). A `shift` task with a `shiftTypeId` + `requiredHours` is the **universal** hours requirement ("everyone owes 3h of Service"), completed when the member's held hours of that type reach the target; without a `shiftTypeId` it's the legacy "holds any shift" boolean. Group/role-conditional requirements are **not** authored here — they live on the group/role and appear as derived checklist lines. Managed via Admin → Configure → Attunement Tasks (`AttunementTasksManager.tsx`). Falls back to `DEFAULT_ATTUNEMENT_TASKS` in `lib/site-config.ts`.
+- `config_shift_signup_open` — string `'true'`/`'false'` (defaults open when absent). When `'false'`, the `/signup` shift calendar is hidden behind a "times not confirmed" notice, `/api/shift-signups` POST rejects new signups (cancelling stays allowed), and shift-requirement attunement lines (authored + derived) are hidden from the checklist. Toggled via Admin → Manage → Schedule (`ShiftSignupToggle.tsx`).
+- `config_event_start_date` / `config_event_end_date` — `"YYYY-MM-DD"` strings: the event's overall date range. The schedule calendars (`ScheduleSection` → `ScheduleCalendarClient`) show a day column for every date in this range (∪ any real event dates outside it — `lib/schedule-days.ts`). Managed via Admin → Configure → Structure → **Event Dates** (`EventDatesManager.tsx`).
 - `config_distinctions` — JSON array of `DistinctionRule` objects (`{ id, label, description?, image?, glyph?, engraving?, yearFact?, conditions[], enabled }`) driving the profile **Cabinet of Distinctions**. `image` is an asset-library path or uploaded URL; `engraving` is an optional short static caption (≤32 chars) shown under the medal. Each rule's `conditions` (`{ fact, op, value }`, all must pass) are evaluated against derived member facts — **earned medals are never stored** (see [features.md](features.md#distinctions)). Managed via Admin → Distinctions (`DistinctionsManager.tsx`). Parsed/evaluated by `lib/distinctions.ts` (`parseDistinctions`/`evaluateDistinctions`); facts come from `lib/member-facts.ts` (`buildMemberFacts`). Falls back to `DEFAULT_DISTINCTIONS`.
 
 - `config_profile_fields` — JSON array of `ProfileField` objects (`{ key, label, type, options?, default?, public, memberEditable, applicationEligible, distinctionEligible, askExisting?, required?, system?, enabled }`) — the **Profile Field registry** defining each member profile detail field (bio, quote, + admin-added). Managed via Admin → Configure → **Profile Fields** (`ProfileFieldsManager.tsx`); parsed by `parseProfileFields` in `lib/profile-fields.ts`, falling back to `DEFAULT_PROFILE_FIELDS`. `public` = **Visible** on the member profile (off = admin-only, shown on `/admin/[id]`); `key` is the stable identity that member answers are stored under in `member_profiles.values`. See [profile-architecture.md](profile-architecture.md) and [features.md](features.md).
@@ -488,6 +534,12 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `039_lead_up_gatherings.sql` | **Lead-Up Gatherings.** Adds `lead_up_events` + `lead_up_event_rsvps` tables — real-dated planning sessions on the runway to the event, separate from `schedule_events`. Additive + idempotent; **must be applied** before the feature works. See [`lead-up-gatherings.md`](./lead-up-gatherings.md). |
 | `040_lead_up_notified.sql` | `notified_at TIMESTAMPTZ` on `lead_up_events` — tracks the "Notify members" broadcast. Additive + idempotent. |
 | `041_lead_up_image.sql` | `image_url TEXT` on `lead_up_events` + public `lead-up-images` storage bucket & read policy. Additive + idempotent; **must be applied** (or create the bucket manually) before image upload works. |
+| `042_group_collections.sql` | **Group Collections.** Adds `group_collections` + `groups.collection_id`; backfills uncollected groups into a default "Contributions" collection. |
+| `043_group_collection_profile_visibility.sql` | `show_on_profile BOOL` on `group_collections`. |
+| `044_group_collection_self_join.sql` | `self_join BOOL` on `group_collections` (collection-level Participate self-join gate; retires per-group `apply_selectable`). |
+| `045_shifts_redesign.sql` | **Shifts redesign, first draft.** `event_types` registry + `schedule_events.event_type_id`/`requires_ack` + `member_shift_signups` (backfilled from `camp_signups`). The `event_types` half was superseded by `046`; `member_shift_signups` + `requires_ack` remain canonical. |
+| `046_shift_types_reshape.sql` | **Shifts redesign, corrected model.** `shift_types` registry (requirement-free kinds); `schedule_events.participation_type` + `shift_type_id`; optional `required_shift_type_id`/`required_shift_hours` on `groups` **and** `roles`. Backfills from `045`'s seed; leaves `event_types` dormant. |
+| `047_shift_times.sql` | `start_time`/`end_time` ("HH:MM") on `schedule_events` — shift durations for hours math (`lib/shift-hours.ts`). No backfill; times set in the schedule editor. |
 
 ---
 

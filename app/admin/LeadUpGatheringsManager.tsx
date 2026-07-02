@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { normaliseToken } from '@/lib/time-format'
+import { LoadError } from './LoadError'
 
 type LeadUpEvent = {
   id: string
@@ -253,6 +254,7 @@ function GatheringModal({ initial, isCreate, onSave, onClose, saving, error }: {
 export function LeadUpGatheringsManager() {
   const [events, setEvents] = useState<LeadUpEvent[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [modal, setModal] = useState<{ mode: 'add' } | { mode: 'edit'; event: LeadUpEvent } | null>(null)
   const [saving, setSaving] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
@@ -260,10 +262,14 @@ export function LeadUpGatheringsManager() {
   const [notifyResult, setNotifyResult] = useState<{ id: string; text: string } | null>(null)
 
   const load = async () => {
-    const res = await fetch('/api/admin/lead-up-events')
-    if (res.ok) {
+    setLoadError(false)
+    try {
+      const res = await fetch('/api/admin/lead-up-events')
+      if (!res.ok) throw new Error()
       const json = await res.json()
       setEvents(json.events)
+    } catch {
+      setLoadError(true)
     }
     setLoading(false)
   }
@@ -353,6 +359,7 @@ export function LeadUpGatheringsManager() {
   }
 
   if (loading) return <p style={{ opacity: 0.4, fontStyle: 'italic', fontSize: '0.875rem' }}>Loading…</p>
+  if (loadError) return <LoadError onRetry={() => { setLoading(true); load() }} />
 
   return (
     <div>
@@ -371,7 +378,10 @@ export function LeadUpGatheringsManager() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         {events.length === 0 && <p style={{ opacity: 0.35, fontStyle: 'italic', fontSize: '0.82rem' }}>No gatherings yet.</p>}
-        {events.map(ev => (
+        {events.map(ev => {
+          // Local calendar date (en-CA = YYYY-MM-DD) so "today" isn't past.
+          const isPast = !!ev.event_date && ev.event_date < new Date().toLocaleDateString('en-CA')
+          return (
           <div
             key={ev.id}
             style={{
@@ -379,7 +389,7 @@ export function LeadUpGatheringsManager() {
               padding: '0.75rem 1rem', borderRadius: '0.65rem',
               border: '1px solid rgba(200,168,72,0.12)',
               background: ev.visible ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.005)',
-              opacity: ev.visible ? 1 : 0.5,
+              opacity: !ev.visible ? 0.5 : isPast ? 0.6 : 1,
             }}
           >
             <div style={{
@@ -391,7 +401,14 @@ export function LeadUpGatheringsManager() {
             </div>
 
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontSize: '0.88rem', fontWeight: 600, color: '#F3EDE6', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.title}</p>
+              <p style={{ fontSize: '0.88rem', fontWeight: 600, color: '#F3EDE6', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {ev.title}
+                {isPast && (
+                  <span style={{ marginLeft: '0.5rem', fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#F3EDE6', opacity: 0.45, border: '1px solid rgba(243,237,230,0.2)', borderRadius: '9999px', padding: '0.1rem 0.5rem', verticalAlign: 'middle' }}>
+                    Past
+                  </span>
+                )}
+              </p>
               <p style={{ fontSize: '0.7rem', opacity: 0.45, margin: '0.15rem 0 0' }}>
                 {[ev.start_time, ev.location || (ev.link ? 'Online' : null), ev.host].filter(Boolean).join(' · ') || '—'}
               </p>
@@ -409,6 +426,8 @@ export function LeadUpGatheringsManager() {
             </div>
 
             <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
+              {/* No alerting members about a gathering that already happened. */}
+              {!isPast && (
               <button
                 onClick={() => handleNotify(ev)}
                 disabled={notifyingId === ev.id}
@@ -422,7 +441,8 @@ export function LeadUpGatheringsManager() {
               >
                 {notifyingId === ev.id ? 'Sending…' : ev.notified_at ? '↻ Notify' : '🔔 Notify'}
               </button>
-              <button onClick={() => handleToggleVisible(ev)} title={ev.visible ? 'Hide' : 'Show'} style={{ background: 'none', border: '1px solid rgba(200,168,72,0.2)', borderRadius: '0.4rem', color: '#C8A848', cursor: 'pointer', padding: '0.25rem 0.5rem', fontSize: '0.7rem', opacity: 0.6 }}>
+              )}
+              <button onClick={() => handleToggleVisible(ev)} title={ev.visible ? 'Visible to members — click to hide' : 'Hidden from members — click to show'} aria-label={ev.visible ? 'Visible to members — click to hide' : 'Hidden from members — click to show'} style={{ background: 'none', border: '1px solid rgba(200,168,72,0.2)', borderRadius: '0.4rem', color: '#C8A848', cursor: 'pointer', padding: '0.25rem 0.5rem', fontSize: '0.7rem', opacity: 0.6 }}>
                 {ev.visible ? '●' : '○'}
               </button>
               <button onClick={() => { setModal({ mode: 'edit', event: ev }); setModalError(null) }} style={{ background: 'none', border: '1px solid rgba(200,168,72,0.2)', borderRadius: '0.4rem', color: '#C8A848', cursor: 'pointer', padding: '0.25rem 0.5rem', fontSize: '0.7rem', opacity: 0.6 }}>
@@ -433,7 +453,8 @@ export function LeadUpGatheringsManager() {
               </button>
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
 
       {modal && (

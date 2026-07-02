@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<circle cx="32" cy="32" r="27.5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+<g transform="translate(32 32) scale(0.68) translate(-32 -32)">
+  <g fill="currentColor">
+    <path d="M17.5 27 H46.5 C46.5 37 40.5 42.5 32 42.5 C23.5 42.5 17.5 37 17.5 27 Z"/>
+    <rect x="30.3" y="43.5" width="3.4" height="4.5"/>
+    <path d="M23.5 53.5 C23.5 50 27 48 32 48 C37 48 40.5 50 40.5 53.5 Z"/>
+  </g>
+  <g fill="#D239F8">
+    <path d="M32 23.5 C29 19 30 14 32 9.5 C34 14 35 19 32 23.5 Z"/>
+    <path d="M25.2 22.5 C23.7 19.5 24.6 16.9 26.6 14.5 C27.6 17.5 27.1 20.4 25.2 22.5 Z"/>
+    <path d="M38.8 22.5 C40.3 19.5 39.4 16.9 37.4 14.5 C36.4 17.5 36.9 20.4 38.8 22.5 Z"/>
+  </g>
+</g>
+</svg>

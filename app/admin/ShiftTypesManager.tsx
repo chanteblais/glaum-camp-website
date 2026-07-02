@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { LoadError } from './LoadError'
 
 // A shift type is just a named, requirement-free KIND of shift (Setup, Service,
 // Tea, …). Requirement-ness lives elsewhere: on a group/role (conditional) or an
@@ -64,17 +65,22 @@ const EMPTY: Form = { name: '', icon: '' }
 export function ShiftTypesManager() {
   const [types, setTypes] = useState<ShiftType[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [editing, setEditing] = useState<ShiftType | null>(null)
   const [creating, setCreating] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
+  const load = () => {
+    setLoadError(false)
     fetch('/api/admin/shift-types')
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error(); return r.json() })
       .then(d => setTypes(d.shiftTypes ?? []))
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false))
-  }, [])
+  }
+
+  useEffect(load, [])
 
   async function handleCreate(form: Form) {
     setSaving(true); setError(null)
@@ -107,6 +113,7 @@ export function ShiftTypesManager() {
   }
 
   if (loading) return <p style={{ opacity: 0.4, fontSize: '0.85rem' }}>Loading…</p>
+  if (loadError) return <LoadError onRetry={() => { setLoading(true); load() }} />
 
   const sorted = [...types].sort((a, b) => a.sort_order - b.sort_order)
 

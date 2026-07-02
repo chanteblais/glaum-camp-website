@@ -140,6 +140,14 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
 
   const hasValue = (v: unknown) => Array.isArray(v) ? v.length > 0 : !!String(v ?? '').trim()
 
+  // Profile-backed answers (fields wired to the Profile Field registry via
+  // profileFieldKey) render once, in Profile Details — the canonical, current
+  // value. Repeating the submitted application copy above it showed the same
+  // text twice, and the two could silently disagree once the member edits their
+  // profile. If the member has no canonical value yet (e.g. a pending
+  // applicant), the application answer still shows.
+  const canonicalKeys = new Set(profileDetailFields.map(f => f.key))
+
   const sections: { title: string; fields: RenderField[] }[] = []
   const seen = new Set<string>()
 
@@ -150,6 +158,12 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
       if (!f.visible || f.element) continue        // skip hidden + layout-only entries
       if (f.type === 'group_select') continue      // group opt-in isn't stored as an answer
       if (f.key === 'avatar_url') continue         // already shown in the header
+      if (f.profileFieldKey && canonicalKeys.has(f.profileFieldKey)) {
+        // Lives in Profile Details; mark as handled so the orphan sweep below
+        // doesn't resurface the stored answer under "Additional Responses".
+        seen.add(f.key); seen.add(f.key + '__other')
+        continue
+      }
 
       let value: string | string[]
       let other: string | undefined

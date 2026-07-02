@@ -4,7 +4,13 @@
 // caches HTML navigations or API requests, so authenticated (Clerk) content is
 // always fetched fresh. Push handling will be added in step 2.
 
-const CACHE = 'glaum-static-v1'
+const CACHE = 'glaum-static-v2'
+
+// Local dev is exempt from caching entirely: dev chunk paths are stable across
+// edits (no content hashes), so cache-first would keep serving stale code after
+// every change. The version bump above also purges caches already poisoned this
+// way (activate deletes all other cache keys).
+const IS_DEV_HOST = self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1'
 
 // Same-origin paths / extensions that are safe to cache (immutable assets).
 const STATIC_PATH = /\/(?:_next\/static|favicon|fonts)\//
@@ -26,6 +32,7 @@ self.addEventListener('activate', (event) => {
 })
 
 self.addEventListener('fetch', (event) => {
+  if (IS_DEV_HOST) return
   const { request } = event
   if (request.method !== 'GET') return
 

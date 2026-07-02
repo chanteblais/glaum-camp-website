@@ -5,6 +5,7 @@ import { NotificationBell } from '@/app/admin/NotificationBell'
 import { AdminNav } from '@/app/admin/AdminNav'
 import { MembersDropdown } from './MembersDropdown'
 import { getGroupNamesByUser } from '@/lib/groups'
+import { getShiftEventByUser } from '@/lib/shift-signups'
 
 const HOURS_PER_MEMBER = 3
 
@@ -66,11 +67,11 @@ export default async function OverviewPage() {
   ] = await Promise.all([
     supabaseAdmin
       .from('applications')
-      .select('id, first_name, last_name, preferred_name, email, status, setup_preference, setup_limitations, setup_available, clerk_user_id, rideshare')
+      .select('id, first_name, last_name, preferred_name, email, status, clerk_user_id, rideshare')
       .order('submitted_at', { ascending: false }),
     supabaseAdmin
       .from('camp_signups')
-      .select('clerk_user_id, role_id, schedule_event_id, role_approval_status'),
+      .select('clerk_user_id, role_id, role_approval_status'),
     supabaseAdmin
       .from('volunteers')
       .select('id, first_name, last_name, preferred_name, email, status')
@@ -120,14 +121,16 @@ export default async function OverviewPage() {
     return { ...p, options, counts, totalVoters: voters.size }
   })
 
-  // Build signup lookup
+  // Build signup lookup. Roles come from camp_signups; "has a shift" uses the
+  // shared union with member_shift_signups so Overview agrees with Manage.
   const signupMap = new Map((signups ?? []).map(s => [s.clerk_user_id, s]))
+  const shiftEventByUser = await getShiftEventByUser()
 
   // Members with signup status
   const members = approved.map(a => {
     const signup = a.clerk_user_id ? signupMap.get(a.clerk_user_id) : undefined
     const hasRole = !!signup?.role_id
-    const hasShift = !!signup?.schedule_event_id
+    const hasShift = !!(a.clerk_user_id && shiftEventByUser[a.clerk_user_id])
     const rolePending = signup?.role_approval_status === 'pending'
     return {
       id: a.id as string,
@@ -148,13 +151,18 @@ export default async function OverviewPage() {
   const pendingHours = incomplete * HOURS_PER_MEMBER
   const volunteerHours = activeVolunteers.length * HOURS_PER_MEMBER
 
-  // Contributions — derived from group membership (admin-assigned groups).
-  const groupNamesByUser = await getGroupNamesByUser()
+  // Groups — one card per admin-configured group, so renames/additions in
+  // Admin → Groups show up here without code changes.
+  const [groupNamesByUser, { data: groupRows }] = await Promise.all([
+    getGroupNamesByUser(),
+    supabaseAdmin.from('groups').select('id, name').order('sort_order'),
+  ])
   const memberGroupNames = (a: { clerk_user_id?: string | null }) => (a.clerk_user_id ? groupNamesByUser[a.clerk_user_id] ?? [] : [])
-  const setupTeam = approved.filter(a => memberGroupNames(a).includes('Setup'))
-  const teardownTeam = approved.filter(a => memberGroupNames(a).includes('Teardown'))
-  const decorTeam = approved.filter(a => memberGroupNames(a).includes('Decor'))
-  const limitations = approved.filter(a => ((a.setup_limitations as string[]) ?? []).length > 0)
+  const groupCards = (groupRows ?? []).map(g => ({
+    id: g.id as string,
+    name: g.name as string,
+    members: approved.filter(a => memberGroupNames(a).includes(g.name)),
+  }))
   const unassigned = approved.filter(a => memberGroupNames(a).length === 0)
 
   // Rideshare
@@ -178,7 +186,7 @@ export default async function OverviewPage() {
         </div>
 
         <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(1.8rem, 5vw, 2.5rem)', color: '#C8A848', marginBottom: '0.5rem', textAlign: 'center' }}>
-          ManyHands Registry
+          Overview
         </h1>
         <p style={{ textAlign: 'center', opacity: 0.4, fontSize: '0.85rem', marginBottom: '2.5rem' }}>
           {pending.length} pending · {approved.length} approved
@@ -248,46 +256,35 @@ export default async function OverviewPage() {
 
         <div style={divider} />
 
-        {/* ── SETUP & TEARDOWN ── */}
+        {/* ── GROUPS ── */}
         <section>
           <p style={{ fontSize: '0.65rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, marginBottom: '1.25rem' }}>
-            Setup & Teardown
+            Groups
           </p>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
-            <div style={card()}>
-              <p style={statLabel}>Setup</p>
-              <p style={statValue}>{setupTeam.length}</p>
-              <MemberPills members={setupTeam} />
+          {groupCards.length === 0 ? (
+            <p style={{ fontSize: '0.85rem', opacity: 0.35, fontStyle: 'italic' }}>No groups configured yet.</p>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+              {groupCards.map(g => (
+                <div key={g.id} style={card()}>
+                  <p style={statLabel}>{g.name}</p>
+                  <p style={statValue}>{g.members.length}</p>
+                  <MemberPills members={g.members} />
+                </div>
+              ))}
             </div>
-            <div style={card()}>
-              <p style={statLabel}>Teardown</p>
-              <p style={statValue}>{teardownTeam.length}</p>
-              <MemberPills members={teardownTeam} />
-            </div>
-            <div style={card()}>
-              <p style={statLabel}>Decor</p>
-              <p style={statValue}>{decorTeam.length}</p>
-              <MemberPills members={decorTeam} />
-            </div>
-          </div>
+          )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-            {limitations.length > 0 && (
-              <div style={{ ...card(), borderColor: 'rgba(255,180,50,0.2)', background: 'rgba(255,180,50,0.03)' }}>
-                <p style={{ ...statLabel, color: '#ffb432' }}>Noted limitations</p>
-                <p style={{ ...statValue, fontSize: '1.5rem', color: '#ffb432' }}>{limitations.length}</p>
-                <MemberPills members={limitations} />
-              </div>
-            )}
-            {unassigned.length > 0 && (
+          {unassigned.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
               <div style={{ ...card(), opacity: 0.7 }}>
-                <p style={statLabel}>Not yet answered</p>
+                <p style={statLabel}>In no group</p>
                 <p style={{ ...statValue, fontSize: '1.5rem' }}>{unassigned.length}</p>
                 <MemberPills members={unassigned} />
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </section>
 
         <div style={divider} />

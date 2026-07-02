@@ -51,7 +51,7 @@ flowchart TD
         (admin-assigned; or applicant
         opt-in via a Group selection field)"]
         ATUNE --> PICK_ROLE["③ Pick a role"]
-        ATUNE --> PICK_SHIFT["④ Pick a shift"]
+        ATUNE --> PICK_SHIFT["④ Sign up for shifts (hours requirements)"]
 
         PICK_ROLE --> NOTHING_FITS{"Nothing fits?"}
         NOTHING_FITS -- Yes --> SUGGEST["Suggest a dept / role
@@ -117,4 +117,4 @@ flowchart TD
 - **Cancelled members** — what happens after cancellation? No re-entry route exists yet.
 - **Volunteer ↔ member overlap** — can someone be both a volunteer and an applicant?
 - **Role suggestion loop** — after a suggestion is approved and the role is created, does the member automatically land on it, or do they have to go find it in the picker?
-- **Shift assignment** — currently self-serve; is there a future admin-assigned shift flow?
+- **Shift assignment** — self-serve, multi-shift with hour requirements since the shifts redesign (2026-07-01, see `shifts-redesign.md`); admins can remove a member's shifts but there's no admin-*assign* flow yet.

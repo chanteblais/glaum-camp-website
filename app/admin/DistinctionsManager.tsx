@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   DISTINCTION_OPS,
   DISTINCTION_ENGRAVING_MAX,
@@ -72,38 +72,37 @@ export function DistinctionsManager({
   const [rules, setRules] = useState<DistinctionRule[]>(initialDistinctions)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // Manual save: edits stay local until "Save changes" is clicked. `dirty` tracks
-  // unsaved edits so the button/status make the state obvious.
-  const [dirty, setDirty] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  async function save() {
-    setSaving(true)
-    try {
-      const res = await fetch('/api/admin/page-content', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ config_distinctions: JSON.stringify(rules) }),
-      })
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}))
-        setError(d.error ?? 'Failed to save')
-      } else {
-        setError(null); setDirty(false); setSaved(true); setTimeout(() => setSaved(false), 2500)
+  // Debounced autosave — same feedback pattern as the sibling Configure sections
+  // (Attunement Tasks, Event Dates, Profile Fields): edit, then a transient
+  // "Saved ✓" confirms.
+  const save = useCallback((next: DistinctionRule[]) => {
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/admin/page-content', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ config_distinctions: JSON.stringify(next) }),
+        })
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}))
+          setError(d.error ?? 'Failed to save')
+          setSaved(false)
+        } else {
+          setError(null)
+          setSaved(true)
+          setTimeout(() => setSaved(false), 1800)
+        }
+      } catch {
+        setError('Network error')
+        setSaved(false)
       }
-    } catch { setError('Network error') }
-    setSaving(false)
-  }
+    }, 600)
+  }, [])
 
-  // Warn before leaving (tab close / refresh) with unsaved edits.
-  useEffect(() => {
-    if (!dirty) return
-    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
-    window.addEventListener('beforeunload', handler)
-    return () => window.removeEventListener('beforeunload', handler)
-  }, [dirty])
-
-  function update(next: DistinctionRule[]) { setRules(next); setDirty(true); setSaved(false) }
+  function update(next: DistinctionRule[]) { setRules(next); save(next) }
   const patch = (idx: number, change: Partial<DistinctionRule>) =>
     update(rules.map((r, i) => i === idx ? { ...r, ...change } : r))
 
@@ -377,29 +376,11 @@ export function DistinctionsManager({
         }}
       >+ Add distinction</button>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '1.25rem' }}>
-        <button
-          onClick={save}
-          disabled={!dirty || saving}
-          style={{
-            padding: '0.6rem 1.6rem', borderRadius: '9999px', border: 'none',
-            cursor: (!dirty || saving) ? 'default' : 'pointer',
-            background: (!dirty || saving) ? 'rgba(200,168,72,0.15)' : GOLD,
-            color: (!dirty || saving) ? 'rgba(243,237,230,0.5)' : '#1A0A24',
-            fontSize: '0.82rem', letterSpacing: '0.06em', fontWeight: 600,
-            transition: 'all 0.15s',
-          }}
-        >
-          {saving ? 'Saving…' : 'Save changes'}
-        </button>
-        <span style={{ fontSize: '0.75rem' }}>
-          {error
-            ? <span style={{ color: '#ff8a8a' }}>{error}</span>
-            : saving ? null
-            : dirty ? <span style={{ color: PURPLE, opacity: 0.85 }}>Unsaved changes</span>
-            : saved ? <span style={{ color: GOLD, opacity: 0.7 }}>Saved ✓</span>
-            : null}
-        </span>
+      <div style={{ minHeight: '1.2rem', marginTop: '0.9rem' }}>
+        {error
+          ? <p style={{ fontSize: '0.75rem', color: '#ff8a8a', margin: 0 }}>{error}</p>
+          : saved ? <p style={{ fontSize: '0.72rem', color: GOLD, opacity: 0.6, margin: 0 }}>Saved ✓</p>
+          : null}
       </div>
     </div>
   )

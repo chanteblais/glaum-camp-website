@@ -4,7 +4,6 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { ApplicationRow } from './ApplicationRow'
 import { CollapsibleSection } from './CollapsibleSection'
 import { VolunteersSection } from './VolunteersSection'
-import { NotificationsSection } from './NotificationsSection'
 import { NotificationBell } from './NotificationBell'
 import { AdminNav } from './AdminNav'
 import { CategoryHeading } from './CategoryHeading'
@@ -13,6 +12,7 @@ import { ScheduleManager } from './ScheduleManager'
 import { LeadUpGatheringsManager } from './LeadUpGatheringsManager'
 import { AnnouncementsManager } from './AnnouncementsManager'
 import { getGroupNamesByUser } from '@/lib/groups'
+import { getShiftEventByUser } from '@/lib/shift-signups'
 import { RoleRequestsSection } from './RoleRequestsSection'
 import { RoleSuggestionsSection } from './RoleSuggestionsSection'
 import { ShiftSignupToggle } from './ShiftSignupToggle'
@@ -41,18 +41,7 @@ export default async function AdminPage() {
 
   const groupNamesByUser = await getGroupNamesByUser()
 
-  // "Has a shift" per member — union of the many-to-many table and the legacy
-  // single signup column (a member counts if they hold at least one shift).
-  const [{ data: signupsRaw }, { data: multiSignupsRaw }] = await Promise.all([
-    supabaseAdmin.from('camp_signups').select('clerk_user_id, schedule_event_id'),
-    supabaseAdmin.from('member_shift_signups').select('clerk_user_id, schedule_event_id'),
-  ])
-  const signupEventMap: Record<string, string | null> = Object.fromEntries(
-    (signupsRaw ?? []).map(s => [s.clerk_user_id, s.schedule_event_id ?? null])
-  )
-  for (const s of multiSignupsRaw ?? []) {
-    if (s.schedule_event_id) signupEventMap[s.clerk_user_id] = s.schedule_event_id
-  }
+  const signupEventMap = await getShiftEventByUser()
 
   const { data: configRows } = await supabaseAdmin
     .from('page_content')
@@ -129,8 +118,6 @@ export default async function AdminPage() {
         <p style={{ textAlign: 'center', opacity: 0.5, fontSize: '0.85rem', marginBottom: '2.5rem' }}>
           {pending.length} pending · {approved.length} approved · {rejected.length} rejected · {cancelled.length} cancelled
         </p>
-
-        <NotificationsSection initialNotifications={notifications ?? []} />
 
         {dbError && (
           <div style={{ padding: '1rem 1.5rem', border: '1px solid rgba(255,80,80,0.4)', borderRadius: '0.75rem', background: 'rgba(255,0,0,0.05)', marginBottom: '2rem' }}>

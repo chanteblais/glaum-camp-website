@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { LoadError } from './LoadError'
 
 type Suggestion = {
   id: string
@@ -18,13 +19,18 @@ export function RoleSuggestionsSection() {
   const [loading, setLoading] = useState(true)
   const [deciding, setDeciding] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState(false)
 
-  useEffect(() => {
+  const load = () => {
+    setLoadError(false)
     fetch('/api/admin/role-suggestions')
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error(); return r.json() })
       .then(d => setSuggestions(d.suggestions ?? []))
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false))
-  }, [])
+  }
+
+  useEffect(load, [])
 
   async function handleDecision(id: string, decision: 'approved' | 'rejected') {
     setDeciding(id)
@@ -38,6 +44,7 @@ export function RoleSuggestionsSection() {
   }
 
   if (loading) return <p style={{ opacity: 0.4, fontSize: '0.85rem' }}>Loading…</p>
+  if (loadError) return <LoadError onRetry={() => { setLoading(true); load() }} />
 
   if (suggestions.length === 0) {
     return <p style={{ opacity: 0.4, fontSize: '0.85rem', fontStyle: 'italic' }}>No pending suggestions.</p>

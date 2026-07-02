@@ -1,5 +1,7 @@
 # Handoff: Schedule & Shifts redesign
 
+> **⚠️ Historical document (2026-07-01, pre-build).** The redesign it hands off was designed *and built* the same day — "nothing is built yet" below is no longer true, and several file/model details changed during design (event-type registry → shift types; participation lives on events). Current state: [shifts-redesign.md](shifts-redesign.md) (status + addendum), [features.md → Shifts](features.md). Kept for context only.
+
 Paste at the start of a new session. Project root: `glaum-camp-website/`.
 
 ## What this is

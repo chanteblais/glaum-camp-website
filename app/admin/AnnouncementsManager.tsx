@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { LoadError } from './LoadError'
 
 type Announcement = {
   id: string
@@ -135,15 +136,20 @@ function formatDate(ts: string) {
 export function AnnouncementsManager() {
   const [items, setItems] = useState<Announcement[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [modal, setModal] = useState<{ mode: 'add' } | { mode: 'edit'; item: Announcement } | null>(null)
   const [saving, setSaving] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
 
   const load = async () => {
-    const res = await fetch('/api/admin/announcements/all')
-    if (res.ok) {
+    setLoadError(false)
+    try {
+      const res = await fetch('/api/admin/announcements/all')
+      if (!res.ok) throw new Error()
       const json = await res.json()
       setItems(json.announcements)
+    } catch {
+      setLoadError(true)
     }
     setLoading(false)
   }
@@ -189,6 +195,7 @@ export function AnnouncementsManager() {
   }
 
   if (loading) return <p style={{ opacity: 0.4, fontStyle: 'italic', fontSize: '0.875rem' }}>Loading…</p>
+  if (loadError) return <LoadError onRetry={() => { setLoading(true); load() }} />
 
   return (
     <div>
@@ -225,7 +232,7 @@ export function AnnouncementsManager() {
               </p>
             </div>
             <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
-              <button onClick={() => handleToggleVisible(item)} title={item.visible ? 'Hide' : 'Show'} style={{ background: 'none', border: '1px solid rgba(200,168,72,0.2)', borderRadius: '0.4rem', color: '#C8A848', cursor: 'pointer', padding: '0.25rem 0.5rem', fontSize: '0.7rem', opacity: 0.6 }}>
+              <button onClick={() => handleToggleVisible(item)} title={item.visible ? 'Visible to members — click to hide' : 'Hidden from members — click to show'} aria-label={item.visible ? 'Visible to members — click to hide' : 'Hidden from members — click to show'} style={{ background: 'none', border: '1px solid rgba(200,168,72,0.2)', borderRadius: '0.4rem', color: '#C8A848', cursor: 'pointer', padding: '0.25rem 0.5rem', fontSize: '0.7rem', opacity: 0.6 }}>
                 {item.visible ? '●' : '○'}
               </button>
               <button onClick={() => { setModal({ mode: 'edit', item }); setModalError(null) }} style={{ background: 'none', border: '1px solid rgba(200,168,72,0.2)', borderRadius: '0.4rem', color: '#C8A848', cursor: 'pointer', padding: '0.25rem 0.5rem', fontSize: '0.7rem', opacity: 0.6 }}>

@@ -22,7 +22,9 @@ export function NotificationBell({
   const ref = useRef<HTMLDivElement>(null)
 
   const unreadCount = notifications.filter((n) => !n.read_at).length
-  const recent = notifications.slice(0, 6)
+  // The bell is the only notifications surface, so the dropdown shows the full
+  // fetched list (it scrolls) rather than a teaser.
+  const recent = notifications
 
   // Mark all unread as read silently (no router refresh — avoids state reset)
   const markAllRead = async () => {
@@ -30,6 +32,11 @@ export function NotificationBell({
       prev.map((n) => ({ ...n, read_at: n.read_at ?? new Date().toISOString() }))
     )
     fetch('/api/admin/notifications', { method: 'PATCH' }).catch(() => {})
+  }
+
+  const clearAll = async () => {
+    setNotifications([])
+    fetch('/api/admin/notifications', { method: 'DELETE' }).catch(() => {})
   }
 
   // Auto-mark as read when dropdown opens
@@ -144,10 +151,33 @@ export function NotificationBell({
           <div style={{
             padding: '0.9rem 1.1rem 0.7rem',
             borderBottom: '1px solid rgba(200,168,72,0.1)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '0.75rem',
           }}>
             <span style={{ fontSize: '0.7rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: '#D239F8', opacity: 0.85 }}>
               Notifications
             </span>
+            {recent.length > 0 && (
+              <button
+                type="button"
+                onClick={clearAll}
+                style={{
+                  border: '1px solid rgba(255,120,120,0.25)',
+                  background: 'transparent',
+                  color: '#ff8a8a',
+                  borderRadius: '9999px',
+                  padding: '0.15rem 0.6rem',
+                  fontSize: '0.62rem',
+                  letterSpacing: '0.06em',
+                  cursor: 'pointer',
+                  opacity: 0.8,
+                }}
+              >
+                Clear all
+              </button>
+            )}
           </div>
 
           {/* List */}
@@ -209,17 +239,6 @@ export function NotificationBell({
             </div>
           )}
 
-          {notifications.length > 6 && (
-            <div style={{ padding: '0.7rem 1.1rem', borderTop: '1px solid rgba(200,168,72,0.08)', textAlign: 'center' }}>
-              <a
-                href="/admin"
-                onClick={() => setOpen(false)}
-                style={{ fontSize: '0.72rem', color: '#C8A848', opacity: 0.5, textDecoration: 'none', letterSpacing: '0.06em' }}
-              >
-                See all in registry →
-              </a>
-            </div>
-          )}
         </div>
       )}
     </div>

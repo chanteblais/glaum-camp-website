@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { AssetImagePicker, type GroupIconOption } from './AssetImagePicker'
+import { LoadError } from './LoadError'
 
 type Group = {
   id: string
@@ -498,16 +499,22 @@ export function GroupsManager({ members }: { members: AssignableMember[] }) {
   const [creatingCol, setCreatingCol] = useState(false)
   const [savingCol, setSavingCol] = useState(false)
   const [colError, setColError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState(false)
 
-  useEffect(() => {
+  const load = () => {
+    setLoadError(false)
+    const getJson = (url: string) => fetch(url).then(r => { if (!r.ok) throw new Error(); return r.json() })
     Promise.all([
-      fetch('/api/admin/groups').then(r => r.json()),
-      fetch('/api/admin/group-collections').then(r => r.json()),
-      fetch('/api/admin/shift-types').then(r => r.json()),
+      getJson('/api/admin/groups'),
+      getJson('/api/admin/group-collections'),
+      getJson('/api/admin/shift-types'),
     ])
       .then(([g, c, s]) => { setGroups(g.groups ?? []); setCollections(c.collections ?? []); setShiftTypes(s.shiftTypes ?? []) })
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false))
-  }, [])
+  }
+
+  useEffect(load, [])
 
   // ── Groups ────────────────────────────────────────────────────────────────
   async function handleCreate(form: GroupForm) {
@@ -572,6 +579,7 @@ export function GroupsManager({ members }: { members: AssignableMember[] }) {
   }
 
   if (loading) return <p style={{ opacity: 0.4, fontSize: '0.85rem' }}>Loading…</p>
+  if (loadError) return <LoadError onRetry={() => { setLoading(true); load() }} />
 
   const sortedCollections = [...collections].sort((a, b) => a.sort_order - b.sort_order)
   const groupsFor = (cid: string) => groups.filter(g => g.collection_id === cid).sort((a, b) => a.sort_order - b.sort_order)

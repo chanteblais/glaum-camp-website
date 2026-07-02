@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<g stroke="currentColor" stroke-width="0.7" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M31.3 5 V10.5"/>
+  <path d="M25 6.6 L27.1 11.6"/>
+  <path d="M37.6 6.6 L35.5 11.6"/>
+  <path d="M19.6 10 L23 13.8"/>
+  <path d="M43 10 L39.6 13.8"/>
+</g>
+<path d="M16.2 15.120000000000001 Q16.455 17.245 17.9 17.5 Q16.455 17.755 16.2 19.88 Q15.944999999999999 17.755 14.5 17.5 Q15.944999999999999 17.245 16.2 15.120000000000001 Z" fill="currentColor"/><path d="M46.4 15.120000000000001 Q46.655 17.245 48.1 17.5 Q46.655 17.755 46.4 19.88 Q46.144999999999996 17.755 44.699999999999996 17.5 Q46.144999999999996 17.245 46.4 15.120000000000001 Z" fill="currentColor"/>
+<circle cx="20.6" cy="13.2" r="0.55" fill="currentColor"/><circle cx="42" cy="13.2" r="0.55" fill="currentColor"/>
+<g stroke="currentColor" stroke-width="1.05" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M21.55 35.5 V26 A1.55 1.55 0 0 1 24.65 26 V31.5 L25.6 31.5 V19 A1.55 1.55 0 0 1 28.7 19 V30 L29.75 30 V16 A1.55 1.55 0 0 1 32.85 16 V30 L33.9 30 V18.5 A1.55 1.55 0 0 1 37 18.5 V32.5 C38.1 31.3 40.2 29.1 41.8 28.3 C43.4 27.5 44.6 28.8 43.9 30.4 C42.9 32.5 40.2 34.7 39.1 37.4 C38.2 39.6 38.5 42.4 36.5 44.9 C34.2 47.6 29.4 48.2 26.2 46.5 C23.2 44.8 21.55 40.8 21.55 35.5 Z"/>
+</g>
+<path d="M30.6 35.940000000000005 Q30.885 38.315000000000005 32.5 38.6 Q30.885 38.885 30.6 41.26 Q30.315 38.885 28.700000000000003 38.6 Q30.315 38.315000000000005 30.6 35.940000000000005 Z" fill="currentColor"/>
+<g stroke="currentColor" stroke-width="0.7" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M25 44.3 Q30 47 34.5 43.9"/>
+</g>
+<circle cx="30.4" cy="51.5" r="0.7" fill="currentColor"/>
+</svg>

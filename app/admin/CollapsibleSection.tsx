@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 export function CollapsibleSection({
   title,
@@ -15,10 +15,27 @@ export function CollapsibleSection({
 }) {
   const [open, setOpen] = useState(defaultOpen)
 
+  // The console remembers how you left each section (keyed by title, per
+  // browser). Hydrate after mount so the server render stays deterministic.
+  const storageKey = `glaum-admin-section:${title}`
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(storageKey)
+      if (saved !== null) setOpen(saved === '1')
+    } catch { /* private mode etc. — keep default */ }
+  }, [storageKey])
+
+  const toggle = () => {
+    setOpen(o => {
+      try { localStorage.setItem(storageKey, o ? '0' : '1') } catch { /* ignore */ }
+      return !o
+    })
+  }
+
   return (
     <div style={{ marginBottom: '3rem' }}>
       <button
-        onClick={() => setOpen(!open)}
+        onClick={toggle}
         style={{
           width: '100%',
           display: 'flex',

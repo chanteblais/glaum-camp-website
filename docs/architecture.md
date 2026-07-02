@@ -75,8 +75,9 @@ Sign-out flow:
 |---|---|---|
 | `/api/apply` | POST | Submit application |
 | `/api/volunteer` | POST | Submit volunteer signup |
-| `/api/signup` | GET/POST | Fetch departments/roles/shifts + upsert member role+shift selection. Sets `role_approval_status = 'pending'` for roles with `requires_approval = true`. Preserves existing approval status on shift-only updates. |
-| `/api/groups/membership` | GET/POST | Self-service opt-in groups for the current member. GET lists groups flagged `apply_selectable` whose collection has `show_on_profile` on (no collection ⇒ visible) + the member's joined state; POST `{ group_id, joined }` joins (`source='application'`) or leaves (re-checks the same gate). Separate from the apply form's `group_select` fields. Powers the **Your Contributions** section on `/signup`. |
+| `/api/signup` | GET/POST | Fetch departments/roles + upsert member **role** selection. Sets `role_approval_status = 'pending'` for roles with `requires_approval = true`. (Shift halves are legacy — shifts moved to `/api/shift-signups`.) |
+| `/api/shift-signups` | GET/POST/DELETE | **Multi-shift signup** (shifts redesign): GET slots + owed hour requirements, POST sign up for a slot (capacity + signup-open enforced, admin notified), DELETE cancel (also clears the legacy `camp_signups.schedule_event_id`). Backed by `member_shift_signups`. |
+| `/api/groups/membership` | GET/POST | Self-service opt-in groups for the current member. GET lists groups whose **collection has `self_join` on** (migration `044`; no collection ⇒ not self-joinable) + the member's joined state, **grouped by collection** (each group carries `collection_id`/`collection_name`, ordered by collection `sort_order`); POST `{ group_id, joined }` joins (`source='application'`) or leaves (re-checks the same gate). Separate from the apply form's `group_select` fields, from `show_on_profile` (profile display), and from group `visibility` (Find-a-group). Powers the **Your Groups** section on `/signup`. |
 | `/api/profile/application` | PATCH | Update profile fields |
 | `/api/profile/avatar` | POST | Upload avatar to Supabase Storage |
 | `/api/profile/cancel` | POST | Cancel own application |
@@ -117,8 +118,8 @@ Sign-out flow:
 | `/api/admin/schedule` | GET/POST | List / create schedule events |
 | `/api/admin/schedule/[id]` | PATCH/DELETE | Update / delete event |
 | `/api/admin/schedule/icon` | POST | Upload custom event icon |
-| `/api/admin/shifts` | GET/POST | List / create shifts |
-| `/api/admin/shifts/[id]` | PATCH/DELETE | Update / delete shift |
+| `/api/admin/shifts` | GET/POST | **Dead** — legacy of the removed original `shifts` table; nothing calls it (removed in the shifts-redesign cleanup) |
+| `/api/admin/shift-types` | GET/POST | List / create shift types (the configurable registry; `/[id]` PATCH/DELETE to edit) |
 | `/api/admin/signups/[userId]` | GET/PATCH | View / manage member signups |
 | `/api/admin/role-requests` | GET | List pending role requests |
 | `/api/admin/role-requests/[userId]` | PATCH | Approve / reject role request |

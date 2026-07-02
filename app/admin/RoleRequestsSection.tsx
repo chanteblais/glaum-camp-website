@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { isImageIcon } from '@/lib/icon-src'
+import { LoadError } from './LoadError'
 
 type RoleRequest = {
   clerk_user_id: string
@@ -18,13 +19,18 @@ export function RoleRequestsSection() {
   const [requests, setRequests] = useState<RoleRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [deciding, setDeciding] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState(false)
 
-  useEffect(() => {
+  const load = () => {
+    setLoadError(false)
     fetch('/api/admin/role-requests')
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error(); return r.json() })
       .then(d => setRequests(d.requests ?? []))
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false))
-  }, [])
+  }
+
+  useEffect(load, [])
 
   async function handleDecision(userId: string, decision: 'approved' | 'rejected') {
     setDeciding(userId)
@@ -40,6 +46,7 @@ export function RoleRequestsSection() {
   }
 
   if (loading) return <p style={{ opacity: 0.4, fontSize: '0.85rem' }}>Loading…</p>
+  if (loadError) return <LoadError onRetry={() => { setLoading(true); load() }} />
 
   if (requests.length === 0) {
     return <p style={{ opacity: 0.4, fontSize: '0.85rem', fontStyle: 'italic' }}>No pending role requests.</p>

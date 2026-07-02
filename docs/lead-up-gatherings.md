@@ -4,7 +4,7 @@
 
 **Built:** migration `039_lead_up_gatherings.sql`; admin manager `app/admin/LeadUpGatheringsManager.tsx` (Manage → Program → "Lead-Up Gatherings") with admin APIs `app/api/admin/lead-up-events/{route,[id]/route}.ts`; member RSVP via `app/api/lead-up-events/route.ts` (list + RSVP state) + `app/api/lead-up-events/[id]/rsvp/route.ts` (toggle); member surface `app/schedule/LeadUpGatherings.tsx` ("Before We Gather" section on `/schedule`) + a home-dashboard teaser (the "events" widget's first list, sourced from `lead_up_events` instead of the old `pre_camp` schedule rows).
 
-**Pre-camp deprecation:** the homepage no longer sources its first gathering list from `schedule_events.event_category='pre_camp'`; it uses `lead_up_events`. The `event_category` column + the "Pre-Camp" option in `ScheduleManager` were **left intact** (no data mutation). Any existing `pre_camp` schedule rows should be re-entered as Lead-Up Gatherings; fully retiring the column (drop option + data migration) is a follow-up.
+**Pre-camp deprecation:** the homepage no longer sources its first gathering list from `schedule_events.event_category='pre_camp'`; it uses `lead_up_events`. The `event_category` column was **left intact** (no data mutation); the "Pre-Camp" option in `ScheduleManager` was later **removed entirely** by the shifts-redesign editor rework (the column is dormant, dropped in that redesign's final cleanup). Any existing `pre_camp` schedule rows should be re-entered as Lead-Up Gatherings; fully retiring the column (drop option + data migration) is a follow-up.
 **One-liner:** Real-dated planning/brainstorming sessions on the **runway to the event** — separate from the at-camp `schedule_events` program.
 
 ## The concept: one event, two phases

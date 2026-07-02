@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import { SITE_NAME } from '@/lib/site-config'
 
 type BeforeInstallPromptEvent = Event & {
@@ -31,6 +32,7 @@ function isStandalone() {
 export default function InstallPrompt() {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null)
   const [show, setShow] = useState(false)
+  const pathname = usePathname()
 
   useEffect(() => {
     if (isStandalone()) return
@@ -44,6 +46,10 @@ export default function InstallPrompt() {
     window.addEventListener('beforeinstallprompt', onBeforeInstall)
     return () => window.removeEventListener('beforeinstallprompt', onBeforeInstall)
   }, [])
+
+  // Not in the admin console: the nudge is for members, and as a fixed overlay
+  // it sits on top of the console's bottom rows of controls.
+  if (pathname?.startsWith('/admin')) return null
 
   if (!show || !deferred) return null
 

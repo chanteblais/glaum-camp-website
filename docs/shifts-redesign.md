@@ -1,6 +1,10 @@
 # Schedule & Shifts — redesign
 
-**Status:** design discussion 2026-07-01. **Not built.** Supersedes the current "a shift is a `schedule_events` row with a capacity" model. Captures decisions reached in conversation so they survive the session. The volunteer ↔ roles branch is **resolved** (see "The model" below): shift *kinds* are a configurable **event-type registry**, and roles/departments are just another **binding target** — symmetric with groups/collections — so nothing hangs off roles as a separate axis.
+**Status: BUILT & live-verified 2026-07-01** (same day as the design). Migrations 045–047 applied in prod; admin + member surfaces built and browser-verified; only the **final cleanup migration** (drop legacy columns/tables/routes + the compat shim) remains, deliberately deferred until the redesign has run in prod. This doc is the design history + build record. The current-state reference lives in [features.md → Shifts](features.md), [database.md](database.md), and [design-system.md → Event Type Colors](design-system.md).
+
+> ⚠️ **Reading order:** the sections below are chronological design history. The first model ("event-type registry" with binding+hours on the type, migration 045) was **corrected the same day** — see "Model corrected" mid-doc. The final model: fixed `participation_type` on events, a requirement-free `shift_types` registry, requirements authored on groups/roles/attunement tasks.
+
+Supersedes the old "a shift is a `schedule_events` row with a capacity" model.
 
 **One-liner:** Separate the *program* (what's happening) from *shifts* (where you're needed) and *mandatory events* (everyone attends), model shift kinds as configurable **categories** instead of hardcoded Setup/Teardown/Decor/Volunteer, and let attunement **reflect** shift requirements rather than re-declare them.
 
@@ -177,3 +181,18 @@ Each phase is independently build-verifiable (`tsc` clean) and leaves prod worki
 - **Keep the UX intuitive, not overcomplicated** — every "several sub-items" idea uses the *same* one-expandable-line shape.
 - **Not a What-If-specific implementation** — category names, mandatory flags, and requirements are all **data**; nothing hardcodes Setup/Teardown/Decor/Volunteer or the camp dates. (See generalizability log.)
 - **One source of truth** — requirements live on the shift type's binding; attunement is a view over them.
+
+---
+
+## Addendum — built beyond the numbered plan (2026-07-01)
+
+All verified live in the browser (signup→progress→cancel round-trip on a real account):
+
+- **Colours** (`lib/shift-colors.ts`): mandatory = the old all-hands teal; each shift type gets a distinct palette hue by registry position (Decor orange, Setup lake blue, Teardown moss, Service magenta). Shared by the main schedule, personal schedule, and picker. Per-type configurable colour = future hook.
+- **Member picker is a calendar** (Chante prefers picking by day): day columns derived from the shifts' real dates, cards coloured by type, owed-hours chips above, type legend below; one row on desktop (no scroll/wrap), stacked day sections on mobile; panel breaks out wider than the `/signup` text column on desktop. Native `confirm()` replaced with a styled `ShiftConfirmModal` (used by picker cards and the Your Shifts card).
+- **Schedule editor rework**: Day dropdown removed — `day` **derives from `event_date`** (server-side too, `weekdayFromISO`); non-recurring events require a date; admin list sorts by real date with `WED · JUL 22` rows (day-of-week sorting used to hide wrong-week mistakes). Icon selection = `AssetImagePicker` (Groups-style asset library + upload), replacing the glyph strip.
+- **Display calendars date-true**: both `ScheduleCalendarClient` and `PersonalScheduleCalendar` dropped their hardcoded (and mutually inconsistent) July day lists; columns come from `lib/schedule-days.ts` = the **configured event range ∪ real event dates**, events placed by `event_date` (weekday-name fallback for undated legacy rows).
+- **Event Dates config**: Admin → Configure → Structure → **Event Dates** (`EventDatesManager`; `page_content.config_event_start_date`/`config_event_end_date`) — the event's overall range, driving the calendars' day columns. Set in prod: 2026-07-22 → 2026-07-27.
+- **Admin multi-shift views**: `/admin/[id]` lists every held shift with per-shift Remove (`remove_shift` in the signups PATCH); roster "has shift" unions both tables (boolean — hours-satisfaction display is future polish).
+
+**Remaining:** the final cleanup migration (item 7 above) + member-side acknowledgement flow for `requires_ack` mandatory events (toggle exists; gate not yet surfaced to members).

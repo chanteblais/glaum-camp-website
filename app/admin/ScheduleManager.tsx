@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { EventIcon } from '@/components/EventIcon'
 import { AssetImagePicker } from './AssetImagePicker'
+import { LoadError } from './LoadError'
 import { isImageIcon } from '@/lib/icon-src'
 import { formatTime } from '@/lib/time-format'
 import { shiftDurationHours, formatShiftRange, weekdayFromISO } from '@/lib/shift-hours'
@@ -368,7 +369,8 @@ function EventRow({
       <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
         <button
           onClick={onToggleVisible}
-          title={event.visible ? 'Hide' : 'Show'}
+          title={event.visible ? 'Visible to members — click to hide' : 'Hidden from members — click to show'}
+          aria-label={event.visible ? 'Visible to members — click to hide' : 'Hidden from members — click to show'}
           style={{ background: 'none', border: '1px solid rgba(200,168,72,0.2)', borderRadius: '0.4rem', color: '#C8A848', cursor: 'pointer', padding: '0.25rem 0.5rem', fontSize: '0.7rem', opacity: 0.6 }}
         >
           {event.visible ? '●' : '○'}
@@ -388,6 +390,7 @@ export function ScheduleManager() {
   const [events, setEvents] = useState<ScheduleEvent[]>([])
   const [shiftTypes, setShiftTypes] = useState<ShiftTypeOption[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [modal, setModal] = useState<{ mode: 'add'; recurring: boolean } | { mode: 'edit'; event: ScheduleEvent } | null>(null)
   const [saving, setSaving] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
@@ -395,10 +398,14 @@ export function ScheduleManager() {
   const [dragOverId, setDragOverId] = useState<string | null>(null)
 
   const load = async () => {
-    const res = await fetch('/api/admin/schedule')
-    if (res.ok) {
+    setLoadError(false)
+    try {
+      const res = await fetch('/api/admin/schedule')
+      if (!res.ok) throw new Error()
       const json = await res.json()
       setEvents(sortChronologically(json.events))
+    } catch {
+      setLoadError(true)
     }
     setLoading(false)
   }
@@ -502,6 +509,7 @@ const handleDrop = async (group: ScheduleEvent[], targetId: string) => {
   }
 
   if (loading) return <p style={{ opacity: 0.4, fontStyle: 'italic', fontSize: '0.875rem' }}>Loading…</p>
+  if (loadError) return <LoadError onRetry={() => { setLoading(true); load() }} />
 
   return (
     <div>

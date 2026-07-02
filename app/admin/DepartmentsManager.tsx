@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { AssetImagePicker, type GroupIconOption } from './AssetImagePicker'
 import { isImageIcon } from '@/lib/icon-src'
+import { LoadError } from './LoadError'
 
 type Role = {
   id: string
@@ -479,12 +480,15 @@ export function DepartmentsManager({ groupIconOptions = [] }: { groupIconOptions
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const [shiftTypes, setShiftTypes] = useState<ShiftTypeOption[]>([])
+  const [loadError, setLoadError] = useState(false)
 
-  useEffect(() => {
+  const load = () => {
+    setLoadError(false)
+    const getJson = (url: string) => fetch(url).then(r => { if (!r.ok) throw new Error(); return r.json() })
     Promise.all([
-      fetch('/api/admin/departments').then(r => r.json()),
-      fetch('/api/admin/roles').then(r => r.json()),
-      fetch('/api/admin/shift-types').then(r => r.json()),
+      getJson('/api/admin/departments'),
+      getJson('/api/admin/roles'),
+      getJson('/api/admin/shift-types'),
     ]).then(([deptData, rolesData, shiftData]) => {
       const roles: Role[] = rolesData.roles ?? []
       const depts: Department[] = (deptData.departments ?? []).map((d: Department) => ({
@@ -493,8 +497,10 @@ export function DepartmentsManager({ groupIconOptions = [] }: { groupIconOptions
       }))
       setDepartments(depts)
       setShiftTypes(shiftData.shiftTypes ?? [])
-    }).finally(() => setLoading(false))
-  }, [])
+    }).catch(() => setLoadError(true)).finally(() => setLoading(false))
+  }
+
+  useEffect(load, [])
 
   async function handleCreateDept(form: { name: string; description: string; icon: string }) {
     setDeptSaving(true); setDeptError(null)
@@ -557,6 +563,7 @@ export function DepartmentsManager({ groupIconOptions = [] }: { groupIconOptions
   }
 
   if (loading) return <p style={{ opacity: 0.4, fontSize: '0.85rem' }}>Loading…</p>
+  if (loadError) return <LoadError onRetry={() => { setLoading(true); load() }} />
 
   return (
     <div>
