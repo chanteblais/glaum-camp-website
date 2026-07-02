@@ -16,18 +16,16 @@ type LeadUpEvent = {
   host: string | null
   image_url: string | null
   visible: boolean
-  needs_lead: boolean
   sort_order: number
   notified_at: string | null
   rsvp_count?: number
-  lead_names?: string[]
 }
 
 type Draft = Omit<LeadUpEvent, 'id' | 'sort_order' | 'rsvp_count' | 'notified_at'>
 
 const blank = (): Draft => ({
   title: '', description: '', event_date: null, start_time: '', end_time: '',
-  location: '', link: '', host: '', image_url: null, visible: true, needs_lead: false,
+  location: '', link: '', host: '', image_url: null, visible: true,
 })
 
 const inputStyle: React.CSSProperties = {
@@ -224,10 +222,6 @@ function GatheringModal({ initial, isCreate, onSave, onClose, saving, error }: {
           {imageError && <p style={{ color: '#ff8a8a', fontSize: '0.72rem', marginTop: '0.4rem' }}>{imageError}</p>}
         </Field>
 
-        <div style={{ marginBottom: '0.75rem' }}>
-          <Toggle checked={form.needs_lead} onChange={v => set('needs_lead', v)} label="Has a lead ✦ — members can offer to lead when they RSVP" />
-        </div>
-
         <div style={{ marginBottom: isCreate ? '0.75rem' : '1.25rem' }}>
           <Toggle checked={form.visible} onChange={v => set('visible', v)} label="Visible to members" />
         </div>
@@ -418,11 +412,6 @@ export function LeadUpGatheringsManager() {
               <p style={{ fontSize: '0.7rem', opacity: 0.45, margin: '0.15rem 0 0' }}>
                 {[ev.start_time, ev.location || (ev.link ? 'Online' : null), ev.host].filter(Boolean).join(' · ') || '—'}
               </p>
-              {(ev.lead_names?.length ?? 0) > 0 && (
-                <p style={{ fontSize: '0.7rem', color: '#C8A848', opacity: 0.65, margin: '0.15rem 0 0' }}>
-                  ✦ Led by {ev.lead_names!.join(' & ')}
-                </p>
-              )}
             </div>
 
             <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem', minWidth: '64px' }}>
@@ -471,7 +460,7 @@ export function LeadUpGatheringsManager() {
       {modal && (
         <GatheringModal
           initial={modal.mode === 'edit'
-            ? { title: modal.event.title, description: modal.event.description, event_date: modal.event.event_date, start_time: modal.event.start_time, end_time: modal.event.end_time, location: modal.event.location, link: modal.event.link, host: modal.event.host, image_url: modal.event.image_url, visible: modal.event.visible, needs_lead: modal.event.needs_lead ?? false }
+            ? { title: modal.event.title, description: modal.event.description, event_date: modal.event.event_date, start_time: modal.event.start_time, end_time: modal.event.end_time, location: modal.event.location, link: modal.event.link, host: modal.event.host, image_url: modal.event.image_url, visible: modal.event.visible }
             : blank()}
           isCreate={modal.mode === 'add'}
           onSave={handleSave}

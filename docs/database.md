@@ -1,6 +1,6 @@
 # Database Schema
 
-All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations in `supabase-migrations/` document incremental changes (latest: `049`; all of `025`–`049` **applied in prod** as of 2026-07-02). Confirm `025` (column renames), `029` (the `application-files` bucket), `033` (group messaging), `034`/`035` (group icon images + `group-badges` bucket, `badge_image` → `icon_image`), `036`–`038` (public profile fields, members/profiles, member distinctions), `039`–`041` (lead-up gatherings + notify/image), `042`–`044` (group collections + per-collection profile visibility + per-collection self-join), `045`–`047` (shifts redesign + shift times), and `048`/`049` (participation leads + per-event lead opt-in) are applied before relying on those features.
+All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations in `supabase-migrations/` document incremental changes (latest: `050`, **pending apply**; all of `025`–`049` **applied in prod** as of 2026-07-02). Confirm `025` (column renames), `029` (the `application-files` bucket), `033` (group messaging), `034`/`035` (group icon images + `group-badges` bucket, `badge_image` → `icon_image`), `036`–`038` (public profile fields, members/profiles, member distinctions), `039`–`041` (lead-up gatherings + notify/image), `042`–`044` (group collections + per-collection profile visibility + per-collection self-join), `045`–`047` (shifts redesign + shift times), and `048`/`049` (participation leads + per-event lead opt-in; the gathering halves are dropped by `050`) are applied before relying on those features.
 
 ---
 
@@ -542,8 +542,9 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `045_shifts_redesign.sql` | **Shifts redesign, first draft.** `event_types` registry + `schedule_events.event_type_id`/`requires_ack` + `member_shift_signups` (backfilled from `camp_signups`). The `event_types` half was superseded by `046`; `member_shift_signups` + `requires_ack` remain canonical. |
 | `046_shift_types_reshape.sql` | **Shifts redesign, corrected model.** `shift_types` registry (requirement-free kinds); `schedule_events.participation_type` + `shift_type_id`; optional `required_shift_type_id`/`required_shift_hours` on `groups` **and** `roles`. Backfills from `045`'s seed; leaves `event_types` dormant. |
 | `047_shift_times.sql` | `start_time`/`end_time` ("HH:MM") on `schedule_events` — shift durations for hours math (`lib/shift-hours.ts`). No backfill; times set in the schedule editor. |
-| `048_participation_leads.sql` | **Participation leads.** Adds `role` (`'member'`/`'lead'`, default `'member'`) to `member_shift_signups` **and** `lead_up_event_rsvps` — members offer to lead what they join; the role lives on the participation row (dies with the signup; co-leads = multiple lead rows; display-only). Additive + idempotent. |
-| `049_needs_lead.sql` | **Per-event lead opt-in.** `needs_lead BOOL` (default false) on `schedule_events` **and** `lead_up_events` — whether an event *has* a lead role is the organizer's call at creation; all member lead affordances (048) are gated on it, and the offer moves to signup/RSVP time. Additive + idempotent. |
+| `048_participation_leads.sql` | **Participation leads.** Adds `role` (`'member'`/`'lead'`, default `'member'`) to `member_shift_signups` **and** `lead_up_event_rsvps` — members offer to lead what they join; the role lives on the participation row (dies with the signup; co-leads = multiple lead rows; display-only). Additive + idempotent. *(The `lead_up_event_rsvps` half is dropped by `050`.)* |
+| `049_needs_lead.sql` | **Per-event lead opt-in.** `needs_lead BOOL` (default false) on `schedule_events` **and** `lead_up_events` — whether an event *has* a lead role is the organizer's call at creation; all member lead affordances (048) are gated on it, and the offer moves to signup/RSVP time. Additive + idempotent. *(The `lead_up_events` half is dropped by `050`.)* |
+| `050_scrap_gathering_leads.sql` | **Scrap gathering leads.** Leads become a **shifts-only** concept: drops `lead_up_event_rsvps.role` + `lead_up_events.needs_lead` (the gathering halves of 048/049). **Destructive by design** — discards any recorded gathering-lead offers. Idempotent via `IF EXISTS`. |
 
 ---
 
@@ -564,7 +565,6 @@ Real-dated planning/brainstorming gatherings on the runway to the event — deli
 | `host` | TEXT | who's running it (optional) |
 | `image_url` | TEXT | optional banner image (public `lead-up-images` bucket); rendered on the /schedule cards + announcement email |
 | `visible` | BOOL | shown to members |
-| `needs_lead` | BOOL | whether this gathering has a lead role (organizer's call; gates the member "Offer to lead" affordance). Migration `049` |
 | `sort_order` | INT | tiebreak ordering (date is primary) |
 | `notified_at` | TIMESTAMPTZ | when members were last alerted (bell + email) via the admin "Notify members" button; NULL = never. Drives the manager's "Notified" state. |
 
@@ -580,8 +580,9 @@ Per-session RSVP to a lead-up gathering. Presence of a row = "I'll be at this pl
 | `lead_up_event_id` | UUID FK → `lead_up_events.id` (ON DELETE CASCADE) | |
 | `clerk_user_id` | TEXT | |
 | `status` | TEXT | defaults `'going'`; exists so a future three-state RSVP needs no migration |
-| `role` | TEXT NOT NULL | `'member'` (default) / `'lead'` — offered to lead this gathering (a member lead supersedes the free-text `host` in bylines). Migration `048` |
 | | | `UNIQUE (lead_up_event_id, clerk_user_id)` |
+
+*(Gathering leads — a `role` column here + `needs_lead` on `lead_up_events` — were built and scrapped 2026-07-02; dropped by migration `050`. Leads are shifts-only.)*
 
 ---
 

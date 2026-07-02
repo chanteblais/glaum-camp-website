@@ -15,9 +15,6 @@ type LeadUpEvent = {
   image_url: string | null
   rsvp_count: number
   rsvped: boolean
-  leading: boolean
-  lead_names: string[]
-  needs_lead: boolean
 }
 
 // "2026-07-08" → { weekday: "TUE", date: "Jul 8" }
@@ -48,21 +45,22 @@ export function LeadUpGatherings() {
       .finally(() => setLoading(false))
   }, [])
 
-  // Shared by the RSVP toggle and the offer-to-lead toggle; the server response
-  // is authoritative (count, lead names, my role) so both settle the same way.
-  const post = async (ev: LeadUpEvent, body: { rsvp: boolean; lead?: boolean }, optimistic: Partial<LeadUpEvent>) => {
+  const toggleRsvp = async (ev: LeadUpEvent) => {
     setPending(ev.id)
-    setEvents(prev => prev.map(e => e.id === ev.id ? { ...e, ...optimistic } : e))
+    // Optimistic update; the server response is authoritative.
+    const next = !ev.rsvped
+    setEvents(prev => prev.map(e => e.id === ev.id
+      ? { ...e, rsvped: next, rsvp_count: e.rsvp_count + (next ? 1 : -1) }
+      : e))
     try {
       const res = await fetch(`/api/lead-up-events/${ev.id}/rsvp`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ rsvp: next }),
       })
       if (res.ok) {
         const json = await res.json()
         setEvents(prev => prev.map(e => e.id === ev.id
-          ? { ...e, rsvped: json.rsvped, rsvp_count: json.count, leading: json.leading, lead_names: json.lead_names ?? [] }
-          : e))
+          ? { ...e, rsvped: json.rsvped, rsvp_count: json.count } : e))
       } else {
         // Revert on failure.
         setEvents(prev => prev.map(e => e.id === ev.id ? { ...ev } : e))
@@ -73,18 +71,6 @@ export function LeadUpGatherings() {
       setPending(null)
     }
   }
-
-  const toggleRsvp = (ev: LeadUpEvent) => {
-    const next = !ev.rsvped
-    return post(ev, { rsvp: next }, {
-      rsvped: next,
-      rsvp_count: ev.rsvp_count + (next ? 1 : -1),
-      leading: next ? ev.leading : false,
-    })
-  }
-
-  const toggleLead = (ev: LeadUpEvent) =>
-    post(ev, { rsvp: true, lead: !ev.leading }, { leading: !ev.leading })
 
   // Hide the whole section when there's nothing to show.
   if (loading || events.length === 0) return null
@@ -125,14 +111,9 @@ export function LeadUpGatherings() {
               {/* Body */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ fontSize: '1rem', color: '#EDE0C8', margin: '0 0 0.25rem', fontFamily: 'TokyoDreams, serif' }}>{ev.title}</p>
-                {(time || ev.location || ev.host || ev.lead_names.length > 0) && (
+                {(time || ev.location || ev.host) && (
                   <p style={{ fontSize: '0.75rem', color: '#C8A848', opacity: 0.6, margin: '0 0 0.4rem' }}>
-                    {/* A member lead supersedes the free-text host in the byline. */}
-                    {[
-                      time,
-                      ev.location,
-                      ev.lead_names.length > 0 ? `led by ${ev.lead_names.join(' & ')}` : ev.host && `with ${ev.host}`,
-                    ].filter(Boolean).join('  ·  ')}
+                    {[time, ev.location, ev.host && `with ${ev.host}`].filter(Boolean).join('  ·  ')}
                   </p>
                 )}
                 {ev.description && (
@@ -161,24 +142,6 @@ export function LeadUpGatherings() {
                 >
                   {ev.rsvped ? '✓ Going' : "I'll be there"}
                 </button>
-                {/* Lead offer only where the organizer asked for a lead (049) —
-                    or to step back from one already held. */}
-                {ev.rsvped && (ev.needs_lead || ev.leading) && (
-                  <button
-                    onClick={() => toggleLead(ev)}
-                    disabled={pending === ev.id}
-                    style={{
-                      background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                      fontSize: '0.68rem', letterSpacing: '0.04em', whiteSpace: 'nowrap',
-                      color: ev.leading ? '#FFFACD' : '#C8A848',
-                      opacity: pending === ev.id ? 0.4 : ev.leading ? 0.9 : 0.55,
-                      textDecoration: ev.leading ? 'none' : 'underline',
-                      textUnderlineOffset: '3px', transition: 'all 0.15s',
-                    }}
-                  >
-                    {ev.leading ? '✦ Leading — step back' : 'Offer to lead ✦'}
-                  </button>
-                )}
                 {ev.rsvp_count > 0 && (
                   <span style={{ fontSize: '0.68rem', opacity: 0.4 }}>
                     {ev.rsvp_count} {ev.rsvp_count === 1 ? 'going' : 'going'}
