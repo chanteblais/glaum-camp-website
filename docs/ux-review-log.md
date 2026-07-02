@@ -7,6 +7,34 @@ Newest review at the top. Fixes are only applied once agreed.
 
 ---
 
+## Review — 2026-07-02 (fifth pass: Messages, Participate, Profile)
+
+Scope: the remaining member surfaces — /messages inbox (threads left unopened to
+avoid marking reads), /signup (Participate), /profile. Mobile still blocked
+(Brave full-screen). **Clean bill overall — no code changes this pass.** Notes:
+
+### 18. Joining several groups stacks shift requirements · Severity: question for Chante · Status: proposed
+
+Chanté's own attunement checklist shows four unchecked shift items — "Shift
+Assigned 0/3h" (global Service) plus Decor/Setup/Teardown 0/3h each from her three
+group memberships = **12 owed hours** for one member. The mechanics work exactly as
+designed (`groups.required_shift_type_id` + the global task); the question is
+policy: is requirement *stacking* intended for multi-group members, or should the
+checklist cap/merge (e.g. "3h in any owed type")? Feeds the shifts redesign.
+
+### Smaller notes
+
+- Nav label "Participate" → URL `/signup` — label/URL mismatch; harmless, not worth
+  breaking links; consider a rename-with-redirect during the shifts redesign.
+- Member Profile Details uses an explicit Save button while admin Configure
+  sections autosave — fine: members are one-shot editors, admins live there.
+- Messages inbox (filters, sent-state, group avatars), the Participate shift picker
+  (capacity "4 of 5 open"), and the profile registry page all read beautifully.
+- Prod verified after ship: rounds 1–4 live on camp.glaum.ca (Overview title,
+  teaser copy confirmed live).
+
+---
+
 ## Review — 2026-07-02 (fourth pass: member-facing flows)
 
 Scope: the member-facing side as an organizer's members see it — home dashboard,
