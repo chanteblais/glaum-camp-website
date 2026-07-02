@@ -19,6 +19,7 @@ type LeadUpEvent = {
   sort_order: number
   notified_at: string | null
   rsvp_count?: number
+  lead_names?: string[]
 }
 
 type Draft = Omit<LeadUpEvent, 'id' | 'sort_order' | 'rsvp_count' | 'notified_at'>
@@ -412,6 +413,11 @@ export function LeadUpGatheringsManager() {
               <p style={{ fontSize: '0.7rem', opacity: 0.45, margin: '0.15rem 0 0' }}>
                 {[ev.start_time, ev.location || (ev.link ? 'Online' : null), ev.host].filter(Boolean).join(' · ') || '—'}
               </p>
+              {(ev.lead_names?.length ?? 0) > 0 && (
+                <p style={{ fontSize: '0.7rem', color: '#C8A848', opacity: 0.65, margin: '0.15rem 0 0' }}>
+                  ✦ Led by {ev.lead_names!.join(' & ')}
+                </p>
+              )}
             </div>
 
             <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem', minWidth: '64px' }}>

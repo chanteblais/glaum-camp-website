@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { isImageIcon } from '@/lib/icon-src'
 
-export type MemberShift = { id: string; title: string; time: string | null; day: string }
+export type MemberShift = { id: string; title: string; time: string | null; day: string; lead: boolean }
 
 type Props = {
   clerkUserId: string
@@ -49,6 +49,23 @@ export function MemberSignupCard({ clerkUserId, role, shifts }: Props) {
       setError(d.error ?? 'Something went wrong')
     } else {
       setCurrentRole(null)
+    }
+    setClearing(null)
+  }
+
+  async function handleToggleLead(s: MemberShift) {
+    setClearing(s.id)
+    setError(null)
+    const res = await fetch(`/api/admin/signups/${clerkUserId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ set_shift_role: { schedule_event_id: s.id, role: s.lead ? 'member' : 'lead' } }),
+    })
+    if (!res.ok) {
+      const d = await res.json()
+      setError(d.error ?? 'Something went wrong')
+    } else {
+      setCurrentShifts(prev => prev.map(x => x.id === s.id ? { ...x, lead: !s.lead } : x))
     }
     setClearing(null)
   }
@@ -156,11 +173,35 @@ export function MemberSignupCard({ clerkUserId, role, shifts }: Props) {
             {currentShifts.map(s => (
               <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: '0.9rem', color: '#F3EDE6', margin: 0 }}>{s.title}</p>
+                  <p style={{ fontSize: '0.9rem', color: '#F3EDE6', margin: 0 }}>
+                    {s.title}
+                    {s.lead && (
+                      <span style={{
+                        marginLeft: '0.45rem', fontSize: '0.6rem', letterSpacing: '0.08em',
+                        textTransform: 'uppercase', color: '#C8A848',
+                        border: '1px solid rgba(200,168,72,0.4)', borderRadius: '9999px',
+                        padding: '0.08rem 0.45rem', verticalAlign: 'middle',
+                      }}>
+                        ✦ Lead
+                      </span>
+                    )}
+                  </p>
                   <p style={{ fontSize: '0.72rem', color: '#D239F8', opacity: 0.45, margin: '0.15rem 0 0' }}>
                     {s.day}{s.time ? ` · ${s.time}` : ''}
                   </p>
                 </div>
+                <button
+                  onClick={() => handleToggleLead(s)}
+                  disabled={clearing === s.id}
+                  style={{
+                    background: 'none', border: '1px solid rgba(200,168,72,0.3)', borderRadius: '9999px',
+                    color: '#C8A848', cursor: 'pointer', padding: '0.25rem 0.7rem',
+                    fontSize: '0.7rem', flexShrink: 0,
+                    opacity: clearing === s.id ? 0.4 : 0.75,
+                  }}
+                >
+                  {s.lead ? 'Demote to member' : 'Make lead'}
+                </button>
                 <button
                   onClick={() => handleRemoveShift(s.id)}
                   disabled={clearing === s.id}
@@ -171,7 +212,7 @@ export function MemberSignupCard({ clerkUserId, role, shifts }: Props) {
                     opacity: clearing === s.id ? 0.4 : 0.75,
                   }}
                 >
-                  {clearing === s.id ? 'Removing…' : 'Remove'}
+                  {clearing === s.id ? '…' : 'Remove'}
                 </button>
               </div>
             ))}
