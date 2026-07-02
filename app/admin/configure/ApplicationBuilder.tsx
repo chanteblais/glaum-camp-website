@@ -274,22 +274,40 @@ function FieldRow({
             </span>
           )}
           {/* Phase 3: bind a custom field's answer to a canonical profile field. */}
-          {field.isCustom && field.type !== 'group_select' && onBindProfileField && (profileFieldOptions?.length ?? 0) > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.4rem' }}>
-              <span style={{ fontSize: '0.58rem', letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.4 }}>Saves to</span>
-              <select
-                value={field.profileFieldKey ?? ''}
-                onChange={e => onBindProfileField(e.target.value || undefined)}
-                title="Save this answer to a member profile field (reusable across forms; usable in distinctions)"
-                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(200,168,72,0.2)', borderRadius: '0.3rem', color: CREAM, fontSize: '0.7rem', padding: '0.15rem 0.35rem', fontFamily: 'inherit', outline: 'none' }}
-              >
-                <option value="" style={{ background: INK }}>This application only</option>
-                {profileFieldOptions!.map(o => (
-                  <option key={o.key} value={o.key} style={{ background: INK }}>{o.label}</option>
-                ))}
-              </select>
+          {field.isCustom && field.type !== 'group_select' && onBindProfileField && (profileFieldOptions?.length ?? 0) > 0 && (() => {
+            // A binding can dangle: if the linked profile field was deleted (or
+            // deleted-and-recreated, which mints a new key), answers keep being
+            // written to a key nothing displays. Surface that instead of letting
+            // the <select> silently render as unbound.
+            const dangling = !!field.profileFieldKey && !profileFieldOptions!.some(o => o.key === field.profileFieldKey)
+            return (
+            <div style={{ marginTop: '0.4rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ fontSize: '0.58rem', letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.4 }}>Saves to</span>
+                <select
+                  value={field.profileFieldKey ?? ''}
+                  onChange={e => onBindProfileField(e.target.value || undefined)}
+                  title="Save this answer to a member profile field (reusable across forms; usable in distinctions)"
+                  style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${dangling ? 'rgba(255,180,50,0.5)' : 'rgba(200,168,72,0.2)'}`, borderRadius: '0.3rem', color: dangling ? '#ffb432' : CREAM, fontSize: '0.7rem', padding: '0.15rem 0.35rem', fontFamily: 'inherit', outline: 'none' }}
+                >
+                  <option value="" style={{ background: INK }}>This application only</option>
+                  {dangling && (
+                    <option value={field.profileFieldKey} style={{ background: INK }}>⚠ missing field: {field.profileFieldKey}</option>
+                  )}
+                  {profileFieldOptions!.map(o => (
+                    <option key={o.key} value={o.key} style={{ background: INK }}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+              {dangling && (
+                <p style={{ margin: '0.3rem 0 0', fontSize: '0.66rem', color: '#ffb432', opacity: 0.85, lineHeight: 1.5 }}>
+                  This answer saves to a profile field that no longer exists, so it shows up nowhere.
+                  Pick a current profile field (or &ldquo;This application only&rdquo;) to fix it.
+                </p>
+              )}
             </div>
-          )}
+            )
+          })()}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
