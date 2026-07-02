@@ -23,6 +23,33 @@ non-trivial change is one visible, revertable unit — not ceremony.
 7. **Want eyes on something before it ships?** Push the *branch* — Vercel builds a
    preview URL per branch — then merge when happy.
 
+## Parallel sessions — one checkout is ONE git context
+
+Learned the hard way (2026-07-02): branches belong to the *checkout*, not the
+session. Two sessions working in the same directory share one HEAD, one index,
+one working tree — when one switches branches or commits, it does so for both.
+That day, session B's `checkout -b` silently moved session A onto B's branch,
+and A's commit swept up B's in-flight edits.
+
+Rules:
+
+1. **The main checkout belongs to one git-active session at a time.** The first
+   session to branch owns it; check `git branch --show-current` before your
+   first git command — if you're unexpectedly on someone else's branch, stop
+   and ask rather than committing.
+2. **A second concurrent session uses `git worktree`** — its own physical
+   checkout of its own branch, immune to the other session's git operations:
+   ```bash
+   git worktree add ../glaum-<branch> -b <type>/<slug>
+   # …work there; when merged:
+   git worktree remove ../glaum-<branch>
+   ```
+   (Claude sessions: the EnterWorktree tool does this for you.)
+3. **Never `git add -A` / `git add .` in the shared checkout.** Stage explicit
+   paths only — the tree may contain another session's (or Chante's) in-flight
+   files.
+4. Sessions that only *read* need no branch and no worktree.
+
 ## Claude sessions
 
 **Every session branches before its first edit.** As soon as a session knows it
