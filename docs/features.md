@@ -348,11 +348,14 @@ Sections:
 **What:** Summary stats + `MembersDropdown` for quick navigation.
 
 Sections:
+- **Needs attention** (first card) — up to five prioritized actionable lines (pending applications / volunteers / role requests / role suggestions / un-notified upcoming gathering), each a verb deep-link into the console; empty state names the days to camp. Data: `lib/admin-attention.ts` (`getAttentionItems`). Counts that imply work elsewhere on the page are verb links too ("Review N pending →", "Assign in Groups →").
 - **Participation** — approved member count, signup completion, active volunteer count, members list (expandable)
 - **Shift Hours** — total committed, confirmed, pending, volunteer hours
-- **Setup & Teardown** — Setup / Teardown / Decor team member pills (derived from **group membership** by group name, via `getGroupNamesByUser`); limitations count; "unassigned" = members in no group
+- **Groups** — one card per row in the `groups` table (sort order honoured) with member pills, via `getGroupNamesByUser`; "In no group" card for unassigned members
 - **Rideshare** — breakdown by rideshare intent
 - **Poll Results** — all polls with bar chart per option (vote count + percentage). Leading option highlighted in gold. Shows Hidden/Closed badges. Hidden if no polls exist.
+
+All admin surfaces also carry the **runway strip** inside the sticky `AdminNav`: "✦ N days to camp" plus the next dated milestones (upcoming gatherings, camp start) as jump links — `lib/admin-attention.ts` (`getAdminRunway`). The member detail page (`/admin/[id]`) shows **cross-reference chips** under the header: department·role, each group, and "N shifts held" (anchors to Role & Shift).
 
 ---
 
