@@ -9,7 +9,7 @@ Newest review at the top. Fixes are only applied once agreed.
 
 ## Follow-up — 2026-07-02 (morning)
 
-### 15. Deleting/recreating a profile field silently strands form answers · Severity: high (data loss) · Status: guardrail **fixed**; data repair pending approval
+### 15. Deleting/recreating a profile field silently strands form answers · Severity: high (data loss) · Status: guardrail **fixed**; data repair **done 2026-07-02**
 
 Found while chasing the `eventExperience` / `gatheringsAttended` double-up: renaming
 a profile field keeps its key (safe), but **delete-and-recreate mints a new key**,
@@ -23,9 +23,10 @@ stranded value.
 "⚠ missing field: <key>" with an amber warning and instructions — picking a real
 field (or "This application only") repairs the config in place.
 
-**Pending (data repair, needs Chante's go-ahead):** re-point the camped-before form
-field to `gatheringsAttended` + migrate the one stranded `eventExperience` value
-(copy, never overwrite). Doable via the new builder warning UI + a two-line script.
+**Data repair (approved & run 2026-07-02):** the camped-before form field now saves
+to `gatheringsAttended`; the one stranded `eventExperience` value turned out to
+duplicate an existing `gatheringsAttended` value, so the dead key was simply removed
+(nothing overwritten). Verified: no `eventExperience` remains anywhere.
 
 **Also noticed:** `member_profiles.values` holds raw `cf_*` keys for ~8 members
 (not in the registry, so invisible) — likely from an earlier catch-up migration.
