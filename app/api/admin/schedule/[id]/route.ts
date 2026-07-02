@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { deriveLegacyColumns } from '@/lib/event-type-compat'
+import { weekdayFromISO } from '@/lib/shift-hours'
 
 async function requireAdmin() {
   const { userId } = await auth()
@@ -29,6 +30,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if ('participation_type' in body && body.participation_type !== 'shift') {
     updates.start_time = null
     updates.end_time = null
+  }
+  // `day` derives from the real date whenever one is set (wrong-weekday-proof).
+  if ('event_date' in body) {
+    const derived = weekdayFromISO(body.event_date)
+    if (derived) updates.day = derived
   }
 
   // Re-derive the legacy columns whenever participation/type/capacity is touched,

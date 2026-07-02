@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { EventIcon } from '@/components/EventIcon'
 import { MANDATORY_HUE, shiftHue } from '@/lib/shift-colors'
+import { firstIsoByWeekday, type ScheduleDay } from '@/lib/schedule-days'
 
 type ScheduleEvent = {
   id: string
@@ -15,20 +16,14 @@ type ScheduleEvent = {
   highlight: boolean
   is_recurring: boolean
   event_type: string | null
+  event_date: string | null
   participation_type?: string | null
   shift_color_index?: number | null
 }
 
-const DAYS = [
-  { label: 'Wednesday', short: 'Wed', date: 22 },
-  { label: 'Thursday',  short: 'Thu', date: 23 },
-  { label: 'Friday',    short: 'Fri', date: 24 },
-  { label: 'Saturday',  short: 'Sat', date: 25 },
-  { label: 'Sunday',    short: 'Sun', date: 26 },
-  { label: 'Monday',    short: 'Mon', date: 27 },
-]
-
-const DAY_ORDER: Record<string, number> = Object.fromEntries(DAYS.map((d, i) => [d.label, i]))
+// Day columns come from the events' real dates + the configured event range
+// (lib/schedule-days.ts, built by ScheduleSection) — nothing hardcoded, so the
+// headers always show true dates and no event can land on the wrong day.
 
 const PX_PER_HOUR = 56
 
@@ -174,9 +169,9 @@ function EventBlock({ event, style }: { event: ScheduleEvent; style: React.CSSPr
 
 // ── Main Calendar ─────────────────────────────────────────────────────────────
 
-export function ScheduleCalendarClient({ events }: { events: ScheduleEvent[] }) {
+export function ScheduleCalendarClient({ events, days }: { events: ScheduleEvent[]; days: ScheduleDay[] }) {
   const [isMobile, setIsMobile] = useState(false)
-  const [selectedDay, setSelectedDay] = useState<string>(DAYS[0].label)
+  const [selectedDay, setSelectedDay] = useState<string>(days[0]?.iso ?? '')
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 640)
@@ -185,9 +180,13 @@ export function ScheduleCalendarClient({ events }: { events: ScheduleEvent[] }) 
     return () => window.removeEventListener('resize', check)
   }, [])
 
+  // Undated legacy rows fall back to the first column matching their weekday name.
+  const weekdayIso = firstIsoByWeekday(days)
+  const columnIso = (e: ScheduleEvent): string | null => e.event_date ?? weekdayIso[e.day] ?? null
+
   const regular = [...events.filter(e => !e.is_recurring)].sort((a, b) => {
-    const dayDiff = (DAY_ORDER[a.day] ?? 99) - (DAY_ORDER[b.day] ?? 99)
-    if (dayDiff !== 0) return dayDiff
+    const dateDiff = (columnIso(a) ?? '9999').localeCompare(columnIso(b) ?? '9999')
+    if (dateDiff !== 0) return dateDiff
     return (parseEventTimes(a.time).start ?? 9999) - (parseEventTimes(b.time).start ?? 9999)
   })
   const recurring = events.filter(e => e.is_recurring)
@@ -216,12 +215,12 @@ export function ScheduleCalendarClient({ events }: { events: ScheduleEvent[] }) 
         // ── Mobile: day tab picker + single column ──
         <div>
           <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem', overflowX: 'auto', paddingBottom: '0.25rem' }}>
-            {DAYS.map(day => {
-              const active = selectedDay === day.label
+            {days.map(day => {
+              const active = selectedDay === day.iso
               return (
                 <button
-                  key={day.label}
-                  onClick={() => setSelectedDay(day.label)}
+                  key={day.iso}
+                  onClick={() => setSelectedDay(day.iso)}
                   style={{
                     flexShrink: 0,
                     padding: '0.4rem 0.9rem',
@@ -238,7 +237,7 @@ export function ScheduleCalendarClient({ events }: { events: ScheduleEvent[] }) 
                   }}
                 >
                   <span style={{ display: 'block' }}>{day.short}</span>
-                  <span style={{ display: 'block', fontSize: '0.65rem', opacity: 0.8 }}>{day.date}</span>
+                  <span style={{ display: 'block', fontSize: '0.65rem', opacity: 0.8 }}>{day.month} {day.date}</span>
                 </button>
               )
             })}
@@ -268,7 +267,7 @@ export function ScheduleCalendarClient({ events }: { events: ScheduleEvent[] }) 
                   borderTop: `1px solid rgba(200,168,72,${label === 'Midnight' || label === 'Noon' ? '0.15' : '0.06'})`,
                 }} />
               ))}
-              {regular.filter(e => e.day === selectedDay).map(ev => {
+              {regular.filter(e => columnIso(e) === selectedDay).map(ev => {
                 const { start, end } = parseEventTimes(ev.time)
                 if (start === null) return null
                 const top = minutesToTop(start, START_HOUR)
@@ -295,11 +294,11 @@ export function ScheduleCalendarClient({ events }: { events: ScheduleEvent[] }) 
               }}>{label}</div>
             ))}
           </div>
-          <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.4rem' }}>
-            {DAYS.map(day => {
-              const dayEvents = regular.filter(e => e.day === day.label)
+          <div style={{ flex: 1, display: 'grid', gridTemplateColumns: `repeat(${Math.max(days.length, 1)}, 1fr)`, gap: '0.4rem' }}>
+            {days.map(day => {
+              const dayEvents = regular.filter(e => columnIso(e) === day.iso)
               return (
-                <div key={day.label}>
+                <div key={day.iso}>
                   <div style={{
                     height: '52px',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -308,7 +307,7 @@ export function ScheduleCalendarClient({ events }: { events: ScheduleEvent[] }) 
                     border: '1px solid rgba(200,168,72,0.2)',
                     borderBottom: 'none',
                   }}>
-                    <p style={{ fontSize: '0.58rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.6, margin: 0 }}>{day.short}</p>
+                    <p style={{ fontSize: '0.58rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.6, margin: 0 }}>{day.short} · {day.month}</p>
                     <p style={{ fontSize: '1rem', color: '#F3EDE6', margin: '0.1rem 0 0', fontFamily: 'TokyoDreams, serif' }}>{day.date}</p>
                   </div>
                   <div style={{

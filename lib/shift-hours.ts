@@ -43,3 +43,13 @@ export function formatShiftRange(start?: string | null, end?: string | null): st
   if (a && b) return `${a} – ${b}`
   return a || b || ''
 }
+
+// "2026-07-22" → "Wednesday". The event's `day` column is DERIVED from its real
+// date (single source of truth — picking the wrong weekday by hand used to be an
+// easy mistake). Returns null for missing/malformed dates.
+export function weekdayFromISO(date?: string | null): string | null {
+  if (!date) return null
+  const d = new Date(`${date}T12:00:00`)
+  if (isNaN(d.getTime())) return null
+  return d.toLocaleDateString('en-US', { weekday: 'long' })
+}

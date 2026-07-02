@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { deriveLegacyColumns } from '@/lib/event-type-compat'
+import { weekdayFromISO } from '@/lib/shift-hours'
 
 async function requireAdmin() {
   const { userId } = await auth()
@@ -53,7 +54,8 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabaseAdmin
     .from('schedule_events')
     .insert([{
-      day: body.day,
+      // `day` derives from the real date when one is set (wrong-weekday-proof).
+      day: weekdayFromISO(body.event_date) ?? body.day ?? '',
       time: body.time,
       title: body.title,
       subtitle: body.subtitle || null,

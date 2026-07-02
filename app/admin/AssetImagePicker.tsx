@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react'
 import {
+  BUILTIN_ASSETS,
   builtinAssets,
   orderedCategories,
   type AssetCategory,
@@ -101,30 +102,43 @@ export function AssetImagePicker({
     const res = await fetch(uploadUrl, { method: 'POST', body: fd })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) { setErr(data.error ?? 'Upload failed'); setBusy(false); return }
-    // Icon endpoints return the URL under `image` (distinctions/departments) or
-    // `icon_image` (groups) — accept either so this picker is endpoint-agnostic.
-    onChange(data.image ?? data.icon_image)
+    // Icon endpoints return the URL under `image` (distinctions/departments),
+    // `icon_image` (groups), or `url` (schedule) — accept any so this picker is
+    // endpoint-agnostic.
+    onChange(data.image ?? data.icon_image ?? data.url)
     setBusy(false)
     setOpen(false)
     if (inputRef.current) inputRef.current.value = ''
   }
 
   type PickItem = { key: string; src: string; label: string; cat: AssetCategory }
+  // The Groups tab lists the community's reusable group icons (admin-named, so
+  // already generic). A group whose icon IS a built-in library image is dropped —
+  // that art already sits under its own category tab — and groups sharing one
+  // uploaded image collapse to a single tile, so no art ever shows twice.
+  const builtinSrcs = new Set(BUILTIN_ASSETS.map(a => a.src))
+  const seenGroupSrcs = new Set<string>()
+  const uniqueGroupIcons = groupIconOptions.filter(g => {
+    if (builtinSrcs.has(g.image) || seenGroupSrcs.has(g.image)) return false
+    seenGroupSrcs.add(g.image)
+    return true
+  })
+
   // Items shown for a tab. Built-in category tabs draw from the shipped library;
-  // the synthetic 'group' tab lists the community's reusable group icons
-  // (admin-named, so already generic) — kept out of built-in Icons so the same
-  // art doesn't appear under both tabs. Group icons render like icons (contain).
+  // the synthetic 'group' tab from the deduped group icons. Group icons render
+  // like icons (contain).
   function itemsFor(tab: PickTab): PickItem[] {
     if (tab === 'group') {
-      return groupIconOptions.map(g => ({ key: `group-${g.image}`, src: g.image, label: g.name, cat: 'icon' as AssetCategory }))
+      return uniqueGroupIcons.map(g => ({ key: `group-${g.image}`, src: g.image, label: g.name, cat: 'icon' as AssetCategory }))
     }
     return builtinAssets(tab).map((a: AssetLibraryItem) => ({ key: a.id, src: a.src, label: a.label, cat: tab }))
   }
 
-  // Built-in category tabs, plus a "Groups" tab only when there are group icons.
+  // Built-in category tabs, plus a "Groups" tab only when there are group icons
+  // left after filtering out built-ins.
   const tabs: { value: PickTab; label: string }[] = [
     ...orderedCategories(primaryCategory),
-    ...(groupIconOptions.length ? [{ value: 'group' as PickTab, label: 'Groups' }] : []),
+    ...(uniqueGroupIcons.length ? [{ value: 'group' as PickTab, label: 'Groups' }] : []),
   ]
   const allItems = tabs.flatMap(t => itemsFor(t.value))
   const selected = value ? allItems.find(i => i.src === value) : undefined

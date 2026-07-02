@@ -2,6 +2,7 @@
 
 import { useId, useState, useEffect } from 'react'
 import { MANDATORY_HUE, shiftHue } from '@/lib/shift-colors'
+import { firstIsoByWeekday, type ScheduleDay } from '@/lib/schedule-days'
 
 export type PersonalEvent = {
   id: string
@@ -13,19 +14,15 @@ export type PersonalEvent = {
   icon_type: string
   highlight: boolean
   event_type: string | null
+  event_date?: string | null
   participation_type?: string | null
   shift_color_index?: number | null
   isPersonal: boolean
 }
 
-const DAY_META: { label: string; short: string; month: string; date: number }[] = [
-  { label: 'Wednesday', short: 'WED', month: 'JULY', date: 23 },
-  { label: 'Thursday',  short: 'THU', month: 'JULY', date: 24 },
-  { label: 'Friday',    short: 'FRI', month: 'JULY', date: 25 },
-  { label: 'Saturday',  short: 'SAT', month: 'JULY', date: 26 },
-  { label: 'Sunday',    short: 'SUN', month: 'JULY', date: 27 },
-  { label: 'Monday',    short: 'MON', month: 'JULY', date: 28 },
-]
+// Day columns come from the member's events' real dates (lib/schedule-days.ts,
+// built by PersonalSchedule) — replaces the old hardcoded July list, whose date
+// numbers had drifted a day off reality.
 
 const PX_PER_HOUR = 40
 const GOLD = '#C8A848'
@@ -193,7 +190,7 @@ function SingleDayGrid({ dayEvents, allEvents }: { dayEvents: PersonalEvent[]; a
   )
 }
 
-export function PersonalScheduleCalendar({ events }: { events: PersonalEvent[] }) {
+export function PersonalScheduleCalendar({ events, days }: { events: PersonalEvent[]; days: ScheduleDay[] }) {
   const [collapsed, setCollapsed] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
@@ -209,8 +206,11 @@ export function PersonalScheduleCalendar({ events }: { events: PersonalEvent[] }
 
   const timed = events.filter(e => !!e.time)
   const untimed = events.filter(e => !e.time)
-  const activeDays = DAY_META.filter(d => events.some(e => e.day === d.label))
-  const activeDay = selectedDay ?? activeDays[0]?.label ?? null
+  // Undated legacy rows fall back to the first column matching their weekday name.
+  const weekdayIso = firstIsoByWeekday(days)
+  const columnIso = (e: PersonalEvent): string | null => e.event_date ?? weekdayIso[e.day] ?? null
+  const activeDays = days.filter(d => events.some(e => columnIso(e) === d.iso))
+  const activeDay = selectedDay ?? activeDays[0]?.iso ?? null
 
   if (activeDays.length === 0 && untimed.length === 0) return null
 
@@ -254,11 +254,11 @@ export function PersonalScheduleCalendar({ events }: { events: PersonalEvent[] }
               {activeDays.length > 1 && (
                 <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', overflowX: 'auto', paddingBottom: '0.25rem' }}>
                   {activeDays.map(day => {
-                    const active = activeDay === day.label
+                    const active = activeDay === day.iso
                     return (
                       <button
-                        key={day.label}
-                        onClick={() => setSelectedDay(day.label)}
+                        key={day.iso}
+                        onClick={() => setSelectedDay(day.iso)}
                         style={{
                           flexShrink: 0,
                           padding: '0.4rem 0.9rem',
@@ -283,7 +283,7 @@ export function PersonalScheduleCalendar({ events }: { events: PersonalEvent[] }
               )}
               {activeDay && (
                 <SingleDayGrid
-                  dayEvents={events.filter(e => e.day === activeDay)}
+                  dayEvents={events.filter(e => columnIso(e) === activeDay)}
                   allEvents={events}
                 />
               )}
@@ -312,10 +312,10 @@ export function PersonalScheduleCalendar({ events }: { events: PersonalEvent[] }
                   <div style={{ flex: 1, display: 'grid', gridTemplateColumns: `repeat(${activeDays.length}, minmax(168px, 1fr))`, gap: '0' }}>
                     {activeDays.map(day => {
                       const dayEvents = timed
-                        .filter(e => e.day === day.label)
+                        .filter(e => columnIso(e) === day.iso)
                         .sort((a, b) => (parseEventTimes(a.time).start ?? 0) - (parseEventTimes(b.time).start ?? 0))
                       return (
-                        <div key={day.label}>
+                        <div key={day.iso}>
                           <div style={{
                             height: '44px', textAlign: 'center',
                             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',

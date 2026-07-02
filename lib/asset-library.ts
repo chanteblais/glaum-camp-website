@@ -124,6 +124,33 @@ export const BUILTIN_ASSETS: AssetLibraryItem[] = [
     source: 'builtin',
     tags: ['lantern', 'lamp', 'flame', 'fire', 'light', 'glow', 'guide'],
   },
+  {
+    id: 'tasselled-cushion',
+    label: 'Tasselled Cushion',
+    src: '/asset-library/icons/tasselled-cushion.webp',
+    kind: 'raster',
+    category: 'icon',
+    source: 'builtin',
+    tags: ['cushion', 'pillow', 'tassel', 'velvet', 'comfort', 'decor', 'lounge'],
+  },
+  {
+    id: 'pitched-tent',
+    label: 'Pitched Tent',
+    src: '/asset-library/icons/pitched-tent.webp',
+    kind: 'raster',
+    category: 'icon',
+    source: 'builtin',
+    tags: ['tent', 'camp', 'shelter', 'canvas', 'pitch', 'setup', 'glow'],
+  },
+  {
+    id: 'mallet-and-stake',
+    label: 'Mallet & Stake',
+    src: '/asset-library/icons/mallet-and-stake.webp',
+    kind: 'raster',
+    category: 'icon',
+    source: 'builtin',
+    tags: ['mallet', 'hammer', 'stake', 'peg', 'tools', 'build', 'teardown'],
+  },
 ]
 
 /** Built-in assets usable in a given category. */

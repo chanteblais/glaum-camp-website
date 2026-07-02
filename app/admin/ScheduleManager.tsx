@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { EventIcon, ICON_TYPES } from '@/components/EventIcon'
+import { EventIcon } from '@/components/EventIcon'
+import { AssetImagePicker } from './AssetImagePicker'
+import { isImageIcon } from '@/lib/icon-src'
 import { formatTime } from '@/lib/time-format'
-import { shiftDurationHours, formatShiftRange } from '@/lib/shift-hours'
+import { shiftDurationHours, formatShiftRange, weekdayFromISO } from '@/lib/shift-hours'
 
 type ScheduleEvent = {
   id: string
@@ -32,7 +34,6 @@ type ScheduleEvent = {
 // Shift types offered when an event is a Shift (Configure → Shift Types registry).
 type ShiftTypeOption = { id: string; name: string }
 
-const DAYS = ['Thursday', 'Friday', 'Saturday', 'Sunday', 'Wednesday', 'Tuesday', 'Monday']
 const DAY_ORDER: Record<string, number> = {
   Wednesday: 0, Thursday: 1, Friday: 2, Saturday: 3, Sunday: 4, Monday: 5, Tuesday: 6,
 }
@@ -55,16 +56,33 @@ function parseStartMinutes(time: string): number {
   return h * 60 + min
 }
 
+// Real dates order the list (undated events sink to the bottom); the day-name
+// order is only a fallback between undated rows. Sorting by day-of-week used to
+// hide wrong-week mistakes — a July 2 and a July 23 Wednesday sorted together.
 function sortChronologically(evs: ScheduleEvent[]): ScheduleEvent[] {
   return [...evs].sort((a, b) => {
+    if (a.event_date && b.event_date && a.event_date !== b.event_date) return a.event_date.localeCompare(b.event_date)
+    if (a.event_date && !b.event_date) return -1
+    if (!a.event_date && b.event_date) return 1
     const dayDiff = (DAY_ORDER[a.day] ?? 99) - (DAY_ORDER[b.day] ?? 99)
     if (dayDiff !== 0) return dayDiff
     return parseStartMinutes(a.time) - parseStartMinutes(b.time)
   })
 }
 
+// "2026-07-22" → "Wed · Jul 22" for the admin list rows.
+function rowDateLabel(ev: ScheduleEvent): string {
+  if (ev.event_date) {
+    const d = new Date(`${ev.event_date}T12:00:00`)
+    if (!isNaN(d.getTime())) {
+      return `${d.toLocaleDateString('en-US', { weekday: 'short' })} · ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+    }
+  }
+  return ev.day
+}
+
 const blank = (): Omit<ScheduleEvent, 'id' | 'sort_order'> => ({
-  day: 'Thursday', time: '', title: '', subtitle: '', detail_desc: '',
+  day: '', time: '', title: '', subtitle: '', detail_desc: '',
   icon_type: 'star', visible: true, highlight: false, is_recurring: false, capacity: null, event_type: null, contribution_type: null, event_date: null, event_category: 'at_camp', participation_type: 'general', shift_type_id: null, requires_ack: false, start_time: null, end_time: null,
 })
 
@@ -112,43 +130,22 @@ function EventModal({
   saving,
   error,
   shiftTypes,
-  customIcons = [],
-  onDeleteIcon,
 }: {
   initial: Omit<ScheduleEvent, 'id' | 'sort_order'>
   onSave: (form: Omit<ScheduleEvent, 'id' | 'sort_order'>) => void
   onClose: () => void
   shiftTypes: ShiftTypeOption[]
-  customIcons?: string[]
-  onDeleteIcon?: (url: string) => void
   saving: boolean
   error: string | null
 }) {
   const [form, setForm] = useState(initial)
-  const [iconUploading, setIconUploading] = useState(false)
-  const [iconError, setIconError] = useState<string | null>(null)
-  const iconInputRef = useRef<HTMLInputElement>(null)
   const set = (k: keyof typeof form, v: unknown) => setForm((p) => ({ ...p, [k]: v }))
 
-  const handleIconUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setIconUploading(true)
-    setIconError(null)
-    try {
-      const fd = new FormData()
-      fd.append('icon', file)
-      const res = await fetch('/api/admin/schedule/icon', { method: 'POST', body: fd })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      set('icon_type', data.url)
-    } catch (err: unknown) {
-      setIconError(err instanceof Error ? err.message : 'Upload failed')
-    } finally {
-      setIconUploading(false)
-      if (iconInputRef.current) iconInputRef.current.value = ''
-    }
-  }
+  // The weekday derives from the picked date — no separate Day dropdown to get
+  // out of sync (picking the wrong Wednesday used to be an easy mistake).
+  const derivedDay = weekdayFromISO(form.event_date)
+  // Non-recurring events need a real date so the schedule can place them.
+  const canSave = !!form.title && (form.is_recurring || !!form.event_date)
 
   return (
     <>
@@ -171,30 +168,27 @@ function EventModal({
           <input style={inputStyle} value={form.title} onChange={(e) => set('title', e.target.value)} />
         </Field>
 
-        <div style={{ display: 'grid', gridTemplateColumns: (form.is_recurring || form.participation_type === 'shift') ? '1fr' : '1fr 1fr', gap: '0 1rem' }}>
-          {!form.is_recurring && (
-            <Field label="Day">
-              <select style={inputStyle} value={form.day} onChange={(e) => set('day', e.target.value)}>
-                {DAYS.map((d) => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </Field>
-          )}
-          {/* Shift events set their time via Start/End (below); other events use free text. */}
-          {form.participation_type !== 'shift' && (
-            <Field label="Time">
-              <input style={inputStyle} value={form.time} placeholder="e.g. 7:00 PM – 10:00 PM" onChange={(e) => set('time', e.target.value)} />
-            </Field>
-          )}
-        </div>
-
+        {/* Date first — the weekday derives from it, shown as instant feedback. */}
         {!form.is_recurring && (
-          <Field label="Date (used to filter Upcoming Gatherings on the dashboard)">
-            <input
-              style={{ ...inputStyle, width: '180px' }}
-              type="date"
-              value={form.event_date ?? ''}
-              onChange={e => set('event_date', e.target.value || null)}
-            />
+          <Field label="Date">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+              <input
+                style={{ ...inputStyle, width: '180px' }}
+                type="date"
+                value={form.event_date ?? ''}
+                onChange={e => set('event_date', e.target.value || null)}
+              />
+              <span style={{ fontSize: '0.85rem', color: derivedDay ? '#C8A848' : 'rgba(243,237,230,0.35)', letterSpacing: '0.04em', fontStyle: derivedDay ? 'normal' : 'italic' }}>
+                {derivedDay ?? 'pick a date'}
+              </span>
+            </div>
+          </Field>
+        )}
+
+        {/* Shift events set their time via Start/End (below); other events use free text. */}
+        {form.participation_type !== 'shift' && (
+          <Field label="Time">
+            <input style={inputStyle} value={form.time} placeholder="e.g. 7:00 PM – 10:00 PM" onChange={(e) => set('time', e.target.value)} />
           </Field>
         )}
 
@@ -209,103 +203,13 @@ function EventModal({
         </Field>
 
         <Field label="Icon">
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
-            {ICON_TYPES.map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => set('icon_type', t)}
-                title={t}
-                style={{
-                  padding: '0.4rem', borderRadius: '0.5rem', cursor: 'pointer',
-                  border: form.icon_type === t ? '1px solid #C8A848' : '1px solid rgba(200,168,72,0.15)',
-                  background: form.icon_type === t ? 'rgba(200,168,72,0.12)' : 'transparent',
-                  color: form.icon_type === t ? '#C8A848' : 'rgba(200,168,72,0.4)',
-                  transition: 'all 0.15s',
-                }}
-              >
-                <EventIcon type={t} size={20} />
-              </button>
-            ))}
-
-            {/* Freshly uploaded icon — not yet in customIcons, show as selected */}
-            {(form.icon_type.startsWith('http') || form.icon_type.startsWith('/')) && !customIcons.includes(form.icon_type) && (
-              <button
-                type="button"
-                title="Custom icon (selected)"
-                style={{
-                  padding: '0.4rem', borderRadius: '0.5rem', cursor: 'default',
-                  border: '1px solid #C8A848', background: 'rgba(200,168,72,0.12)',
-                }}
-              >
-                <EventIcon type={form.icon_type} size={20} />
-              </button>
-            )}
-
-            {/* Previously uploaded custom icons — reusable across events */}
-            {customIcons.map((url) => (
-              <div key={url} style={{ position: 'relative', display: 'inline-flex' }} className="icon-item" onMouseEnter={e => { const btn = e.currentTarget.querySelector('.icon-delete') as HTMLElement; if (btn) btn.style.opacity = '1' }} onMouseLeave={e => { const btn = e.currentTarget.querySelector('.icon-delete') as HTMLElement; if (btn) btn.style.opacity = '0' }}>
-                <button
-                  type="button"
-                  onClick={() => set('icon_type', url)}
-                  title="Use this icon"
-                  style={{
-                    padding: '0.4rem', borderRadius: '0.5rem', cursor: 'pointer',
-                    border: form.icon_type === url ? '1px solid #C8A848' : '1px solid rgba(200,168,72,0.2)',
-                    background: form.icon_type === url ? 'rgba(200,168,72,0.12)' : 'transparent',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  <EventIcon type={url} size={20} />
-                </button>
-                {onDeleteIcon && (
-                  <button
-                    type="button"
-                    className="icon-delete"
-                    onClick={(e) => { e.stopPropagation(); onDeleteIcon(url) }}
-                    title="Delete icon"
-                    style={{
-                      position: 'absolute', top: '-6px', right: '-6px',
-                      width: '16px', height: '16px', borderRadius: '50%',
-                      background: '#1A0A24', border: '1px solid rgba(255,100,100,0.4)',
-                      color: '#ff8a8a', cursor: 'pointer', fontSize: '0.55rem',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      lineHeight: 1, padding: 0,
-                      opacity: 0, transition: 'opacity 0.15s',
-                    }}
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            ))}
-
-            {/* Upload button */}
-            <button
-              type="button"
-              onClick={() => iconInputRef.current?.click()}
-              disabled={iconUploading}
-              title="Upload custom icon"
-              style={{
-                width: '32px', height: '32px', borderRadius: '0.5rem', cursor: 'pointer',
-                border: '1px dashed rgba(200,168,72,0.35)', background: 'transparent',
-                color: '#C8A848', opacity: iconUploading ? 0.4 : 0.6,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '1.1rem', lineHeight: 1, flexShrink: 0,
-                transition: 'opacity 0.15s, border-color 0.15s',
-              }}
-            >
-              {iconUploading ? '…' : '+'}
-            </button>
-            <input
-              ref={iconInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/svg+xml"
-              onChange={handleIconUpload}
-              style={{ display: 'none' }}
-            />
-          </div>
-          {iconError && <p style={{ color: '#ff8a8a', fontSize: '0.75rem', marginTop: '0.4rem' }}>{iconError}</p>}
+          <AssetImagePicker
+            value={isImageIcon(form.icon_type) ? form.icon_type : undefined}
+            onChange={v => set('icon_type', v ?? 'star')}
+            uploadUrl="/api/admin/schedule/icon"
+            primaryCategory="icon"
+            label="Event icon"
+          />
         </Field>
 
         <Field label="Participation">
@@ -377,7 +281,7 @@ function EventModal({
           <button onClick={onClose} style={{ padding: '0.6rem 1.2rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.2)', background: 'transparent', color: '#F3EDE6', cursor: 'pointer', fontSize: '0.82rem', opacity: 0.7 }}>
             Cancel
           </button>
-          <button onClick={() => onSave(form)} disabled={saving || !form.title} style={{ padding: '0.6rem 1.2rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.45)', background: 'transparent', color: '#FFFACD', cursor: 'pointer', fontSize: '0.82rem', letterSpacing: '0.05em', opacity: saving ? 0.5 : 1 }}>
+          <button onClick={() => onSave(form)} disabled={saving || !canSave} style={{ padding: '0.6rem 1.2rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.45)', background: 'transparent', color: '#FFFACD', cursor: 'pointer', fontSize: '0.82rem', letterSpacing: '0.05em', opacity: (saving || !canSave) ? 0.5 : 1 }}>
             {saving ? 'Saving…' : 'Save event'}
           </button>
         </div>
@@ -446,7 +350,7 @@ function EventRow({
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'baseline', flexWrap: 'wrap' }}>
           {!event.is_recurring && (
-            <span style={{ fontSize: '0.68rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.6, flexShrink: 0 }}>{event.day}</span>
+            <span style={{ fontSize: '0.68rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.6, flexShrink: 0 }}>{rowDateLabel(event)}</span>
           )}
           {event.time && <span style={{ fontSize: '0.68rem', opacity: 0.45, flexShrink: 0 }}>{event.time}</span>}
         </div>
@@ -510,7 +414,6 @@ export function ScheduleManager() {
 
   const regular = events.filter((e) => !e.is_recurring)
   const recurring = events.filter((e) => e.is_recurring)
-  const customIcons = Array.from(new Set(events.map(e => e.icon_type).filter(t => t.startsWith('http') || t.startsWith('/'))))
 
   const handleSave = async (form: Omit<ScheduleEvent, 'id' | 'sort_order'>) => {
     setSaving(true)
@@ -547,17 +450,6 @@ export function ScheduleManager() {
     if (!confirm('Delete this event?')) return
     await fetch(`/api/admin/schedule/${id}`, { method: 'DELETE' })
     setEvents((prev) => prev.filter((e) => e.id !== id))
-  }
-
-  const handleDeleteIcon = async (url: string) => {
-    if (!confirm('Delete this icon? Any events using it will revert to the default icon.')) return
-    await fetch('/api/admin/schedule/icon', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url }),
-    })
-    // Reload events so any that used this icon show the updated icon_type
-    await load()
   }
 
   const handleToggleVisible = async (event: ScheduleEvent) => {
@@ -683,8 +575,6 @@ const handleDrop = async (group: ScheduleEvent[], targetId: string) => {
           saving={saving}
           error={modalError}
           shiftTypes={shiftTypes}
-          customIcons={customIcons}
-          onDeleteIcon={handleDeleteIcon}
         />
       )}
     </div>

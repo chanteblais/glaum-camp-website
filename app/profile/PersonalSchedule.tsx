@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase'
 import { shiftColorIndexMap } from '@/lib/shift-colors'
+import { buildScheduleDays } from '@/lib/schedule-days'
 import { PersonalScheduleCalendar, type PersonalEvent } from './PersonalScheduleCalendar'
 
 type Props = {
@@ -11,7 +12,7 @@ type Props = {
 // The old contribution_type-tagged events are superseded: the group says WHAT
 // you contribute, the shifts you signed up for say WHEN.
 export async function PersonalSchedule({ userId }: Props) {
-  const EVENT_COLS = 'id, day, time, title, subtitle, detail_desc, icon_type, highlight, event_type, participation_type, shift_type_id'
+  const EVENT_COLS = 'id, day, time, title, subtitle, detail_desc, icon_type, highlight, event_type, event_date, participation_type, shift_type_id'
 
   const [{ data: mandatoryEvents }, { data: heldRows }, { data: legacySignup }, { data: shiftTypes }] = await Promise.all([
     supabaseAdmin
@@ -68,9 +69,13 @@ export async function PersonalSchedule({ userId }: Props) {
 
   if (events.length === 0) return null
 
+  // Day columns from the member's events' real dates (only days they have
+  // something on) — replaces the hardcoded July DAY_META list.
+  const days = buildScheduleDays(events.map(e => (e as { event_date?: string | null }).event_date))
+
   return (
     <div style={{ marginBottom: '2.5rem' }}>
-      <PersonalScheduleCalendar events={events} />
+      <PersonalScheduleCalendar events={events} days={days} />
     </div>
   )
 }

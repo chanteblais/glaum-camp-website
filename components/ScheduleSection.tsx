@@ -1,17 +1,19 @@
 import { supabaseAdmin } from '@/lib/supabase'
 import { ScheduleCalendarClient } from '@/components/ScheduleCalendarClient'
 import { shiftColorIndexMap } from '@/lib/shift-colors'
+import { buildScheduleDays } from '@/lib/schedule-days'
 export { EventIcon } from '@/components/EventIcon'
 export { ICON_TYPES } from '@/components/EventIcon'
 
 export async function ScheduleSection() {
-  const [{ data: eventsRaw }, { data: shiftTypes }] = await Promise.all([
+  const [{ data: eventsRaw }, { data: shiftTypes }, { data: configRows }] = await Promise.all([
     supabaseAdmin
       .from('schedule_events')
-      .select('id, day, time, title, subtitle, detail_desc, icon_type, highlight, is_recurring, event_type, participation_type, shift_type_id')
+      .select('id, day, time, title, subtitle, detail_desc, icon_type, highlight, is_recurring, event_type, event_date, participation_type, shift_type_id')
       .eq('visible', true)
       .order('sort_order', { ascending: true }),
     supabaseAdmin.from('shift_types').select('id').order('sort_order'),
+    supabaseAdmin.from('page_content').select('key, value').in('key', ['config_event_start_date', 'config_event_end_date']),
   ])
 
   // Each shift type gets a stable palette slot from its registry position.
@@ -20,6 +22,14 @@ export async function ScheduleSection() {
     ...e,
     shift_color_index: e.shift_type_id != null ? colorIndex[e.shift_type_id] ?? null : null,
   }))
+
+  // Day columns: the configured event range ∪ every date an event carries.
+  const config = Object.fromEntries((configRows ?? []).map(r => [r.key, r.value]))
+  const days = buildScheduleDays(
+    data.filter(e => !e.is_recurring).map(e => e.event_date),
+    config['config_event_start_date'],
+    config['config_event_end_date'],
+  )
 
   return (
     <div>
@@ -31,7 +41,7 @@ export async function ScheduleSection() {
           All times approximate. Attunement occurs continuously. Results may vary.
         </p>
       </div>
-      <ScheduleCalendarClient events={data ?? []} />
+      <ScheduleCalendarClient events={data ?? []} days={days} />
     </div>
   )
 }

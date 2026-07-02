@@ -11,6 +11,7 @@ import { AttunementTasksManager } from '../AttunementTasksManager'
 import { DepartmentsManager } from '../DepartmentsManager'
 import { GroupsManager } from '../GroupsManager'
 import { ShiftTypesManager } from '../ShiftTypesManager'
+import { EventDatesManager } from '../EventDatesManager'
 import { AdminsManager } from '../AdminsManager'
 import { PollManagersManager } from '../PollManagersManager'
 import { DebugSection } from '../DebugSection'
@@ -31,7 +32,7 @@ export default async function ConfigurePage() {
   const { data: configRows } = await supabaseAdmin
     .from('page_content')
     .select('key, value')
-    .in('key', ['config_attunement_tasks', 'config_distinctions', 'config_profile_fields'])
+    .in('key', ['config_attunement_tasks', 'config_distinctions', 'config_profile_fields', 'config_event_start_date', 'config_event_end_date'])
   const configMap = Object.fromEntries((configRows ?? []).map(r => [r.key, r.value]))
   const attunementTasks = parseAttunementTasks(configMap['config_attunement_tasks'])
   const distinctions = parseDistinctions(configMap['config_distinctions'])
@@ -165,6 +166,16 @@ export default async function ConfigurePage() {
 
         {/* ═══════════════ STRUCTURE ═══════════════ */}
         <CategoryHeading id="structure" />
+
+        <CollapsibleSection
+          title="Event Dates"
+          summary="When the event runs — drives the schedule calendars' day columns"
+        >
+          <EventDatesManager
+            initialStart={configMap['config_event_start_date'] ?? ''}
+            initialEnd={configMap['config_event_end_date'] ?? ''}
+          />
+        </CollapsibleSection>
 
         <CollapsibleSection
           title="Departments"
