@@ -12,6 +12,9 @@ type OptInGroup = {
   collection_id: string | null
   collection_name: string | null
   joined: boolean
+  // The shift commitment this group carries (null = none). Surfaced on the row
+  // so members see what they're taking on before they join.
+  shift_commitment: { hours: number; type: string } | null
 }
 
 const GOLD = '#C8A848'
@@ -105,6 +108,11 @@ export function GroupCommitments() {
           <p style={{ margin: 0, fontSize: '0.95rem', color: '#F3EDE6', fontWeight: 600 }}>{g.name}</p>
           {g.description && (
             <p style={{ margin: '0.2rem 0 0', fontSize: '0.78rem', opacity: 0.5, lineHeight: 1.5 }}>{g.description}</p>
+          )}
+          {g.shift_commitment && (
+            <p style={{ margin: '0.3rem 0 0', fontSize: '0.72rem', color: GOLD, opacity: 0.75, letterSpacing: '0.04em' }}>
+              ✦ carries a {g.shift_commitment.hours}h {g.shift_commitment.type} shift commitment
+            </p>
           )}
         </div>
 

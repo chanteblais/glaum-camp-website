@@ -10,7 +10,18 @@ export type AttunementChecklistItem = {
   done: boolean
   href?: string
   section?: 'photo' | 'contribution'
+  // 'required'  — authored attunement tasks: the community's minimum expectation.
+  //               Only these gate "Attuned".
+  // 'commitment' — derived from groups/roles the member chose to join: shown as
+  //               a guide to meeting what they signed up for, never a blocker.
+  tier: 'required' | 'commitment'
 }
+
+// Split helpers so every consumer applies the same semantics.
+export const requiredItems = (items: AttunementChecklistItem[]) =>
+  items.filter(i => i.tier !== 'commitment')
+export const commitmentItems = (items: AttunementChecklistItem[]) =>
+  items.filter(i => i.tier === 'commitment')
 
 // The member's current state, derived from their application + camp signup.
 export type AttunementState = {
@@ -53,44 +64,62 @@ export function buildAttunementChecklist(
   configJson: string | null | undefined,
   state: AttunementState,
 ): AttunementChecklistItem[] {
+  const tier = 'required' as const
   const authored = parseAttunementTasks(configJson)
     .filter(t => t.enabled && (t.requirement !== 'shift' || state.shiftSignupOpen))
     .map(t => {
       switch (t.requirement) {
-        case 'photo':      return { id: t.id, label: t.label, done: state.hasPhoto, section: 'photo' as const }
+        case 'photo':      return { id: t.id, label: t.label, done: state.hasPhoto, section: 'photo' as const, tier }
         case 'collection': {
           const need = t.requiredCount ?? 1
           const have = t.collectionId
             ? (state.groupCountsByCollection[t.collectionId] ?? 0)
             : state.totalGroupCount
-          return { id: t.id, label: t.label, done: have >= need, href: '/signup' }
+          return { id: t.id, label: t.label, done: have >= need, href: '/signup', tier }
         }
-        case 'role':       return { id: t.id, label: t.label, done: state.roleDone, href: '/signup' }
+        case 'role':       return { id: t.id, label: t.label, done: state.roleDone, href: '/signup', tier }
         case 'shift': {
           // "Any shift" (no type) keeps the legacy boolean — one signup counts,
           // regardless of whether that shift's start/end times are set yet.
-          if (!t.shiftTypeId) return { id: t.id, label: t.label, done: state.hasShift, href: '/signup' }
+          if (!t.shiftTypeId) return { id: t.id, label: t.label, done: state.hasShift, href: '/signup', tier }
           // Typed task = the universal hours requirement: sum the member's held
           // hours in that shift type against the task's required hours.
           const need = t.requiredHours ?? 1
           const have = state.hoursByShiftType[t.shiftTypeId] ?? 0
-          return { id: t.id, label: `${t.label} — ${have}/${need}h`, done: have >= need, href: '/signup' }
+          return { id: t.id, label: `${t.label} — ${have}/${need}h`, done: have >= need, href: '/signup', tier }
         }
         case 'approved':
-        default:           return { id: t.id, label: t.label, done: true }
+        default:           return { id: t.id, label: t.label, done: true, tier }
       }
     })
 
   // Derived obligations from the member's groups/roles (conditional requirements).
   // These aren't authored tasks — they appear because of what the member joined,
   // and disappear if they leave. Gated on shift signup being open, like the
-  // authored shift tasks.
+  // authored shift tasks. They are 'commitment' tier: a guide to what the member
+  // signed up for, never a gate on "Attuned".
   const derived: AttunementChecklistItem[] = state.shiftSignupOpen
     ? state.derivedShiftRequirements.map(r => {
         const have = state.hoursByShiftType[r.shiftTypeId] ?? 0
-        return { id: r.id, label: `${r.label} — ${have}/${r.requiredHours}h`, done: have >= r.requiredHours, href: '/signup' }
+        return { id: r.id, label: `${r.label} — ${have}/${r.requiredHours}h`, done: have >= r.requiredHours, href: '/signup', tier: 'commitment' as const }
       })
     : []
 
   return [...authored, ...derived]
+}
+
+// Hour totals behind the checklist, for the "minimum vs your commitments"
+// summary: minimumHours = the community-wide expectation (authored shift-hours
+// tasks); commitmentHours = extra hours the member took on by joining
+// groups/roles that carry a requirement. Gated on shift signup like the list.
+export function attunementHoursSummary(
+  configJson: string | null | undefined,
+  state: AttunementState,
+): { minimumHours: number; commitmentHours: number } {
+  if (!state.shiftSignupOpen) return { minimumHours: 0, commitmentHours: 0 }
+  const minimumHours = parseAttunementTasks(configJson)
+    .filter(t => t.enabled && t.requirement === 'shift' && t.shiftTypeId)
+    .reduce((n, t) => n + (t.requiredHours ?? 1), 0)
+  const commitmentHours = state.derivedShiftRequirements.reduce((n, r) => n + r.requiredHours, 0)
+  return { minimumHours, commitmentHours }
 }

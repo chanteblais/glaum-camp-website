@@ -14,7 +14,7 @@ import { PersonalSchedule } from './PersonalSchedule'
 import { AttunementStatus } from './AttunementStatus'
 import { ApprovedCamperPill } from '@/app/ApprovedCamperPill'
 import { getMemberGroups, groupCommitmentMeta } from '@/lib/groups'
-import { buildAttunementChecklist, memberGroupCounts } from '@/lib/attunement'
+import { buildAttunementChecklist, memberGroupCounts, requiredItems, attunementHoursSummary } from '@/lib/attunement'
 import { getMemberShiftState } from '@/lib/shift-attunement'
 import { buildMemberFacts } from '@/lib/member-facts'
 import { parseDistinctions, evaluateDistinctions } from '@/lib/distinctions'
@@ -131,7 +131,7 @@ export default async function ProfilePage() {
   // member's groups/roles. Same helper as the home dashboard — keep in sync.
   const shiftState = await getMemberShiftState(application?.clerk_user_id ?? userId)
   // Shared with the home dashboard banner via buildAttunementChecklist — keep both in sync.
-  const attunementTasks = buildAttunementChecklist(attuneConfig['config_attunement_tasks'], {
+  const attunementState = {
     hasPhoto: !!application?.avatar_url,
     groupCountsByCollection,
     totalGroupCount,
@@ -140,7 +140,9 @@ export default async function ProfilePage() {
     shiftSignupOpen: attuneConfig['config_shift_signup_open'] !== 'false',
     hoursByShiftType: shiftState.hoursByShiftType,
     derivedShiftRequirements: shiftState.derivedShiftRequirements,
-  })
+  }
+  const attunementTasks = buildAttunementChecklist(attuneConfig['config_attunement_tasks'], attunementState)
+  const attunementHours = attunementHoursSummary(attuneConfig['config_attunement_tasks'], attunementState)
 
   // Member facts → earned distinctions (Cabinet of Distinctions). Facts are
   // derived from existing data; medals are never persisted — they're recomputed
@@ -186,8 +188,11 @@ export default async function ProfilePage() {
   // narrative shows only on the public profile; here it's edited in Profile Details.)
   const quoteText = typeof profileValues['quote'] === 'string' ? (profileValues['quote'] as string).trim() : ''
   const commitmentCount = contributions.length + heldShifts.length
-  const attunementDone = attunementTasks.length > 0 && attunementTasks.every(t => t.done)
-  const attunementRemaining = attunementTasks.filter(t => !t.done).length
+  // "Attuned" = the required tier (authored tasks) only; group/role commitments
+  // are tracked as a guide below and never gate the status.
+  const requiredTasks = requiredItems(attunementTasks)
+  const attunementDone = requiredTasks.length > 0 && requiredTasks.every(t => t.done)
+  const attunementRemaining = requiredTasks.filter(t => !t.done).length
 
   const avatar = (
     <AvatarUpload
@@ -483,7 +488,7 @@ export default async function ProfilePage() {
                 showManageLink
               />
               <div style={{ height: '100%' }}>
-                {attunementTasks.length > 0 && <AttunementStatus tasks={attunementTasks} />}
+                {attunementTasks.length > 0 && <AttunementStatus tasks={attunementTasks} minimumHours={attunementHours.minimumHours} commitmentHours={attunementHours.commitmentHours} />}
               </div>
             </div>
 

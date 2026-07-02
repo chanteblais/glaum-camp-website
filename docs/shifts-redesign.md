@@ -196,3 +196,16 @@ All verified live in the browser (signup→progress→cancel round-trip on a rea
 - **Admin multi-shift views**: `/admin/[id]` lists every held shift with per-shift Remove (`remove_shift` in the signups PATCH); roster "has shift" unions both tables (boolean — hours-satisfaction display is future polish).
 
 **Remaining:** the final cleanup migration (item 7 above) + member-side acknowledgement flow for `requires_ack` mandatory events (toggle exists; gate not yet surfaced to members).
+
+## Decision (2026-07-02): required vs. chosen — two tiers, one checklist
+
+Confirmed with Chanté and **built** (feat/commitment-tiers): the attunement
+checklist distinguishes **required** items (authored attunement tasks — the
+community-wide minimum; the only tier that gates "Attuned") from **commitment**
+items (shift-hours obligations derived from groups/roles the member chose to
+join — shown under "Your Commitments" as a guide, never a blocker). Members who
+exceed the minimum are celebrated ("Xh is the expectation — you've pledged Yh
+more"), and group rows on Participate disclose their commitment before joining
+("carries a 3h Setup shift commitment"). The redesign's hours model must keep
+this distinction: authored/universal hours = minimum; binding-derived hours =
+chosen load.
