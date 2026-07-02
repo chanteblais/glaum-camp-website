@@ -7,6 +7,31 @@ Newest review at the top. Fixes are only applied once agreed.
 
 ---
 
+## Tier A implementation — 2026-07-02 (from docs/admin-ux-handoff.md, `feat/admin-ux-tier-a`)
+
+Chanté asked for the handoff brief's work to begin. Tier A shipped this round
+(browser-verified, zero new config):
+
+- **A1 — "Needs attention" digest** atop Overview (`lib/admin-attention.ts` +
+  Overview card): up to five prioritized actionable lines (pending applications /
+  volunteers / role requests / role suggestions / un-notified upcoming gathering),
+  each with a verb deep-link. Empty state: "All quiet — N days to camp."
+- **A2 — runway strip** inside the sticky `AdminNav` on all four admin surfaces:
+  "✦ 20 days to camp" + next dated milestones (upcoming gatherings, camp start),
+  each a jump link.
+- **A3 — verb-ified counts (scoped)**: Overview's "N pending review" → "Review N
+  pending →"; "In no group" card gained "Assign in Groups →". The A1 digest carries
+  most of the verb duty; further sweeps as sections get touched.
+- **A5 — cross-reference chips** on `/admin/[id]`: role/department (purple), each
+  group, and "N shifts held" (anchors to the Role & Shift section) as linked chips
+  under the header.
+
+**Deferred to next round:** A4 (sticky scroll-spy section sidebar), A5's second half
+(member names elsewhere linking consistently to `/admin/[id]` — rosters need ids
+plumbed), and all of Tier B (queue mode first).
+
+---
+
 ## Review — 2026-07-02 (fifth pass: Messages, Participate, Profile)
 
 Scope: the remaining member surfaces — /messages inbox (threads left unopened to

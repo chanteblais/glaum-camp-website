@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { shiftDurationHours } from '@/lib/shift-hours'
 import { getMemberShiftState } from '@/lib/shift-attunement'
 import { parseAttunementTasks } from '@/lib/site-config'
+import { memberDisplayNames } from '@/lib/member-names'
 
 // Member-facing multi-shift signup (shifts redesign). A member holds any number
 // of shift events via member_shift_signups; this replaces the single
@@ -25,16 +26,25 @@ async function requireApprovedCamper(userId: string) {
 }
 
 // Unique (member, event) holds across the new table + the legacy single column.
+// Leads (migration 048) only exist on the new table; legacy holds are members.
 async function fetchAllHolds() {
   const [{ data: many }, { data: legacy }] = await Promise.all([
-    supabaseAdmin.from('member_shift_signups').select('clerk_user_id, schedule_event_id'),
+    supabaseAdmin.from('member_shift_signups').select('clerk_user_id, schedule_event_id, role'),
     supabaseAdmin.from('camp_signups').select('clerk_user_id, schedule_event_id').not('schedule_event_id', 'is', null),
   ])
   const pairs = new Set<string>()
-  for (const r of [...(many ?? []), ...(legacy ?? [])]) {
+  const leadsByEvent = new Map<string, string[]>()
+  for (const r of many ?? []) {
+    if (!r.schedule_event_id) continue
+    pairs.add(`${r.clerk_user_id}|${r.schedule_event_id}`)
+    if (r.role === 'lead') {
+      leadsByEvent.set(r.schedule_event_id, [...(leadsByEvent.get(r.schedule_event_id) ?? []), r.clerk_user_id])
+    }
+  }
+  for (const r of legacy ?? []) {
     if (r.schedule_event_id) pairs.add(`${r.clerk_user_id}|${r.schedule_event_id}`)
   }
-  return pairs
+  return { pairs, leadsByEvent }
 }
 
 const countFor = (pairs: Set<string>, eventId: string) => {
@@ -70,8 +80,12 @@ export async function GET() {
   const config = Object.fromEntries((flagRes.data ?? []).map(r => [r.key, r.value]))
   const shiftSignupOpen = config['config_shift_signup_open'] !== 'false'
 
+  const leadNames = await memberDisplayNames(Array.from(holds.leadsByEvent.values()).flat())
+
   const shifts = (eventsRes.data ?? []).map(e => {
     const st = e.shift_types as unknown as { name?: string; icon?: string | null } | null
+    const leadIds = holds.leadsByEvent.get(e.id) ?? []
+    const held = holds.pairs.has(`${userId}|${e.id}`)
     return {
       id: e.id,
       title: e.title,
@@ -81,11 +95,13 @@ export async function GET() {
       event_date: e.event_date,
       duration_hours: shiftDurationHours(e.start_time, e.end_time),
       capacity: e.capacity,
-      signed_up: countFor(holds, e.id),
+      signed_up: countFor(holds.pairs, e.id),
       shift_type_id: e.shift_type_id,
       shift_type_name: st?.name ?? 'Shift',
       shift_type_icon: st?.icon ?? null,
-      held: holds.has(`${userId}|${e.id}`),
+      held,
+      held_role: held ? (leadIds.includes(userId) ? 'lead' : 'member') : null,
+      lead_names: leadIds.map(id => leadNames[id]).filter(Boolean),
     }
   })
 
@@ -116,8 +132,14 @@ export async function POST(req: NextRequest) {
   const application = await requireApprovedCamper(userId)
   if (!application) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { schedule_event_id } = await req.json()
+  const { schedule_event_id, role: rawRole } = await req.json()
   if (!schedule_event_id) return NextResponse.json({ error: 'schedule_event_id required' }, { status: 400 })
+  // Optional participation role (migration 048); omitting it keeps an existing
+  // signup's role, so a plain re-sign never demotes a lead.
+  if (rawRole !== undefined && rawRole !== 'member' && rawRole !== 'lead') {
+    return NextResponse.json({ error: 'role must be "member" or "lead"' }, { status: 400 })
+  }
+  const role = rawRole as 'member' | 'lead' | undefined
 
   const { data: flag } = await supabaseAdmin
     .from('page_content').select('value').eq('key', 'config_shift_signup_open').maybeSingle()
@@ -134,28 +156,46 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Shift not found' }, { status: 404 })
   }
 
-  if (event.capacity != null) {
+  const { data: existing } = await supabaseAdmin
+    .from('member_shift_signups')
+    .select('id, role')
+    .eq('clerk_user_id', userId)
+    .eq('schedule_event_id', schedule_event_id)
+    .maybeSingle()
+
+  if (event.capacity != null && !existing) {
     const holds = await fetchAllHolds()
-    if (!holds.has(`${userId}|${event.id}`) && countFor(holds, event.id) >= event.capacity) {
+    if (!holds.pairs.has(`${userId}|${event.id}`) && countFor(holds.pairs, event.id) >= event.capacity) {
       return NextResponse.json({ error: `"${event.title}" is full` }, { status: 409 })
     }
   }
 
-  // Unique constraint makes re-signing the same shift a no-op.
+  // Unique constraint makes re-signing the same shift a no-op (bar a role change).
   const { error } = await supabaseAdmin
     .from('member_shift_signups')
-    .upsert({ clerk_user_id: userId, schedule_event_id }, { onConflict: 'clerk_user_id,schedule_event_id' })
+    .upsert(
+      { clerk_user_id: userId, schedule_event_id, role: role ?? existing?.role ?? 'member' },
+      { onConflict: 'clerk_user_id,schedule_event_id' }
+    )
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Admin notification (same shape as the legacy shift_change event).
+  // Admin notification (same shape as the legacy shift_change event). A role
+  // change on an existing signup reads as such, not as a fresh signup.
   const user = await currentUser()
   const name = user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.firstName ?? userId
-  await supabaseAdmin.from('admin_notifications').insert({
-    application_id: application.id,
-    event_type: 'shift_change',
-    message: `${name} signed up for "${event.title}"`,
-    details: { schedule_event_id, shift_title: event.title },
-  })
+  const message = existing && role && role !== existing.role
+    ? role === 'lead'
+      ? `${name} offered to lead "${event.title}"`
+      : `${name} stepped back from leading "${event.title}"`
+    : `${name} signed up ${role === 'lead' ? 'to lead' : 'for'} "${event.title}"`
+  if (!existing || (role && role !== existing.role)) {
+    await supabaseAdmin.from('admin_notifications').insert({
+      application_id: application.id,
+      event_type: 'shift_change',
+      message,
+      details: { schedule_event_id, shift_title: event.title },
+    })
+  }
 
   return NextResponse.json({ success: true })
 }

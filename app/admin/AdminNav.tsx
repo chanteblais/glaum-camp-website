@@ -14,15 +14,21 @@ const TABS = [
   { label: 'Configure', href: '/admin/configure' },
 ]
 
+export type RunwayProps = {
+  daysToCamp: number | null
+  milestones: { label: string; dateLabel: string; href: string }[]
+}
+
 /**
  * Sticky admin navigation shown on every admin page (incl. nested ones like
  * /admin/configure and /admin/[id]) so the nav never disappears and you can
  * always jump between areas or back to camp without backtracking.
  *
  * Pass `sections` (on the Manage or Configure page) to surface a second row of
- * jump-links down to each category on that page.
+ * jump-links down to each category on that page. Pass `runway` to show the
+ * days-to-camp strip with the next dated milestones (docs/admin-ux-handoff.md A2).
  */
-export function AdminNav({ sections }: { sections?: AdminCategory[] }) {
+export function AdminNav({ sections, runway }: { sections?: AdminCategory[]; runway?: RunwayProps }) {
   const path = usePathname()
 
   // /admin/[id] (application detail) belongs under Manage.
@@ -115,6 +121,40 @@ export function AdminNav({ sections }: { sections?: AdminCategory[] }) {
                 }}
               >
                 {c.label}
+              </a>
+            ))}
+          </div>
+        )}
+
+        {/* Runway strip — days to camp + the next dated milestones (A2). */}
+        {runway && (runway.daysToCamp !== null || runway.milestones.length > 0) && (
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: '0.3rem 1.1rem',
+              justifyContent: 'center',
+              marginTop: '0.55rem',
+              paddingTop: '0.5rem',
+              borderTop: '1px solid rgba(200,168,72,0.08)',
+              fontSize: '0.66rem',
+              letterSpacing: '0.06em',
+            }}
+          >
+            {runway.daysToCamp !== null && (
+              <span style={{ color: GOLD, opacity: 0.85, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                ✦ {runway.daysToCamp === 0 ? 'Camp is here' : `${runway.daysToCamp} day${runway.daysToCamp === 1 ? '' : 's'} to camp`}
+              </span>
+            )}
+            {runway.milestones.map((m, i) => (
+              <a
+                key={`${m.label}-${i}`}
+                href={m.href}
+                style={{ color: CREAM, opacity: 0.45, textDecoration: 'none', whiteSpace: 'nowrap' }}
+              >
+                <span style={{ color: GOLD, opacity: 0.9 }}>·</span>{' '}
+                {m.label} — {m.dateLabel}
               </a>
             ))}
           </div>

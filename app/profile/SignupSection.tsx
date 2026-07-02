@@ -45,6 +45,8 @@ type ShiftSlot = {
   shift_type_name: string
   shift_type_icon: string | null
   held: boolean
+  held_role: 'member' | 'lead' | null
+  lead_names: string[]
 }
 
 // One owed shift-type requirement (derived from groups/roles + universal tasks).
@@ -84,7 +86,7 @@ function shiftDateLabel(s: { event_date: string | null; day: string }): string {
 // ── Current Signup Cards ──────────────────────────────────────────────────────
 
 function CurrentSignupCards({
-  signup, departments, heldShifts, shiftTypes, onOptOut, onCancelShift,
+  signup, departments, heldShifts, shiftTypes, onOptOut, onCancelShift, onSetLead,
 }: {
   signup: Signup | null
   departments: Department[]
@@ -92,11 +94,13 @@ function CurrentSignupCards({
   shiftTypes: ShiftTypeInfo[]
   onOptOut: () => void
   onCancelShift: (id: string) => Promise<void>
+  onSetLead: (id: string, lead: boolean) => Promise<void>
 }) {
   const [roleExpanded, setRoleExpanded] = useState(false)
   const [optingOut, setOptingOut] = useState(false)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [pendingCancel, setPendingCancel] = useState<ShiftSlot | null>(null)
+  const [leadingId, setLeadingId] = useState<string | null>(null)
 
   const allRoles = departments.flatMap(d => d.roles)
   const role = allRoles.find(r => r.id === signup?.role_id)
@@ -117,6 +121,12 @@ function CurrentSignupCards({
     setCancellingId(id)
     await onCancelShift(id)
     setCancellingId(null)
+  }
+
+  async function handleSetLead(s: ShiftSlot) {
+    setLeadingId(s.id)
+    await onSetLead(s.id, s.held_role !== 'lead')
+    setLeadingId(null)
   }
 
   return (
@@ -190,10 +200,32 @@ function CurrentSignupCards({
                     <p style={{ fontSize: '0.88rem', color: '#F3EDE6', margin: 0 }}>
                       {s.shift_type_icon && <span style={{ marginRight: '0.3rem' }}>{s.shift_type_icon}</span>}
                       {s.title}
+                      {s.held_role === 'lead' && (
+                        <span style={{
+                          marginLeft: '0.45rem', fontSize: '0.62rem', letterSpacing: '0.08em',
+                          textTransform: 'uppercase', color: '#C8A848',
+                          border: '1px solid rgba(200,168,72,0.4)', borderRadius: '9999px',
+                          padding: '0.08rem 0.45rem', verticalAlign: 'middle',
+                        }}>
+                          ✦ Lead
+                        </span>
+                      )}
                     </p>
                     <p style={{ fontSize: '0.72rem', color: '#D239F8', opacity: 0.75, margin: '0.15rem 0 0', letterSpacing: '0.04em' }}>
                       {shiftDateLabel(s)}{s.time ? ` · ${s.time}` : ''}{s.duration_hours > 0 ? ` · ${s.duration_hours}h` : ''}
                     </p>
+                    <button
+                      onClick={() => handleSetLead(s)}
+                      disabled={leadingId === s.id}
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                        marginTop: '0.25rem', fontSize: '0.68rem', letterSpacing: '0.04em',
+                        color: '#C8A848', opacity: leadingId === s.id ? 0.35 : 0.55,
+                        textDecoration: 'underline', textUnderlineOffset: '3px',
+                      }}
+                    >
+                      {leadingId === s.id ? '…' : s.held_role === 'lead' ? 'Step back from lead' : 'Offer to lead ✦'}
+                    </button>
                   </div>
                   <button
                     onClick={() => setPendingCancel(s)}
@@ -647,13 +679,18 @@ function ShiftCard({
         {busy
           ? 'Saving…'
           : slot.held
-            ? '✓ Signed up'
+            ? slot.held_role === 'lead' ? '✦ Leading' : '✓ Signed up'
             : full
               ? 'Full'
               : slot.capacity != null
                 ? `${slot.capacity - slot.signed_up} of ${slot.capacity} open`
                 : 'Open'}
       </p>
+      {slot.lead_names.length > 0 && (
+        <p style={{ fontSize: '0.6rem', margin: '0.2rem 0 0', lineHeight: 1.35, overflowWrap: 'break-word', color: '#C8A848', opacity: 0.65 }}>
+          ✦ Led by {slot.lead_names.join(' & ')}
+        </p>
+      )}
     </button>
   )
 }
@@ -941,6 +978,23 @@ export function SignupSection({ showPickers = true }: { showPickers?: boolean })
     setSigningId(null)
   }
 
+  // Offer to lead / step back on a shift the member already holds — the same
+  // POST as signup with an explicit role; the upsert flips the row in place.
+  async function handleSetLeadShift(id: string, lead: boolean) {
+    setShiftError(null)
+    const res = await fetch('/api/shift-signups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ schedule_event_id: id, role: lead ? 'lead' : 'member' }),
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      setShiftError(data.error ?? 'Something went wrong')
+    } else {
+      await refreshShifts()
+    }
+  }
+
   async function handleOptOut() {
     const res = await fetch('/api/signup', {
       method: 'POST',
@@ -1002,7 +1056,7 @@ export function SignupSection({ showPickers = true }: { showPickers?: boolean })
   return (
     <div id="role-signup" style={{ marginBottom: '2.5rem' }}>
       {showSuggest && <SuggestRoleModal onClose={() => setShowSuggest(false)} />}
-      <CurrentSignupCards signup={signup} departments={departments} heldShifts={heldShifts} shiftTypes={shiftTypes} onOptOut={handleOptOut} onCancelShift={handleCancelShift} />
+      <CurrentSignupCards signup={signup} departments={departments} heldShifts={heldShifts} shiftTypes={shiftTypes} onOptOut={handleOptOut} onCancelShift={handleCancelShift} onSetLead={handleSetLeadShift} />
 
       {showPickers && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>

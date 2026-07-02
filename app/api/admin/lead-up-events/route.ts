@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { memberDisplayNames } from '@/lib/member-names'
 
 async function requireAdmin() {
   const { userId } = await auth()
@@ -26,13 +27,22 @@ export async function GET() {
 
   const { data: rsvps } = await supabaseAdmin
     .from('lead_up_event_rsvps')
-    .select('lead_up_event_id')
+    .select('lead_up_event_id, clerk_user_id, role')
   const counts: Record<string, number> = {}
+  const leadIdsByEvent: Record<string, string[]> = {}
   for (const r of rsvps ?? []) {
     counts[r.lead_up_event_id] = (counts[r.lead_up_event_id] ?? 0) + 1
+    if (r.role === 'lead') {
+      leadIdsByEvent[r.lead_up_event_id] = [...(leadIdsByEvent[r.lead_up_event_id] ?? []), r.clerk_user_id]
+    }
   }
+  const leadNames = await memberDisplayNames(Object.values(leadIdsByEvent).flat())
 
-  const events = (data ?? []).map(e => ({ ...e, rsvp_count: counts[e.id] ?? 0 }))
+  const events = (data ?? []).map(e => ({
+    ...e,
+    rsvp_count: counts[e.id] ?? 0,
+    lead_names: (leadIdsByEvent[e.id] ?? []).map(id => leadNames[id]).filter(Boolean),
+  }))
   return NextResponse.json({ events })
 }
 

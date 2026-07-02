@@ -8,6 +8,8 @@ import { mergeMemberConfig } from '@/lib/form-config'
 import { resolveMember, getMemberProfileValues } from '@/lib/members'
 import { parseProfileFields, storedFields } from '@/lib/profile-fields'
 import { getMemberAwards } from '@/lib/distinction-awards'
+import { getMemberGroups } from '@/lib/groups'
+import { getAdminRunway } from '@/lib/admin-attention'
 import { parseDistinctions } from '@/lib/distinctions'
 import { DistinctionAwards } from './DistinctionAwards'
 import { AdminNav } from '../AdminNav'
@@ -30,7 +32,7 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
 
   // Fetch signup if member has a clerk_user_id. Shifts are many-to-many
   // (member_shift_signups) plus the legacy single camp_signups.schedule_event_id.
-  let signupData: { role: any; shifts: { id: string; title: string; time: string | null; day: string }[] } | null = null
+  let signupData: { role: any; shifts: { id: string; title: string; time: string | null; day: string; lead: boolean }[] } | null = null
   if (app.clerk_user_id) {
     const [{ data: signup }, { data: heldRows }] = await Promise.all([
       supabaseAdmin
@@ -40,7 +42,7 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
         .maybeSingle(),
       supabaseAdmin
         .from('member_shift_signups')
-        .select('schedule_events(id, title, time, day)')
+        .select('role, schedule_events(id, title, time, day)')
         .eq('clerk_user_id', app.clerk_user_id),
     ])
 
@@ -49,16 +51,17 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
         ? await supabaseAdmin.from('roles').select('name, commitment, department_id, departments(name, icon)').eq('id', signup.role_id).single()
         : { data: null }
 
-      // Union many-to-many + legacy single, deduped by event id.
-      const shiftMap = new Map<string, { id: string; title: string; time: string | null; day: string }>()
+      // Union many-to-many + legacy single, deduped by event id. Only the
+      // many-to-many rows can carry a lead role (migration 048).
+      const shiftMap = new Map<string, { id: string; title: string; time: string | null; day: string; lead: boolean }>()
       for (const r of heldRows ?? []) {
         const ev = r.schedule_events as any
-        if (ev?.id) shiftMap.set(ev.id, { id: ev.id, title: ev.title, time: ev.time ?? null, day: ev.day })
+        if (ev?.id) shiftMap.set(ev.id, { id: ev.id, title: ev.title, time: ev.time ?? null, day: ev.day, lead: (r as any).role === 'lead' })
       }
       if (signup?.schedule_event_id && !shiftMap.has(signup.schedule_event_id)) {
         const { data: legacyEv } = await supabaseAdmin
           .from('schedule_events').select('id, title, time, day').eq('id', signup.schedule_event_id).single()
-        if (legacyEv) shiftMap.set(legacyEv.id, { id: legacyEv.id, title: legacyEv.title, time: legacyEv.time ?? null, day: legacyEv.day })
+        if (legacyEv) shiftMap.set(legacyEv.id, { id: legacyEv.id, title: legacyEv.title, time: legacyEv.time ?? null, day: legacyEv.day, lead: false })
       }
 
       const roleRow = roleRes.data as any
@@ -80,6 +83,11 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
   const submitted = new Date(app.submitted_at).toLocaleDateString('en-CA', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   })
+
+  // Cross-reference chips (docs/admin-ux-handoff.md A5): the member's linked
+  // entities at a glance, each deep-linking to where that entity is managed.
+  const memberGroupChips = app.clerk_user_id ? await getMemberGroups(app.clerk_user_id) : []
+  const runway = await getAdminRunway()
 
   // Render the application strictly from the member-form config so the review
   // mirrors the live form: sections + fields in config order, honouring admin
@@ -205,7 +213,7 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1 }}>
       <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '0 1.5rem 6rem' }}>
 
-        <AdminNav />
+        <AdminNav runway={runway} />
 
         {/* Contextual back link */}
         <div style={{ marginBottom: '2.5rem' }}>
@@ -256,6 +264,27 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
           </span>
 
           <p style={{ fontSize: '0.72rem', opacity: 0.3, marginTop: '0.75rem', fontStyle: 'italic' }}>Submitted {submitted}</p>
+
+          {/* Cross-reference chips — the member's linked entities (A5) */}
+          {(signupData?.role || memberGroupChips.length > 0 || (signupData?.shifts.length ?? 0) > 0) && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', justifyContent: 'center', marginTop: '1rem', maxWidth: '640px' }}>
+              {signupData?.role && (
+                <a href="/admin/configure#structure" style={chipStyle('purple')}>
+                  {signupData.role.department ? `${signupData.role.department} · ` : ''}{signupData.role.name}
+                </a>
+              )}
+              {memberGroupChips.map(g => (
+                <a key={g.id} href="/admin/configure#structure" style={chipStyle('gold')}>
+                  {g.icon && !g.icon_image ? `${g.icon} ` : ''}{g.name}
+                </a>
+              ))}
+              {(signupData?.shifts.length ?? 0) > 0 && (
+                <a href="#role-shift" style={chipStyle('gold')}>
+                  {signupData!.shifts.length} shift{signupData!.shifts.length === 1 ? '' : 's'} held
+                </a>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Actions for pending */}
@@ -283,7 +312,7 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
 
         {/* Role & Shift */}
         {app.clerk_user_id && (
-          <>
+          <div id="role-shift">
             <Section title="Role & Shift">
               <MemberSignupCard
                 clerkUserId={app.clerk_user_id}
@@ -292,7 +321,7 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
               />
             </Section>
             <Divider />
-          </>
+          </div>
         )}
 
         {/* Sections — driven entirely by the live member-form config */}
@@ -457,4 +486,21 @@ function Field({ label, value }: { label: string; value: string | null }) {
 
 function Divider() {
   return <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.15), transparent)', margin: '2.5rem 0' }} />
+}
+
+// Cross-reference chip (A5): a small linked capsule for one related entity.
+function chipStyle(accent: 'gold' | 'purple'): React.CSSProperties {
+  const gold = accent === 'gold'
+  return {
+    display: 'inline-block',
+    padding: '0.3rem 0.85rem',
+    borderRadius: '9999px',
+    fontSize: '0.72rem',
+    letterSpacing: '0.05em',
+    textDecoration: 'none',
+    whiteSpace: 'nowrap',
+    border: `1px solid ${gold ? 'rgba(200,168,72,0.3)' : 'rgba(210,57,248,0.35)'}`,
+    color: gold ? '#C8A848' : '#D239F8',
+    background: gold ? 'rgba(200,168,72,0.06)' : 'rgba(210,57,248,0.07)',
+  }
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { memberDisplayNames } from '@/lib/member-names'
 
 // GET — visible lead-up gatherings for the current member, each with its RSVP
 // headcount and whether this member has RSVP'd. Drives the /schedule section.
@@ -32,21 +33,32 @@ export async function GET() {
   const ids = (events ?? []).map(e => e.id)
   const counts: Record<string, number> = {}
   const mine = new Set<string>()
+  const myLeads = new Set<string>()
+  const leadIdsByEvent: Record<string, string[]> = {}
   if (ids.length) {
     const { data: rsvps } = await supabaseAdmin
       .from('lead_up_event_rsvps')
-      .select('lead_up_event_id, clerk_user_id')
+      .select('lead_up_event_id, clerk_user_id, role')
       .in('lead_up_event_id', ids)
     for (const r of rsvps ?? []) {
       counts[r.lead_up_event_id] = (counts[r.lead_up_event_id] ?? 0) + 1
-      if (r.clerk_user_id === userId) mine.add(r.lead_up_event_id)
+      if (r.clerk_user_id === userId) {
+        mine.add(r.lead_up_event_id)
+        if (r.role === 'lead') myLeads.add(r.lead_up_event_id)
+      }
+      if (r.role === 'lead') {
+        leadIdsByEvent[r.lead_up_event_id] = [...(leadIdsByEvent[r.lead_up_event_id] ?? []), r.clerk_user_id]
+      }
     }
   }
+  const leadNames = await memberDisplayNames(Object.values(leadIdsByEvent).flat())
 
   const result = (events ?? []).map(e => ({
     ...e,
     rsvp_count: counts[e.id] ?? 0,
     rsvped: mine.has(e.id),
+    leading: myLeads.has(e.id),
+    lead_names: (leadIdsByEvent[e.id] ?? []).map(id => leadNames[id]).filter(Boolean),
   }))
   return NextResponse.json({ events: result })
 }

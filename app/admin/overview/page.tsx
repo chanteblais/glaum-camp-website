@@ -6,6 +6,7 @@ import { AdminNav } from '@/app/admin/AdminNav'
 import { MembersDropdown } from './MembersDropdown'
 import { getGroupNamesByUser } from '@/lib/groups'
 import { getShiftEventByUser } from '@/lib/shift-signups'
+import { getAttentionItems, getAdminRunway } from '@/lib/admin-attention'
 
 const HOURS_PER_MEMBER = 3
 
@@ -55,6 +56,9 @@ export default async function OverviewPage() {
   const client = await clerkClient()
   const user = await client.users.getUser(userId)
   if (user.publicMetadata?.role !== 'admin') redirect('/')
+
+  // "Needs attention" digest + runway strip (docs/admin-ux-handoff.md A1/A2).
+  const [attention, runway] = await Promise.all([getAttentionItems(), getAdminRunway()])
 
   // Fetch data
   const [
@@ -179,7 +183,7 @@ export default async function OverviewPage() {
 
       <div style={{ maxWidth: '960px', margin: '0 auto', padding: '0 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
 
-        <AdminNav />
+        <AdminNav runway={runway} />
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.5rem' }}>
           <NotificationBell initialNotifications={notifications ?? []} />
@@ -192,6 +196,43 @@ export default async function OverviewPage() {
           {pending.length} pending · {approved.length} approved
         </p>
 
+        {/* ── NEEDS ATTENTION (A1) — the console's to-do surface ── */}
+        <section style={{ marginBottom: '2.5rem' }}>
+          <div style={{
+            padding: '1.25rem 1.5rem',
+            borderRadius: '0.85rem',
+            border: attention.length > 0 ? '1px solid rgba(210,57,248,0.3)' : '1px solid rgba(200,168,72,0.15)',
+            background: attention.length > 0 ? 'rgba(210,57,248,0.05)' : 'rgba(200,168,72,0.03)',
+          }}>
+            <p style={{ fontSize: '0.65rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: attention.length > 0 ? '#D239F8' : '#C8A848', opacity: 0.8, margin: '0 0 0.9rem' }}>
+              Needs attention
+            </p>
+            {attention.length === 0 ? (
+              <p style={{ margin: 0, fontSize: '0.9rem', opacity: 0.55, fontStyle: 'italic' }}>
+                All quiet{runway.daysToCamp !== null ? ` — ${runway.daysToCamp} day${runway.daysToCamp === 1 ? '' : 's'} to camp` : ''}.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+                {attention.map(item => (
+                  <a
+                    key={item.id}
+                    href={item.href}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem',
+                      textDecoration: 'none', padding: '0.35rem 0', borderBottom: '1px solid rgba(200,168,72,0.07)',
+                    }}
+                  >
+                    <span style={{ fontSize: '0.9rem', color: '#F3EDE6', opacity: 0.85 }}>{item.text}</span>
+                    <span style={{ fontSize: '0.78rem', color: '#D239F8', letterSpacing: '0.06em', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      {item.verb} →
+                    </span>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
         {/* ── PARTICIPATION OVERVIEW ── */}
         <section style={{ marginBottom: '2.5rem' }}>
           <p style={{ fontSize: '0.65rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, marginBottom: '1.25rem' }}>
@@ -202,7 +243,13 @@ export default async function OverviewPage() {
             <div style={card()}>
               <p style={statLabel}>Approved Campers</p>
               <p style={statValue}>{approved.length}</p>
-              <p style={statSub}>{pending.length} pending review</p>
+              {pending.length > 0 ? (
+                <a href="/admin#people" style={{ ...statSub, display: 'inline-block', color: '#D239F8', opacity: 0.8, textDecoration: 'none' }}>
+                  Review {pending.length} pending →
+                </a>
+              ) : (
+                <p style={statSub}>none pending review</p>
+              )}
             </div>
             <div style={card()}>
               <p style={statLabel}>Signup Complete</p>
@@ -282,6 +329,9 @@ export default async function OverviewPage() {
                 <p style={statLabel}>In no group</p>
                 <p style={{ ...statValue, fontSize: '1.5rem' }}>{unassigned.length}</p>
                 <MemberPills members={unassigned} />
+                <a href="/admin/configure#structure" style={{ display: 'inline-block', marginTop: '0.6rem', fontSize: '0.75rem', color: '#C8A848', opacity: 0.75, textDecoration: 'none' }}>
+                  Assign in Groups →
+                </a>
               </div>
             </div>
           )}
