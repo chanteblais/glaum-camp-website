@@ -25,9 +25,13 @@ non-trivial change is one visible, revertable unit — not ceremony.
 
 ## Claude sessions
 
-Claude follows the same rules: work lands on a `type/slug` branch (or directly on
-`main` only for rule-5 tweaks), merges with `--no-ff` after verification, and
-**never pushes** — pushing (= deploying) is always Chante's call.
+**Every session branches before its first edit.** As soon as a session knows it
+will change files, it creates its own branch — `type/slug` when the scope is
+clear, `session/YYYY-MM-DD-<topic>` when it isn't yet (rename or split later if
+the work firms up). Unrelated tasks in one session get separate branches. Merge
+with `--no-ff` after verification (tsc + click-through), delete the branch, and
+**never push** — pushing (= deploying) is always Chante's call. Rule-5 tiny
+tweaks (log updates, one-line doc fixes) may still go straight to `main`.
 
 ## Day-to-day cheat sheet
 
