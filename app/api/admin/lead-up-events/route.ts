@@ -75,6 +75,7 @@ export async function POST(req: NextRequest) {
       host: body.host || null,
       image_url: body.image_url || null,
       visible: body.visible ?? true,
+      needs_lead: body.needs_lead ?? false,
       sort_order,
     }])
     .select()

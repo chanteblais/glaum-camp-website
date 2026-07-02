@@ -30,6 +30,7 @@ type ScheduleEvent = {
   requires_ack: boolean
   start_time: string | null
   end_time: string | null
+  needs_lead: boolean
 }
 
 // Shift types offered when an event is a Shift (Configure → Shift Types registry).
@@ -84,7 +85,7 @@ function rowDateLabel(ev: ScheduleEvent): string {
 
 const blank = (): Omit<ScheduleEvent, 'id' | 'sort_order'> => ({
   day: '', time: '', title: '', subtitle: '', detail_desc: '',
-  icon_type: 'star', visible: true, highlight: false, is_recurring: false, capacity: null, event_type: null, contribution_type: null, event_date: null, event_category: 'at_camp', participation_type: 'general', shift_type_id: null, requires_ack: false, start_time: null, end_time: null,
+  icon_type: 'star', visible: true, highlight: false, is_recurring: false, capacity: null, event_type: null, contribution_type: null, event_date: null, event_category: 'at_camp', participation_type: 'general', shift_type_id: null, requires_ack: false, start_time: null, end_time: null, needs_lead: false,
 })
 
 const inputStyle: React.CSSProperties = {
@@ -239,6 +240,19 @@ function EventModal({
               <p style={{ fontSize: '0.72rem', opacity: 0.4, lineHeight: 1.5, margin: '0.35rem 0 0' }}>
                 Kinds are defined in Configure → Shift Types. Requirements (who owes hours) live on groups/roles or attunement tasks.
               </p>
+            </Field>
+            <Field label="Lead role">
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', cursor: 'pointer', fontSize: '0.85rem', userSelect: 'none' }}>
+                <input
+                  type="checkbox"
+                  checked={form.needs_lead}
+                  onChange={e => set('needs_lead', e.target.checked)}
+                  style={{ marginTop: '0.2rem', accentColor: '#C8A848', cursor: 'pointer' }}
+                />
+                <span style={{ opacity: 0.75, lineHeight: 1.5 }}>
+                  This shift has a lead ✦ — members are offered &ldquo;I&rsquo;d like to be the shift lead&rdquo; when they sign up
+                </span>
+              </label>
             </Field>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '0 1rem', alignItems: 'end' }}>
               <Field label="Start">
