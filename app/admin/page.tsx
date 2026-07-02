@@ -13,6 +13,7 @@ import { LeadUpGatheringsManager } from './LeadUpGatheringsManager'
 import { AnnouncementsManager } from './AnnouncementsManager'
 import { getGroupNamesByUser } from '@/lib/groups'
 import { getShiftEventByUser } from '@/lib/shift-signups'
+import { getAdminRunway } from '@/lib/admin-attention'
 import { RoleRequestsSection } from './RoleRequestsSection'
 import { RoleSuggestionsSection } from './RoleSuggestionsSection'
 import { ShiftSignupToggle } from './ShiftSignupToggle'
@@ -42,6 +43,7 @@ export default async function AdminPage() {
   const groupNamesByUser = await getGroupNamesByUser()
 
   const signupEventMap = await getShiftEventByUser()
+  const runway = await getAdminRunway()
 
   const { data: configRows } = await supabaseAdmin
     .from('page_content')
@@ -106,7 +108,7 @@ export default async function AdminPage() {
 
       <div style={{ maxWidth: '960px', margin: '0 auto', padding: '0 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
 
-        <AdminNav sections={MANAGE_CATEGORIES} />
+        <AdminNav sections={MANAGE_CATEGORIES} runway={runway} />
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.5rem' }}>
           <NotificationBell initialNotifications={notifications ?? []} />

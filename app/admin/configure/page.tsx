@@ -20,6 +20,7 @@ import { parseAttunementTasks } from '@/lib/site-config'
 import { getGroupCollections } from '@/lib/group-collections'
 import { parseDistinctions } from '@/lib/distinctions'
 import { parseProfileFields, distinctionCatalog } from '@/lib/profile-fields'
+import { getAdminRunway } from '@/lib/admin-attention'
 
 export default async function ConfigurePage() {
   const { userId } = await auth()
@@ -102,7 +103,7 @@ export default async function ConfigurePage() {
 
       <div style={{ maxWidth: '960px', margin: '0 auto', padding: '0 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
 
-        <AdminNav sections={CONFIGURE_CATEGORIES} />
+        <AdminNav sections={CONFIGURE_CATEGORIES} runway={await getAdminRunway()} />
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.5rem' }}>
           <NotificationBell initialNotifications={notifications ?? []} />
