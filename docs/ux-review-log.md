@@ -7,6 +7,32 @@ Newest review at the top. Fixes are only applied once agreed.
 
 ---
 
+## Follow-up — 2026-07-02 (morning)
+
+### 15. Deleting/recreating a profile field silently strands form answers · Severity: high (data loss) · Status: guardrail **fixed**; data repair pending approval
+
+Found while chasing the `eventExperience` / `gatheringsAttended` double-up: renaming
+a profile field keeps its key (safe), but **delete-and-recreate mints a new key**,
+and any apply-form field still bound to the old key keeps writing answers to a key
+nothing displays. Worse, the builder's "Saves to" dropdown silently rendered the
+dangling binding as "This application only", hiding the problem. Live impact: the
+"camped before" form field writes to the deleted `eventExperience`; one member has a
+stranded value.
+
+**Fixed (guardrail):** the builder now shows a dangling binding as
+"⚠ missing field: <key>" with an amber warning and instructions — picking a real
+field (or "This application only") repairs the config in place.
+
+**Pending (data repair, needs Chante's go-ahead):** re-point the camped-before form
+field to `gatheringsAttended` + migrate the one stranded `eventExperience` value
+(copy, never overwrite). Doable via the new builder warning UI + a two-line script.
+
+**Also noticed:** `member_profiles.values` holds raw `cf_*` keys for ~8 members
+(not in the registry, so invisible) — likely from an earlier catch-up migration.
+Worth a look someday; not urgent.
+
+---
+
 ## Overnight fixes — 2026-07-02 (approved: "do all relevant fixes, best judgment")
 
 All verified live in the browser against the dev server, tsc-clean, dev server
