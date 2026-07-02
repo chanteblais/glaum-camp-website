@@ -17,10 +17,13 @@ export async function GET() {
     .maybeSingle()
   if (!member) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
+  // Past gatherings drop out for members (no RSVPing something that already
+  // happened); dateless gatherings stay. Matches the home-dashboard teaser.
   const { data: events, error } = await supabaseAdmin
     .from('lead_up_events')
     .select('*')
     .eq('visible', true)
+    .or(`event_date.is.null,event_date.gte.${new Date().toISOString().slice(0, 10)}`)
     .order('event_date', { ascending: true, nullsFirst: false })
     .order('sort_order', { ascending: true })
 
