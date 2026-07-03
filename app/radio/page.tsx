@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { getApprovedMember } from '@/lib/members'
 import { getRadioFeed, getRadioNowData, getRadioStats } from '@/lib/radio'
 import { Header } from '@/components/Header'
+import { RadioHero } from './RadioHero'
 import { RadioNowStrip } from './RadioNowStrip'
 import { RadioComposer, GoLiveBar } from './RadioComposer'
 import { RadioFeed } from './RadioFeed'
@@ -78,55 +79,9 @@ export default async function RadioPage() {
       ` }} />
       <main style={{ maxWidth: '760px', margin: '0 auto', padding: '5.5rem 1.5rem 6rem' }}>
 
-        {/* ── Hero ── */}
-        <div style={{ position: 'relative', padding: '1.5rem 0 2rem', overflow: 'hidden' }}>
-          {/* Art slot: warm glow where the radio illustration will live
-              (a future strike-batch piece in the medallion style). */}
-          <div
-            aria-hidden
-            style={{
-              position: 'absolute',
-              right: '-4rem',
-              top: '-5rem',
-              width: '20rem',
-              height: '16rem',
-              background: 'radial-gradient(closest-side, rgba(200,168,72,0.14), rgba(210,57,248,0.05), transparent)',
-              pointerEvents: 'none',
-            }}
-          />
-          <span aria-hidden style={{ position: 'absolute', right: '3.5rem', top: '2rem', color: '#C8A848', opacity: 0.6, fontSize: '0.8rem' }}>✦</span>
-          <span aria-hidden style={{ position: 'absolute', right: '7rem', top: '4.5rem', color: '#D239F8', opacity: 0.4, fontSize: '0.6rem' }}>✦</span>
-          <span aria-hidden style={{ position: 'absolute', right: '2rem', top: '5.5rem', color: '#C8A848', opacity: 0.35, fontSize: '0.55rem' }}>✦</span>
-
-          <h1
-            style={{
-              fontFamily: 'TokyoDreams, serif',
-              fontSize: 'clamp(2.4rem, 7vw, 3.6rem)',
-              color: '#C8A848',
-              margin: 0,
-              letterSpacing: '0.06em',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.9rem',
-            }}
-          >
-            <span aria-hidden style={{ fontSize: '0.9rem', opacity: 0.55 }}>–✦</span>
-            Radio
-            <span aria-hidden style={{ fontSize: '0.9rem', opacity: 0.55 }}>✦–</span>
-          </h1>
-          <p
-            style={{
-              margin: '0.5rem 0 0 0.2rem',
-              fontStyle: 'italic',
-              fontSize: '1.02rem',
-              lineHeight: 1.55,
-              color: 'rgba(216,180,232,0.85)',
-              maxWidth: '24rem',
-            }}
-          >
-            the pulse of camp — tune in to what's happening around you.
-          </p>
-        </div>
+        {/* ── Hero (RadioHero: waves mark, diamond rule, script subtitle,
+               frequency waveform — her banner mockup) ── */}
+        <RadioHero />
 
         {/* ── Stats band ── */}
         <div

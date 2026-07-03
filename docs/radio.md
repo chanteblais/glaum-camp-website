@@ -43,8 +43,10 @@ Something board) — no invisible whole-row links; a linkless post is just a
 post. **Human speech reads differently from automatic moments**: organizer
 broadcasts and member voices sit flush-left (emoji inline, no emblem
 column) in lavender, so a person talking stands apart from the platform
-narrating. Hero header (flourished title, script subtitle, an art slot
-reserved for a radio illustration in the medallion style), a **stats band**
+narrating. Hero header (`RadioHero.tsx`, from her banner mockup: the ((✦))
+waves mark beside the title, an ornamental diamond rule, a warm-gold script
+subtitle in Caveat — loaded via `next/font` for this page only — and the
+frequency-waveform graphic with glowing motes, all inline SVG), a **stats band**
 (on the air this week / resources claimed / distinctions awarded /
 announcements shared — `getRadioStats`), the day rules end in a ✦, and the
 feed signs off with *"That's all for now. Stay tuned."*
