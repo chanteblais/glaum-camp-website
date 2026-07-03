@@ -4,7 +4,10 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-export function MessagesNavLink({ style }: { style?: React.CSSProperties }) {
+// Polls the unread-message count and keeps it fresh across focus, route
+// changes, and the glaum:messages-read signal. Shared by the nav link and the
+// mobile tab bar (only one of the two renders a badge at a time).
+export function useUnreadMessages() {
   const [unread, setUnread] = useState(0)
   const pathname = usePathname()
 
@@ -33,6 +36,12 @@ export function MessagesNavLink({ style }: { style?: React.CSSProperties }) {
     }
     // Re-run on route change so the count updates after navigating into/out of /messages
   }, [refresh, pathname])
+
+  return unread
+}
+
+export function MessagesNavLink({ style }: { style?: React.CSSProperties }) {
+  const unread = useUnreadMessages()
 
   return (
     <Link
