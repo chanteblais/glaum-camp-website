@@ -1,6 +1,6 @@
 # Database Schema
 
-All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations in `supabase-migrations/` document incremental changes (latest here: `058`; all of `025`–`057` **applied in prod** as of 2026-07-03, `058` **pending**). Confirm `025` (column renames), `029` (the `application-files` bucket), `033` (group messaging), `034`/`035` (group icon images + `group-badges` bucket, `badge_image` → `icon_image`), `036`–`038` (public profile fields, members/profiles, member distinctions), `039`–`041` (lead-up gatherings + notify/image), `042`–`044` (group collections + per-collection profile visibility + per-collection self-join), `045`–`047` (shifts redesign + shift times), and `048`/`049` (participation leads + per-event lead opt-in; the gathering halves are dropped by `050`) are applied before relying on those features.
+All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations in `supabase-migrations/` document incremental changes (latest here: `061`; all of `025`–`058` and `060` **applied in prod** as of 2026-07-03 — `059` is the reserved/generated Clerk remap, applied at cutover; `060` lives on the QA-sweep branch; `061` **pending** — Radio). Confirm `025` (column renames), `029` (the `application-files` bucket), `033` (group messaging), `034`/`035` (group icon images + `group-badges` bucket, `badge_image` → `icon_image`), `036`–`038` (public profile fields, members/profiles, member distinctions), `039`–`041` (lead-up gatherings + notify/image), `042`–`044` (group collections + per-collection profile visibility + per-collection self-join), `045`–`047` (shifts redesign + shift times), and `048`/`049` (participation leads + per-event lead opt-in; the gathering halves are dropped by `050`) are applied before relying on those features.
 
 ---
 
@@ -360,6 +360,27 @@ Admin-posted updates shown to all approved members on the dashboard.
 
 ---
 
+### `radio_events`
+
+The stored half of **Radio** — the community broadcast feed (migration `061`; spec [radio.md](radio.md)). One row per broadcast moment; written by `postRadioEvent` / `postSourcedRadioEvent` (`lib/radio.ts`) from the route where the moment happens (application approve, resource claim/offer, manual distinction grant, organizer composer). The Now / Up next strip on `/radio` is **derived at read time** and never stored here.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `kind` | TEXT NOT NULL | `'broadcast'` / `'member'` / `'resource'` / `'distinction'` — open set, no CHECK (new kinds need no migration) |
+| `message` | TEXT NOT NULL | The full card line, actor name inline ("Sarah committed to bringing a camping stove.") |
+| `icon` | TEXT | Emoji or asset-library image path |
+| `actor_clerk_id` | TEXT | Member the event is about; their **current** avatar is joined at read time (shoutouts pattern) |
+| `actor_name` | TEXT | Display name denormalized at write time — the feed is a historical record |
+| `link` | TEXT | Optional internal deep link (e.g. `/participate#bring`) |
+| `created_by` | TEXT | Admin clerk_user_id, organizer broadcasts only |
+| `visible` | BOOL | Default `true` (admin delete removes the row outright; the column is future curation headroom) |
+| `created_at` | TIMESTAMPTZ | Feed order (indexed DESC) |
+
+Migration `061` also **backfills** one `member` event per approved application from `reviewed_at`, so the feed launches populated. Automatic sources are toggleable via `page_content.config_radio`.
+
+---
+
 ### `page_content`
 
 Admin-editable copy for the homepage. One row per key.
@@ -387,6 +408,7 @@ Admin-editable copy for the homepage. One row per key.
 - `config_shift_signup_open` — string `'true'`/`'false'` (defaults open when absent). When `'false'`, the `/participate` shift calendar is hidden behind a "times not confirmed" notice, `/api/shift-signups` POST rejects new signups (cancelling stays allowed), and shift-requirement attunement lines (authored + derived) are hidden from the checklist. Toggled via Admin → Program → Schedule (`ShiftSignupToggle.tsx`).
 - `config_event_start_date` / `config_event_end_date` — `"YYYY-MM-DD"` strings: the event's overall date range. The schedule calendars (`ScheduleSection` → `ScheduleCalendarClient`) show a day column for every date in this range (∪ any real event dates outside it — `lib/schedule-days.ts`). Managed via Admin → Configure → Structure → **Event Dates** (`EventDatesManager.tsx`). The start date also drives the home-banner countdown and the nudge emails' "gathers in N days" line (`lib/camp-event.ts` `daysUntilEvent`).
 - `config_attunement_nudge_days` — string integer: days between attunement nudge emails per member (`'0'` = off; absent/invalid → default `2`). Parsed by `parseAttunementNudgeDays` (`lib/site-config.ts`); consumed by `/api/cron/attunement-nudges`; set via the **Reminder emails** cadence select in the Attunement Tasks manager (Admin → Configure).
+- `config_radio` — JSON `{ sources: { member, resource, distinction } }`: which automatic Radio sources broadcast (absent key / malformed = all **on**). Parsed by `parseRadioSources` (`lib/radio.ts`); toggled in Admin → Program → Radio (`RadioManager.tsx`). Organizer broadcasts have no toggle. See [radio.md](radio.md).
 - `config_distinctions` — JSON array of `DistinctionRule` objects (`{ id, label, description?, image?, glyph?, engraving?, yearFact?, conditions[], enabled }`) driving the profile **Cabinet of Distinctions**. `image` is an asset-library path or uploaded URL; `engraving` is an optional short static caption (≤32 chars) shown under the medal. Each rule's `conditions` (`{ fact, op, value }`, all must pass) are evaluated against derived member facts — **earned medals are never stored** (see [features.md](features.md#distinctions)). Managed via Admin → Distinctions (`DistinctionsManager.tsx`). Parsed/evaluated by `lib/distinctions.ts` (`parseDistinctions`/`evaluateDistinctions`); facts come from `lib/member-facts.ts` (`buildMemberFacts`). Falls back to `DEFAULT_DISTINCTIONS`.
 
 - `config_profile_fields` — JSON array of `ProfileField` objects (`{ key, label, type, options?, default?, public, memberEditable, applicationEligible, distinctionEligible, askExisting?, required?, system?, enabled }`) — the **Profile Field registry** defining each member profile detail field (bio, quote, + admin-added). Managed via Admin → Configure → **Profile Fields** (`ProfileFieldsManager.tsx`); parsed by `parseProfileFields` in `lib/profile-fields.ts`, falling back to `DEFAULT_PROFILE_FIELDS`. `public` = **Visible** on the member profile (off = admin-only, shown on `/admin/[id]`); `key` is the stable identity that member answers are stored under in `member_profiles.values`. See [profile-architecture.md](profile-architecture.md) and [features.md](features.md).
@@ -557,6 +579,8 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `057_recurrence_days.sql` | **Recurring events on chosen dates.** Adds `recurrence_days TEXT[]` (default NULL) to `schedule_events`: NULL = every day (old behavior, existing rows untouched), an array of ISO dates = only those days. Additive, non-destructive; **must be applied before deploying** this branch — the member `ScheduleSection` selects the new column. |
 | `058_show_on_schedule.sql` | **Keep events off the schedule page.** Adds `show_on_schedule BOOL NOT NULL DEFAULT true` to `schedule_events`: FALSE = the event skips the schedule page (homepage embed + /schedule) and the home upcoming-events teaser while staying signable/ackable. Additive, non-destructive; **must be applied before deploying** — member queries filter on the new column. |
 | `059_clerk_prod_remap.sql` | **Clerk dev→prod user-ID remap** (RESERVED — file is *generated*, not in the repo, by `scripts/migrate-clerk-to-prod.mjs --execute` once the prod users exist). Rewrites every stored Clerk ID (18 table/column pairs + derived `conversations.direct_key`) from the dev instance to the production instance via a temp mapping table, with per-column verification counts before COMMIT. Non-destructive (pure ID rewrite), re-runnable; apply during the key-swap cutover window. Runbook: [clerk-prod-migration.md](clerk-prod-migration.md). |
+| `060_*` | Lives on the QA-sweep branch (approved-campers `members` backfill); applied in prod 2026-07-03. Numbering reserved here. |
+| `061_radio.sql` | **Radio.** Creates `radio_events` (the community broadcast feed — see [radio.md](radio.md)) + DESC index on `created_at`, and backfills one `member` ("joined the camp") event per approved application from `reviewed_at`. Additive + idempotent (guarded backfill), non-destructive; **must be applied before deploying** — the home dashboard teaser and `/radio` read the new table. |
 
 ---
 

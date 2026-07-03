@@ -20,6 +20,7 @@ export const PROGRAM_CATEGORIES: AdminCategory[] = [
   { id: 'schedule', label: 'Schedule' },
   { id: 'lead-up', label: 'Lead-Up Gatherings' },
   { id: 'resources', label: 'Shared Resources' },
+  { id: 'radio', label: 'Radio' },
 ]
 
 // Configure — define the standalone structures the rest of the app reads from.

@@ -9,8 +9,10 @@ import { ScheduleManager } from '../ScheduleManager'
 import { LeadUpGatheringsManager } from '../LeadUpGatheringsManager'
 import { ResourcesManager } from '../ResourcesManager'
 import { ShiftSignupToggle } from '../ShiftSignupToggle'
+import { RadioManager } from '../RadioManager'
 import { PROGRAM_CATEGORIES } from '../admin-sections'
 import { getAdminRunway } from '@/lib/admin-attention'
+import { parseRadioSources } from '@/lib/radio'
 import {
   getAdminScheduleEvents,
   getAdminShiftTypes,
@@ -18,6 +20,7 @@ import {
   getAdminLeadUpEvents,
   getAdminResourceLists,
   getStewardOptions,
+  getAdminRadioEvents,
 } from '@/lib/admin-program-data'
 
 // A failed section fetch degrades to undefined — the manager then runs its own
@@ -50,11 +53,12 @@ export default async function ProgramPage() {
     leadUpEvents,
     resourceLists,
     stewardOptions,
+    radioEvents,
   ] = await Promise.all([
     supabaseAdmin
       .from('page_content')
       .select('key, value')
-      .in('key', ['config_shift_signup_open', 'config_event_start_date', 'config_event_end_date']),
+      .in('key', ['config_shift_signup_open', 'config_event_start_date', 'config_event_end_date', 'config_radio']),
     supabaseAdmin
       .from('admin_notifications')
       .select('id, application_id, event_type, message, details, created_at, read_at')
@@ -69,6 +73,7 @@ export default async function ProgramPage() {
     safe(getAdminLeadUpEvents()),
     safe(getAdminResourceLists()),
     safe(getStewardOptions()),
+    safe(getAdminRadioEvents()),
   ])
   const configMap = Object.fromEntries((configRows ?? []).map(r => [r.key, r.value]))
   const shiftSignupOpen = configMap['config_shift_signup_open'] !== 'false'
@@ -124,6 +129,16 @@ export default async function ProgramPage() {
 
         <div style={workspacePanel}>
           <ResourcesManager initialLists={resourceLists} initialStewards={stewardOptions} />
+        </div>
+
+        {/* ═══════════════ RADIO ═══════════════ */}
+        <CategoryHeading id="radio" large />
+
+        <div style={workspacePanel}>
+          <RadioManager
+            initialEvents={radioEvents}
+            initialSources={parseRadioSources(configMap['config_radio'])}
+          />
         </div>
 
       </div>

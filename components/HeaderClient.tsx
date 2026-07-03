@@ -29,6 +29,7 @@ const publicNavLinks = [
 
 const memberNavLinks = [
   { href: '/schedule', label: 'Schedule' },
+  { href: '/radio', label: 'Radio' },
   { href: '/members', label: 'Many Hands' },
   { href: '/messages', label: 'Messages', badge: true },
   { href: '/participate', label: 'Participate' },

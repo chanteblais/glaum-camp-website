@@ -3,6 +3,7 @@ import { memberDisplayNames } from './member-names'
 import type { ScheduleEvent, ShiftTypeOption, RosterEntry } from '@/app/admin/ScheduleManager'
 import type { LeadUpEvent } from '@/app/admin/LeadUpGatheringsManager'
 import type { ResourceList, StewardOptions } from '@/app/admin/ResourcesManager'
+import type { AdminRadioEvent } from '@/app/admin/RadioManager'
 
 // Server-side assembly for the Program tab's managers. Each function is the
 // single source for one admin GET's response body: /admin/program calls them
@@ -176,4 +177,16 @@ export async function getStewardOptions(): Promise<StewardOptions> {
       department_name: r.department_id ? deptName[r.department_id] ?? null : null,
     })),
   }
+}
+
+// The Radio manager's "recently on the air" list (all kinds, for curation).
+export async function getAdminRadioEvents(): Promise<AdminRadioEvent[]> {
+  const { data, error } = await supabaseAdmin
+    .from('radio_events')
+    .select('id, kind, message, icon, actor_name, created_at')
+    .eq('visible', true)
+    .order('created_at', { ascending: false })
+    .limit(40)
+  if (error) throw new Error(error.message)
+  return (data ?? []) as AdminRadioEvent[]
 }

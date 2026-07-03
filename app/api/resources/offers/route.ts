@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { postSourcedRadioEvent, getRadioActorName, resourceCommitmentMessage } from '@/lib/radio'
 
 // Suggest a resource the organizers haven't listed ("we'll want sharp
 // knives" / "I have a guitar amp — useful?"). Creates an open-callout item
@@ -47,6 +48,18 @@ export async function POST(req: NextRequest) {
       await supabaseAdmin.from('resources').delete().eq('id', item.id)
       return NextResponse.json({ error: claimError.message }, { status: 500 })
     }
+
+    // Radio: an offer with "I'll bring it" is the same commitment moment as a
+    // first claim (bare suggestions without a claim stay silent).
+    const actorName = await getRadioActorName(userId)
+    await postSourcedRadioEvent('resource', {
+      kind: 'resource',
+      message: resourceCommitmentMessage(actorName, item.name, 1),
+      icon: '✨',
+      actorClerkId: userId,
+      actorName,
+      link: '/participate#bring',
+    })
   }
 
   return NextResponse.json({ success: true, item })

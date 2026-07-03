@@ -13,7 +13,7 @@ Glåüm   About · Participate · Schedule · Apply     [Sign in]
 
 **Approved members:**
 ```
-Glåüm   Home · Schedule · Many Hands · Messages · My Profile   [🔔 avatar▾]
+Glåüm   Schedule · Radio · Many Hands · Messages · Participate · My Profile   [🔔 avatar▾]
 ```
 
 - `Messages` shows an unread count badge (polled every 30s via `/api/messages/unread`)
@@ -57,7 +57,7 @@ Configurable widgets (order, visibility, and width controlled by admin via the p
 | `polls` | Polls | Active, non-expired admin polls. Members vote inline; results visible to everyone (voted or not) |
 | `events` | Upcoming Gatherings | Pre-camp + at-camp `schedule_events` in the next 14 days. "View full schedule →" links to `/schedule` |
 | `spotlight` | Meet a Member | Left: rotating member spotlight (cycles every minute). Right: Upcoming Gatherings list |
-| `activity` | Recent Activity | Mixed feed of member joins + profile updates, up to 6 items |
+| `activity` | On the Air | The latest 6 **Radio** events with a "Tune in →" link to `/radio` (replaced the old member-joins/profile-updates feed — joins now *are* Radio events). See **Radio** under Authenticated Member Pages + [radio.md](radio.md) |
 
 Fixed bottom section (always present):
 - **Role & Shift + Many Hands** — quick-link grid to `/participate` and `/members`
@@ -261,6 +261,19 @@ Linked from nav as "Many Hands".
 
 ---
 
+### Radio (`/radio`)
+
+**Who:** Approved members
+**What:** The community's broadcast feed — the public pulse of camp. Full spec: [radio.md](radio.md).
+
+Deliberately **not** chat: no threads, no replies. One calm editorial stream of camp life — organizer broadcasts (📢), new members (✦), resource commitments (✨), distinction grants (🏅) — as cards (icon/avatar disc · message · local-clock time) grouped under day headings (Today / Yesterday / date), newest first, latest 60. Broadcast cards wear a slightly stronger gold edge. Events are stored in `radio_events` and written at the moment they happen (`lib/radio.ts`); the actor's avatar is joined fresh at read time.
+
+At the top, the **Now / Up next strip** (`RadioNowStrip`) is derived, never stored: the camp-day welcome ("✦ Day 2 of camp") while today is inside the configured event range, plus what's happening now (purple ● pulse line; open-ended events stay "now" for 90 min) and the next thing starting today — from `schedule_events` (visible + on-schedule, `general`/`mandatory` only; shifts are work slots, not atmosphere). The client picks against the member's own clock (their device is at camp; the server is in UTC) and re-checks each minute.
+
+Radio never notifies (Messages interrupt; Radio informs). The one exception is an organizer broadcast posted with **"Also alert members"** — bell + announcement email (`radio_broadcast` bell rows deep-link "Tune in →"). The home dashboard's `activity` widget ("On the Air") teases the latest 6 events.
+
+---
+
 ## Admin Pages
 
 ### Admin Console (four tabs)
@@ -286,13 +299,14 @@ Sections are collapsible (`CollapsibleSection`) and **default to collapsed** —
 
 ### Program tab (`/admin/program`)
 
-The event itself: three always-open workspaces, each held together by a **soft panel** (cream wash + hairline gold edge) under an enlarged anchored `CategoryHeading` (`large` variant; anchors `#schedule`, `#lead-up`, `#resources` — the targets of Overview's "Needs attention" deep links and the runway milestones).
+The event itself: four always-open workspaces, each held together by a **soft panel** (cream wash + hairline gold edge) under an enlarged anchored `CategoryHeading` (`large` variant; anchors `#schedule`, `#lead-up`, `#resources`, `#radio` — the first three are the targets of Overview's "Needs attention" deep links and the runway milestones).
 
 | Section | Component | What it does |
 |---|---|---|
 | Schedule | `ScheduleManager` (opens with one controls row: the compact `ShiftSignupToggle` pill (passed as children) left, List ⇄ Week + Add right; the closed-state explanation only appears while signup is closed) | CRUD for schedule events, laid out as a day-grouped program view: one section per day (same day model as the member calendar — `buildScheduleDays`, configured range ∪ event dates, so admin and member views always agree), rows time-sorted with an aligned time column, a day-jump chip rail on top, per-day "+ Add" buttons that prefill the date, an **Undated** bucket for legacy rows missing a date, and the Recurring group below (each row sub-labelled "Every day" or its picked dates). **Every event carries structured Start/End times** (`TimeField`, `app/components/TimeField.tsx` — a house-styled replacement for the native `<input type="time">` used here and in the Lead-Up modal: free-text input accepting "7pm"/"7:30 pm"/"19:00"/"730" over a 15-minute options dropdown, End flavour listing times after the Start with the resulting duration; value contract stays "HH:MM"|null. Start required on all events, end also required on shifts — there is no free-text time field; the display `time` string derives on save, and editing a legacy row prefills Start/End parsed from its old text). A **Show on schedule page** toggle (`show_on_schedule`, migration `058`, default on) keeps an event off the schedule page + home teaser while it stays signable/ackable — unlike Visible, which hides it from members everywhere; rows flagged off wear an "off schedule" chip. **Recurring events pick their days**: the modal's Recurring toggle reveals "Repeats on" day chips (the schedule's day columns); all chips lit = `recurrence_days` NULL = every day incl. later range growth, a subset = an array of ISO dates (migration `057`). A **List ⇄ Week toggle** (remembered in `localStorage` across visits) swaps the day sections for a **week grid** (`ScheduleWeekView`): day columns × hour axis in the member calendar's visual language (same hour scale + shift-type hues from `lib/shift-colors.ts`, mandatory teal), overlapping events share the column side-by-side, recurring events render as ghosted bands in each column they repeat on (`recurrence_days` NULL = every column; ghost bodies are click-through so they never swallow add-at-slot clicks, while the ghost's text label still opens the editor), general events wear a stable per-event hue (`generalHue(id)`, `lib/shift-colors.ts` `GENERAL_HUES`: crimson/chartreuse/silver/citron — bands of the wheel no shift, mandatory-teal, or gold/purple chrome colour owns, so generals never read as another event's kin), shift blocks show `n/cap` + a "✦ no lead" flag; click a block to edit (the edit modal carries a Delete button — from the week grid the modal is the only way to reach an event), click an empty slot to add with that day + nearest half-hour prefilled, and **drag a block to reschedule it** (pointer-based, 15-minute snap: vertical moves the time keeping the duration, crossing columns moves the day; drop PATCHes structured start/end + `event_date` + the derived display `time`, optimistic with snap-back on failure; recurring ghosts and the fix-me strip stay click-to-edit); dated-but-untimed rows surface in a fix-me strip. Drag-reorder exists only on recurring rows (the one place `sort_order` affects member display; dated events order by date + time everywhere). Shift rows carry a **compact roster** (`ShiftRoster`, fed by `GET /api/admin/schedule/rosters`): count vs capacity, a "✦ no lead yet" hint on lead-enabled shifts with signups but no lead, and one chip per holder (✦ = lead) — clicking a chip promotes/demotes via the same `set_shift_role` PATCH as the member page; legacy-only holds (no `member_shift_signups` row) are inert |
 | Lead-Up Gatherings | `LeadUpGatheringsManager` | CRUD for lead-up gatherings (spec: [`lead-up-gatherings.md`](./lead-up-gatherings.md)) topped by a **month calendar** (`LeadUpCalendar`) — the runway at a glance: click an empty day to add a gathering there (date prefilled), click a gathering chip to edit it; ‹ › month nav opens on the next upcoming gathering's month; the configured event range (Configure → Event Dates) is tinted purple with an "Event" marker; past days dimmed; hidden gatherings at low opacity with ○. The editor requires title + date + start time (the same styled `TimeField` as the event modal, end optional with durations). The row list below keeps Notify / visibility / delete per gathering |
 | Shared Resources | `ResourcesManager` | Gear the community needs, members claim what they'll bring — see [Shared Resources](#shared-resources) |
+| Radio | `RadioManager` | The broadcast feed's console (spec: [radio.md](radio.md)): a composer (message ≤280 + emoji + optional **"Also alert members"** bell/email), the **Automatic broadcasts** toggles (`config_radio` — new members / resource commitments / distinction grants, all default on), and **Recently on the air** — the latest 40 events of any kind with two-tap Remove (feed curation) |
 
 ### Configure tab (`/admin/configure`)
 

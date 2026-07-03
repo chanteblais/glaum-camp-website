@@ -151,6 +151,8 @@ Sign-out flow:
 | `/api/admin/announcements` | GET/POST | List visible announcements / create new |
 | `/api/admin/announcements/all` | GET | List all announcements including hidden (admin only) |
 | `/api/admin/announcements/[id]` | PATCH/DELETE | Update / delete announcement |
+| `/api/admin/radio` | GET/POST | Recent radio events (manager list, same assembly the Program tab server-renders) / post an organizer broadcast — optional `notify` = bell + announcement email (lead-up notify pattern). See [radio.md](radio.md) |
+| `/api/admin/radio/[id]` | DELETE | Remove a radio event (feed curation, any kind) |
 | `/api/admin/page-content` | GET/PATCH | Read / upsert any `page_content` row — used for homepage copy (`home_*`) and form configs (`config_member_form`, `config_volunteer_form`) |
 
 ### Cron (Vercel Cron)

@@ -10,6 +10,7 @@ import { getMemberGroups } from '@/lib/groups'
 import { getResourceWidgetState } from '@/lib/resources'
 import { buildAttunementChecklist, memberGroupCounts, requiredItems, commitmentItems } from '@/lib/attunement'
 import { getMemberShiftState, EMPTY_MEMBER_SHIFT_STATE } from '@/lib/shift-attunement'
+import { getRadioFeed, type RadioEventRow } from '@/lib/radio'
 import { daysUntilEvent } from '@/lib/camp-event'
 import { clockLabel } from '@/lib/shift-hours'
 
@@ -43,8 +44,7 @@ export default async function Home() {
   let leadUpEvents: { id: string; title: string; event_date: string | null; start_time: string | null; location: string | null; host: string | null; image_url: string | null }[] = []
   let spotlightPool: unknown[] = []
   let userFirstName: string | null = null
-  type ActivityItem = { label: string; name: string; ts: string; avatar_url: string | null }
-  let recentActivity: ActivityItem[] = []
+  let recentActivity: RadioEventRow[] = []
   type Announcement = { id: string; title: string; body: string | null; pinned: boolean; created_at: string }
   let announcements: Announcement[] = []
   type PollRow = { id: string; question: string; options: string[]; allow_multiple: boolean; expires_at: string | null; initialCounts: number[]; initialUserVotes: number[] }
@@ -92,7 +92,7 @@ let canManagePolls = false
     application = appRaw?.status === 'cancelled' ? null : appRaw ?? null
 
     if (application?.status === 'approved') {
-      const [signupResult, eventsResult, leadUpResult, spotlightResult, announcementsResult, pollsResult, pollVotesResult, shoutoutsResult, nextEventResult, recentApprovedResult] = await Promise.all([
+      const [signupResult, eventsResult, leadUpResult, spotlightResult, announcementsResult, pollsResult, pollVotesResult, shoutoutsResult, nextEventResult, radioFeed] = await Promise.all([
         supabaseAdmin
           .from('camp_signups')
           .select('role_id, schedule_event_id, role_approval_status, roles(name, description, purpose, department_id, departments(name, icon)), schedule_events(title, day, time, icon_type)')
@@ -159,14 +159,8 @@ let canManagePolls = false
           .order('event_date', { ascending: true })
           .limit(1)
           .maybeSingle(),
-        // Recent activity feed
-        supabaseAdmin
-          .from('applications')
-          .select('preferred_name, first_name, reviewed_at, profile_updated_at, avatar_url')
-          .eq('status', 'approved')
-          .not('reviewed_at', 'is', null)
-          .order('reviewed_at', { ascending: false })
-          .limit(10),
+        // "On the Air" teaser — the latest Radio events (docs/radio.md)
+        getRadioFeed(6),
       ])
 
       campSignup = signupResult.data ?? null
@@ -219,17 +213,7 @@ let canManagePolls = false
         })
       }
 
-      // Recent activity feed
-      const activityFeed: ActivityItem[] = []
-      for (const row of recentApprovedResult.data ?? []) {
-        const name = row.preferred_name || row.first_name || 'A member'
-        activityFeed.push({ label: 'joined the camp', name, ts: row.reviewed_at, avatar_url: row.avatar_url ?? null })
-        if (row.profile_updated_at && row.profile_updated_at > row.reviewed_at) {
-          activityFeed.push({ label: 'updated their profile', name, ts: row.profile_updated_at, avatar_url: row.avatar_url ?? null })
-        }
-      }
-      activityFeed.sort((a, b) => b.ts.localeCompare(a.ts))
-      recentActivity = activityFeed.slice(0, 6)
+      recentActivity = radioFeed
 
       if (pool.length > 0) {
         const signupRows = (signupRowsRes.data ?? []) as { clerk_user_id: string; roles: unknown }[]
@@ -637,23 +621,25 @@ let canManagePolls = false
 
                 activity: recentActivity.length > 0 ? (
                   <div style={{ border: '1px solid rgba(200,168,72,0.2)', borderRadius: '1rem', background: 'rgba(10,0,20,0.5)', overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
-                    <div style={{ padding: '1rem 1.5rem 0.75rem', borderBottom: '1px solid rgba(200,168,72,0.12)' }}>
-                      <p style={{ fontSize: '0.62rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, margin: 0 }}>Recent Activity</p>
+                    <div style={{ padding: '1rem 1.5rem 0.75rem', borderBottom: '1px solid rgba(200,168,72,0.12)', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                      <p style={{ fontSize: '0.62rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, margin: 0 }}>On the Air</p>
+                      <a href="/radio" style={{ fontSize: '0.68rem', color: '#C8A848', opacity: 0.6, textDecoration: 'none', letterSpacing: '0.06em' }}>Tune in →</a>
                     </div>
                     <div>
                       {recentActivity.map((item, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', padding: '0.7rem 1.5rem', borderBottom: i < recentActivity.length - 1 ? '1px solid rgba(200,168,72,0.07)' : 'none' }}>
+                        <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', padding: '0.7rem 1.5rem', borderBottom: i < recentActivity.length - 1 ? '1px solid rgba(200,168,72,0.07)' : 'none' }}>
                           <div style={{ flexShrink: 0, width: '28px', height: '28px', borderRadius: '50%', overflow: 'hidden', border: '1px solid rgba(111,73,31,0.6)', background: 'rgba(200,168,72,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             {item.avatar_url
                               // eslint-disable-next-line @next/next/no-img-element
                               ? <img src={supabaseResizedUrl(item.avatar_url, 56) ?? ''} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                              : <span style={{ fontSize: '0.65rem', opacity: 0.3 }}>✦</span>}
+                              : item.icon && (item.icon.startsWith('/') || item.icon.startsWith('http'))
+                              ? <IconImage src={item.icon} size="100%" fill={0.8} />
+                              : <span style={{ fontSize: '0.65rem', color: '#C8A848', opacity: 0.75 }}>{item.icon || '✦'}</span>}
                           </div>
-                          <p style={{ flex: 1, margin: 0, fontSize: '0.82rem', lineHeight: 1.4 }}>
-                            <span style={{ color: '#C8A848', opacity: 0.9 }}>{item.name}</span>
-                            <span style={{ opacity: 0.5 }}> {item.label}</span>
+                          <p style={{ flex: 1, margin: 0, fontSize: '0.82rem', lineHeight: 1.4, opacity: 0.75, minWidth: 0 }}>
+                            {item.message}
                           </p>
-                          <span style={{ fontSize: '0.7rem', opacity: 0.3, flexShrink: 0 }}>{timeAgo(item.ts)}</span>
+                          <span style={{ fontSize: '0.7rem', opacity: 0.3, flexShrink: 0 }}>{timeAgo(item.created_at)}</span>
                         </div>
                       ))}
                     </div>

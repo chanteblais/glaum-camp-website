@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { sendUserEmail, APP_URL } from '@/lib/send-email'
 import { setMemberStatus } from '@/lib/members'
 import { requireAdmin } from '@/lib/admin-auth'
+import { postSourcedRadioEvent } from '@/lib/radio'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const userId = await requireAdmin()
@@ -47,6 +48,25 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       event_type: 'application_approved',
       message,
     }])
+
+    // Radio: announce the new member — once per member (re-approvals and the
+    // migration-061 backfill both mean an event may already exist).
+    const { data: alreadyOnAir } = await supabaseAdmin
+      .from('radio_events')
+      .select('id')
+      .eq('kind', 'member')
+      .eq('actor_clerk_id', application.clerk_user_id)
+      .limit(1)
+      .maybeSingle()
+    if (!alreadyOnAir) {
+      await postSourcedRadioEvent('member', {
+        kind: 'member',
+        message: `${displayName} joined the camp.`,
+        icon: '✦',
+        actorClerkId: application.clerk_user_id,
+        actorName: displayName,
+      })
+    }
 
     const clerkUser = await client.users.getUser(application.clerk_user_id)
     const email = clerkUser.emailAddresses[0]?.emailAddress
