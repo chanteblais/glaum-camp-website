@@ -1,4 +1,5 @@
 import { supabaseAdmin } from './supabase'
+import { eventRangeDays, shiftOccurrenceDates } from './shift-occurrences'
 
 // Data behind the admin console's "Needs attention" digest (A1) and the
 // days-to-camp runway strip (A2) — see docs/admin-ux-handoff.md. Derived
@@ -34,7 +35,7 @@ const daysUntil = (iso: string) =>
 // At most five prioritized, actionable lines. Every line names work and links
 // to where it's done. Order = review queues first, then time-sensitive comms.
 export async function getAttentionItems(): Promise<AttentionItem[]> {
-  const [apps, vols, roleReqs, roleSuggs, { data: gatherings }, { data: leadShifts }, { data: shiftHolds }, { data: legacyHolds }] = await Promise.all([
+  const [apps, vols, roleReqs, roleSuggs, { data: gatherings }, { data: leadShifts }, { data: shiftHolds }, { data: legacyHolds }, { data: rangeRows }] = await Promise.all([
     supabaseAdmin.from('applications').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     supabaseAdmin.from('volunteers').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     supabaseAdmin.from('camp_signups').select('clerk_user_id', { count: 'exact', head: true }).eq('role_approval_status', 'pending'),
@@ -50,14 +51,15 @@ export async function getAttentionItems(): Promise<AttentionItem[]> {
     // members can no longer notice at signup time, so it's flagged here.
     supabaseAdmin
       .from('schedule_events')
-      .select('id, title, capacity, event_date')
+      .select('id, title, capacity, event_date, is_recurring, recurrence_days')
       .eq('participation_type', 'shift')
       .eq('visible', true)
       .eq('needs_lead', true)
       .gt('capacity', 0)
-      .or(`event_date.is.null,event_date.gte.${todayLocal()}`),
-    supabaseAdmin.from('member_shift_signups').select('clerk_user_id, schedule_event_id, role'),
+      .or(`event_date.is.null,event_date.gte.${todayLocal()},is_recurring.eq.true`),
+    supabaseAdmin.from('member_shift_signups').select('clerk_user_id, schedule_event_id, occurrence_date, role'),
     supabaseAdmin.from('camp_signups').select('clerk_user_id, schedule_event_id').not('schedule_event_id', 'is', null),
+    supabaseAdmin.from('page_content').select('key, value').in('key', ['config_event_start_date', 'config_event_end_date']),
   ])
 
   const items: AttentionItem[] = []
@@ -92,21 +94,39 @@ export async function getAttentionItems(): Promise<AttentionItem[]> {
   })
 
   // Holds = member_shift_signups ∪ legacy camp_signups.schedule_event_id,
-  // deduped per (member, event); leads exist only on the new table. Mirrors
-  // fetchAllHolds in app/api/shift-signups/route.ts so "full" agrees with the
-  // member-facing counts.
-  const holdsByEvent = new Map<string, Set<string>>()
-  const leadEvents = new Set<string>()
-  for (const r of [...(shiftHolds ?? []), ...(legacyHolds ?? [])]) {
+  // deduped per (member, event, night); leads exist only on the new table.
+  // Each night of a recurring shift is checked independently for fullness, so a
+  // single full-and-leadless night flags. Mirrors fetchAllHolds so "full" agrees
+  // with the member-facing counts.
+  const occKey = (eventId: string, date: string | null) => `${eventId}|${date ?? ''}`
+  const holdsByOcc = new Map<string, Set<string>>()
+  const leadOccs = new Set<string>()
+  for (const r of [
+    ...(shiftHolds ?? []).map(r => ({ ...r, occurrence_date: (r.occurrence_date as string | null) ?? null })),
+    ...(legacyHolds ?? []).map(r => ({ ...r, occurrence_date: null as string | null, role: 'member' })),
+  ]) {
     if (!r.schedule_event_id) continue
-    const set = holdsByEvent.get(r.schedule_event_id) ?? new Set<string>()
+    const k = occKey(r.schedule_event_id, r.occurrence_date)
+    const set = holdsByOcc.get(k) ?? new Set<string>()
     set.add(r.clerk_user_id)
-    holdsByEvent.set(r.schedule_event_id, set)
-    if ('role' in r && r.role === 'lead') leadEvents.add(r.schedule_event_id)
+    holdsByOcc.set(k, set)
+    if ('role' in r && r.role === 'lead') leadOccs.add(k)
   }
-  const leadless = (leadShifts ?? []).filter(s =>
-    !leadEvents.has(s.id) && (holdsByEvent.get(s.id)?.size ?? 0) >= (s.capacity as number)
+  const rangeDays = eventRangeDays(
+    (rangeRows ?? []).find(r => r.key === 'config_event_start_date')?.value,
+    (rangeRows ?? []).find(r => r.key === 'config_event_end_date')?.value,
   )
+  // A shift flags if ANY of its occurrences (nights) is full and leadless.
+  const leadless = (leadShifts ?? []).filter(s => {
+    const cap = s.capacity as number
+    const dates: (string | null)[] = s.is_recurring
+      ? (shiftOccurrenceDates(s, rangeDays).length ? shiftOccurrenceDates(s, rangeDays) : [])
+      : [null]
+    return dates.some(d => {
+      const k = occKey(s.id, d)
+      return !leadOccs.has(k) && (holdsByOcc.get(k)?.size ?? 0) >= cap
+    })
+  })
   if (leadless.length === 1) items.push({
     id: `leadless-${leadless[0].id}`,
     text: `“${leadless[0].title}” is fully signed up but has no lead ✦`,

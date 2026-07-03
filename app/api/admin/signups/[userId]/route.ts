@@ -18,16 +18,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { userId: st
 
   // Admin promote/demote a lead on a shift the member already holds. Only the
   // many-to-many table carries roles; a legacy-only hold can't be promoted.
+  // occurrence_date targets one night of a recurring shift (omit it to affect
+  // every held night — back-compatible with callers that don't send it).
   if (body.set_shift_role) {
-    const { schedule_event_id, role } = body.set_shift_role
+    const { schedule_event_id, role, occurrence_date } = body.set_shift_role
     if (!schedule_event_id || (role !== 'member' && role !== 'lead')) {
       return NextResponse.json({ error: 'set_shift_role needs schedule_event_id and role "member"|"lead"' }, { status: 400 })
     }
-    const { error, count } = await supabaseAdmin
+    let q = supabaseAdmin
       .from('member_shift_signups')
       .update({ role }, { count: 'exact' })
       .eq('clerk_user_id', params.userId)
       .eq('schedule_event_id', schedule_event_id)
+    if ('occurrence_date' in body.set_shift_role) {
+      q = occurrence_date == null ? q.is('occurrence_date', null) : q.eq('occurrence_date', occurrence_date)
+    }
+    const { error, count } = await q
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     if ((count ?? 0) === 0) {
       return NextResponse.json({ error: 'Member does not hold that shift' }, { status: 404 })

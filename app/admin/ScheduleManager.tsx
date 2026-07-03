@@ -47,7 +47,7 @@ export type ShiftTypeOption = { id: string; name: string }
 // One holder of a shift, from GET /api/admin/schedule/rosters (member_shift_signups
 // ∪ legacy camp_signups). legacy_only holds have no member_shift_signups row,
 // so the lead toggle can't touch them.
-export type RosterEntry = { clerk_user_id: string; name: string; role: 'member' | 'lead'; legacy_only: boolean }
+export type RosterEntry = { clerk_user_id: string; name: string; role: 'member' | 'lead'; legacy_only: boolean; occurrence_date: string | null }
 
 // Weekday fallback order — only used to sort legacy UNDATED rows among themselves.
 const DAY_ORDER: Record<string, number> = {
@@ -514,19 +514,25 @@ function EventRow({
 // Compact roster under a shift row: count vs capacity, then one chip per holder
 // (✦ = lead). Chips toggle lead/member with the same set_shift_role PATCH the
 // member page uses — so the digest's "full but no lead" flag is fixable right
-// here. Legacy-only holds can't carry a role, so their chip is inert.
-function ShiftRoster({ event, entries, busyKey, error, onToggleLead }: {
+// here. Legacy-only holds can't carry a role, so their chip is inert. A
+// recurring shift breaks out one line per night (each is a regular shift).
+function ShiftRosterLine({ event, entries, label, busyKey, onToggleLead }: {
   event: ScheduleEvent
   entries: RosterEntry[]
+  label: string | null
   busyKey: string | null
-  error: string | null
   onToggleLead: (entry: RosterEntry) => void
 }) {
   const n = entries.length
   const hasLead = entries.some(e => e.role === 'lead')
   const full = event.capacity != null && n >= event.capacity
   return (
-    <div style={{ marginTop: '0.5rem', paddingLeft: '6.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+      {label && (
+        <span style={{ fontSize: '0.62rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#D239F8', opacity: 0.7, whiteSpace: 'nowrap', minWidth: '3.4rem' }}>
+          {label}
+        </span>
+      )}
       <span style={{ fontSize: '0.68rem', color: full ? '#C8A848' : '#F3EDE6', opacity: full ? 0.85 : 0.4, whiteSpace: 'nowrap' }}>
         {n}{event.capacity != null ? ` / ${event.capacity}` : ''} signed up
       </span>
@@ -536,11 +542,11 @@ function ShiftRoster({ event, entries, busyKey, error, onToggleLead }: {
         </span>
       )}
       {entries.map(e => {
-        const busy = busyKey === `${event.id}|${e.clerk_user_id}`
+        const busy = busyKey === `${event.id}|${e.clerk_user_id}|${e.occurrence_date ?? ''}`
         const lead = e.role === 'lead'
         return (
           <button
-            key={e.clerk_user_id}
+            key={`${e.clerk_user_id}|${e.occurrence_date ?? ''}`}
             onClick={() => onToggleLead(e)}
             disabled={busy || e.legacy_only}
             title={e.legacy_only
@@ -558,6 +564,41 @@ function ShiftRoster({ event, entries, busyKey, error, onToggleLead }: {
             {lead && <span style={{ marginRight: '0.3rem' }}>✦</span>}
             {e.name}
           </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function ShiftRoster({ event, entries, busyKey, error, onToggleLead }: {
+  event: ScheduleEvent
+  entries: RosterEntry[]
+  busyKey: string | null
+  error: string | null
+  onToggleLead: (entry: RosterEntry) => void
+}) {
+  // Non-recurring: one line (occurrence null). Recurring: one line per night
+  // that has holders, labelled by date, ordered chronologically.
+  const nights = event.is_recurring
+    ? Array.from(new Set(entries.map(e => e.occurrence_date ?? ''))).sort()
+    : ['']
+  return (
+    <div style={{ marginTop: '0.5rem', paddingLeft: '6.95rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+      {nights.map(night => {
+        const lineEntries = entries.filter(e => (e.occurrence_date ?? '') === night)
+        if (event.is_recurring && lineEntries.length === 0) return null
+        const label = event.is_recurring && night
+          ? (() => { const d = new Date(`${night}T12:00:00`); return isNaN(d.getTime()) ? night : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) })()
+          : null
+        return (
+          <ShiftRosterLine
+            key={night || 'single'}
+            event={event}
+            entries={lineEntries}
+            label={label}
+            busyKey={busyKey}
+            onToggleLead={onToggleLead}
+          />
         )
       })}
       {error && <span style={{ fontSize: '0.68rem', color: '#ff8a8a' }}>{error}</span>}
@@ -807,18 +848,20 @@ export function ScheduleManager({ rangeStart, rangeEnd, initialEvents, initialSh
   // Promote/demote a lead right on the roster — same endpoint as the member
   // page's "Make lead" (PATCH /api/admin/signups/[userId], set_shift_role).
   const handleToggleLead = async (eventId: string, entry: RosterEntry) => {
-    setRosterBusy(`${eventId}|${entry.clerk_user_id}`)
+    setRosterBusy(`${eventId}|${entry.clerk_user_id}|${entry.occurrence_date ?? ''}`)
     setRosterError(null)
     const role = entry.role === 'lead' ? 'member' : 'lead'
     try {
       const res = await fetch(`/api/admin/signups/${entry.clerk_user_id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ set_shift_role: { schedule_event_id: eventId, role } }),
+        // occurrence_date scopes the lead to the specific night held.
+        body: JSON.stringify({ set_shift_role: { schedule_event_id: eventId, role, occurrence_date: entry.occurrence_date } }),
       })
       if (!res.ok) { const d = await res.json(); throw new Error(d.error) }
       setRosters(prev => ({
         ...prev,
-        [eventId]: (prev[eventId] ?? []).map(e => e.clerk_user_id === entry.clerk_user_id ? { ...e, role } : e),
+        [eventId]: (prev[eventId] ?? []).map(e =>
+          e.clerk_user_id === entry.clerk_user_id && e.occurrence_date === entry.occurrence_date ? { ...e, role } : e),
       }))
     } catch (e: unknown) {
       setRosterError({ eventId, message: e instanceof Error ? e.message : 'Something went wrong' })

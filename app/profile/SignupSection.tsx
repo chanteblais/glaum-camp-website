@@ -33,9 +33,13 @@ type Department = {
 }
 
 // A signable shift slot from /api/shift-signups (shifts redesign: a member can
-// hold several; hours count toward the shift-type requirements they owe).
+// hold several; hours count toward the shift-type requirements they owe). Each
+// night of a recurring shift is its own slot — `id` is a composite (eventId or
+// eventId::date), `schedule_event_id` + `occurrence_date` are what the API needs.
 type ShiftSlot = {
   id: string
+  schedule_event_id: string
+  occurrence_date: string | null
   title: string
   subtitle: string | null
   day: string
@@ -1112,13 +1116,23 @@ export function SignupSection({ showPickers = true, initialData }: { showPickers
     } catch { /* keep current state */ }
   }
 
+  // Slot ids are composite (eventId or eventId::date). Resolve one back to what
+  // the API needs — the event id + the specific night (null = non-recurring).
+  function resolveSlot(id: string): { schedule_event_id: string; occurrence_date: string | null } {
+    const s = shifts.find(x => x.id === id)
+    if (s) return { schedule_event_id: s.schedule_event_id, occurrence_date: s.occurrence_date }
+    const [ev, date] = id.includes('::') ? id.split('::') : [id, null]
+    return { schedule_event_id: ev, occurrence_date: date ?? null }
+  }
+
   async function handleSignUpShift(id: string, lead = false) {
     if (signingId) return
     setSigningId(id); setShiftError(null)
+    const { schedule_event_id, occurrence_date } = resolveSlot(id)
     const res = await fetch('/api/shift-signups', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ schedule_event_id: id, ...(lead ? { role: 'lead' } : {}) }),
+      body: JSON.stringify({ schedule_event_id, occurrence_date, ...(lead ? { role: 'lead' } : {}) }),
     })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
@@ -1131,7 +1145,10 @@ export function SignupSection({ showPickers = true, initialData }: { showPickers
 
   async function handleCancelShift(id: string) {
     setSigningId(id); setShiftError(null)
-    const res = await fetch(`/api/shift-signups?schedule_event_id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+    const { schedule_event_id, occurrence_date } = resolveSlot(id)
+    const qs = new URLSearchParams({ schedule_event_id })
+    if (occurrence_date) qs.set('occurrence_date', occurrence_date)
+    const res = await fetch(`/api/shift-signups?${qs.toString()}`, { method: 'DELETE' })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
       setShiftError(data.error ?? 'Something went wrong')
@@ -1142,13 +1159,14 @@ export function SignupSection({ showPickers = true, initialData }: { showPickers
   }
 
   // Offer to lead / step back on a shift the member already holds — the same
-  // POST as signup with an explicit role; the upsert flips the row in place.
+  // POST as signup with an explicit role; the insert/update flips the row in place.
   async function handleSetLeadShift(id: string, lead: boolean) {
     setShiftError(null)
+    const { schedule_event_id, occurrence_date } = resolveSlot(id)
     const res = await fetch('/api/shift-signups', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ schedule_event_id: id, role: lead ? 'lead' : 'member' }),
+      body: JSON.stringify({ schedule_event_id, occurrence_date, role: lead ? 'lead' : 'member' }),
     })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))

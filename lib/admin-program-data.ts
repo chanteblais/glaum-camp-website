@@ -43,38 +43,45 @@ export async function getAdminShiftTypes(): Promise<ShiftTypeRow[]> {
 // (PATCH /api/admin/signups/[userId]) can't promote those.
 export async function getAdminRosters(): Promise<Record<string, RosterEntry[]>> {
   const [{ data: many }, { data: legacy }] = await Promise.all([
-    supabaseAdmin.from('member_shift_signups').select('clerk_user_id, schedule_event_id, role'),
+    supabaseAdmin.from('member_shift_signups').select('clerk_user_id, schedule_event_id, occurrence_date, role'),
     supabaseAdmin.from('camp_signups').select('clerk_user_id, schedule_event_id').not('schedule_event_id', 'is', null),
   ])
 
-  type Hold = { role: 'member' | 'lead'; legacy_only: boolean }
+  // Each night of a recurring shift is its own roster: hold identity is
+  // (event, occurrence, member). Rosters stay keyed by event; the entry carries
+  // occurrence_date so the schedule editor can group holders by night.
+  type Hold = { clerk_user_id: string; role: 'member' | 'lead'; legacy_only: boolean; occurrence_date: string | null }
   const byEvent = new Map<string, Map<string, Hold>>()
   const holdersFor = (eventId: string) => {
     const holders = byEvent.get(eventId) ?? new Map<string, Hold>()
     byEvent.set(eventId, holders)
     return holders
   }
+  const holdKey = (userId: string, occ: string | null) => `${userId}|${occ ?? ''}`
   for (const r of many ?? []) {
     if (!r.schedule_event_id) continue
-    holdersFor(r.schedule_event_id).set(r.clerk_user_id, { role: r.role === 'lead' ? 'lead' : 'member', legacy_only: false })
+    const occ = (r.occurrence_date as string | null) ?? null
+    holdersFor(r.schedule_event_id).set(holdKey(r.clerk_user_id, occ), { clerk_user_id: r.clerk_user_id, role: r.role === 'lead' ? 'lead' : 'member', legacy_only: false, occurrence_date: occ })
   }
   for (const r of legacy ?? []) {
     if (!r.schedule_event_id) continue
     const holders = holdersFor(r.schedule_event_id)
-    if (!holders.has(r.clerk_user_id)) holders.set(r.clerk_user_id, { role: 'member', legacy_only: true })
+    const key = holdKey(r.clerk_user_id, null)
+    if (!holders.has(key)) holders.set(key, { clerk_user_id: r.clerk_user_id, role: 'member', legacy_only: true, occurrence_date: null })
   }
 
-  const allIds = Array.from(byEvent.values()).flatMap(h => Array.from(h.keys()))
+  const allIds = Array.from(byEvent.values()).flatMap(h => Array.from(h.values()).map(v => v.clerk_user_id))
   const names = await memberDisplayNames(allIds)
 
   const rosters: Record<string, RosterEntry[]> = {}
   byEvent.forEach((holders, eventId) => {
-    rosters[eventId] = Array.from(holders.entries())
-      .map(([clerk_user_id, h]) => ({
-        clerk_user_id,
-        name: names[clerk_user_id] ?? 'Unknown member',
+    rosters[eventId] = Array.from(holders.values())
+      .map(h => ({
+        clerk_user_id: h.clerk_user_id,
+        name: names[h.clerk_user_id] ?? 'Unknown member',
         role: h.role,
         legacy_only: h.legacy_only,
+        occurrence_date: h.occurrence_date,
       }))
       // Leads first, then alphabetical — the ✦ reads at a glance.
       .sort((a, b) => (a.role === b.role ? a.name.localeCompare(b.name) : a.role === 'lead' ? -1 : 1))

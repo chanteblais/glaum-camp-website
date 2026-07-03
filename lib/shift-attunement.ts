@@ -43,9 +43,11 @@ type ReqRow = {
 export async function getMemberShiftState(clerkUserId: string): Promise<MemberShiftState> {
   const [signupsRes, legacyRes, groupRes] = await Promise.all([
     // Many-to-many holds (the redesign's table; 045 backfilled the legacy single).
+    // occurrence_date names each held night — every night of a recurring shift
+    // counts its own hours (it's a regular shift).
     supabaseAdmin
       .from('member_shift_signups')
-      .select('schedule_event_id')
+      .select('schedule_event_id, occurrence_date')
       .eq('clerk_user_id', clerkUserId),
     // Legacy single signup + the member's role (which may carry a requirement).
     supabaseAdmin
@@ -61,9 +63,17 @@ export async function getMemberShiftState(clerkUserId: string): Promise<MemberSh
   ])
 
   // ── Hours held: union of many-to-many + legacy single signup ──────────────
-  const eventIds = new Set<string>()
-  for (const r of signupsRes.data ?? []) if (r.schedule_event_id) eventIds.add(r.schedule_event_id)
-  if (legacyRes.data?.schedule_event_id) eventIds.add(legacyRes.data.schedule_event_id)
+  // Held OCCURRENCES, keyed (event, night). A recurring shift held for 2 nights
+  // is 2 occurrences = 2× hours. The legacy single hold is the null occurrence,
+  // deduped against a matching many-to-many row (045 backfill overlap).
+  const heldOcc = new Map<string, string>() // `${eventId}|${date??''}` → eventId
+  for (const r of signupsRes.data ?? []) {
+    if (r.schedule_event_id) heldOcc.set(`${r.schedule_event_id}|${(r.occurrence_date as string | null) ?? ''}`, r.schedule_event_id)
+  }
+  if (legacyRes.data?.schedule_event_id) {
+    heldOcc.set(`${legacyRes.data.schedule_event_id}|`, legacyRes.data.schedule_event_id)
+  }
+  const eventIds = new Set(Array.from(heldOcc.values()))
 
   const hoursByShiftType: Record<string, number> = {}
   let totalShiftHours = 0
@@ -72,12 +82,19 @@ export async function getMemberShiftState(clerkUserId: string): Promise<MemberSh
       .from('schedule_events')
       .select('id, participation_type, shift_type_id, start_time, end_time')
       .in('id', Array.from(eventIds))
+    const meta = new Map<string, { typeId: string; h: number }>()
     for (const ev of events ?? []) {
       if (ev.participation_type !== 'shift' || !ev.shift_type_id) continue
       const h = shiftDurationHours(ev.start_time, ev.end_time)
       if (h <= 0) continue
-      hoursByShiftType[ev.shift_type_id] = (hoursByShiftType[ev.shift_type_id] ?? 0) + h
-      totalShiftHours += h
+      meta.set(ev.id as string, { typeId: ev.shift_type_id as string, h })
+    }
+    // One count per held occurrence (per night), not per distinct event.
+    for (const eventId of Array.from(heldOcc.values())) {
+      const m = meta.get(eventId)
+      if (!m) continue
+      hoursByShiftType[m.typeId] = (hoursByShiftType[m.typeId] ?? 0) + m.h
+      totalShiftHours += m.h
     }
   }
 
