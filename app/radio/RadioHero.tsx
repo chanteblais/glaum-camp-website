@@ -264,10 +264,13 @@ export function RadioHero() {
       <h1
         style={{
           fontFamily: 'TokyoDreams, serif',
-          fontSize: 'clamp(2.2rem, 6vw, 3.2rem)',
+          // The exact scale + tracking of the other page titles (e.g.
+          // /participate) — same optical weight and shadow density, so the
+          // ornaments carry Radio's specialness, not font size.
+          fontSize: 'clamp(1.8rem, 4vw, 2.6rem)',
           color: GOLD,
           margin: 0,
-          letterSpacing: '0.08em',
+          letterSpacing: '0.06em',
           display: 'flex',
           alignItems: 'center',
           gap: '1.1rem',
