@@ -121,8 +121,8 @@ export default async function ConfigurePage() {
 
   // ── Panel status chips — the collapsed page doubles as a state-of-the-camp
   // overview, so each panel header carries a live one-glance count.
-  const customFieldCount = profileFields.filter(f => !f.system).length
-  const systemFieldCount = profileFields.length - customFieldCount
+  const customFieldCount = profileFields.filter(f => !f.system && !f.locked).length
+  const systemFieldCount = profileFields.filter(f => f.system).length
   const activeDistinctions = distinctions.filter(d => d.enabled).length
   const activeTasks = attunementTasks.filter(t => t.enabled).length
   const adminCount = adminMembers.filter(m => m.isAdmin).length
@@ -200,7 +200,7 @@ export default async function ConfigurePage() {
           panel
           title="Profile Fields"
           summary="The details you keep about each member — they feed the application form, profiles, and distinction rules"
-          status={`${counted(customFieldCount, 'field')} · ${systemFieldCount} system`}
+          status={`${counted(customFieldCount, 'field')} · ${systemFieldCount} automatic`}
         >
           <ProfileFieldsManager initialFields={profileFields} />
         </CollapsibleSection>

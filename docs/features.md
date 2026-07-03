@@ -347,12 +347,12 @@ Reached via the **Application Form** link panel at the top of Configure → Form
 - **Per field:** enable/disable, label, `key` (internal identity), description, type (Text / Long text / Number / Yes-No / Single-select / Multi-select / Date, with options for the selects), reorder, delete. Plus capability toggles:
   - **Visible** (the `public` flag) — **on** = shown on the member’s profile (and the editable Profile Details card); **off** = the field is **admin-only**, appearing solely in the member’s application detail (`/admin/[id]` → Profile Details). Never public.
   - **Editable** — members can edit their own value (on `/profile`).
-  - **In apps** — the field can be attached to an application question (see below).
-  - **In rules** — the field can be referenced by distinction rules.
+  - **On application** (`applicationEligible`) — the field can be attached to an application question (see below).
+  - **For medals** (`distinctionEligible`) — the field can be referenced by distinction rules.
   - **Catch-up** / **Required** — prompt existing members who haven’t filled the field in yet (Phase 4.5).
-- **Ties into the Application Builder:** a custom application question can be bound to a profile field (`FieldConfig.profileFieldKey`), so its answer saves to `member_profiles.values` and is reused everywhere. The builder’s field-binding dropdown lists every **In apps** profile field (`applicationFields`).
-- **Key stability (data safety):** a field’s `key` is the identity its saved answers are stored under. Renaming a field’s **label never changes its key** for any field that already existed when the manager loaded — only brand-new (this-session) fields auto-derive their key from the label. Editing the `key` box directly still re-keys it, which **disconnects existing member answers** (the old values remain in `member_profiles.values` under the old key — recoverable by setting the key back).
-- **System fields** (groups, tenure, designation, …) are shown read-only at the bottom — derived at eval time, never stored, usable in distinction rules.
+- **Ties into the Application Builder:** a custom application question can be bound to a profile field (`FieldConfig.profileFieldKey`), so its answer saves to `member_profiles.values` and is reused everywhere. The builder’s field-binding dropdown lists every **On application** profile field (`applicationFields`).
+- **Key stability (data safety):** a field’s `key` is the identity its saved answers are stored under, and it is **fully internal — the manager never shows or edits it**. Brand-new (this-session) fields auto-derive a unique key from the label as it’s typed; any field that already existed keeps its key forever, so renaming a label can never disconnect the member answers saved under it.
+- **Derived facts** (groups, tenure, designation, …) are shown read-only at the bottom as the “Tracked automatically” strip with plain-English hover hints — computed at eval time, never stored, usable in distinction rules (`system: true` in the registry).
 
 **Key files:** `app/admin/ProfileFieldsManager.tsx`, `lib/profile-fields.ts`
 
