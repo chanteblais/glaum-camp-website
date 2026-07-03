@@ -155,17 +155,21 @@ function Waveform() {
         </radialGradient>
         {/* the line fades in from the left edge (picking up the rule's
             hand-off) and out to the right */}
+        {/* long wispy tapers: the ribbon gathers out of the braid on the
+            left and dissolves back into it on the right */}
         <linearGradient id="radio-fade" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor={LINE} stopOpacity="0.35" />
-          <stop offset="0.05" stopColor={LINE} stopOpacity="1" />
-          <stop offset="0.92" stopColor={LINE} stopOpacity="1" />
+          <stop offset="0" stopColor={LINE} stopOpacity="0.12" />
+          <stop offset="0.07" stopColor={LINE} stopOpacity="0.4" />
+          <stop offset="0.18" stopColor={LINE} stopOpacity="1" />
+          <stop offset="0.72" stopColor={LINE} stopOpacity="1" />
+          <stop offset="0.86" stopColor={LINE} stopOpacity="0.4" />
           <stop offset="1" stopColor={LINE} stopOpacity="0" />
         </linearGradient>
         <linearGradient id="radio-fade-core" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor={LINE_CORE} stopOpacity="0.2" />
-          <stop offset="0.05" stopColor={LINE_CORE} stopOpacity="0.55" />
-          <stop offset="0.92" stopColor={LINE_CORE} stopOpacity="0.55" />
-          <stop offset="1" stopColor={LINE_CORE} stopOpacity="0" />
+          <stop offset="0.12" stopColor={LINE_CORE} stopOpacity="0" />
+          <stop offset="0.28" stopColor={LINE_CORE} stopOpacity="0.55" />
+          <stop offset="0.68" stopColor={LINE_CORE} stopOpacity="0.55" />
+          <stop offset="0.85" stopColor={LINE_CORE} stopOpacity="0" />
         </linearGradient>
         {/* the edge threads fade at their inner ends — no thin lines cross
             the loud middle */}
@@ -202,7 +206,7 @@ function Waveform() {
         {/* the pulse — glow underlay, amber ribbon, bright core. The mock's
             line is proportionally substantial (~2px on a 570px-wide band):
             stroke 3.6 here renders ~1.6px at the hero's width. */}
-        <path d={smoothPath(MAIN)} stroke={LINE} strokeWidth="8" opacity="0.16" filter="url(#radio-blur)" />
+        <path d={smoothPath(MAIN)} stroke="url(#radio-fade)" strokeWidth="8" opacity="0.16" filter="url(#radio-blur)" />
         <path d={smoothPath(MAIN)} stroke="url(#radio-fade)" strokeWidth="3.6" strokeLinecap="round" />
         <path d={smoothPath(MAIN)} stroke="url(#radio-fade-core)" strokeWidth="1.4" strokeLinecap="round" />
       </g>
@@ -243,7 +247,7 @@ export function RadioHero() {
         .radio-hero-wave {
           position: absolute;
           left: 46%;
-          right: 4%;
+          right: 11%;
           top: 50%;
           transform: translateY(-50%);
           pointer-events: none;
