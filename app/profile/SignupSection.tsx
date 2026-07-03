@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { SuggestRoleModal } from './SuggestRoleModal'
 import { isImageIcon } from '@/lib/icon-src'
+import { roleSlug } from '@/lib/role-slug'
 import { shiftHue } from '@/lib/shift-colors'
 import { useConfirm } from '../components/ConfirmDialog'
 
@@ -143,33 +144,60 @@ function CurrentSignupCards({
   return (
     <div className="mobile-stack" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '2.5rem' }}>
 
-      {/* Role card — plain, since the badge now lives in the profile header */}
-      <div style={{ border: '1px solid rgba(200,168,72,0.15)', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.02)', overflow: 'hidden' }}>
+      {/* Role card — the member's standing, drawn as an engraved PLAQUE: a
+          double rule (border + inset outline) + centered kicker between
+          hairlines. A different species from the single-hairline list cards
+          below — distinct by construction, not by glow. */}
+      <div style={{
+        border: '1px solid rgba(200,168,72,0.35)', borderRadius: '0.85rem',
+        outline: '1px solid rgba(200,168,72,0.14)', outlineOffset: '-5px',
+        background: '#231132',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
+        overflow: 'hidden',
+      }}>
         <button
           onClick={() => role && setRoleExpanded(o => !o)}
-          style={{ width: '100%', textAlign: 'left', padding: '1rem 1.25rem', background: 'none', border: 'none', cursor: role ? 'pointer' : 'default', display: 'block' }}
+          style={{ width: '100%', textAlign: 'left', padding: '1.1rem 1.35rem', background: 'none', border: 'none', cursor: role ? 'pointer' : 'default', display: 'block' }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <p style={{ fontSize: '0.68rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.85, margin: '0 0 0.4rem' }}>
-              Your Role
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', margin: '0 0 0.9rem', position: 'relative' }}>
+            <span aria-hidden style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.4))' }} />
+            <p style={{ fontSize: '0.66rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.9, margin: 0, whiteSpace: 'nowrap' }}>
+              ✦ Your Role ✦
             </p>
-            {role && <span style={{ fontSize: '0.6rem', color: '#C8A848', opacity: 0.4 }}>{roleExpanded ? '▲' : '▼'}</span>}
+            <span aria-hidden style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(200,168,72,0.4), transparent)' }} />
+            {role && (
+              <span style={{ position: 'absolute', right: 0, top: '-0.15rem', fontSize: '0.6rem', color: '#C8A848', opacity: 0.45 }}>
+                {roleExpanded ? '▲' : '▼'}
+              </span>
+            )}
           </div>
           {role ? (
-            <>
-              {dept && (
-                <p style={{ fontSize: '0.72rem', color: '#C8A848', opacity: 0.75, margin: '0 0 0.2rem', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  {dept.icon && (isImageIcon(dept.icon) ? <img src={dept.icon} alt="" aria-hidden style={{ width: '1rem', height: '1rem', objectFit: 'contain', flexShrink: 0 }} /> : <span>{dept.icon}</span>)}
-                  {dept.name}
-                </p>
-              )}
-              <p style={{ fontSize: '0.92rem', color: '#F3EDE6', margin: 0 }}>{role.name}</p>
-              {(role.commitment || role.commitment_period) && (
-                <div style={{ marginTop: '0.4rem' }}><CommitmentPill commitment={role.commitment} period={role.commitment_period} /></div>
-              )}
-            </>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+              {/* Department emblem in a brass ring (matches the profile designation) */}
+              <div style={{
+                width: '46px', height: '46px', borderRadius: '50%', flexShrink: 0,
+                border: '1.5px solid #C8A848',
+                background: 'radial-gradient(circle at 42% 38%, rgba(200,168,72,0.18), rgba(8,0,18,0.85))',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                {dept?.icon && (isImageIcon(dept.icon)
+                  ? <img src={dept.icon} alt="" aria-hidden style={{ width: '72%', height: '72%', objectFit: 'contain', opacity: 0.92 }} />
+                  : <span style={{ fontSize: '1.25rem', lineHeight: 1 }}>{dept?.icon ?? '✦'}</span>)}
+              </div>
+              <div style={{ minWidth: 0 }}>
+                {dept && (
+                  <p style={{ fontSize: '0.66rem', color: '#C8A848', opacity: 0.7, margin: '0 0 0.15rem', letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+                    {dept.name}
+                  </p>
+                )}
+                <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.2rem', color: '#F3EDE6', margin: 0, lineHeight: 1.2 }}>{role.name}</p>
+                {(role.commitment || role.commitment_period) && (
+                  <div style={{ marginTop: '0.4rem' }}><CommitmentPill commitment={role.commitment} period={role.commitment_period} /></div>
+                )}
+              </div>
+            </div>
           ) : (
-            <p style={{ fontSize: '0.85rem', opacity: 0.35, fontStyle: 'italic', margin: 0 }}>Not chosen</p>
+            <p style={{ fontSize: '0.85rem', opacity: 0.35, fontStyle: 'italic', margin: 0 }}>Not chosen — pick one below</p>
           )}
         </button>
 
@@ -183,24 +211,35 @@ function CurrentSignupCards({
                 {role.ideal_for && <div><p style={{ fontSize: '0.63rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.5, marginBottom: '0.3rem' }}>Ideal For</p><p style={{ fontSize: '0.8rem', lineHeight: 1.65, opacity: 0.7, fontStyle: 'italic', margin: 0 }}>{role.ideal_for}</p></div>}
               </div>
             )}
-            <div style={{ padding: '0.75rem 1.25rem', borderTop: hasRoleDetail ? '1px solid rgba(200,168,72,0.08)' : undefined }}>
+            <div style={{ padding: '0.75rem 1.25rem', borderTop: hasRoleDetail ? '1px solid rgba(200,168,72,0.08)' : undefined, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
               <button onClick={handleOptOut} disabled={optingOut} style={{ background: 'none', border: '1px solid rgba(255,80,80,0.25)', borderRadius: '9999px', color: '#ff8a8a', cursor: 'pointer', padding: '0.35rem 0.85rem', fontSize: '0.75rem', opacity: optingOut ? 0.4 : 0.75 }}>
                 {optingOut ? 'Removing…' : 'Opt out of this role'}
               </button>
+              <a href={`/roles#${roleSlug(role.name)}`} style={{ fontSize: '0.72rem', color: '#C8A848', opacity: 0.6, letterSpacing: '0.04em', textDecoration: 'underline', textUnderlineOffset: '3px' }}>
+                View in the Registry →
+              </a>
             </div>
           </div>
         )}
       </div>
 
-      {/* Shifts card — every shift the member holds, each cancellable */}
+      {/* Shifts card — the matching plaque in the shift accent; every held
+          shift listed, each cancellable. */}
       <div style={{
-        border: '1px solid rgba(210,57,248,0.15)', borderRadius: '0.75rem',
-        background: 'rgba(210,57,248,0.02)', overflow: 'hidden',
+        border: '1px solid rgba(210,57,248,0.3)', borderRadius: '0.85rem',
+        outline: '1px solid rgba(210,57,248,0.12)', outlineOffset: '-5px',
+        background: '#231132',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
+        overflow: 'hidden',
       }}>
-        <div style={{ padding: '1rem 1.25rem' }}>
-          <p style={{ fontSize: '0.68rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#D239F8', opacity: 0.85, margin: '0 0 0.4rem' }}>
-            Your Shifts
-          </p>
+        <div style={{ padding: '1.1rem 1.35rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', margin: '0 0 0.9rem' }}>
+            <span aria-hidden style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, transparent, rgba(210,57,248,0.4))' }} />
+            <p style={{ fontSize: '0.66rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#D239F8', opacity: 0.9, margin: 0, whiteSpace: 'nowrap' }}>
+              ✦ Your Shifts ✦
+            </p>
+            <span aria-hidden style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(210,57,248,0.4), transparent)' }} />
+          </div>
           {heldShifts.length === 0 ? (
             <p style={{ fontSize: '0.85rem', opacity: 0.35, fontStyle: 'italic', margin: 0 }}>None yet</p>
           ) : (
@@ -277,56 +316,9 @@ function CurrentSignupCards({
   )
 }
 
-// ── Role Detail Panel ─────────────────────────────────────────────────────────
-
-function RoleDetailPanel({ role }: { role: Role }) {
-  const hasDetail = role.purpose || role.responsibilities_before || role.responsibilities_during || role.ideal_for
-  if (!hasDetail && !role.commitment && !role.commitment_period) return null
-
-  return (
-    <div style={{ marginTop: '0.75rem', padding: '1rem', borderRadius: '0.5rem', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(200,168,72,0.1)' }}>
-      {(role.commitment || role.commitment_period) && (
-        <p style={{ fontSize: '0.75rem', color: '#C8A848', opacity: 0.7, marginBottom: hasDetail ? '0.85rem' : 0 }}>
-          Time Commitment: {[role.commitment, role.commitment_period].filter(Boolean).join(' · ')}
-        </p>
-      )}
-      {role.purpose && (
-        <div style={{ marginBottom: '0.85rem' }}>
-          <p style={{ fontSize: '0.63rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.5, marginBottom: '0.3rem' }}>Purpose</p>
-          <p style={{ fontSize: '0.82rem', lineHeight: 1.7, opacity: 0.7, margin: 0 }}>{role.purpose}</p>
-        </div>
-      )}
-      {role.responsibilities_before && (
-        <div style={{ marginBottom: '0.85rem' }}>
-          <p style={{ fontSize: '0.63rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.5, marginBottom: '0.3rem' }}>Before Event</p>
-          <ul style={{ margin: 0, paddingLeft: '1.2rem' }}>
-            {role.responsibilities_before.split('\n').filter(Boolean).map((line, i) => (
-              <li key={i} style={{ fontSize: '0.82rem', lineHeight: 1.7, opacity: 0.7 }}>{line}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {role.responsibilities_during && (
-        <div style={{ marginBottom: '0.85rem' }}>
-          <p style={{ fontSize: '0.63rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.5, marginBottom: '0.3rem' }}>During Event</p>
-          <ul style={{ margin: 0, paddingLeft: '1.2rem' }}>
-            {role.responsibilities_during.split('\n').filter(Boolean).map((line, i) => (
-              <li key={i} style={{ fontSize: '0.82rem', lineHeight: 1.7, opacity: 0.7 }}>{line}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {role.ideal_for && (
-        <div>
-          <p style={{ fontSize: '0.63rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.5, marginBottom: '0.3rem' }}>Ideal For</p>
-          <p style={{ fontSize: '0.82rem', lineHeight: 1.7, opacity: 0.7, fontStyle: 'italic', margin: 0 }}>{role.ideal_for}</p>
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ── Commitment Pill ───────────────────────────────────────────────────────────
+// Colour-scaled in the pickers/registry where it informs choosing; the profile
+// designation deliberately carries no pill (read harsh there).
 
 const COMMITMENT_COLORS: Record<string, string> = {
   'Low':         'rgba(100,200,120,0.15)',
@@ -358,232 +350,285 @@ function CommitmentPill({ commitment, period }: { commitment: string | null; per
   )
 }
 
-// ── Department Card (collapsible) ─────────────────────────────────────────────
+// ── Role Card (compact, scannable) ─────────────────────────────────────────────
+//
+// The picker shows every role at once — department headers + compact cards in a
+// grid, no accordions. Clicking a card opens the full charge in a modal where
+// the confirm lives. Deep reading happens on /roles (the Registry).
 
-function DeptCard({
-  dept, selectedRole, signup, saving, error, onChange, onDeselect, onConfirm, canConfirm,
-}: {
-  dept: Department
-  selectedRole: string | null
-  signup: Signup | null
-  saving: boolean
-  error: string | null
-  onChange: (id: string) => void
-  onDeselect: () => void
-  onConfirm: () => void
-  canConfirm: boolean
+function RoleCard({ role, isCurrent, isPending, onOpen }: {
+  role: Role
+  isCurrent: boolean
+  isPending: boolean
+  onOpen: (id: string) => void
 }) {
-  const hasSelectedRole = dept.roles.some(r => r.id === selectedRole)
-  const [open, setOpen] = useState(false)
-  const [expandedRole, setExpandedRole] = useState<string | null>(null)
-
+  const full = role.signed_up >= role.capacity && !isCurrent
   return (
-    <div style={{
-      borderRadius: '0.85rem', overflow: 'hidden',
-      border: '1px solid rgba(200,168,72,0.15)',
-      background: 'rgba(255,255,255,0.01)',
-    }}>
-      {/* Department header — clickable to collapse */}
-      <button
-        onClick={() => setOpen(o => !o)}
-        style={{
-          width: '100%', textAlign: 'left', background: 'none', border: 'none',
-          padding: '1rem 1.1rem', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', gap: '0.65rem',
-        }}
-      >
-        {dept.icon && (isImageIcon(dept.icon) ? <img src={dept.icon} alt="" aria-hidden style={{ width: '1.4rem', height: '1.4rem', objectFit: 'contain', flexShrink: 0 }} /> : <span style={{ fontSize: '1.2rem', flexShrink: 0 }}>{dept.icon}</span>)}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontSize: '0.9rem', color: '#C8A848', margin: 0, fontWeight: 600, letterSpacing: '0.03em' }}>
-            {dept.name}
-          </p>
-          {dept.description && (
-            <p style={{ fontSize: '0.75rem', opacity: 0.45, margin: '0.15rem 0 0', lineHeight: 1.4 }}>{dept.description}</p>
-          )}
-        </div>
-        <span style={{ fontSize: '0.7rem', color: '#C8A848', opacity: 0.4, flexShrink: 0 }}>{open ? '▲' : '▼'}</span>
-      </button>
-
-      {/* Roles list */}
-      {open && (
-        <div style={{
-          borderTop: '1px solid rgba(200,168,72,0.1)',
-          padding: '0.75rem',
-          display: 'flex', flexDirection: 'column', gap: '0.5rem',
+    <button
+      onClick={() => onOpen(role.id)}
+      style={{
+        textAlign: 'left', padding: '0.75rem 0.9rem', borderRadius: '0.6rem',
+        border: `1px solid rgba(200,168,72,${isCurrent ? 0.45 : 0.12})`,
+        background: isCurrent ? 'rgba(200,168,72,0.06)' : full ? 'transparent' : 'rgba(255,255,255,0.02)',
+        cursor: 'pointer', opacity: full ? 0.5 : 1, display: 'block', width: '100%',
+        transition: 'border-color 0.15s, background 0.15s',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '0.5rem' }}>
+        <p style={{ fontSize: '0.87rem', color: '#F3EDE6', margin: 0, minWidth: 0 }}>
+          {isCurrent && <span aria-hidden style={{ color: '#C8A848', marginRight: '0.35rem' }}>✦</span>}
+          {role.name}
+        </p>
+        <span style={{
+          fontSize: '0.65rem', whiteSpace: 'nowrap', flexShrink: 0,
+          color: isPending ? '#D239F8' : isCurrent ? '#7dcf8e' : full ? '#ff8a8a' : '#C8A848',
+          opacity: isCurrent || isPending ? 0.9 : full ? 0.8 : 0.55,
         }}>
-          {dept.roles.length === 0 && (
-            <p style={{ fontSize: '0.78rem', opacity: 0.3, fontStyle: 'italic', padding: '0.25rem 0.25rem' }}>No roles in this department yet.</p>
+          {isPending ? 'pending approval' : isCurrent ? 'your role' : full ? 'Full' : `${role.capacity - role.signed_up} open`}
+        </span>
+      </div>
+      {role.description && (
+        <p style={{
+          fontSize: '0.73rem', opacity: 0.5, margin: '0.25rem 0 0', lineHeight: 1.45,
+          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+        }}>
+          {role.description}
+        </p>
+      )}
+      {(role.commitment || role.commitment_period || role.requires_approval) && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.45rem' }}>
+          <CommitmentPill commitment={role.commitment} period={role.commitment_period} />
+          {role.requires_approval && (
+            <span style={{ fontSize: '0.62rem', opacity: 0.45 }} title="Requires admin approval">🔒</span>
           )}
-          {dept.roles.map(role => {
-            const full = role.signed_up >= role.capacity && role.id !== signup?.role_id
-            const selected = selectedRole === role.id
-            const isPendingApproval = selected && signup?.role_approval_status === 'pending'
-            return (
-              <div key={role.id}>
-                <button
-                  onClick={() => {
-                    if (full) return
-                    if (!selected) onChange(role.id)
-                    setExpandedRole(expandedRole === role.id ? null : role.id)
-                  }}
-                  disabled={full}
-                  style={{
-                    width: '100%', textAlign: 'left',
-                    padding: '0.7rem 0.85rem',
-                    borderRadius: expandedRole === role.id ? '0.55rem 0.55rem 0 0' : '0.55rem',
-                    border: '1px solid rgba(200,168,72,0.08)',
-                    borderBottom: expandedRole === role.id ? '1px solid rgba(200,168,72,0.08)' : undefined,
-                    background: full ? 'transparent' : 'rgba(255,255,255,0.02)',
-                    cursor: full ? 'not-allowed' : 'pointer',
-                    opacity: full ? 0.4 : 1,
-                    transition: 'border-color 0.15s',
-                    display: 'block',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.75rem' }}>
-                    <div style={{ minWidth: 0 }}>
-                      <p style={{ fontSize: '0.87rem', color: '#F3EDE6', margin: 0 }}>{role.name}</p>
-                      {role.description && (
-                        <p style={{ fontSize: '0.75rem', opacity: 0.5, margin: '0.2rem 0 0', lineHeight: 1.5 }}>{role.description}</p>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.35rem', flexShrink: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        {isPendingApproval ? (
-                          <span style={{ fontSize: '0.68rem', color: '#D239F8', opacity: 0.85, whiteSpace: 'nowrap', border: '1px solid rgba(210,57,248,0.3)', borderRadius: '9999px', padding: '0.1rem 0.45rem' }}>
-                            pending approval
-                          </span>
-                        ) : (
-                          <span style={{ fontSize: '0.7rem', color: full ? '#ff8a8a' : '#C8A848', opacity: full ? 0.8 : 0.5, whiteSpace: 'nowrap' }}>
-                            {full ? 'Full' : `${role.capacity - role.signed_up} open`}
-                          </span>
-                        )}
-                        {role.requires_approval && !isPendingApproval && (
-                          <span style={{ fontSize: '0.65rem', opacity: 0.45 }} title="Requires admin approval">🔒</span>
-                        )}
-                        <span style={{ fontSize: '0.6rem', color: '#C8A848', opacity: 0.35 }}>
-                          {expandedRole === role.id ? '▲' : '▼'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </button>
-                {expandedRole === role.id && (
-                  <>
-                    <div style={{ padding: '0.5rem 1rem 0', borderTop: '1px solid rgba(200,168,72,0.08)' }}>
-                      <CommitmentPill commitment={role.commitment} period={role.commitment_period} />
-                    </div>
-                    <RoleDetailPanel role={role} />
-                    {/* Confirm footer */}
-                    <div style={{
-                      padding: '0.85rem 1rem',
-                      borderTop: '1px solid rgba(200,168,72,0.1)',
-                      background: 'rgba(200,168,72,0.04)',
-                      borderRadius: '0 0 0.55rem 0.55rem',
-                    }}>
-                      {/* Approval notice */}
-                      {role.requires_approval && (
-                        <div style={{
-                          padding: '0.6rem 0.75rem', borderRadius: '0.5rem', marginBottom: '0.75rem',
-                          background: 'rgba(210,57,248,0.07)', border: '1px solid rgba(210,57,248,0.2)',
-                        }}>
-                          <p style={{ fontSize: '0.78rem', color: '#D239F8', opacity: 0.9, margin: 0, lineHeight: 1.5 }}>
-                            This role requires admin approval. Your request will be reviewed before it's confirmed.
-                          </p>
-                        </div>
-                      )}
-
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
-                        <div>
-                          {role.requires_approval ? (
-                            <p style={{ fontSize: '0.78rem', opacity: 0.4, margin: 0, fontStyle: 'italic' }}>
-                              You can pick a shift after your role is approved.
-                            </p>
-                          ) : (
-                            <p style={{ fontSize: '0.78rem', opacity: 0.4, margin: 0, fontStyle: 'italic' }}>
-                              You can also select a shift below.
-                            </p>
-                          )}
-                          {error && <p style={{ color: '#ff8a8a', fontSize: '0.75rem', margin: '0.35rem 0 0' }}>{error}</p>}
-                        </div>
-                        <div style={{ display: 'flex', gap: '0.6rem', flexShrink: 0, alignItems: 'center' }}>
-                          {/* Cancel selection */}
-                          <button
-                            onClick={() => { onDeselect(); setExpandedRole(null) }}
-                            style={{
-                              background: 'none', border: 'none', color: '#F3EDE6',
-                              cursor: 'pointer', fontSize: '0.75rem', opacity: 0.4, padding: '0.5rem 0',
-                            }}
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            onClick={onConfirm}
-                            disabled={saving}
-                            style={{
-                              padding: '0.5rem 1.25rem', borderRadius: '9999px',
-                              border: '1px solid rgba(200,168,72,0.5)',
-                              background: 'rgba(200,168,72,0.1)',
-                              color: '#FFFACD', cursor: saving ? 'not-allowed' : 'pointer',
-                              fontSize: '0.8rem', letterSpacing: '0.05em',
-                              opacity: saving ? 0.5 : 1,
-                              transition: 'opacity 0.15s',
-                            }}
-                          >
-                            {saving ? 'Saving…' : role.requires_approval ? 'Request Role' : signup?.role_id ? 'Update' : 'Confirm'}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            )
-          })}
         </div>
       )}
-    </div>
+    </button>
   )
 }
 
-// ── Role Picker (departments + roles) ─────────────────────────────────────────
+// ── Role Detail Modal (full charge + confirm) ──────────────────────────────────
+
+function RoleDetailModal({ role, dept, signup, saving, error, onConfirm, onClose }: {
+  role: Role
+  dept: Department | null
+  signup: Signup | null
+  saving: boolean
+  error: string | null
+  onConfirm: () => Promise<boolean>
+  onClose: () => void
+}) {
+  const isCurrent = signup?.role_id === role.id
+  const isPending = isCurrent && signup?.role_approval_status === 'pending'
+  const full = role.signed_up >= role.capacity && !isCurrent
+
+  async function handleConfirm() {
+    const ok = await onConfirm()
+    if (ok) onClose()
+  }
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 60 }} />
+      <div style={{
+        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 61,
+        background: '#1A0A24', border: '1px solid rgba(200,168,72,0.4)', borderRadius: '1rem',
+        width: '92%', maxWidth: '540px', maxHeight: '82vh', display: 'flex', flexDirection: 'column',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(200,168,72,0.1)',
+      }}>
+        {/* Header */}
+        <div style={{ padding: '1.4rem 1.6rem 0.9rem', borderBottom: '1px solid rgba(200,168,72,0.12)' }}>
+          {dept && (
+            <p style={{ fontSize: '0.65rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.7, margin: '0 0 0.4rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              {dept.icon && (isImageIcon(dept.icon)
+                ? <img src={dept.icon} alt="" aria-hidden style={{ width: '1rem', height: '1rem', objectFit: 'contain' }} />
+                : <span style={{ fontSize: '0.9rem' }}>{dept.icon}</span>)}
+              {dept.name}
+            </p>
+          )}
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.35rem', color: '#F3EDE6', margin: 0, lineHeight: 1.25 }}>
+              {role.name}
+            </p>
+            <span style={{ fontSize: '0.7rem', whiteSpace: 'nowrap', color: isPending ? '#D239F8' : isCurrent ? '#7dcf8e' : full ? '#ff8a8a' : '#C8A848', opacity: 0.85 }}>
+              {isPending ? 'pending approval' : isCurrent ? '✦ your role' : full ? 'Full' : `${role.capacity - role.signed_up} of ${role.capacity} open`}
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+            <CommitmentPill commitment={role.commitment} period={role.commitment_period} />
+            <a
+              href={`/roles#${roleSlug(role.name)}`}
+              style={{ fontSize: '0.68rem', color: '#C8A848', opacity: 0.6, letterSpacing: '0.04em', textDecoration: 'underline', textUnderlineOffset: '3px' }}
+            >
+              View in the Registry →
+            </a>
+          </div>
+        </div>
+
+        {/* Scrollable charge */}
+        <div style={{ padding: '1rem 1.6rem', overflowY: 'auto', flex: 1 }}>
+          {role.purpose && <div style={{ marginBottom: '0.9rem' }}><p style={{ fontSize: '0.63rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.5, marginBottom: '0.3rem' }}>Purpose</p><p style={{ fontSize: '0.84rem', lineHeight: 1.7, opacity: 0.75, margin: 0 }}>{role.purpose}</p></div>}
+          {!role.purpose && role.description && <p style={{ fontSize: '0.84rem', lineHeight: 1.7, opacity: 0.75, margin: '0 0 0.9rem' }}>{role.description}</p>}
+          {role.responsibilities_before && (
+            <div style={{ marginBottom: '0.9rem' }}>
+              <p style={{ fontSize: '0.63rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.5, marginBottom: '0.3rem' }}>Before Event</p>
+              <ul style={{ margin: 0, paddingLeft: '1.2rem' }}>
+                {role.responsibilities_before.split('\n').filter(Boolean).map((line, i) => (
+                  <li key={i} style={{ fontSize: '0.82rem', lineHeight: 1.7, opacity: 0.72 }}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {role.responsibilities_during && (
+            <div style={{ marginBottom: '0.9rem' }}>
+              <p style={{ fontSize: '0.63rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.5, marginBottom: '0.3rem' }}>During Event</p>
+              <ul style={{ margin: 0, paddingLeft: '1.2rem' }}>
+                {role.responsibilities_during.split('\n').filter(Boolean).map((line, i) => (
+                  <li key={i} style={{ fontSize: '0.82rem', lineHeight: 1.7, opacity: 0.72 }}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {role.ideal_for && (
+            <div>
+              <p style={{ fontSize: '0.63rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.5, marginBottom: '0.3rem' }}>Ideal For</p>
+              <p style={{ fontSize: '0.82rem', lineHeight: 1.7, opacity: 0.72, fontStyle: 'italic', margin: 0 }}>{role.ideal_for}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer — confirm / status */}
+        <div style={{ padding: '0.9rem 1.6rem 1.2rem', borderTop: '1px solid rgba(200,168,72,0.12)', background: 'rgba(200,168,72,0.03)', borderRadius: '0 0 1rem 1rem' }}>
+          {role.requires_approval && !isCurrent && !full && (
+            <p style={{ fontSize: '0.75rem', color: '#D239F8', opacity: 0.85, margin: '0 0 0.7rem', lineHeight: 1.5 }}>
+              This role requires admin approval — your request will be reviewed before it&rsquo;s confirmed.
+            </p>
+          )}
+          {error && <p style={{ color: '#ff8a8a', fontSize: '0.75rem', margin: '0 0 0.7rem' }}>{error}</p>}
+          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+            <button
+              onClick={onClose}
+              style={{ padding: '0.5rem 1.1rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.2)', background: 'transparent', color: '#F3EDE6', cursor: 'pointer', fontSize: '0.8rem', opacity: 0.7 }}
+            >
+              {isCurrent || full ? 'Close' : 'Never mind'}
+            </button>
+            {!isCurrent && !full && (
+              <button
+                onClick={handleConfirm}
+                disabled={saving}
+                style={{
+                  padding: '0.5rem 1.25rem', borderRadius: '9999px',
+                  border: '1px solid rgba(200,168,72,0.5)', background: 'rgba(200,168,72,0.1)',
+                  color: '#FFFACD', cursor: saving ? 'not-allowed' : 'pointer',
+                  fontSize: '0.8rem', letterSpacing: '0.05em', opacity: saving ? 0.5 : 1,
+                }}
+              >
+                {saving ? 'Saving…' : role.requires_approval ? 'Request Role' : signup?.role_id ? 'Switch to this role' : 'Confirm'}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ── Role Picker (flat registry — every role visible) ───────────────────────────
 
 function RolePicker({
-  departments, selectedRole, signup, saving, error, onChange, onDeselect, onConfirm, canConfirm,
+  departments, signup, saving, error, onChange, onDeselect, onConfirm,
 }: {
   departments: Department[]
-  selectedRole: string | null
   signup: Signup | null
   saving: boolean
   error: string | null
   onChange: (id: string) => void
   onDeselect: () => void
-  onConfirm: () => void
-  canConfirm: boolean
+  onConfirm: () => Promise<boolean>
 }) {
-  if (departments.length === 0) return null
+  const [openRoleId, setOpenRoleId] = useState<string | null>(null)
+
+  const withRoles = departments.filter(d => d.roles.length > 0)
+  if (withRoles.length === 0) return null
+
+  const allRoles = withRoles.flatMap(d => d.roles)
+  const openRole = allRoles.find(r => r.id === openRoleId) ?? null
+  const openDept = openRole ? withRoles.find(d => d.id === openRole.department_id) ?? null : null
+
+  function handleOpen(id: string) {
+    onChange(id) // stage the selection; confirm happens in the modal
+    setOpenRoleId(id)
+  }
+
+  function handleClose() {
+    onDeselect()
+    setOpenRoleId(null)
+  }
 
   return (
     <div>
-      <p style={{ fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.85, marginBottom: '1rem', textAlign: 'center' }}>
+      <p style={{ fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.85, marginBottom: '0.4rem', textAlign: 'center' }}>
         Choose a Role
       </p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-        {departments.map(dept => (
-          <DeptCard
-            key={dept.id}
-            dept={dept}
-            selectedRole={selectedRole}
-            signup={signup}
-            saving={saving}
-            error={error}
-            onChange={onChange}
-            onDeselect={onDeselect}
-            onConfirm={onConfirm}
-            canConfirm={canConfirm}
-          />
+      <p style={{ fontSize: '0.78rem', opacity: 0.55, textAlign: 'center', margin: '0 0 1.5rem', lineHeight: 1.6 }}>
+        Tap a role to read its full charge and claim it. Or browse the{' '}
+        <a href="/roles" style={{ color: '#C8A848', textDecoration: 'underline', textUnderlineOffset: '3px' }}>
+          Registry of Roles
+        </a>{' '}
+        for the complete record.
+      </p>
+
+      <style>{`
+        .role-grid { display: grid; grid-template-columns: 1fr; gap: 0.55rem; }
+        @media (min-width: 560px) { .role-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+      `}</style>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2.75rem' }}>
+        {withRoles.map(dept => (
+          <div key={dept.id}>
+            {/* Department header — a heading, not a gate. TokyoDreams + real air
+                between groups so departments read as distinct sections. */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', marginBottom: dept.description ? '0.35rem' : '0.85rem' }}>
+              {dept.icon && (isImageIcon(dept.icon)
+                ? <img src={dept.icon} alt="" aria-hidden style={{ width: '1.7rem', height: '1.7rem', objectFit: 'contain', flexShrink: 0 }} />
+                : <span style={{ fontSize: '1.4rem', flexShrink: 0 }}>{dept.icon}</span>)}
+              <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.2rem', color: '#C8A848', margin: 0, letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
+                {dept.name}
+              </p>
+              <span aria-hidden style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <span style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(200,168,72,0.35), transparent)' }} />
+                <span style={{ color: '#C8A848', fontSize: '0.5rem', opacity: 0.6, lineHeight: 1 }}>✦</span>
+              </span>
+            </div>
+            {dept.description && (
+              <p style={{ fontSize: '0.76rem', opacity: 0.45, margin: '0 0 0.85rem', lineHeight: 1.5 }}>{dept.description}</p>
+            )}
+            <div className="role-grid">
+              {dept.roles.map(role => (
+                <RoleCard
+                  key={role.id}
+                  role={role}
+                  isCurrent={signup?.role_id === role.id}
+                  isPending={signup?.role_id === role.id && signup?.role_approval_status === 'pending'}
+                  onOpen={handleOpen}
+                />
+              ))}
+            </div>
+          </div>
         ))}
       </div>
+
+      {openRole && (
+        <RoleDetailModal
+          role={openRole}
+          dept={openDept}
+          signup={signup}
+          saving={saving}
+          error={error}
+          onConfirm={onConfirm}
+          onClose={handleClose}
+        />
+      )}
     </div>
   )
 }
@@ -1064,8 +1109,9 @@ export function SignupSection({ showPickers = true }: { showPickers?: boolean })
     })))
   }
 
-  async function handleSave() {
-    if (!selectedRole || saving) return
+  // Returns true on success so the detail modal knows it can close.
+  async function handleSave(): Promise<boolean> {
+    if (!selectedRole || saving) return false
     setSaving(true); setError(null)
 
     const res = await fetch('/api/signup', {
@@ -1075,7 +1121,7 @@ export function SignupSection({ showPickers = true }: { showPickers?: boolean })
     })
     const data = await res.json()
 
-    if (!res.ok) { setError(data.error ?? 'Something went wrong'); setSaving(false); return }
+    if (!res.ok) { setError(data.error ?? 'Something went wrong'); setSaving(false); return false }
 
     const prevSignup = signup
     const updated: Signup = {
@@ -1094,6 +1140,7 @@ export function SignupSection({ showPickers = true }: { showPickers?: boolean })
         return r
       }),
     })))
+    return true
   }
 
   if (loading) return (
@@ -1112,19 +1159,17 @@ export function SignupSection({ showPickers = true }: { showPickers?: boolean })
       {showPickers && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
 
-          {/* Role picker — confirm button lives inside the selected role card */}
+          {/* Role picker — every role visible; confirm lives in the detail modal */}
           {hasRoles && (
             <div style={{ padding: '1.5rem', border: '1px solid rgba(200,168,72,0.15)', borderRadius: '1rem', background: 'rgba(255,255,255,0.01)' }}>
               <RolePicker
                 departments={departments}
-                selectedRole={selectedRole}
                 signup={signup}
                 saving={saving}
                 error={error}
                 onChange={setSelectedRole}
                 onDeselect={() => setSelectedRole(signup?.role_id ?? null)}
                 onConfirm={handleSave}
-                canConfirm={!!selectedRole}
               />
             </div>
           )}

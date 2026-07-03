@@ -50,8 +50,9 @@ Sign-out flow:
 /                        Public homepage (schedule, about) / Member dashboard (if approved)
 /apply                   Application form (4 states, see Features doc)
 /volunteer               Outside volunteer signup
-/profile                 Logged-in member profile + role/shift picker
-/participate             Participate page: role + shift pickers, Bring Something (resources), Your Groups (renamed from /signup 2026-07-02; /signup now redirects here)
+/profile                 Logged-in member profile (designation, commitments, distinctions)
+/participate             Participate page: role + shift pickers, Bring Something (resources), Your Groups (renamed from /signup 2026-07-02; /signup permanently redirects here via next.config.js)
+/roles                   Registry of Roles — full departments + roles documentation, claimable in place
 /members                 Member directory (approved members only)
 /members/[id]            Individual member view
 /messages                Member messaging inbox (DMs + group threads, filterable)

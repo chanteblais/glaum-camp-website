@@ -7,7 +7,6 @@ import { NotificationPreferences } from './NotificationPreferences'
 import { ProfileSettings } from './ProfileSettings'
 import { VolunteerSettings } from './VolunteerSettings'
 import { AvatarUpload } from '@/components/AvatarUpload'
-import { SignupSection } from './SignupSection'
 import { CommitmentsSection } from './CommitmentsSection'
 import { TaskStatus } from './TaskStatus'
 import { PersonalSchedule } from './PersonalSchedule'
@@ -24,6 +23,7 @@ import { getMemberAwards } from '@/lib/distinction-awards'
 import { CabinetOfDistinctions } from './CabinetOfDistinctions'
 import { ProfileDetails } from './ProfileDetails'
 import { isImageIcon } from '@/lib/icon-src'
+import { roleSlug } from '@/lib/role-slug'
 
 // ── Identity stat list (mirrors the mockup's right-column at-a-glance facts) ──
 function StatIcon({ name }: { name: 'calendar' | 'star' | 'shield' | 'hand' }) {
@@ -278,8 +278,13 @@ export default async function ProfilePage() {
       <p style={{ fontSize: '0.64rem', letterSpacing: '0.34em', textTransform: 'uppercase', color: '#D239F8', marginBottom: '0.35rem', opacity: 0.85 }}>
         Designation
       </p>
+      {/* The title itself is the doorway to the full charge in the Registry. */}
       <h2 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(1.7rem, 3vw, 2.2rem)', color: '#C8A848', margin: '0 auto', maxWidth: '13rem', lineHeight: 1.05, textShadow: '0 0 30px rgba(210,57,248,0.35)' }}>
-        {memberFacts.designation}
+        {roleInfo?.name ? (
+          <a href={`/roles#${roleSlug(roleInfo.name)}`} className="designation-link">
+            {memberFacts.designation}
+          </a>
+        ) : memberFacts.designation}
       </h2>
       {/* Stylized divider under the designation — ── ✦ ── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', width: '68%', margin: '0.6rem auto 0.6rem' }}>
@@ -295,10 +300,14 @@ export default async function ProfilePage() {
       {memberFacts.department && (() => {
         // Break "Department of X" onto two lines: "Department of" / "X".
         const m = memberFacts.department.match(/^(department of)\s+(.+)$/i)
+        const deptLabel = m ? <>{m[1]}<br />{m[2]}</> : memberFacts.department
+        const deptName = roleInfo?.departments?.name
         return (
           <div>
             <p style={{ fontSize: '0.72rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.72, lineHeight: 1.45 }}>
-              {m ? <>{m[1]}<br />{m[2]}</> : memberFacts.department}
+              {deptName
+                ? <a href={`/roles#${roleSlug(deptName)}`} className="designation-link">{deptLabel}</a>
+                : deptLabel}
             </p>
             {/* Decorative closing flourish — small and delicate */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', width: '12%', margin: '1.3rem auto 0' }}>
@@ -327,6 +336,10 @@ export default async function ProfilePage() {
         .profile-main-grid > *, .profile-info-grid > * { min-width: 0; }
         /* Header: designation (left) · portrait (center, focal point) · identity (right). */
         .profile-header-grid    { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 2.25rem; }
+        /* Designation title + department double as doorways into the Registry —
+           quiet by default, a gentle underline on hover. */
+        .designation-link       { color: inherit; text-decoration: none; }
+        .designation-link:hover { text-decoration: underline; text-decoration-color: rgba(200,168,72,0.45); text-underline-offset: 5px; text-decoration-thickness: 1px; }
         .profile-header-desig   { text-align: center; min-width: 0; }
         .profile-header-id      { text-align: center; min-width: 0; }
         /* Let the portrait feel slightly oversized — it can bleed past its grid cell. */

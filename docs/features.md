@@ -145,7 +145,7 @@ The page reads like a ceremonial registry, separating three concepts: **Designat
 
 Sections (approved members):
 - **Header** — a three-column registry band (`profile-header-grid`, `1fr auto 1fr`, within the centered content width): **Designation** (left), **portrait** (center, the focal point), **Member Information** (right). No badges live here.
-  - **Designation column** — the role + department as *text*, not a medal: a brass emblem (the department `icon`/`icon_image`, else `/handicon.png`), a "DESIGNATION" kicker, the role name (`TokyoDreams`), a `── ✦ ──` divider, the role purpose/description, then the department ("Department of X" is split onto two lines) closed by a small flourish. Only shown when the member has an approved designation.
+  - **Designation column** — the role + department as *text*, not a medal: a brass emblem (the department `icon`/`icon_image`, else `/handicon.png`), a "DESIGNATION" kicker, the role name (`TokyoDreams`), a `── ✦ ──` divider, the role purpose/description, then the department ("Department of X" is split onto two lines) closed by a small flourish. The **role title and department name are quiet links** (`.designation-link`, underline on hover) into the Registry of Roles (`/roles#<slug>`) — no separate "read more" line, and deliberately **no commitment pill here** (Chante: read harsh on the ceremonial column; the colour-scaled pill lives in the picker/registry where it informs choosing). Only shown when the member has an approved designation.
   - **Portrait** — `AvatarUpload` at an enlarged size (new `size` prop; 340px here vs the 260px default). Click to change photo.
   - **Member Information column** — "MEMBER" kicker, name + settings gear (`ProfileSettings`), the shared **`ApprovedCamperPill`** (`app/ApprovedCamperPill.tsx` — amethyst-glass status pill, same component the public profile uses), email, then (when the member has filled in the `quote` profile field) an italic **quote** line, then an at-a-glance **stat list** (small gold line-icons + right-aligned values, built inline in `page.tsx` via `StatRow`/`StatIcon`): Member since (`joined_year`), Active Commitments (group + held-shift + resource-claim count), Distinctions Earned (count), Attunement Status (Fully Attuned / N left).
 - **About** — a centered card shown when the member has filled in the `bio` profile field, rendered via `RichText` (`lib/markdown-lite.tsx`). Sits at the top of the approved body. Read-only presentation; the value is edited in the Profile Details card below.
@@ -158,7 +158,7 @@ Sections (approved members):
   - `approved` — always done on this page (reassuring first step)
   - Default list (when key absent) mirrors the original five hardcoded items (the "Contribution Selected" default is now an any-collection membership task).
 - **Cabinet of Distinctions** (`CabinetOfDistinctions.tsx`, full-width band below the two cards) — a centered gallery of earned **engraved medals** (honours, *not* controls — nothing is clickable). Each medal renders the distinction's `image` (from the shared asset library — a built-in or an upload) inside a CSS medal frame (gold ring + purple glow), with an uppercase label, an optional short static **engraving** caption (gold italic, ≤32 chars), and an optional dynamic year. Art is sized by height + clipped to the circle so the emblem fills the frame; built-in art should be a transparent emblem with no baked rim (the frame supplies the ring). A `glyph` emoji is the fallback when a rule has no `image`. Shown only when ≥1 is earned. Distinctions are **derived, never stored** — see [Distinctions](#distinctions) below.
-- **Signup Section** (`SignupSection.tsx`) — role picker + the **multi-shift calendar picker** (see Shifts below); "Suggest a role" opens `SuggestRoleModal`. On `/profile` it renders cards-only (`showPickers=false`); the full pickers live on `/participate` (Participate).
+- **Signup Section** (`SignupSection.tsx`) — role picker + the **multi-shift calendar picker** (see Shifts below); "Suggest a role" opens `SuggestRoleModal`. Rendered on `/participate` (Participate); `/profile` no longer embeds it (the header designation + Commitments card carry the member's current state, with links into `/participate` and `/roles`).
 - **Personal Schedule** (`PersonalSchedule.tsx` → `PersonalScheduleCalendar.tsx`) — **mandatory events** (`participation_type='mandatory'`, everyone) + the **shifts the member holds** (`member_shift_signups` ∪ legacy single signup, deduped). Day columns derive from the events' real dates (`lib/schedule-days.ts`); cards are coloured by shift-type hue (`lib/shift-colors.ts`). "View full calendar →" → `/schedule`.
 - **Profile Details** (`ProfileDetails.tsx`, client) — an editable card for the member's registry-defined detail fields (bio, quote, and any admin-added custom fields), reading/writing `member_profiles.values` via `/api/profile/fields`. Only shows fields that are **Visible** (`public`) or member-editable; admin-only fields (not Visible) never appear here — they surface on `/admin/[id]`. Renders nothing until the registry has such fields. The fields are defined in the Profile Field registry (Admin → Configure → **Profile Fields**, `ProfileFieldsManager`); see [profile-architecture.md](profile-architecture.md).
 - **Settings** — gear icon opens `ProfileSettings` (edit profile fields, avatar). Groups are admin-assigned, so not edited here.
@@ -166,6 +166,20 @@ Sections (approved members):
 Max content width: `1100px`. Layout uses CSS classes (`profile-main-grid` [`1.1fr 1fr`, equal-height], `profile-info-grid`, `profile-header-grid`) for responsive behavior; under 768px the header stacks portrait → identity → designation.
 
 **Custom event:** `ProfileSettings` listens for `glaum:open-settings` dispatched by `AttunementStatus` when member clicks an incomplete item.
+
+---
+
+### Registry of Roles (`/roles`)
+
+**Who:** Approved members only (redirects others to `/profile`; signed-out → `/sign-in`)
+**What:** The permanent, readable home for every department and role — the documentation the signup picker links into. One scrollable page, no accordions.
+
+- **Department sections** — emblem in a brass ring, department name (`TokyoDreams`), italic description, `── ✦ ──` divider; a **department chip rail** at the top jumps to each section. Departments with no roles are omitted.
+- **Role entries** — each an anchored card (`/roles#<slug>`, slugs derived from names by `roleSlug` in `lib/role-slug.ts` — never stored): role name, **commitment pill**, live **capacity pill** (`N of M open` / `Full`), "Approval required" pill where relevant; then the full charge — purpose, **Before/During the event** ✦-lists (two columns ≥640px), *Ideal for*. The member's own role is highlighted gold.
+- **Claim in place** (`ClaimRoleButton.tsx`, client) — each entry ends with **Claim this role** (or **Request this role** when `requires_approval`), a two-step inline confirm that POSTs the same `/api/signup` the picker uses, then `router.refresh()`. Current role shows "✦ Your role" (or "Requested — pending approval"); full roles show "Full".
+- Server component; reads `departments`/`roles`/`camp_signups` via `supabaseAdmin` directly (no new API route). Deep-linked from the signup picker's role modal, the "Your Role" card, and the profile designation ("Read your full charge ✦").
+
+**Key files:** `app/roles/page.tsx`, `app/roles/ClaimRoleButton.tsx`, `lib/role-slug.ts`
 
 ---
 
@@ -433,7 +447,7 @@ Rebuilt 2026-07-01 — full design + history in [shifts-redesign.md](shifts-rede
 
 ### Role Selection & Approval Flow
 
-Members pick a role via `SignupSection` on `/profile`. The selection is submitted to `POST /api/signup`.
+Members pick a role via `SignupSection` on `/participate` (Participate) — a **flat registry picker**: every role visible at once under **`TokyoDreams` department headers** (icon + name + `─ ✦` hairline, description beneath, generous gap between groups), as compact cards in a responsive grid (name, status, 2-line description clamp, colour-scaled commitment pill, 🔒 when approval-gated). Above the picker, the **Your Role / Your Shifts standing cards** are drawn as engraved **plaques** — a double rule (border + inset `outline`) with a centered `✦ Your Role ✦` kicker between hairlines, brass-ringed department emblem, `TokyoDreams` role name, on a **solid panel** (`#231132` + drop shadow) so mass, not brightness, separates them from the translucent single-hairline cards below. Frame strength is **constant regardless of filled/empty state** — no glow, no conditional emphasis (Chante, twice: the member's role is already highlighted in the full list; don't re-highlight it here). Tapping a card opens the **role detail modal** (`RoleDetailModal`) with the full charge (purpose, before/during, ideal-for), a "View in the Registry →" deep link, and the confirm button (`Confirm` / `Switch to this role` / `Request Role`). Roles can also be claimed directly on `/roles` (see Registry of Roles). Either path submits to `POST /api/signup`.
 
 **Approval logic in `POST /api/signup`:**
 - If the role changed (`isRoleChange = true`) and `roles.requires_approval = true` → `role_approval_status` is set to `'pending'` and an admin notification is created
