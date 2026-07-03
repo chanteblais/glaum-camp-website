@@ -258,7 +258,7 @@ Sections (collapsible via `CollapsibleSection`):
 | Departments | `DepartmentsManager` | CRUD for departments + roles |
 | Announcements | `AnnouncementsManager` | Create/edit/delete member-facing announcements |
 | Polls | `PollsManager` | Create/edit/delete/toggle polls. Each poll has: question, 2–10 options, visible toggle, multiple-choice toggle, optional expiry |
-| Schedule | `ScheduleManager` | CRUD for schedule events |
+| Schedule | `ScheduleManager` | CRUD for schedule events, laid out as a day-grouped program view: one section per day (same day model as the member calendar — `buildScheduleDays`, configured range ∪ event dates, so admin and member views always agree), rows time-sorted with an aligned time column, a day-jump chip rail on top, per-day "+ Add" buttons that prefill the date, an **Undated** bucket for legacy rows missing a date, and the Daily Recurring group below. Drag-reorder exists only on recurring rows (the one place `sort_order` affects member display; dated events order by date + time everywhere) |
 | Configure Applications | link → `/admin/configure` | Opens the Application Builder |
 | Debug Tools | `DebugSection` | Reset test user data |
 | Applications | `ApplicationRow` list | Review + approve/reject applications |
