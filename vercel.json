@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/attunement-nudges",
+      "schedule": "0 16 * * *"
+    }
+  ]
+}

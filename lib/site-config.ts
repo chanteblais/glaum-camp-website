@@ -127,6 +127,23 @@ export const DEFAULT_ATTUNEMENT_TASKS: AttunementTask[] = [
   { id: 'shift',        label: 'Shift Assigned',         requirement: 'shift',      enabled: true },
 ]
 
+// Cadence for the attunement nudge emails (page_content key
+// `config_attunement_nudge_days`): days between nudges per member; 0 = off.
+// Set in the Attunement Tasks manager; consumed by /api/cron/attunement-nudges.
+export const DEFAULT_ATTUNEMENT_NUDGE_DAYS = 2
+export const ATTUNEMENT_NUDGE_OPTIONS: { value: number; label: string }[] = [
+  { value: 0, label: 'Off' },
+  { value: 1, label: 'Daily' },
+  { value: 2, label: 'Every 2 days' },
+  { value: 3, label: 'Every 3 days' },
+  { value: 7, label: 'Weekly' },
+]
+
+export function parseAttunementNudgeDays(raw?: string | null): number {
+  const n = parseInt(raw ?? '', 10)
+  return Number.isFinite(n) && n >= 0 && n <= 30 ? n : DEFAULT_ATTUNEMENT_NUDGE_DAYS
+}
+
 export function parseAttunementTasks(raw?: string | null): AttunementTask[] {
   if (!raw) return DEFAULT_ATTUNEMENT_TASKS
   try {

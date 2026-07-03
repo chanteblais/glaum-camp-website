@@ -9,6 +9,7 @@ import { getMemberGroups } from '@/lib/groups'
 import { getUnmetResourceNeeds } from '@/lib/resources'
 import { buildAttunementChecklist, memberGroupCounts, requiredItems, commitmentItems } from '@/lib/attunement'
 import { getMemberShiftState, EMPTY_MEMBER_SHIFT_STATE } from '@/lib/shift-attunement'
+import { daysUntilEvent } from '@/lib/camp-event'
 import { clockLabel } from '@/lib/shift-hours'
 
 import { HomePageEditor } from './HomePageEditor'
@@ -267,8 +268,7 @@ let canManagePolls = false
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
-  const WHAT_IF_DATE = new Date('2026-07-23T12:00:00')
-  const daysUntil = Math.max(0, Math.ceil((WHAT_IF_DATE.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+  const daysUntil = daysUntilEvent(pageContent['config_event_start_date'])
 
   // ── APPROVED MEMBER DASHBOARD ─────────────────────────────────
   if (isApproved) {

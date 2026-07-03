@@ -181,6 +181,66 @@ export async function sendLeadUpGatheringEmail(opts: {
   return sendUserEmail(to, `New gathering: ${title}`, html)
 }
 
+/**
+ * Daily attunement nudge: the member's outstanding checklist, exactly as the
+ * home banner / profile card compute it. Required tasks are the headline
+ * (they gate "Attuned"); commitment items ride along in a gentler section —
+ * a guide to what the member signed up for, never a blocker. Gated by the
+ * recipient's `email_attunement_nudges` preference (checked by the caller).
+ */
+export async function sendAttunementNudgeEmail(opts: {
+  to: string
+  recipientName: string
+  required: { label: string; href?: string }[]
+  commitments: { label: string; href?: string }[]
+  eventName: string
+  daysUntil: number
+}) {
+  const { to, recipientName, required, commitments, eventName, daysUntil } = opts
+  const prefsUrl = `${APP_URL}/profile#notifications`
+
+  const taskList = (items: { label: string; href?: string }[]) => `
+    <ul style="margin:10px 0 18px;padding-left:0;list-style:none">
+      ${items.map(t => `
+        <li style="margin:6px 0;padding:9px 14px;border-left:3px solid #C8A848;background:rgba(200,168,72,0.06);border-radius:6px;color:#3a2b14">
+          ✦&nbsp; ${t.href
+            ? `<a href="${APP_URL}${encodeURI(t.href)}" style="color:#634D0B;text-decoration:none;font-weight:bold">${escapeHtml(t.label)}</a>`
+            : `<strong>${escapeHtml(t.label)}</strong>`}
+        </li>`).join('')}
+    </ul>`
+
+  const countdown = daysUntil > 0
+    ? `${escapeHtml(eventName)} gathers in <strong>${daysUntil} day${daysUntil === 1 ? '' : 's'}</strong>.`
+    : `${escapeHtml(eventName)} is here.`
+
+  const requiredBlock = required.length
+    ? `<p style="margin:18px 0 0">To complete your attunement:</p>${taskList(required)}`
+    : ''
+  const commitmentsBlock = commitments.length
+    ? `<p style="margin:18px 0 0;color:#6b5a3e">And from the commitments you've taken on:</p>${taskList(commitments)}`
+    : ''
+
+  const n = required.length
+  const subject = n > 0
+    ? `Your attunement awaits — ${n} step${n === 1 ? '' : 's'} remain${n === 1 ? 's' : ''}`
+    : 'A gentle word about your commitments'
+
+  const html = `
+    <p>Hi ${escapeHtml(recipientName)},</p>
+    <p>${countdown} The triangle holds, the eye witnesses — and a few things still await your hands:</p>
+    ${requiredBlock}
+    ${commitmentsBlock}
+    <p style="margin:24px 0">
+      <a href="${APP_URL}/profile" style="display:inline-block;background:#C8A848;color:#1A0A24;text-decoration:none;padding:11px 22px;border-radius:8px;font-weight:bold">Complete your attunement ✦</a>
+    </p>
+    <p style="font-size:12px;color:#8a8a8a;margin-top:28px">
+      You're receiving this because you have outstanding attunement tasks and attunement reminders turned on.
+      <a href="${prefsUrl}" style="color:#8a8a8a">Manage your notification preferences</a>.
+    </p>`
+
+  return sendUserEmail(to, subject, html)
+}
+
 // ── Helpers ───────────────────────────────────────────────────────
 
 function escapeHtml(s: string): string {

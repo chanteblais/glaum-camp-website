@@ -146,6 +146,14 @@ Sign-out flow:
 | `/api/admin/announcements/[id]` | PATCH/DELETE | Update / delete announcement |
 | `/api/admin/page-content` | GET/PATCH | Read / upsert any `page_content` row — used for homepage copy (`home_*`) and form configs (`config_member_form`, `config_volunteer_form`) |
 
+### Cron (Vercel Cron)
+
+Scheduled jobs are declared in `vercel.json` (`crons`) and hit API routes under `/api/cron/*`. Vercel authenticates each invocation with `Authorization: Bearer ${CRON_SECRET}` — the `CRON_SECRET` env var must be set in Vercel (and `.env.local` for local testing); the routes fail closed without it. Cron schedules use **UTC**. Crons only run on the production deployment and activate on the next deploy after `vercel.json` changes.
+
+| Route | Schedule | Purpose |
+|---|---|---|
+| `/api/cron/attunement-nudges` | daily 16:00 UTC (9am PT) | Email approved members their outstanding attunement checklist (same `buildAttunementChecklist` as home/profile). Per-member cadence from `config_attunement_nudge_days` (Off/1/2/3/7 days, default 2; **Reminder emails** select in the Attunement Tasks manager) — the cron fires daily, each member is emailed only once their cadence cooldown lapses (`attunement_nudges` ledger). Also skips: attuned members, opt-outs (`notification_preferences.email_attunement_nudges`), no-email rows. Sends are spaced 600ms apart (Resend rate limit); `maxDuration = 60`. A logged-in **admin** can also GET the route in a browser: **dry-run by default** (JSON report of who'd get what), `?send=1` to really send. |
+
 ---
 
 ## Storage Buckets (Supabase)
