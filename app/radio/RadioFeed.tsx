@@ -30,10 +30,11 @@ const clockOf = (ts: string) =>
 
 function RadioRow({ e, last }: { e: RadioEventRow; last: boolean }) {
   const isVoice = e.kind === 'voice'
-  // Human speech (organizer broadcasts, member voices) sits flush-left in
-  // lavender — a person talking stands apart from the automatic moments,
-  // whose emblem column indents them.
+  // Human speech sits flush-left, apart from the automatic moments (whose
+  // emblem column indents them) — organizer broadcasts in lavender, member
+  // voices in the accent purple so a member's own words stand out most.
   const isSpeech = e.kind === 'broadcast' || isVoice
+  const speechColor = isVoice ? 'rgba(224,140,255,0.95)' : 'rgba(216,180,232,0.95)'
   const hasEntity = e.message.includes('**')
 
   const body = (
@@ -43,7 +44,7 @@ function RadioRow({ e, last }: { e: RadioEventRow; last: boolean }) {
           margin: 0,
           fontSize: '1rem',
           lineHeight: 1.5,
-          color: isSpeech ? 'rgba(216,180,232,0.95)' : '#F3EDE6',
+          color: isSpeech ? speechColor : '#F3EDE6',
           opacity: isSpeech ? 1 : 0.92,
           fontStyle: isVoice ? 'italic' : undefined,
           overflowWrap: 'anywhere',
@@ -62,7 +63,7 @@ function RadioRow({ e, last }: { e: RadioEventRow; last: boolean }) {
         </p>
       )}
       {isVoice && e.actor_name && (
-        <p style={{ margin: '0.3rem 0 0', fontSize: '0.72rem', color: '#C8A848', opacity: 0.6 }}>
+        <p style={{ margin: '0.3rem 0 0', fontSize: '0.72rem', color: 'rgba(224,140,255,0.8)', opacity: 0.75 }}>
           — {e.actor_name}
         </p>
       )}

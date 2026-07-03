@@ -61,14 +61,20 @@ const MID = 180
 // The main pulse: quiet braid → growing swells → jagged mid-cluster → the
 // heartbeat spike → decay → quiet braid.
 const MAIN: [number, number][] = [
-  [0, 180], [30, 176], [60, 184], [90, 177], [120, 183], [152, 175], [184, 185],
-  [218, 166], [252, 194], [286, 160], [318, 198],
-  [348, 154], [376, 200], [404, 148], [430, 198],
-  [456, 168], [478, 190],
-  [494, 168], [506, 212], [518, 46], [531, 336], [544, 24], [557, 302], [570, 108], [582, 218],
-  [602, 156], [628, 208], [656, 152], [684, 200], [712, 164],
-  [742, 192], [774, 170], [806, 190], [838, 173],
-  [868, 184], [900, 177], [932, 182], [966, 178], [1000, 180],
+  // quiet braid in
+  [0, 180], [36, 177], [72, 183], [108, 178], [144, 182],
+  // gentle swells, growing
+  [178, 170], [212, 190], [246, 164], [280, 194],
+  // the rhythmic mid-cluster — even wavelengths, consistent height
+  [310, 146], [336, 210], [362, 142], [388, 214], [414, 146], [440, 206],
+  // calm shoulder before the event
+  [464, 172], [486, 186],
+  // the pulse
+  [502, 170], [514, 214], [526, 44], [539, 338], [552, 22], [565, 304], [578, 106], [590, 216],
+  // decay, quickly polite again
+  [612, 158], [640, 204], [668, 160], [696, 196],
+  // braid out
+  [730, 174], [768, 186], [806, 176], [844, 184], [882, 178], [922, 182], [960, 179], [1000, 180],
 ]
 
 // Echo threads — the braid: they hug the baseline, cross the main line in
@@ -134,9 +140,9 @@ function Waveform() {
       <path d={smoothPath(THREAD_C)} stroke={GOLD} strokeWidth="0.8" opacity="0.22" />
       <path d={smoothPath(THREAD_B)} stroke={GOLD} strokeWidth="0.9" opacity="0.3" />
 
-      {/* the pulse — glow underlay, then the fine line */}
-      <path d={smoothPath(MAIN)} stroke={WARM} strokeWidth="4" opacity="0.22" filter="url(#radio-blur)" />
-      <path d={smoothPath(MAIN)} stroke="url(#radio-fade)" strokeWidth="1.4" strokeLinecap="round" />
+      {/* the pulse — glow underlay, then the hairline */}
+      <path d={smoothPath(MAIN)} stroke={WARM} strokeWidth="3.5" opacity="0.18" filter="url(#radio-blur)" />
+      <path d={smoothPath(MAIN)} stroke="url(#radio-fade)" strokeWidth="1.1" strokeLinecap="round" />
 
       {/* dust + blooming orbs */}
       {DUST.map(([x, y, r, o], i) => (
