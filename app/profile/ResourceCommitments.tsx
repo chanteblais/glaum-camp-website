@@ -331,9 +331,11 @@ export function ResourceCommitments({ initialLists }: { initialLists?: ResourceL
     const suggested = list.items.filter(i => i.needed === null)
 
     return (
-      <div key={list.id}>
+      // One list = one card: header, items, and the suggest footer share a
+      // visible boundary (bare sections read as unrelated sibling cards).
+      <div key={list.id} style={{ border: '1px solid rgba(200,168,72,0.25)', borderRadius: '1rem', background: 'rgba(10,0,20,0.5)', overflow: 'hidden' }}>
         {/* List header: the shared goal, not the inventory */}
-        <div style={{ marginBottom: '1rem' }}>
+        <div style={{ padding: '1.1rem 1.25rem 1rem', borderBottom: '1px solid rgba(200,168,72,0.12)' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
             <p style={{ margin: 0, fontSize: '1.25rem', letterSpacing: '0.05em', color: GOLD, opacity: 0.95, fontFamily: 'TokyoDreams, serif' }}>
               {list.title}
@@ -373,7 +375,7 @@ export function ResourceCommitments({ initialLists }: { initialLists?: ResourceL
         </div>
 
         {/* Items grouped by what needs attention */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1.1rem 1.25rem 1.25rem' }}>
           {stillNeeded.length > 0 && (
             <div>
               <p style={{ ...groupLabelStyle, color: GOLD, opacity: 0.75 }}>Still Needed</p>
@@ -399,12 +401,14 @@ export function ResourceCommitments({ initialLists }: { initialLists?: ResourceL
             </div>
           )}
 
-          {/* Collaborative planning: suggest what the organizers haven't thought of */}
+        </div>
+
+        {/* Collaborative planning: suggest what the organizers haven't
+            thought of. A footer OF the card — not a dashed sibling box,
+            which read as a separate card. */}
+        <div style={{ borderTop: '1px solid rgba(200,168,72,0.12)' }}>
           {suggestListId === list.id ? (
-            <div style={{
-              padding: '1rem 1.25rem', borderRadius: '0.85rem',
-              border: '1px dashed rgba(200,168,72,0.35)', background: 'rgba(200,168,72,0.04)',
-            }}>
+            <div style={{ padding: '1rem 1.25rem 1.1rem', background: 'rgba(200,168,72,0.03)' }}>
               <input
                 autoFocus
                 value={suggestName}
@@ -455,8 +459,8 @@ export function ResourceCommitments({ initialLists }: { initialLists?: ResourceL
               onClick={() => { setSuggestListId(list.id); setSuggestName(''); setSuggestNote(''); setSuggestBring(true) }}
               style={{
                 display: 'block', width: '100%', boxSizing: 'border-box', textAlign: 'center',
-                padding: '0.8rem 1.25rem', borderRadius: '0.85rem', cursor: 'pointer',
-                border: '1px dashed rgba(200,168,72,0.3)', background: 'rgba(255,255,255,0.01)',
+                padding: '0.85rem 1.25rem', cursor: 'pointer',
+                border: 'none', background: 'transparent',
                 color: GOLD, opacity: 0.65, fontSize: '0.78rem',
                 letterSpacing: '0.05em', fontFamily: 'inherit',
               }}
@@ -504,7 +508,7 @@ export function ResourceCommitments({ initialLists }: { initialLists?: ResourceL
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         {lists.map(renderList)}
       </div>
     </div>

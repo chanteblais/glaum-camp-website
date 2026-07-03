@@ -43,7 +43,9 @@ organizer wants, not an error).
   anchored `#bring`, **above** Your Groups — needs are live and time-sensitive,
   group membership is set-once): a **preparation board**, not an inventory —
   it answers *"what can I do that would be most helpful?"* first (redesigned
-  2026-07-02 on Chante's direction):
+  2026-07-02 on Chante's direction). **Each list is ONE card** (gold border,
+  header / items / footer, 2026-07-03) — bare sections read as unrelated
+  sibling cards and the suggest box got mistaken for its own card:
   - **I'M BRINGING** — a pinned card of my commitments ("✓ Camping Stove ×2 —
     Shared Kitchen") with per-row *Edit ›* that expands + scrolls to the item.
   - **Per-list readiness** — "84% Ready" + progress bar + "27 of 32 covered"
@@ -58,8 +60,9 @@ organizer wants, not an error).
     **who's bringing it** (✓ names, quantities, "You" first — social proof,
     now member-visible), and my −/+/Remove controls. Unclaiming is always
     allowed; a claimed row shows purple.
-  - **Suggest a resource** — the dashed last card reads *"Don't see
-    something? ＋ Suggest a resource"* (collaborative planning, replacing
+  - **Suggest a resource** — the list card's **footer row** (hairline-
+    separated, inside the card) reads *"Don't see something? ＋ Suggest a
+    resource"* (collaborative planning, replacing
     "Offer it"); the form has an **"I can bring one myself"** checkbox
     (default on → seeds the ×1 claim; off = pure suggestion for organizers).
     Retracting your own suggestion's last claim removes the listing.
