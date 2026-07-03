@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { EventIcon } from '@/components/EventIcon'
 import { AssetImagePicker } from './AssetImagePicker'
-import { WorkspaceHeader } from './WorkspaceHeader'
 import { LoadError } from './LoadError'
 import { isImageIcon } from '@/lib/icon-src'
 import { rangeTo24h } from '@/lib/time-format'
@@ -716,20 +715,17 @@ export function ScheduleManager({ rangeStart, rangeEnd, children }: { rangeStart
 
   if (loading || loadError) return (
     <div>
-      <WorkspaceHeader title="Scheduled Events" />
       {children}
       {loading
-        ? <p style={{ opacity: 0.4, fontStyle: 'italic', fontSize: '0.875rem' }}>Loading…</p>
+        ? <p style={{ opacity: 0.4, fontStyle: 'italic', fontSize: '0.875rem', marginTop: '0.75rem' }}>Loading…</p>
         : <LoadError onRetry={() => { setLoading(true); load() }} />}
     </div>
   )
 
   return (
     <div>
-      {/* Header first, then one controls row: the shift-signup pill (rides in
-          as children) on the left, view + add on the right — one section. */}
-      <WorkspaceHeader title="Scheduled Events" count={dated.length + undated.length} />
-
+      {/* One controls row opens the workspace: the shift-signup pill (rides
+          in as children) on the left, view + add on the right. */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.85rem', gap: '0.75rem', flexWrap: 'wrap' }}>
         <div>{children}</div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>

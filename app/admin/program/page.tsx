@@ -69,7 +69,7 @@ export default async function ProgramPage() {
         </p>
 
         {/* ═══════════════ SCHEDULE ═══════════════ */}
-        <CategoryHeading id="schedule" />
+        <CategoryHeading id="schedule" large />
 
         <div style={workspacePanel}>
           <ScheduleManager rangeStart={eventRangeStart} rangeEnd={eventRangeEnd}>
@@ -78,14 +78,14 @@ export default async function ProgramPage() {
         </div>
 
         {/* ═══════════════ LEAD-UP GATHERINGS ═══════════════ */}
-        <CategoryHeading id="lead-up" />
+        <CategoryHeading id="lead-up" large />
 
         <div style={workspacePanel}>
           <LeadUpGatheringsManager rangeStart={eventRangeStart} rangeEnd={eventRangeEnd} />
         </div>
 
         {/* ═══════════════ SHARED RESOURCES ═══════════════ */}
-        <CategoryHeading id="resources" />
+        <CategoryHeading id="resources" large />
 
         <div style={workspacePanel}>
           <ResourcesManager />
