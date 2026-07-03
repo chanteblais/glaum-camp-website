@@ -383,9 +383,9 @@ export function RadioHero() {
           fontSize: '1.1rem',
           lineHeight: 1.5,
           letterSpacing: '0.02em',
-          // a step darker than the band's warm gold — present, not popping
-          color: '#C39D5F',
-          opacity: 0.9,
+          // two steps darker than the band's warm gold — present, not popping
+          color: '#A98A52',
+          opacity: 0.88,
           position: 'relative',
           zIndex: 1,
           maxWidth: '22rem',

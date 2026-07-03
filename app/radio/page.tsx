@@ -58,7 +58,7 @@ export default async function RadioPage() {
   const isBroadcaster = user?.publicMetadata?.role === 'admin'
 
   const statCells: { icon: keyof typeof statIcon; value: number; label: string }[] = [
-    { icon: 'waves', value: stats.postsThisWeek, label: 'on the air this week' },
+    { icon: 'waves', value: stats.postsThisWeek, label: 'broadcasts this week' },
     { icon: 'tent', value: stats.contributions, label: 'resources claimed' },
     { icon: 'medal', value: stats.achievements, label: 'distinctions awarded' },
     { icon: 'horn', value: stats.broadcasts, label: 'announcements shared' },
@@ -71,10 +71,17 @@ export default async function RadioPage() {
           the server escapes `>` to `&gt;` and hydration trips (house gotcha). */}
       <style dangerouslySetInnerHTML={{ __html: `
         .radio-stats { display: grid; grid-template-columns: repeat(4, 1fr); }
-        .radio-stats > div + div { border-left: 1px solid rgba(200,168,72,0.14); }
+        .radio-stat { display: flex; align-items: center; gap: 0.75rem; justify-content: center; padding: 0 0.75rem; min-width: 0; }
+        .radio-stat + .radio-stat { border-left: 1px solid rgba(200,168,72,0.14); }
+        .radio-stat-icon { opacity: 0.8; flex-shrink: 0; display: flex; }
+        .radio-stat-num { display: block; font-size: 1.25rem; color: #C8A848; line-height: 1.1; }
+        .radio-stat-label { display: block; font-size: 0.68rem; color: #F3EDE6; opacity: 0.5; line-height: 1.35; }
+        /* one row on mobile too — everything just gets smaller */
         @media (max-width: 640px) {
-          .radio-stats { grid-template-columns: repeat(2, 1fr); row-gap: 1rem; }
-          .radio-stats > div:nth-child(3) { border-left: none; }
+          .radio-stat { gap: 0.35rem; padding: 0 0.25rem; }
+          .radio-stat-icon svg { width: 15px; height: 15px; }
+          .radio-stat-num { font-size: 0.9rem; }
+          .radio-stat-label { font-size: 0.5rem; }
         }
       ` }} />
       <main style={{ maxWidth: '760px', margin: '0 auto', padding: '5.5rem 1.5rem 6rem' }}>
@@ -90,16 +97,16 @@ export default async function RadioPage() {
             border: '1px solid rgba(200,168,72,0.16)',
             borderRadius: '0.9rem',
             background: 'rgba(243,237,230,0.03)',
-            padding: '1.1rem 0.5rem',
+            padding: '0.65rem 0.4rem',
             marginBottom: '1.75rem',
           }}
         >
           {statCells.map(cell => (
-            <div key={cell.label} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', justifyContent: 'center', padding: '0 0.75rem' }}>
-              <span aria-hidden style={{ opacity: 0.8, flexShrink: 0, display: 'flex' }}>{statIcon[cell.icon]}</span>
+            <div key={cell.label} className="radio-stat">
+              <span aria-hidden className="radio-stat-icon">{statIcon[cell.icon]}</span>
               <span style={{ minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: '1.25rem', color: '#C8A848', lineHeight: 1.1 }}>{cell.value}</span>
-                <span style={{ display: 'block', fontSize: '0.68rem', color: '#F3EDE6', opacity: 0.5, lineHeight: 1.35 }}>{cell.label}</span>
+                <span className="radio-stat-num">{cell.value}</span>
+                <span className="radio-stat-label">{cell.label}</span>
               </span>
             </div>
           ))}
