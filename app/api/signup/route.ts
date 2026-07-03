@@ -1,29 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth, currentUser } from '@clerk/nextjs/server'
+import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
-
-async function requireApprovedCamper(userId: string) {
-  const user = await currentUser()
-  const email = user?.emailAddresses[0]?.emailAddress
-
-  const { data: application } = await supabaseAdmin
-    .from('members')
-    .select('id, status')
-    .or(`clerk_user_id.eq.${userId},email.eq.${email}`)
-    .eq('status', 'approved')
-    .maybeSingle()
-
-  return application ?? null
-}
+import { getApprovedMember, memberDisplayName } from '@/lib/members'
 
 export async function GET() {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const application = await requireApprovedCamper(userId)
-  if (!application) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-
-  const [deptRes, rolesRes, signupRes, roleCounts, eventSignupCounts, scheduleRes, shiftFlagRes] = await Promise.all([
+  // The approval gate runs alongside the data batch — it only gates the
+  // response, not what we fetch, so there's no need to serialize on it.
+  const [application, deptRes, rolesRes, signupRes, roleCounts, eventSignupCounts, scheduleRes, shiftFlagRes] = await Promise.all([
+    getApprovedMember(userId),
     supabaseAdmin.from('departments').select('id, name, description, icon, sort_order').order('sort_order'),
     supabaseAdmin.from('roles').select('id, name, description, capacity, sort_order, department_id, purpose, responsibilities_before, responsibilities_during, ideal_for, commitment, commitment_period, requires_approval').order('sort_order'),
     supabaseAdmin.from('camp_signups').select('role_id, schedule_event_id, role_approval_status').eq('clerk_user_id', userId).maybeSingle(),
@@ -32,6 +19,8 @@ export async function GET() {
     supabaseAdmin.from('schedule_events').select('id, day, time, title, subtitle, icon_type, highlight, is_recurring, capacity').eq('visible', true).order('sort_order'),
     supabaseAdmin.from('page_content').select('value').eq('key', 'config_shift_signup_open').maybeSingle(),
   ])
+
+  if (!application) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const shiftSignupOpen = shiftFlagRes.data?.value !== 'false'
 
@@ -73,7 +62,7 @@ export async function POST(req: NextRequest) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const application = await requireApprovedCamper(userId)
+  const application = await getApprovedMember(userId)
   if (!application) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await req.json()
@@ -162,10 +151,7 @@ export async function POST(req: NextRequest) {
 
   // Notify admin if role requires approval
   if (requiresApproval && isRoleChange && next_role_id) {
-    const user = await currentUser()
-    const name = user?.firstName && user?.lastName
-      ? `${user.firstName} ${user.lastName}`
-      : user?.firstName ?? userId
+    const name = memberDisplayName(application, userId)
 
     const { error: notifError } = await supabaseAdmin.from('admin_notifications').insert({
       application_id: application.id,
@@ -178,10 +164,7 @@ export async function POST(req: NextRequest) {
 
   // Notify admin on role or shift change (non-approval roles)
   if (!requiresApproval && next_role_id && (isRoleChange || isEventChange)) {
-    const user = await currentUser()
-    const name = user?.firstName && user?.lastName
-      ? `${user.firstName} ${user.lastName}`
-      : user?.firstName ?? userId
+    const name = memberDisplayName(application, userId)
 
     if (isRoleChange) {
       const [oldRole, newRole] = await Promise.all([

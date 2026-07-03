@@ -1,29 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth, currentUser } from '@clerk/nextjs/server'
+import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { shiftDurationHours } from '@/lib/shift-hours'
 import { getMemberShiftState } from '@/lib/shift-attunement'
 import { parseAttunementTasks } from '@/lib/site-config'
 import { memberDisplayNames } from '@/lib/member-names'
+import { getApprovedMember, memberDisplayName } from '@/lib/members'
 
 // Member-facing multi-shift signup (shifts redesign). A member holds any number
 // of shift events via member_shift_signups; this replaces the single
 // camp_signups.schedule_event_id (still read for back-compat, never written here;
 // cancelling a legacy-held shift clears both so hours never double-count).
-
-async function requireApprovedCamper(userId: string) {
-  const user = await currentUser()
-  const email = user?.emailAddresses[0]?.emailAddress
-
-  const { data: application } = await supabaseAdmin
-    .from('members')
-    .select('id, status')
-    .or(`clerk_user_id.eq.${userId},email.eq.${email}`)
-    .eq('status', 'approved')
-    .maybeSingle()
-
-  return application ?? null
-}
 
 // Unique (member, event) holds across the new table + the legacy single column.
 // Leads (migration 048) only exist on the new table; legacy holds are members.
@@ -57,10 +44,10 @@ export async function GET() {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const application = await requireApprovedCamper(userId)
-  if (!application) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-
-  const [eventsRes, holds, shiftState, flagRes, typesRes] = await Promise.all([
+  // The approval gate runs alongside the data batch — it only gates the
+  // response, not what we fetch, so there's no need to serialize on it.
+  const [application, eventsRes, holds, shiftState, flagRes, typesRes] = await Promise.all([
+    getApprovedMember(userId),
     supabaseAdmin
       .from('schedule_events')
       .select('id, title, subtitle, day, time, event_date, start_time, end_time, capacity, shift_type_id, needs_lead, shift_types(name, icon)')
@@ -73,6 +60,8 @@ export async function GET() {
     supabaseAdmin.from('page_content').select('key, value').in('key', ['config_shift_signup_open', 'config_attunement_tasks']),
     supabaseAdmin.from('shift_types').select('id, name, icon').order('sort_order'),
   ])
+
+  if (!application) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   // Registry order drives each type's palette slot (lib/shift-colors.ts).
   const shiftTypes = (typesRes.data ?? []).map((t, i) => ({ id: t.id, name: t.name, icon: t.icon, color_index: i }))
@@ -130,7 +119,7 @@ export async function POST(req: NextRequest) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const application = await requireApprovedCamper(userId)
+  const application = await getApprovedMember(userId)
   if (!application) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { schedule_event_id, role: rawRole } = await req.json()
@@ -186,8 +175,7 @@ export async function POST(req: NextRequest) {
 
   // Admin notification (same shape as the legacy shift_change event). A role
   // change on an existing signup reads as such, not as a fresh signup.
-  const user = await currentUser()
-  const name = user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.firstName ?? userId
+  const name = memberDisplayName(application, userId)
   const message = existing && role && role !== existing.role
     ? role === 'lead'
       ? `${name} offered to lead "${event.title}"`
@@ -209,7 +197,7 @@ export async function DELETE(req: NextRequest) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const application = await requireApprovedCamper(userId)
+  const application = await getApprovedMember(userId)
   if (!application) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const schedule_event_id = req.nextUrl.searchParams.get('schedule_event_id')

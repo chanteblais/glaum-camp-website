@@ -51,42 +51,86 @@ export default async function ProfilePage() {
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
 
-  const user = await currentUser()
+  // currentUser() is a Clerk Backend-API round-trip; both DB lookups key on
+  // clerk_user_id, so all three overlap. Email matching survives as a rare
+  // fallback for applications never linked to a Clerk account.
+  const [user, appByIdRes, volunteerRes] = await Promise.all([
+    currentUser(),
+    supabaseAdmin
+      .from('applications')
+      .select('*')
+      .eq('clerk_user_id', userId)
+      .order('submitted_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabaseAdmin
+      .from('volunteers')
+      .select('*')
+      .eq('clerk_user_id', userId)
+      .maybeSingle(),
+  ])
   const email = user?.emailAddresses[0]?.emailAddress
 
   // Check for camp application (cancelled treated as no application)
-  const { data: applicationRaw } = await supabaseAdmin
-    .from('applications')
-    .select('*')
-    .or(`clerk_user_id.eq.${userId},email.eq.${email}`)
-    .order('submitted_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  let applicationRaw = appByIdRes.data
+  if (!applicationRaw && email) {
+    const { data } = await supabaseAdmin
+      .from('applications')
+      .select('*')
+      .eq('email', email)
+      .order('submitted_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    applicationRaw = data
+  }
   const application = applicationRaw?.status === 'cancelled' ? null : applicationRaw
 
-  // Check for active volunteer signup (cancelled records are treated as no record)
-  const { data: volunteerRaw } = await supabaseAdmin
-    .from('volunteers')
-    .select('*')
-    .eq('clerk_user_id', userId)
-    .maybeSingle()
+  // Active volunteer signup (cancelled records are treated as no record)
+  const volunteerRaw = volunteerRes.data
   const volunteer = (volunteerRaw?.status === 'active' || volunteerRaw?.status === 'pending') ? volunteerRaw : null
 
-  // Fetch signup status for approved members and active (not pending) volunteers
+  // Everything below keys on the resolved identity and nothing else, so it all
+  // shares one parallel round-trip: signup status (approved members and active,
+  // not pending, volunteers), groups, resource claims, config, shift state, and
+  // the canonical member row.
   const isActiveMember = application?.status === 'approved' || volunteer?.status === 'active'
-  const [{ data: campSignup }, { data: heldShiftRows }] = isActiveMember
-    ? await Promise.all([
-        supabaseAdmin
-          .from('camp_signups')
-          .select('role_id, schedule_event_id, role_approval_status, roles(name, description, purpose, department_id, departments(name, icon)), schedule_events(id, title, day, time, icon_type, event_date)')
-          .eq('clerk_user_id', userId)
-          .maybeSingle(),
-        supabaseAdmin
-          .from('member_shift_signups')
-          .select('schedule_events(id, title, day, time, icon_type, event_date)')
-          .eq('clerk_user_id', userId),
-      ])
-    : [{ data: null }, { data: null }]
+  const memberClerkId = application?.clerk_user_id ?? userId
+  const [
+    [{ data: campSignup }, { data: heldShiftRows }],
+    memberGroups,
+    resourceClaims,
+    { data: attuneConfigRows },
+    shiftState,
+    profileMember,
+  ] = await Promise.all([
+    isActiveMember
+      ? Promise.all([
+          supabaseAdmin
+            .from('camp_signups')
+            .select('role_id, schedule_event_id, role_approval_status, roles(name, description, purpose, department_id, departments(name, icon)), schedule_events(id, title, day, time, icon_type, event_date)')
+            .eq('clerk_user_id', userId)
+            .maybeSingle(),
+          supabaseAdmin
+            .from('member_shift_signups')
+            .select('schedule_events(id, title, day, time, icon_type, event_date)')
+            .eq('clerk_user_id', userId),
+        ])
+      : ([{ data: null }, { data: null }] as const),
+    // Groups the member belongs to (replaces the old setup_preference "contributions").
+    getMemberGroups(memberClerkId),
+    // Shared-resource claims ("I'll bring one") — BRINGING rows on the commitments card.
+    getMemberResourceClaims(memberClerkId),
+    // Attunement config (Admin → Manage → Attunement Tasks) + distinction rules.
+    supabaseAdmin
+      .from('page_content')
+      .select('key, value')
+      .in('key', ['config_attunement_tasks', 'config_shift_signup_open', 'config_distinctions']),
+    // Shift-hours state: held hours per shift type + obligations derived from the
+    // member's groups/roles. Same helper as the home dashboard — keep in sync.
+    getMemberShiftState(memberClerkId),
+    // Canonical member row (Phase 1 member_profiles) for stored profile values.
+    resolveMember(memberClerkId, email),
+  ])
 
   // Extract role + department info
   const roleInfo = campSignup?.roles as { name?: string; description?: string | null; purpose?: string | null; departments?: { name?: string; icon?: string } | null } | null
@@ -110,12 +154,8 @@ export default async function ProfilePage() {
     event_date: ev.event_date ?? null,
   }))
 
-  // Groups the member belongs to (replaces the old setup_preference "contributions").
   // `contributions` = group names; `groupMeta` carries each group's icon/description
   // for the commitments card (keyed by name, the shape CommitmentsSection expects).
-  const memberGroups = await getMemberGroups(application?.clerk_user_id ?? userId)
-  // Shared-resource claims ("I'll bring one") — BRINGING rows on the commitments card.
-  const resourceClaims = await getMemberResourceClaims(application?.clerk_user_id ?? userId)
   // Full list drives attunement + distinction facts; the profile card shows only
   // groups whose collection is marked visible (show_on_profile).
   const contributions = memberGroups.map(g => g.name)
@@ -125,14 +165,7 @@ export default async function ProfilePage() {
 
   // Attunement checklist — admin-configured tasks, each auto-completed from its
   // requirement type (Admin → Manage → Attunement Tasks).
-  const { data: attuneConfigRows } = await supabaseAdmin
-    .from('page_content')
-    .select('key, value')
-    .in('key', ['config_attunement_tasks', 'config_shift_signup_open', 'config_distinctions'])
   const attuneConfig = Object.fromEntries((attuneConfigRows ?? []).map(r => [r.key, r.value]))
-  // Shift-hours state: held hours per shift type + obligations derived from the
-  // member's groups/roles. Same helper as the home dashboard — keep in sync.
-  const shiftState = await getMemberShiftState(application?.clerk_user_id ?? userId)
   // Shared with the home dashboard banner via buildAttunementChecklist — keep both in sync.
   const attunementState = {
     hasPhoto: !!application?.avatar_url,
@@ -155,9 +188,10 @@ export default async function ProfilePage() {
   // member_profiles) ∪ derived system facts. System facts win on any key overlap
   // (they're authoritative and non-spoofable). Guarded — empty when no member row
   // exists yet, so this falls back to system-facts-only behavior.
-  const profileMember = await resolveMember(application?.clerk_user_id ?? userId, email)
-  const profileValues = profileMember ? await getMemberProfileValues(profileMember.id) : {}
-  const awardedIds = profileMember ? new Set(await getMemberAwards(profileMember.id)) : undefined
+  const [profileValues, awardIds] = profileMember
+    ? await Promise.all([getMemberProfileValues(profileMember.id), getMemberAwards(profileMember.id)])
+    : [{} as Record<string, unknown>, null]
+  const awardedIds = awardIds ? new Set(awardIds) : undefined
   const factContext = { ...profileValues, ...memberFacts }
   const earnedDistinctions = evaluateDistinctions(factContext, parseDistinctions(attuneConfig['config_distinctions']), awardedIds)
 

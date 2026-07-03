@@ -1,6 +1,6 @@
-import { auth, currentUser } from '@clerk/nextjs/server'
+import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
-import { supabaseAdmin } from '@/lib/supabase'
+import { getApprovedMember } from '@/lib/members'
 import { SignupSection } from '@/app/profile/SignupSection'
 import { GroupCommitments } from '@/app/profile/GroupCommitments'
 import { ResourceCommitments } from '@/app/profile/ResourceCommitments'
@@ -12,18 +12,8 @@ export default async function SignupPage() {
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
 
-  const user = await currentUser()
-  const email = user?.emailAddresses[0]?.emailAddress ?? ''
-
-  const { data: application } = await supabaseAdmin
-    .from('members')
-    .select('id, status')
-    .or(`clerk_user_id.eq.${userId},email.eq.${email}`)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  if (!application || application.status !== 'approved') redirect('/profile')
+  const member = await getApprovedMember(userId)
+  if (!member) redirect('/profile')
 
   return (
     <>
