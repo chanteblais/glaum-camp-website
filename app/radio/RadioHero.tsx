@@ -172,9 +172,9 @@ function Waveform() {
         {/* long wispy tapers: the ribbon gathers out of the braid on the
             left and dissolves down the long tail on the right */}
         <linearGradient id="radio-fade" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor={LINE} stopOpacity="0.03" />
-          <stop offset="0.07" stopColor={LINE} stopOpacity="0.22" />
-          <stop offset="0.17" stopColor={LINE} stopOpacity="1" />
+          <stop offset="0" stopColor={LINE} stopOpacity="0.015" />
+          <stop offset="0.1" stopColor={LINE} stopOpacity="0.12" />
+          <stop offset="0.24" stopColor={LINE} stopOpacity="1" />
           <stop offset="0.48" stopColor={LINE} stopOpacity="1" />
           <stop offset="0.64" stopColor={LINE} stopOpacity="0.5" />
           <stop offset="0.8" stopColor={LINE} stopOpacity="0.3" />
@@ -190,8 +190,8 @@ function Waveform() {
           <stop offset="1" stopColor={LINE} stopOpacity="0.01" />
         </linearGradient>
         <linearGradient id="radio-fade-core" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0.08" stopColor={LINE_CORE} stopOpacity="0" />
-          <stop offset="0.19" stopColor={LINE_CORE} stopOpacity="0.55" />
+          <stop offset="0.14" stopColor={LINE_CORE} stopOpacity="0" />
+          <stop offset="0.26" stopColor={LINE_CORE} stopOpacity="0.55" />
           <stop offset="0.45" stopColor={LINE_CORE} stopOpacity="0.55" />
           <stop offset="0.59" stopColor={LINE_CORE} stopOpacity="0" />
         </linearGradient>
@@ -199,9 +199,9 @@ function Waveform() {
             ends, ducking through the loud middle — and always FAINTER than
             the main line's own fade at the same point */}
         <linearGradient id="radio-fade-edges" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor={LINE} stopOpacity="0.02" />
-          <stop offset="0.1" stopColor={LINE} stopOpacity="0.13" />
-          <stop offset="0.22" stopColor={LINE} stopOpacity="0.2" />
+          <stop offset="0" stopColor={LINE} stopOpacity="0.01" />
+          <stop offset="0.13" stopColor={LINE} stopOpacity="0.08" />
+          <stop offset="0.26" stopColor={LINE} stopOpacity="0.18" />
           <stop offset="0.38" stopColor={LINE} stopOpacity="0.06" />
           <stop offset="0.55" stopColor={LINE} stopOpacity="0.07" />
           <stop offset="0.72" stopColor={LINE} stopOpacity="0.18" />
