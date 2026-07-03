@@ -596,20 +596,28 @@ function RolePicker({
           aria-expanded={false}
           style={{ display: 'block', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '0.5rem 0', textAlign: 'center' }}
         >
-          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '1rem 1.25rem', marginBottom: '1.4rem' }}>
+          {/* Seal sizes step down on narrow screens so a full row of
+              departments still wraps cleanly at phone width. */}
+          <style>{`
+            .role-seal-strip { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem 1.1rem; margin-bottom: 1.4rem; }
+            .role-seal { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; width: 90px; }
+            .role-seal-ring { width: 56px; height: 56px; border-radius: 50%; border: 1.5px solid #C8A848; background: radial-gradient(circle at 42% 38%, rgba(200,168,72,0.18), rgba(8,0,18,0.85)); display: flex; align-items: center; justify-content: center; }
+            .role-seal-ring .role-seal-emoji { font-size: 1.5rem; line-height: 1; }
+            @media (min-width: 560px) {
+              .role-seal { width: 108px; }
+              .role-seal-ring { width: 68px; height: 68px; }
+              .role-seal-ring .role-seal-emoji { font-size: 1.85rem; }
+            }
+          `}</style>
+          <div className="role-seal-strip">
             {withRoles.map(dept => (
-              <span key={dept.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.45rem', width: '84px' }}>
-                <span style={{
-                  width: '46px', height: '46px', borderRadius: '50%',
-                  border: '1.5px solid #C8A848',
-                  background: 'radial-gradient(circle at 42% 38%, rgba(200,168,72,0.18), rgba(8,0,18,0.85))',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
+              <span key={dept.id} className="role-seal">
+                <span className="role-seal-ring">
                   {dept.icon && isImageIcon(dept.icon)
                     ? <img src={dept.icon} alt="" aria-hidden style={{ width: '72%', height: '72%', objectFit: 'contain', opacity: 0.92 }} />
-                    : <span style={{ fontSize: '1.25rem', lineHeight: 1 }}>{dept.icon ?? '✦'}</span>}
+                    : <span className="role-seal-emoji">{dept.icon ?? '✦'}</span>}
                 </span>
-                <span style={{ fontSize: '0.58rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.6, lineHeight: 1.3 }}>
+                <span style={{ fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.6, lineHeight: 1.3 }}>
                   {dept.name}
                 </span>
               </span>
