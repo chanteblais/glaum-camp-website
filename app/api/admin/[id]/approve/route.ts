@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { clerkClient } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { sendUserEmail, APP_URL } from '@/lib/send-email'
-import { setMemberStatus } from '@/lib/members'
+import { upsertMember } from '@/lib/members'
 import { requireAdmin } from '@/lib/admin-auth'
 import { postSourcedRadioEvent } from '@/lib/radio'
 
@@ -14,12 +14,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const { id } = params
 
-  // Fetch application so we can notify the user
+  // Fetch application so we can notify the user (and mirror identity onto the
+  // canonical member record below)
   const { data: application } = await supabaseAdmin
     .from('applications')
-    .select('clerk_user_id, first_name, preferred_name')
+    .select('clerk_user_id, email, first_name, last_name, preferred_name, pronouns, phone, avatar_url')
     .eq('id', id)
     .single()
+
+  if (!application) return NextResponse.json({ error: 'Application not found' }, { status: 404 })
 
   // Mark application as approved
   const { error: updateError } = await supabaseAdmin
@@ -35,8 +38,22 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: updateError.message }, { status: 500 })
   }
 
-  // Phase 1 dual-write: mirror the approval onto the canonical member record.
-  await setMemberStatus(application?.clerk_user_id ?? null, id, 'approved')
+  // Mirror the approval onto the canonical member record. upsertMember (not
+  // setMemberStatus, which only UPDATEs) so a members row that was never
+  // created — e.g. pre-dual-write submissions — is inserted here rather than
+  // silently no-opping and locking the approved member out of every
+  // member-only surface (getApprovedMember gates on members.status).
+  await upsertMember(application.clerk_user_id ?? null, {
+    email: application.email,
+    first_name: application.first_name,
+    last_name: application.last_name,
+    preferred_name: application.preferred_name,
+    pronouns: application.pronouns,
+    phone: application.phone,
+    avatar_url: application.avatar_url,
+    status: 'approved',
+    application_id: id,
+  })
 
   // Notify the applicant
   let emailWarning: string | undefined
@@ -68,8 +85,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       })
     }
 
-    const clerkUser = await client.users.getUser(application.clerk_user_id)
-    const email = clerkUser.emailAddresses[0]?.emailAddress
+    // A deleted / unknown Clerk account must not turn the (already committed)
+    // approval into a 500 — degrade to the email warning instead.
+    let email: string | undefined
+    try {
+      const clerkUser = await client.users.getUser(application.clerk_user_id)
+      email = clerkUser.emailAddresses[0]?.emailAddress
+    } catch {
+      email = undefined
+    }
     if (email) {
       const result = await sendUserEmail(
         email,

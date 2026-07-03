@@ -10,7 +10,9 @@
 | [Lead-Up Gatherings](lead-up-gatherings.md) | Pre-event planning sessions (`lead_up_events`) — design + build log |
 | [Design System](design-system.md) | Colors, typography, spacing, reusable CSS classes, component patterns |
 | [Pre-Production](pre-prod.md) | Checklist of things to complete before going live |
+| [QA Log](qa-log.md) | QA sweeps: what was tested/fixed, known-and-deliberate behaviors (don't re-report), open items, highest-value manual tests |
 | [Multi-Community Roadmap](multi-community.md) | Long-term direction, what's already configurable, phased migration plan |
+| [Mobile Companion](mobile-companion.md) | Long-term mobile app direction — member companion, not the website in a shell; disciplines to hold now |
 
 ---
 

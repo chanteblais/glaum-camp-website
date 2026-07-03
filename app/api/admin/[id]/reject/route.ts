@@ -18,6 +18,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     .eq('id', params.id)
     .single()
 
+  if (!application) return NextResponse.json({ error: 'Application not found' }, { status: 404 })
+
   const { error } = await supabaseAdmin
     .from('applications')
     .update({
@@ -41,8 +43,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       message,
     }])
 
-    const clerkUser = await client.users.getUser(application.clerk_user_id)
-    const email = clerkUser.emailAddresses[0]?.emailAddress
+    // A deleted / unknown Clerk account must not turn the (already committed)
+    // rejection into a 500 — skip the email instead.
+    let email: string | undefined
+    try {
+      const clerkUser = await client.users.getUser(application.clerk_user_id)
+      email = clerkUser.emailAddresses[0]?.emailAddress
+    } catch {
+      email = undefined
+    }
     if (email) {
       await sendUserEmail(
         email,

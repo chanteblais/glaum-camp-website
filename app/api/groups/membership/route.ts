@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getSelfJoinGroups } from '@/lib/participate-data'
+import { getApprovedMember } from '@/lib/members'
 
 // Member-facing self-service for opt-in groups (e.g. Setup / Teardown / Decor).
 // A group is self-joinable iff its collection has self_join = true. This is a
@@ -47,6 +48,11 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // Approved members only — same gate as the /participate page this backs.
+  if (!(await getApprovedMember(userId))) {
+    return NextResponse.json({ error: 'Only approved members can join groups' }, { status: 403 })
+  }
 
   const { group_id, joined } = await req.json()
   if (!group_id || typeof joined !== 'boolean') {

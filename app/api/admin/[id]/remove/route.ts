@@ -3,6 +3,7 @@ import { clerkClient } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { sendUserEmail } from '@/lib/send-email'
 import { requireAdmin } from '@/lib/admin-auth'
+import { setMemberStatus } from '@/lib/members'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const userId = await requireAdmin()
@@ -28,6 +29,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     .eq('id', id)
     .single()
 
+  if (!application) return NextResponse.json({ error: 'Application not found' }, { status: 404 })
+
   // Soft-remove: mark cancelled, preserving the row (reversible by re-approving)
   const { error: updateError } = await supabaseAdmin
     .from('applications')
@@ -44,12 +47,23 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: updateError.message }, { status: 500 })
   }
 
-  // Free up their role + shift slot
+  // Mirror onto the canonical member record — member-only access checks
+  // (getApprovedMember) read members.status, not the application row.
+  await setMemberStatus(application?.clerk_user_id ?? null, id, 'cancelled')
+
+  // Free up their role + shift slots (role lives on camp_signups; shift claims
+  // live on member_shift_signups since the shifts redesign)
   if (application?.clerk_user_id) {
-    await supabaseAdmin
-      .from('camp_signups')
-      .delete()
-      .eq('clerk_user_id', application.clerk_user_id)
+    await Promise.all([
+      supabaseAdmin
+        .from('camp_signups')
+        .delete()
+        .eq('clerk_user_id', application.clerk_user_id),
+      supabaseAdmin
+        .from('member_shift_signups')
+        .delete()
+        .eq('clerk_user_id', application.clerk_user_id),
+    ])
 
     // Notify the removed member
     const displayName = application.preferred_name || application.first_name || 'there'
@@ -60,8 +74,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       message,
     }])
 
-    const clerkUser = await client.users.getUser(application.clerk_user_id)
-    const email = clerkUser.emailAddresses[0]?.emailAddress
+    // A deleted / unknown Clerk account must not turn the (already committed)
+    // removal into a 500 — skip the email instead.
+    let email: string | undefined
+    try {
+      const clerkUser = await client.users.getUser(application.clerk_user_id)
+      email = clerkUser.emailAddresses[0]?.emailAddress
+    } catch {
+      email = undefined
+    }
     if (email) {
       await sendUserEmail(
         email,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getApprovedMember } from '@/lib/members'
 import { postSourcedRadioEvent, getRadioActorName, resourceCommitmentMessage } from '@/lib/radio'
 
 // Suggest a resource the organizers haven't listed ("we'll want sharp
@@ -12,6 +13,11 @@ import { postSourcedRadioEvent, getRadioActorName, resourceCommitmentMessage } f
 export async function POST(req: NextRequest) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // Approved members only — same gate as the /participate page this backs.
+  if (!(await getApprovedMember(userId))) {
+    return NextResponse.json({ error: 'Only approved members can suggest resources' }, { status: 403 })
+  }
 
   const { list_id, name, note, bring } = await req.json()
   if (!list_id) return NextResponse.json({ error: 'list_id is required' }, { status: 400 })

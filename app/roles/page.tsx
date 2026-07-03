@@ -154,6 +154,12 @@ export default async function RolesRegistryPage() {
           }
         `}</style>
 
+        {departments.length === 0 && (
+          <p style={{ textAlign: 'center', fontSize: '0.9rem', opacity: 0.5, fontStyle: 'italic', margin: '3rem 0', lineHeight: 1.7 }}>
+            The registry is still being inscribed — departments and roles will appear here soon.
+          </p>
+        )}
+
         {departments.map(dept => (
           <section key={dept.id} id={roleSlug(dept.name)} style={{ scrollMarginTop: '84px', marginBottom: '3.5rem' }}>
 
