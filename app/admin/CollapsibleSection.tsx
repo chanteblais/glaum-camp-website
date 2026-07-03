@@ -69,7 +69,9 @@ export function CollapsibleSection({
           }}
         >
           <span style={{ flex: '1 1 16rem', minWidth: 0 }}>
-            <span style={{ display: 'block', fontSize: '0.78rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: '#C8A848' }}>
+            {/* Same title scale as the flat variant below — the two admin pages
+                (Members flat, Configure panels) read as one family. */}
+            <span style={{ display: 'block', fontSize: '0.95rem', letterSpacing: '0.16em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.85 }}>
               {title}
             </span>
             {summary && (
