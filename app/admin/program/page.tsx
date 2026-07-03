@@ -7,7 +7,6 @@ import { CategoryHeading } from '../CategoryHeading'
 import { NotificationBell } from '../NotificationBell'
 import { ScheduleManager } from '../ScheduleManager'
 import { LeadUpGatheringsManager } from '../LeadUpGatheringsManager'
-import { ResourcesManager } from '../ResourcesManager'
 import { ShiftSignupToggle } from '../ShiftSignupToggle'
 import { PROGRAM_CATEGORIES } from '../admin-sections'
 import { getAdminRunway } from '@/lib/admin-attention'
@@ -16,8 +15,6 @@ import {
   getAdminShiftTypes,
   getAdminRosters,
   getAdminLeadUpEvents,
-  getAdminResourceLists,
-  getStewardOptions,
 } from '@/lib/admin-program-data'
 
 // A failed section fetch degrades to undefined — the manager then runs its own
@@ -48,8 +45,6 @@ export default async function ProgramPage() {
     shiftTypeRows,
     rosters,
     leadUpEvents,
-    resourceLists,
-    stewardOptions,
   ] = await Promise.all([
     supabaseAdmin
       .from('page_content')
@@ -67,8 +62,6 @@ export default async function ProgramPage() {
     safe(getAdminShiftTypes()),
     safe(getAdminRosters()),
     safe(getAdminLeadUpEvents()),
-    safe(getAdminResourceLists()),
-    safe(getStewardOptions()),
   ])
   const configMap = Object.fromEntries((configRows ?? []).map(r => [r.key, r.value]))
   const shiftSignupOpen = configMap['config_shift_signup_open'] !== 'false'
@@ -117,13 +110,6 @@ export default async function ProgramPage() {
 
         <div style={workspacePanel}>
           <LeadUpGatheringsManager rangeStart={eventRangeStart} rangeEnd={eventRangeEnd} initialEvents={leadUpEvents} />
-        </div>
-
-        {/* ═══════════════ SHARED RESOURCES ═══════════════ */}
-        <CategoryHeading id="resources" large />
-
-        <div style={workspacePanel}>
-          <ResourcesManager initialLists={resourceLists} initialStewards={stewardOptions} />
         </div>
 
       </div>
