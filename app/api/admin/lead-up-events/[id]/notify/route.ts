@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { sendLeadUpGatheringEmail } from '@/lib/send-email'
+import { clockLabel } from '@/lib/shift-hours'
 
 async function requireAdmin() {
   const { userId } = await auth()
@@ -11,7 +12,8 @@ async function requireAdmin() {
   return user.publicMetadata?.role === 'admin' ? userId : null
 }
 
-// "2026-07-08" + "7:00 PM" → "Tue, Jul 8 · 7:00 PM"
+// "2026-07-08" + "19:00" → "Tue, Jul 8 · 7:00 PM" (clockLabel tolerates
+// legacy display-string times).
 function whenLabel(event_date: string | null, start_time: string | null): string | null {
   let datePart: string | null = null
   if (event_date) {
@@ -20,7 +22,7 @@ function whenLabel(event_date: string | null, start_time: string | null): string
       datePart = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
     }
   }
-  return [datePart, start_time].filter(Boolean).join(' · ') || null
+  return [datePart, clockLabel(start_time)].filter(Boolean).join(' · ') || null
 }
 
 // POST — alert all approved members about this lead-up gathering: an in-app

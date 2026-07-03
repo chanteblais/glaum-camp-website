@@ -67,8 +67,10 @@ export async function POST(req: NextRequest) {
       is_recurring: body.is_recurring ?? false,
       participation_type,
       shift_type_id,
-      start_time: participation_type === 'shift' ? (body.start_time ?? null) : null,
-      end_time: participation_type === 'shift' ? (body.end_time ?? null) : null,
+      // Every event carries structured times (not just shifts) — the display
+      // `time` string is derived from them client-side.
+      start_time: body.start_time ?? null,
+      end_time: body.end_time ?? null,
       requires_ack: participation_type === 'mandatory' ? (body.requires_ack ?? false) : false,
       event_date: body.event_date ?? null,
       event_category: body.event_category ?? 'at_camp',

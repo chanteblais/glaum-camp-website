@@ -151,7 +151,43 @@ export const BUILTIN_ASSETS: AssetLibraryItem[] = [
     source: 'builtin',
     tags: ['mallet', 'hammer', 'stake', 'peg', 'tools', 'build', 'teardown'],
   },
-]
+
+  {
+    id: 'eye-in-triangle',
+    label: 'Eye in Triangle',
+    src: '/asset-library/icons/eye-in-triangle.webp',
+    kind: 'raster',
+    category: 'icon',
+    source: 'builtin',
+    tags: ['eye', 'triangle', 'witness', 'attunement', 'rays', 'trinity', 'sight'],
+  },
+  {
+    id: 'elder-tree',
+    label: 'Elder Tree',
+    src: '/asset-library/icons/elder-tree.webp',
+    kind: 'raster',
+    category: 'icon',
+    source: 'builtin',
+    tags: ['tree', 'roots', 'canopy', 'elder', 'nature', 'growth'],
+  },
+  {
+    id: 'crescent-moon',
+    label: 'Crescent Moon',
+    src: '/asset-library/icons/crescent-moon.webp',
+    kind: 'raster',
+    category: 'icon',
+    source: 'builtin',
+    tags: ['moon', 'crescent', 'night', 'celestial', 'sky'],
+  },
+  {
+    id: 'flame',
+    label: 'Flame',
+    src: '/asset-library/icons/flame.webp',
+    kind: 'raster',
+    category: 'icon',
+    source: 'builtin',
+    tags: ['flame', 'fire', 'spark', 'light', 'ceremony'],
+  },]
 
 /** Built-in assets usable in a given category. */
 export function builtinAssets(category: AssetCategory): AssetLibraryItem[] {

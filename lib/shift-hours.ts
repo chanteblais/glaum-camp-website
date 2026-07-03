@@ -2,7 +2,7 @@
 // 24-hour strings (from <input type="time">). Duration is computed here so the
 // admin editor, attunement, and the member picker all agree.
 
-function parseHHMM(t?: string | null): number | null {
+export function parseHHMM(t?: string | null): number | null {
   if (!t) return null
   const m = /^(\d{1,2}):(\d{2})$/.exec(t.trim())
   if (!m) return null
@@ -40,6 +40,21 @@ export function formatClock(t?: string | null): string {
 export function formatShiftRange(start?: string | null, end?: string | null): string {
   const a = formatClock(start)
   const b = formatClock(end)
+  if (a && b) return `${a} – ${b}`
+  return a || b || ''
+}
+
+// Display label for a stored time that may be structured ("19:00") or a legacy
+// display string ("7:00 PM", pre-054 lead-up rows): format when parseable,
+// otherwise show the stored text as-is so nothing silently disappears.
+export function clockLabel(t?: string | null): string {
+  return formatClock(t) || (t ?? '')
+}
+
+// Range variant of clockLabel, same legacy tolerance.
+export function clockRangeLabel(start?: string | null, end?: string | null): string {
+  const a = clockLabel(start)
+  const b = clockLabel(end)
   if (a && b) return `${a} – ${b}`
   return a || b || ''
 }

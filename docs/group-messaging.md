@@ -35,7 +35,7 @@ The shipped build follows this design; a few details were refined during impleme
   **Mute** = excluded from the unread badge (mentions still notify). **email_opt_in** fan-out is
   throttled **per conversation** (only fires when the thread was quiet for the window), so a
   burst yields one nudge, not per-message email — no per-recipient tracking needed.
-- Code: `lib/conversations.ts`; `app/api/messages/g/[groupId]/{route,read}`; `app/messages/g/[groupId]/{page,GroupThreadClient}`; inbox changes in `app/api/messages/route.ts` + `MessagesInboxClient.tsx`; `sendGroupMentionEmail` in `lib/send-email.ts`; `group_mention` link in `UserNotificationBell`.
+- Code: `lib/conversations.ts`; `app/api/messages/g/[groupId]/{route,read}`; `app/messages/g/[groupId]/{page,GroupThreadClient}`; inbox changes in `lib/inbox.ts` (summary logic, shared by `app/api/messages/route.ts` and the server-rendered `/messages` page) + `MessagesInboxClient.tsx`; `sendGroupMentionEmail` in `lib/send-email.ts`; `group_mention` link in `UserNotificationBell`.
 
 ## Decisions already made
 

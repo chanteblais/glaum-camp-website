@@ -5,6 +5,7 @@ import { SuggestRoleModal } from './SuggestRoleModal'
 import { isImageIcon } from '@/lib/icon-src'
 import { roleSlug } from '@/lib/role-slug'
 import { shiftHue } from '@/lib/shift-colors'
+import { useConfirm } from '../components/ConfirmDialog'
 
 type Role = {
   id: string
@@ -105,6 +106,7 @@ function CurrentSignupCards({
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [pendingCancel, setPendingCancel] = useState<ShiftSlot | null>(null)
   const [leadingId, setLeadingId] = useState<string | null>(null)
+  const { confirm, confirmDialog } = useConfirm()
 
   const allRoles = departments.flatMap(d => d.roles)
   const role = allRoles.find(r => r.id === signup?.role_id)
@@ -113,7 +115,13 @@ function CurrentSignupCards({
   const hasRoleDetail = role && (role.purpose || role.responsibilities_before || role.responsibilities_during || role.ideal_for || role.commitment || role.commitment_period)
 
   async function handleOptOut() {
-    if (!confirm('Remove your role selection? You can choose a new one below.')) return
+    const ok = await confirm({
+      title: `Remove your role selection${role ? ` (“${role.name}”)` : ''}?`,
+      body: 'You can choose a new one below.',
+      confirmLabel: 'Remove role',
+      danger: true,
+    })
+    if (!ok) return
     setOptingOut(true)
     await onOptOut()
     setRoleExpanded(false)
@@ -134,7 +142,7 @@ function CurrentSignupCards({
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '2.5rem' }}>
+    <div className="mobile-stack" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '2.5rem' }}>
 
       {/* Role card — the member's standing, drawn as an engraved PLAQUE: a
           double rule (border + inset outline) + centered kicker between
@@ -302,6 +310,8 @@ function CurrentSignupCards({
           onClose={() => setPendingCancel(null)}
         />
       )}
+
+      {confirmDialog}
     </div>
   )
 }

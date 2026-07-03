@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { isImageIcon } from '@/lib/icon-src'
+import { useConfirm } from '../components/ConfirmDialog'
 
 export type MemberShift = { id: string; title: string; time: string | null; day: string; lead: boolean }
 
@@ -17,6 +18,7 @@ export function MemberSignupCard({ clerkUserId, role, shifts }: Props) {
   const [clearing, setClearing] = useState<string | null>(null) // 'role' | shift event id
   const [approving, setApproving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { confirm, confirmDialog } = useConfirm()
 
   async function handleApprove() {
     setApproving(true)
@@ -36,7 +38,13 @@ export function MemberSignupCard({ clerkUserId, role, shifts }: Props) {
   }
 
   async function handleClearRole() {
-    if (!confirm("Remove this member's role? They will be notified to choose a new one.")) return
+    const ok = await confirm({
+      title: `Remove this member's role${currentRole ? ` (“${currentRole.name}”)` : ''}?`,
+      body: 'They will be notified to choose a new one.',
+      confirmLabel: 'Remove role',
+      danger: true,
+    })
+    if (!ok) return
     setClearing('role')
     setError(null)
     const res = await fetch(`/api/admin/signups/${clerkUserId}`, {
@@ -71,7 +79,14 @@ export function MemberSignupCard({ clerkUserId, role, shifts }: Props) {
   }
 
   async function handleRemoveShift(eventId: string) {
-    if (!confirm('Remove this shift from the member? They can pick a replacement on their signup page.')) return
+    const shift = currentShifts.find(s => s.id === eventId)
+    const ok = await confirm({
+      title: `Remove ${shift ? `“${shift.title}”` : 'this shift'} from the member?`,
+      body: 'They can pick a replacement on their signup page.',
+      confirmLabel: 'Remove shift',
+      danger: true,
+    })
+    if (!ok) return
     setClearing(eventId)
     setError(null)
     const res = await fetch(`/api/admin/signups/${clerkUserId}`, {
@@ -221,6 +236,7 @@ export function MemberSignupCard({ clerkUserId, role, shifts }: Props) {
       </div>
 
       {error && <p style={{ color: '#ff8a8a', fontSize: '0.8rem' }}>{error}</p>}
+      {confirmDialog}
     </div>
   )
 }

@@ -735,7 +735,7 @@ function ModularSection({ step, form, set, answers, setAnswer, optionSources, is
       )}
       {rows.map((row, i) =>
         row.length === 2 ? (
-          <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div key={i} className="mobile-stack" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             {row.map(f => <FieldCell key={f.key} field={f} {...cellProps} />)}
           </div>
         ) : (

@@ -152,53 +152,53 @@ export async function getParticipantPrefs(
 // from group membership (the source of truth) so a newly added member sees their
 // group even before a participant row exists.
 export async function getMyConversations(userId: string): Promise<MyConversation[]> {
-  const { data: parts, error } = await supabaseAdmin
-    .from('conversation_participants')
-    .select('conversation_id, last_read_at, muted')
-    .eq('clerk_user_id', userId)
+  // My participant rows and my group memberships are independent — fetch together.
+  const [{ data: parts, error }, { data: myGroups }] = await Promise.all([
+    supabaseAdmin
+      .from('conversation_participants')
+      .select('conversation_id, last_read_at, muted')
+      .eq('clerk_user_id', userId),
+    supabaseAdmin
+      .from('group_members')
+      .select('group_id')
+      .eq('clerk_user_id', userId),
+  ])
   if (error && error.code !== '42P01') throw error
   const lastReadByConv = new Map((parts ?? []).map(p => [p.conversation_id, p.last_read_at as string | null]))
   const mutedByConv = new Map((parts ?? []).map(p => [p.conversation_id, !!p.muted]))
 
+  const partIds = (parts ?? []).map(p => p.conversation_id)
+  const groupIds = (myGroups ?? []).map(g => g.group_id)
+
+  // Resolve conversation rows — direct (from participant rows) and group (from
+  // membership) lookups are also independent of each other.
+  const [directConvsRes, groupConvsRes] = await Promise.all([
+    partIds.length
+      ? supabaseAdmin.from('conversations').select('id').eq('type', 'direct').in('id', partIds)
+      : Promise.resolve({ data: [] }),
+    groupIds.length
+      ? supabaseAdmin.from('conversations').select('id, group_id').eq('type', 'group').in('group_id', groupIds)
+      : Promise.resolve({ data: [] }),
+  ])
+
   const result: MyConversation[] = []
 
-  // Direct conversations — from my participant rows, filtered to type='direct'.
-  const partIds = (parts ?? []).map(p => p.conversation_id)
-  if (partIds.length) {
-    const { data: directConvs } = await supabaseAdmin
-      .from('conversations')
-      .select('id')
-      .eq('type', 'direct')
-      .in('id', partIds)
-    const directIds = (directConvs ?? []).map(c => c.id)
-    if (directIds.length) {
-      const { data: others } = await supabaseAdmin
-        .from('conversation_participants')
-        .select('conversation_id, clerk_user_id')
-        .in('conversation_id', directIds)
-        .neq('clerk_user_id', userId)
-      const otherByConv = new Map((others ?? []).map(o => [o.conversation_id, o.clerk_user_id]))
-      for (const id of directIds) {
-        result.push({ conversationId: id, type: 'direct', lastReadAt: lastReadByConv.get(id) ?? null, muted: mutedByConv.get(id) ?? false, otherUserId: otherByConv.get(id) })
-      }
+  // Direct conversations — resolve the other participant of each.
+  const directIds = (directConvsRes.data ?? []).map(c => c.id)
+  if (directIds.length) {
+    const { data: others } = await supabaseAdmin
+      .from('conversation_participants')
+      .select('conversation_id, clerk_user_id')
+      .in('conversation_id', directIds)
+      .neq('clerk_user_id', userId)
+    const otherByConv = new Map((others ?? []).map(o => [o.conversation_id, o.clerk_user_id]))
+    for (const id of directIds) {
+      result.push({ conversationId: id, type: 'direct', lastReadAt: lastReadByConv.get(id) ?? null, muted: mutedByConv.get(id) ?? false, otherUserId: otherByConv.get(id) })
     }
   }
 
-  // Group conversations — derived from group membership.
-  const { data: myGroups } = await supabaseAdmin
-    .from('group_members')
-    .select('group_id')
-    .eq('clerk_user_id', userId)
-  const groupIds = (myGroups ?? []).map(g => g.group_id)
-  if (groupIds.length) {
-    const { data: groupConvs } = await supabaseAdmin
-      .from('conversations')
-      .select('id, group_id')
-      .eq('type', 'group')
-      .in('group_id', groupIds)
-    for (const gc of groupConvs ?? []) {
-      result.push({ conversationId: gc.id, type: 'group', lastReadAt: lastReadByConv.get(gc.id) ?? null, muted: mutedByConv.get(gc.id) ?? false, groupId: gc.group_id as string })
-    }
+  for (const gc of groupConvsRes.data ?? []) {
+    result.push({ conversationId: gc.id, type: 'group', lastReadAt: lastReadByConv.get(gc.id) ?? null, muted: mutedByConv.get(gc.id) ?? false, groupId: gc.group_id as string })
   }
 
   return result

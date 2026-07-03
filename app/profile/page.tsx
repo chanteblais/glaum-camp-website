@@ -321,9 +321,16 @@ export default async function ProfilePage() {
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
       <Header />
-      <style>{`
+      {/* dangerouslySetInnerHTML: the child combinator (>) in a JSX <style> text
+          node hydration-mismatches (React escapes it client-side) — same gotcha
+          as attribute selectors. */}
+      <style dangerouslySetInnerHTML={{ __html: `
         .profile-main-grid  { display: grid; grid-template-columns: 1.1fr 1fr; gap: 1.25rem; align-items: stretch; margin-bottom: 0.75rem; }
         .profile-info-grid  { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 2.5rem; }
+        /* Grid items default to min-width:auto — a card whose min-content width
+           exceeds its track (e.g. a long nowrap header) would overflow the
+           viewport on phones instead of shrinking. */
+        .profile-main-grid > *, .profile-info-grid > * { min-width: 0; }
         /* Header: designation (left) · portrait (center, focal point) · identity (right). */
         .profile-header-grid    { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 2.25rem; }
         /* Designation title + department double as doorways into the Registry —
@@ -343,7 +350,7 @@ export default async function ProfilePage() {
           .profile-header-id       { order: 2; }
           .profile-header-portrait { order: 1; }
         }
-      `}</style>
+      ` }} />
       <img src="/hands-left.svg" alt="" aria-hidden style={{ position: 'fixed', left: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
       <img src="/hands-right.svg" alt="" aria-hidden style={{ position: 'fixed', right: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
       <RememberSignedIn firstName={user?.firstName} email={email} />
