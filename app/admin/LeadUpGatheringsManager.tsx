@@ -377,8 +377,8 @@ export function LeadUpGatheringsManager({ rangeStart, rangeEnd, initialEvents }:
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', marginBottom: '1rem' }}>
-        <p style={{ fontSize: '0.78rem', opacity: 0.45, lineHeight: 1.6, margin: 0, flex: 1 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+        <p style={{ fontSize: '0.78rem', opacity: 0.45, lineHeight: 1.6, margin: 0, flex: '1 1 14rem' }}>
           Planning &amp; brainstorming sessions on the runway to the event. Members RSVP per session — these are separate from the at-camp schedule and never affect shifts or attunement.
         </p>
         <button style={addBtnStyle} onClick={() => { setModal({ mode: 'add' }); setModalError(null) }}>
@@ -405,7 +405,9 @@ export function LeadUpGatheringsManager({ rangeStart, rangeEnd, initialEvents }:
           <div
             key={ev.id}
             style={{
-              display: 'flex', alignItems: 'center', gap: '0.75rem',
+              // flexWrap: on phone widths the RSVP/action cluster drops to its
+              // own line instead of crushing the title column to a sliver
+              display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap',
               padding: '0.75rem 1rem', borderRadius: '0.65rem',
               border: '1px solid rgba(200,168,72,0.12)',
               background: ev.visible ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.005)',
@@ -420,7 +422,7 @@ export function LeadUpGatheringsManager({ rangeStart, rangeEnd, initialEvents }:
               <p style={{ fontSize: '0.62rem', color: '#C8A848', margin: 0, letterSpacing: '0.03em' }}>{formatDate(ev.event_date)}</p>
             </div>
 
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ flex: '1 1 11rem', minWidth: 0 }}>
               <p style={{ fontSize: '0.88rem', fontWeight: 600, color: '#F3EDE6', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {ev.title}
                 {isPast && (
@@ -445,7 +447,7 @@ export function LeadUpGatheringsManager({ rangeStart, rangeEnd, initialEvents }:
               ) : null}
             </div>
 
-            <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
+            <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0, marginLeft: 'auto' }}>
               {/* No alerting members about a gathering that already happened. */}
               {!isPast && (
               <button

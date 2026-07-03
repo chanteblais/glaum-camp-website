@@ -41,25 +41,74 @@ organizer wants, not an error).
   claimant names* — the organizer always knows who to chase.
 - **Member: `/participate` → "Bring Something"** (`ResourceCommitments.tsx`,
   anchored `#bring`, **above** Your Groups — needs are live and time-sensitive,
-  group membership is set-once): visible lists with per-item progress and an
-  **"I'll bring one"** button; a claimed row grows −/+ steppers and a remove
-  control. Unclaiming is always allowed — plans change, and the count simply
-  reflects reality. The last card **inside** each list's stack is the
-  dashed *"Have something that fits? ＋ Offer it"* trigger → an inline form
-  that lists unrequested gear (offer = item with no target + the offerer's
-  ×1 claim; retracting the claim removes the listing unless others piled on).
+  group membership is set-once): a **preparation board**, not an inventory —
+  it answers *"what can I do that would be most helpful?"* first (redesigned
+  2026-07-02 on Chante's direction). **Each list is ONE card** (gold border,
+  header / items / footer, 2026-07-03) — bare sections read as unrelated
+  sibling cards and the suggest box got mistaken for its own card:
+  - **I'M BRINGING** — a pinned card of my commitments ("✓ Camping Stove ×2 —
+    Shared Kitchen") with per-row *Edit ›* that expands + scrolls to the item.
+  - **Automatic list health** (2026-07-03, replacing the % bar — one
+    generator isn't one fork, so counts are harder to misinterpret than a
+    unit-weighted percentage): a pill by the title — **Needs Attention**
+    (purple) → **Almost Ready** (gold; ≤2 items short or ≥80% of items
+    covered) → **Complete** (green) — plus *"18 of 22 resources covered ·
+    4 still need attention"* (item counts). Almost-ready celebrates *"✨ …
+    is almost ready — only 3 more items needed."*; complete keeps *"✨ …
+    is fully equipped! Thanks to everyone contributing."*
+  - **The pulse** (2026-07-03) — one quiet italic line atop the board,
+    derived from `resource_claims.updated_at` (never stored): *"✦ 3 members
+    contributed resources today — thank you."* (≥3 in 24h), else *"✨ Sarah
+    just covered the last Cooler!"* / *"✦ Sarah just committed to bringing
+    Cooler."* (latest claim within 48h). People preparing together, not
+    inventory being managed.
+  - **Dense task-list rows** (2026-07-03, GitHub-Issues density — lists may
+    grow to dozens of items): hairline-divided rows inside one bordered
+    container per status group — **Still Needed** (shortage leads:
+    **"Still need: 3"** bold; "I'll bring one" right on the row) →
+    **Covered** (dimmer; "Bring an extra" inside the detail) → **Suggested
+    by Members**. Each row: small icon, name, one meta line (shortage/
+    covered/suggested + first two claimant names inline: *"· ✓ Erik, Sarah
+    +1"*). A row I've claimed tints purple.
+  - **Expandable rows** — compact by default; expanding shows the note,
+    **who's bringing it** (✓ names, quantities, "You" first — social proof,
+    member-visible), and my −/+/Remove controls. Unclaiming is always
+    allowed. Hierarchy: dashboard = *tell me where I'm needed* → page =
+    *help me take action* → expanded row = *give me all the details*.
+  - **Suggest a resource** — the list card's **footer row** (hairline-
+    separated, inside the card) reads *"Don't see something? ＋ Suggest a
+    resource"* (collaborative planning, replacing
+    "Offer it"); the form has an **"I can bring one myself"** checkbox
+    (default on → seeds the ×1 claim; off = pure suggestion for organizers).
+    Retracting your own suggestion's last claim removes the listing.
 - **Home dashboard: the Bring Something widget** — a configurable dashboard
   widget (id `resources`, reorder/hide/resize via the page editor like any
-  other): one row per list with gaps — the **list title is the headline**
-  ("Shared Kitchen"), "N items still needed — stove, cooler" the description
-  — and the **whole card** is the link to `/participate#bring`.
-  The page's sections now arrive server-rendered (initial data via
-  `lib/participate-data.ts` / `getMemberResourceView`), but late layout
-  shifts (images, fonts) can still nudge the anchor, so `ResourceCommitments`
-  **pins** `#bring` on every layout change for the first ~3s (ResizeObserver
-  on body; the first wheel/touch cancels). Demand-driven via `getUnmetResourceNeeds`
-  (`lib/resources.ts`, offers excluded): it renders nothing once everything
-  is covered.
+  other). It answers *"what does the community still need from me?"*, not
+  "here is a link to the Resources page" (redesigned 2026-07-03):
+  - **One list, not a directory** — it surfaces only the list currently
+    needing the most attention (largest shortfall in units, then lowest
+    readiness); other lists with gaps compress to "+N more lists could use a
+    hand".
+  - **Collective progress** — "% Ready" in the header (unit-weighted, same
+    math as the board; never rounds up to 100 while short) + a 3px hairline
+    progress bar. A whisper of momentum, not project management.
+  - **Urgency-adaptive copy** — "1 Camping stove still needed." / "Still
+    need 2 × Extension cord." / "7 items still needed — …", plus a purple
+    **Needs attention** chip when ≥5 units short or readiness <50%.
+    Everything covered is a **celebration state** ("✨ Everything Covered",
+    "29 of 30 resources covered — the community is ready."), not a hidden
+    widget — it hides only while **no** visible list has a targeted item.
+  - **Personal line** — with claims: "You're bringing Camping Stove ×2,
+    Cooler — thank you ✦" (gold); without: "You haven't committed anything
+    yet — see what's needed →".
+  - The **whole card** links to `/participate#bring`; data via
+    `getResourceWidgetState` (`lib/resources.ts`, suggestions/offers never
+    gate readiness; over-fulfillment never inflates it). The page's sections
+    arrive server-rendered (initial data via `lib/participate-data.ts` /
+    `getMemberResourceView`), but late layout shifts (images, fonts) can
+    still nudge the anchor, so `ResourceCommitments` **pins** `#bring` on
+    every layout change for the first ~3s (ResizeObserver on body; the first
+    wheel/touch cancels).
 - **Profile → Active Commitments**: each claim renders as a `BRINGING` row
   ("Camping Stove ×2 · Shared Kitchen", with the item's icon when set) via
   `lib/resources.ts` → `getMemberResourceClaims`, and counts toward the
@@ -72,12 +121,14 @@ organizer wants, not an error).
 - `PATCH/DELETE /api/admin/resources/[id]` — update / delete a list
 - `POST /api/admin/resources/items`, `PATCH/DELETE /api/admin/resources/items/[id]` — items
 - `GET /api/resources` — member view: visible lists + items + totals + own claim
-  + offer attribution
+  + suggestion attribution + **claimant names** (`claimants: [{ name, quantity,
+  me }]`, "You" first — the board's social proof)
 - `POST /api/resources/claims` — `{ resource_id, quantity }`; quantity 0 removes
   the claim, otherwise upserts. Quantity clamped to 1–99. Removing the last
-  claim on your own offer deletes the offer row (retraction).
-- `POST /api/resources/offers` — `{ list_id, name, note }`; creates the
-  open-callout item + the offerer's ×1 claim.
+  claim on your own suggestion deletes its row (retraction).
+- `POST /api/resources/offers` — `{ list_id, name, note, bring }`; creates the
+  open-callout item, plus the suggester's ×1 claim unless `bring: false`
+  (a pure suggestion for organizers).
 
 ## Non-goals (deliberate, revisit post–What If)
 

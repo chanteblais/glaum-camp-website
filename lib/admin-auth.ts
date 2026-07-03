@@ -14,9 +14,15 @@ export async function requireAdmin(): Promise<string | null> {
   const { userId, sessionClaims } = await auth()
   if (!userId) return null
 
+  // The claim is only ever a POSITIVE fast path. A metadata claim that exists
+  // but lacks role === 'admin' must not settle the question — a differently
+  // shaped dashboard customization or a token minted mid-config would lock
+  // real admins out of every admin route (403 "Forbidden" on all saves).
+  // Anything short of a confirmed admin claim falls through to the backend
+  // read; actual admins with a healthy claim still skip the network call.
   const metadata = (sessionClaims as { metadata?: unknown } | null)?.metadata
-  if (metadata && typeof metadata === 'object') {
-    return (metadata as { role?: unknown }).role === 'admin' ? userId : null
+  if (metadata && typeof metadata === 'object' && (metadata as { role?: unknown }).role === 'admin') {
+    return userId
   }
 
   const client = await clerkClient()

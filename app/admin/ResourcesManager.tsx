@@ -399,9 +399,10 @@ export function ResourcesManager({ initialLists, initialStewards }: {
             background: 'rgba(255,255,255,0.02)', overflow: 'hidden',
             opacity: list.visible ? 1 : 0.55,
           }}>
-            {/* List header */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem', borderBottom: list.items.length > 0 ? '1px solid rgba(200,168,72,0.1)' : 'none' }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
+            {/* List header — flexWrap keeps the action cluster on-screen at
+                phone widths (it drops to its own right-aligned line) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', padding: '0.75rem 1rem', borderBottom: list.items.length > 0 ? '1px solid rgba(200,168,72,0.1)' : 'none' }}>
+              <div style={{ flex: '1 1 11rem', minWidth: 0 }}>
                 <p style={{ fontSize: '0.92rem', fontWeight: 600, color: '#C8A848', margin: 0 }}>
                   {list.title}
                   {!list.visible && (
@@ -414,7 +415,7 @@ export function ResourcesManager({ initialLists, initialStewards }: {
                   {[list.description, list.steward_name ? `Stewarded by ${list.steward_name}` : null].filter(Boolean).join(' · ') || '—'}
                 </p>
               </div>
-              <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
+              <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0, marginLeft: 'auto' }}>
                 <button style={smallBtn} onClick={() => { setModal({ kind: 'add-item', list }); setModalError(null) }}>+ Item</button>
                 <button style={smallBtn} onClick={() => handleToggleVisible(list)} title={list.visible ? 'Visible to members — click to hide' : 'Hidden from members — click to show'}>
                   {list.visible ? '●' : '○'}
@@ -426,12 +427,12 @@ export function ResourcesManager({ initialLists, initialStewards }: {
 
             {/* Items */}
             {list.items.map(item => (
-              <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 1rem', borderTop: '1px solid rgba(200,168,72,0.06)' }}>
+              <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', padding: '0.6rem 1rem', borderTop: '1px solid rgba(200,168,72,0.06)' }}>
                 {item.icon && isImageIcon(item.icon) && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <IconImage src={item.icon} size={32} fill={0.85} />
                 )}
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ flex: '1 1 10rem', minWidth: 0 }}>
                   <p style={{ fontSize: '0.84rem', color: '#F3EDE6', margin: 0 }}>
                     {item.name}
                     {item.offered_by_name && (
@@ -448,7 +449,7 @@ export function ResourcesManager({ initialLists, initialStewards }: {
                   )}
                 </div>
                 <ProgressPill claimed={item.claimed} needed={item.quantity_needed} />
-                <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
+                <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0, marginLeft: 'auto' }}>
                   <button style={smallBtn} onClick={() => { setModal({ kind: 'edit-item', item }); setModalError(null) }}>Edit</button>
                   <button style={{ ...smallBtn, border: '1px solid rgba(255,100,100,0.2)', color: '#ff8a8a', opacity: 0.5 }} onClick={() => handleDeleteItem(item)}>✕</button>
                 </div>

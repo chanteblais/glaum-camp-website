@@ -351,7 +351,7 @@ function EventModal({
         )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem 1.5rem', marginBottom: '1.25rem' }}>
-          <Toggle checked={form.visible} onChange={(v) => set('visible', v)} label="Visible on site" />
+          <Toggle checked={form.visible} onChange={(v) => set('visible', v)} label="Visible" />
           <Toggle checked={form.highlight} onChange={(v) => set('highlight', v)} label="Highlight day" />
           <Toggle checked={form.is_recurring} onChange={(v) => set('is_recurring', v)} label="Recurring" />
           {/* Off = not on the schedule page / home teaser, but members can
@@ -441,7 +441,9 @@ function EventRow({
         transition: 'border-color 0.15s, background 0.15s',
       }}
     >
-    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+    {/* flexWrap: on phone widths the badge/action cluster drops to its own
+        right-aligned line instead of shoving Edit/✕ past the viewport edge */}
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
       {/* Drag handle (recurring only) */}
       {drag && (
         <div style={{ color: '#C8A848', opacity: 0.25, flexShrink: 0, fontSize: '1rem', lineHeight: 1, userSelect: 'none' }}>
@@ -459,8 +461,9 @@ function EventRow({
         <EventIcon type={event.icon_type} size={18} />
       </div>
 
-      {/* Title (+ weekday name for undated legacy rows) */}
-      <div style={{ flex: 1, minWidth: 0 }}>
+      {/* Title (+ weekday name for undated legacy rows) — the 10rem basis is
+          what triggers the wrap before the title column gets crushed */}
+      <div style={{ flex: '1 1 10rem', minWidth: 0 }}>
         <p style={{ fontSize: '0.88rem', fontWeight: 600, color: '#F3EDE6', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {event.title}
           {event.highlight && <span style={{ color: '#C8A848', opacity: 0.7, marginLeft: '0.4rem' }}>✦</span>}
@@ -486,7 +489,7 @@ function EventRow({
       )}
 
       {/* Actions */}
-      <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
+      <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0, marginLeft: 'auto' }}>
         <button
           onClick={onToggleVisible}
           title={event.visible ? 'Visible to members — click to hide' : 'Hidden from members — click to show'}
@@ -920,7 +923,7 @@ export function ScheduleManager({ rangeStart, rangeEnd, initialEvents, initialSh
 
       {/* Day rail — one chip per day, click to jump */}
       {view === 'list' && (days.length > 1 || undated.length > 0 || recurring.length > 0) && (
-        <div style={{ display: 'flex', gap: '0.4rem', overflowX: 'auto', paddingBottom: '0.4rem', marginBottom: '1.25rem' }}>
+        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', paddingBottom: '0.4rem', marginBottom: '1.25rem' }}>
           {days.map((d) => {
             const n = eventsOn(d.iso).length
             return (

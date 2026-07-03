@@ -49,24 +49,25 @@ export default async function ThreadPage({ params }: { params: { userId: string 
     pronouns = other.pronouns ?? null
   } else {
     // Find the most recent message they sent us — its snapshot name (and the
-    // existence check) tells us whether to render the thread read-only.
-    const { data: lastFromThem } = await supabaseAdmin
-      .from('messages')
-      .select('sender_name')
-      .eq('sender_clerk_id', params.userId)
-      .eq('recipient_clerk_id', myId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    // They may have only ever received messages from us — still allow the thread
+    // existence check) tells us whether to render the thread read-only. They
+    // may have only ever received messages from us — still allow the thread
     // if any history exists in either direction.
-    const { count } = await supabaseAdmin
-      .from('messages')
-      .select('id', { count: 'exact', head: true })
-      .or(
-        `and(sender_clerk_id.eq.${myId},recipient_clerk_id.eq.${params.userId}),and(sender_clerk_id.eq.${params.userId},recipient_clerk_id.eq.${myId})`
-      )
+    const [{ data: lastFromThem }, { count }] = await Promise.all([
+      supabaseAdmin
+        .from('messages')
+        .select('sender_name')
+        .eq('sender_clerk_id', params.userId)
+        .eq('recipient_clerk_id', myId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabaseAdmin
+        .from('messages')
+        .select('id', { count: 'exact', head: true })
+        .or(
+          `and(sender_clerk_id.eq.${myId},recipient_clerk_id.eq.${params.userId}),and(sender_clerk_id.eq.${params.userId},recipient_clerk_id.eq.${myId})`
+        ),
+    ])
     if (!count) notFound()
     recipientActive = false
     displayName = lastFromThem?.sender_name || 'Former member'

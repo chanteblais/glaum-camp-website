@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getMemberLeadUpEvents } from '@/lib/lead-up'
 
 // GET — visible lead-up gatherings for the current member, each with its RSVP
 // headcount and whether this member has RSVP'd. Drives the /schedule section.
@@ -17,36 +18,11 @@ export async function GET() {
     .maybeSingle()
   if (!member) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  // Past gatherings drop out for members (no RSVPing something that already
-  // happened); dateless gatherings stay. Matches the home-dashboard teaser.
-  const { data: events, error } = await supabaseAdmin
-    .from('lead_up_events')
-    .select('*')
-    .eq('visible', true)
-    .or(`event_date.is.null,event_date.gte.${new Date().toISOString().slice(0, 10)}`)
-    .order('event_date', { ascending: true, nullsFirst: false })
-    .order('sort_order', { ascending: true })
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  const ids = (events ?? []).map(e => e.id)
-  const counts: Record<string, number> = {}
-  const mine = new Set<string>()
-  if (ids.length) {
-    const { data: rsvps } = await supabaseAdmin
-      .from('lead_up_event_rsvps')
-      .select('lead_up_event_id, clerk_user_id')
-      .in('lead_up_event_id', ids)
-    for (const r of rsvps ?? []) {
-      counts[r.lead_up_event_id] = (counts[r.lead_up_event_id] ?? 0) + 1
-      if (r.clerk_user_id === userId) mine.add(r.lead_up_event_id)
-    }
+  // Assembly lives in lib/lead-up.ts (shared with /schedule's server render);
+  // this route is the client's refresh path.
+  try {
+    return NextResponse.json({ events: await getMemberLeadUpEvents(userId) })
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 500 })
   }
-
-  const result = (events ?? []).map(e => ({
-    ...e,
-    rsvp_count: counts[e.id] ?? 0,
-    rsvped: mine.has(e.id),
-  }))
-  return NextResponse.json({ events: result })
 }

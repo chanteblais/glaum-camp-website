@@ -6,3 +6,7 @@ node_modules
 out
 tsconfig.tsbuildinfo
 scripts/logs/
+scripts/clerk-id-map.json
+
+# clerk configuration (can include secrets)
+/.clerk/

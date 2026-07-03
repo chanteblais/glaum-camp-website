@@ -7,6 +7,57 @@ Newest review at the top. Fixes are only applied once agreed.
 
 ---
 
+## Review — 2026-07-03 (mobile pass: full site at ~390px, fixes applied same day on `ux/mobile-overflow`)
+
+Method: browser window clamps at 512px, so true phone width was tested via a
+same-origin 390px iframe harness plus a programmatic per-page overflow scan
+(every element's rect vs. viewport). Member pages (`/`, `/schedule`,
+`/participate`, `/roles`, `/profile`, `/members`, `/messages`) all scanned clean —
+the real findings clustered on Admin → Program. Common root cause: manager rows
+are non-wrapping flex with fixed-width trailing action clusters, so at phone
+widths the text column gets crushed to a sliver (one-word-per-line towers) and
+the actions get pushed past the viewport edge. Fix pattern applied everywhere:
+`flexWrap: 'wrap'` on the row + a `flex: '1 1 ~10rem'` basis on the text column
+(triggers the wrap before the text crushes) + `marginLeft: 'auto'` on the action
+cluster (right-aligns it when it wraps; no-op on desktop).
+
+### 21. Admin schedule list: Edit/✕ pushed off-screen on phones · Severity: high (mobile-only) · Effort: small · Status: **fixed 2026-07-03**
+
+`ScheduleManager.tsx` `EventRow`: ✕ clipped or fully off-screen (untappable) on
+every row at 390px; on rows with longer type pills (Mandatory/Service) Edit was
+half-cut too (~35 elements past the viewport edge). Fixed with the wrap pattern.
+
+### 22. One-word-per-line text towers in Program manager rows · Severity: medium (mobile-only) · Effort: small · Status: **fixed 2026-07-03**
+
+Lead-up gathering rows ("6:00 PM / · / 755 / East / …" — with "Notified Jul 3"
+colliding into the address column), the recurring-event row's pinned-days list,
+the Lead-Up manager's intro-paragraph-vs-button header, and Shared Resources
+list headers/items all crushed their text columns into tall towers. Same wrap
+pattern across `LeadUpGatheringsManager.tsx` and `ResourcesManager.tsx`.
+
+### 23. Hidden-scroll day rails: last days undiscoverable · Severity: medium (mobile-only) · Effort: trivial · Status: **fixed 2026-07-03**
+
+Both the member `/schedule` day tabs (`ScheduleCalendarClient.tsx`) and the admin
+schedule day-chip rail used `overflowX: auto` with no affordance — at 390px SUN
+was half-clipped and MON fully hidden; a member could plausibly never find the
+last two camp days. Changed both to `flexWrap: 'wrap'` so every day is always
+visible (two rows on phones, unchanged single row on desktop).
+
+### 24. Floating "✎ Edit Page" pill covers homepage text on phones · Severity: low · Effort: trivial · Status: **fixed 2026-07-03**
+
+The admin-only FAB (`HomePageEditor.tsx`) sat on top of announcement/body text at
+phone widths. Now collapses to a small ✎ disc under 640px (label hidden via a
+scoped media query); unchanged on desktop.
+
+### 25. Admin week grid: fixed ~690px width inside horizontal scroll · Severity: low (advice) · Status: proposed
+
+`ScheduleWeekView.tsx` shows ~2.5 of 6 day columns at 390px and horizontal panning
+fights drag-to-reschedule on touch. Functional (it scrolls), and admin-on-desktop
+is the primary use — flagging, not fixing. A mobile fallback could reuse the
+member calendar's day-tab + single-column pattern if this ever hurts for real.
+
+---
+
 ## Session close-out — 2026-07-02 (evening)
 
 ### 19. `/admin/[id]` URL says nothing about what it is · Severity: low (advice) · Status: proposed
@@ -374,3 +425,17 @@ Delete confirmations are consistent (native `confirm()`) — no action needed.
 Overview's Shift Hours section assumes a flat 3 h/member. The agreed shifts model
 puts required hours on shift types. No action now — the redesign should rebuild this
 section; noting it so it doesn't survive by accident.
+
+### 11. The PWA service worker was pinning stale icon art in prod · Severity: medium · Status: **fixed 2026-07-03**
+
+Sibling of #10: `public/sw.js` matched every same-origin `.webp` as an
+"immutable" static asset and served it **cache-first, forever**. The asset
+library is mutable art under stable names (icons and medals get re-struck in
+place), so every installed PWA kept the pre-normalization icons — new sizing
+CSS + old tight-cropped art = icons overflowing their display boxes (reported
+from the schedule's event-icon picker).
+
+**Fixed:** `/asset-library/` excluded from SW caching (network + HTTP etags —
+the files are ≤320px now, and Vercel serves them `must-revalidate`) + cache
+bumped to `glaum-static-v3` so activation purges the poisoned entries. After
+the deploy, one reload installs the new worker; the next paints fresh art.
