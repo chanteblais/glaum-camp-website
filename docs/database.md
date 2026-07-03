@@ -1,6 +1,6 @@
 # Database Schema
 
-All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations in `supabase-migrations/` document incremental changes (latest here: `057`; all of `025`–`056` **applied in prod** as of 2026-07-02, `057` **pending**). Confirm `025` (column renames), `029` (the `application-files` bucket), `033` (group messaging), `034`/`035` (group icon images + `group-badges` bucket, `badge_image` → `icon_image`), `036`–`038` (public profile fields, members/profiles, member distinctions), `039`–`041` (lead-up gatherings + notify/image), `042`–`044` (group collections + per-collection profile visibility + per-collection self-join), `045`–`047` (shifts redesign + shift times), and `048`/`049` (participation leads + per-event lead opt-in; the gathering halves are dropped by `050`) are applied before relying on those features.
+All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations in `supabase-migrations/` document incremental changes (latest here: `058`; all of `025`–`057` **applied in prod** as of 2026-07-03, `058` **pending**). Confirm `025` (column renames), `029` (the `application-files` bucket), `033` (group messaging), `034`/`035` (group icon images + `group-badges` bucket, `badge_image` → `icon_image`), `036`–`038` (public profile fields, members/profiles, member distinctions), `039`–`041` (lead-up gatherings + notify/image), `042`–`044` (group collections + per-collection profile visibility + per-collection self-join), `045`–`047` (shifts redesign + shift times), and `048`/`049` (participation leads + per-event lead opt-in; the gathering halves are dropped by `050`) are applied before relying on those features.
 
 ---
 
@@ -241,6 +241,7 @@ Public camp schedule entries. **Reworked by the shifts redesign** (see [shifts-r
 | `highlight` | BOOL | Whether visually highlighted |
 | `is_recurring` | BOOL | Recurring (no single date) |
 | `recurrence_days` | TEXT[] | Recurring only: NULL = repeats every day of the event range; an array of ISO dates = repeats on just those days (057) |
+| `show_on_schedule` | BOOL | Default TRUE. FALSE = skips the schedule page + home teaser, but stays signable/ackable (unlike `visible`, which hides everywhere) (058) |
 | `sort_order` | INT | |
 | `event_date` | DATE | The event's real calendar date. **Required for non-recurring events** (editor enforces); drives calendar day columns, admin list ordering, and Upcoming Gatherings filtering |
 | `participation_type` | TEXT | `'general'` (optional/info) / `'shift'` (signable slots) / `'mandatory'` (everyone attends). Migration `046` |
@@ -554,6 +555,7 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `055_resource_item_icons.sql` | **Resource item icons.** `resources.icon TEXT` — optional image reference (asset-library path or uploaded `group-badges` URL, `resources/` prefix), following the `departments.icon` idiom. Additive + idempotent. *(Was briefly numbered 054 on the branch; renumbered at merge — 054 was taken by structured event times.)* |
 | `056_attunement_nudges.sql` | **Attunement nudge emails.** Adds `email_attunement_nudges BOOL` (default TRUE) to `notification_preferences` + the `attunement_nudges` send ledger (one row per member: `last_sent_at`, `outstanding_count`, `nudge_count`). Additive + idempotent; **must be applied before deploying** the nudge branch — `getNotificationPreferences` selects the new column, and an errored select fails open to all-defaults-ON. |
 | `057_recurrence_days.sql` | **Recurring events on chosen dates.** Adds `recurrence_days TEXT[]` (default NULL) to `schedule_events`: NULL = every day (old behavior, existing rows untouched), an array of ISO dates = only those days. Additive, non-destructive; **must be applied before deploying** this branch — the member `ScheduleSection` selects the new column. |
+| `058_show_on_schedule.sql` | **Keep events off the schedule page.** Adds `show_on_schedule BOOL NOT NULL DEFAULT true` to `schedule_events`: FALSE = the event skips the schedule page (homepage embed + /schedule) and the home upcoming-events teaser while staying signable/ackable. Additive, non-destructive; **must be applied before deploying** — member queries filter on the new column. |
 
 ---
 

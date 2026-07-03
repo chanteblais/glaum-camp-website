@@ -67,6 +67,8 @@ export async function POST(req: NextRequest) {
       is_recurring: body.is_recurring ?? false,
       // Recurring only: NULL = every day; an array of ISO dates = those days.
       recurrence_days: body.is_recurring ? (body.recurrence_days ?? null) : null,
+      // Off = kept off the schedule page + home teaser (still signable/ackable).
+      show_on_schedule: body.show_on_schedule ?? true,
       participation_type,
       shift_type_id,
       // Every event carries structured times (not just shifts) — the display

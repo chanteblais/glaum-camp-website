@@ -6,7 +6,9 @@
 //                  in the Shift Types registry (sort order) — deterministic and
 //                  name-agnostic, so any community's types get distinct colours.
 //                  Per-type configurable colour can replace this index later.
-//   · general    → the surface's default styling (uncoloured, as before)
+//   · general    → a hue from GENERAL_HUES, hashed from the event id — stable
+//                  across surfaces and disjoint from the shift palette, so a
+//                  general event never impersonates a shift type.
 
 export type Hue = { rgb: string; accent: string }
 
@@ -33,4 +35,24 @@ export function shiftColorIndexMap(shiftTypes: { id: string }[]): Record<string,
   const map: Record<string, number> = {}
   shiftTypes.forEach((t, i) => { map[t.id] = i })
   return map
+}
+
+// General events used to share one neutral styling, which made neighbours like
+// the Community Dinner and the Salon read as twins once generals landed on the
+// calendar as blocks. Each general event now wears a stable hue of its own,
+// hashed from its id. Kept visually apart from SHIFT_HUES, MANDATORY_HUE, and
+// the gold/purple chrome.
+export const GENERAL_HUES: Hue[] = [
+  { rgb: '235,185,80', accent: '#ebb950' },  // honey
+  { rgb: '150,120,250', accent: '#9678fa' }, // iris
+  { rgb: '120,205,225', accent: '#78cde1' }, // glacier
+  { rgb: '255,140,110', accent: '#ff8c6e' }, // coral
+  { rgb: '170,215,120', accent: '#aad778' }, // pear
+  { rgb: '225,120,205', accent: '#e178cd' }, // orchid
+]
+
+export function generalHue(seed: string): Hue {
+  let h = 5381
+  for (let i = 0; i < seed.length; i++) h = ((h << 5) + h + seed.charCodeAt(i)) | 0
+  return GENERAL_HUES[Math.abs(h) % GENERAL_HUES.length]
 }

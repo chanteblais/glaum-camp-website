@@ -10,12 +10,13 @@
 // list view jump out here.
 //
 // Recurring events render as ghosted bands in each column they repeat on
-// (recurrence_days NULL = every day) — context, not clutter (they have no
-// single date, so they stay click-to-edit). Dated events missing a parseable
-// time surface in a fix-me strip below the grid.
+// (recurrence_days NULL = every day) — context, not clutter. The ghosts are
+// click-through: they'd otherwise swallow add-at-slot clicks across every
+// column they span (edit recurring events from the Recurring list below).
+// Dated events missing a parseable time surface in a fix-me strip below.
 
 import { useRef, useState } from 'react'
-import { MANDATORY_HUE, shiftHue, shiftColorIndexMap } from '@/lib/shift-colors'
+import { MANDATORY_HUE, shiftHue, shiftColorIndexMap, generalHue } from '@/lib/shift-colors'
 import { parseHHMM, formatShiftRange } from '@/lib/shift-hours'
 import { rangeTo24h } from '@/lib/time-format'
 import type { ScheduleDay } from '@/lib/schedule-days'
@@ -66,11 +67,10 @@ function hue(e: WeekViewEvent, shiftIndex: Record<string, number>) {
   if (e.participation_type === 'shift' && e.shift_type_id != null && shiftIndex[e.shift_type_id] != null) {
     return shiftHue(shiftIndex[e.shift_type_id])
   }
-  // Recurring wears the manager's recurring purple (same as the "Recurring"
-  // section header + rail chip) — they're usually 'general', which would
-  // otherwise dissolve into the neutral gold chrome.
-  if (e.is_recurring) return { rgb: '210,57,248', accent: '#D239F8' }
-  return { rgb: '200,168,72', accent: GOLD } // general → house gold
+  // General (incl. recurring) → the event's own stable hue, same as members
+  // see on the calendar. (Recurring purple stays chrome-only — as a block
+  // colour it collided with magenta shift types.)
+  return generalHue(e.id)
 }
 
 // Side-by-side lanes for overlapping events in one column. Greedy: sorted by
@@ -236,15 +236,13 @@ export function ScheduleWeekView({ events, days, shiftTypes, rosters, onEdit, on
     return (
       <div
         key={ev.id}
-        onClick={e => {
+        onClick={ghost ? undefined : e => {
           e.stopPropagation()
           if (suppressClick.current) { suppressClick.current = false; return }
           onEdit(ev.id)
         }}
         {...(ghost ? {} : dragHandlers(ev, start, end))}
-        title={ghost
-          ? `${ev.title}${ev.visible ? '' : ' (hidden)'} — recurring — click to edit`
-          : `${ev.title}${ev.visible ? '' : ' (hidden)'} — click to edit · drag to reschedule`}
+        title={ghost ? undefined : `${ev.title}${ev.visible ? '' : ' (hidden)'} — click to edit · drag to reschedule`}
         style={{
           position: 'absolute',
           top,
@@ -256,7 +254,10 @@ export function ScheduleWeekView({ events, days, shiftTypes, rosters, onEdit, on
           background: `rgba(${h.rgb},${ghost ? 0.08 : 0.1})`,
           opacity: beingDragged ? 0.3 : ev.visible ? (ghost ? 0.8 : 1) : 0.4,
           overflow: 'hidden',
-          cursor: ghost ? 'pointer' : beingDragged ? 'grabbing' : 'grab',
+          cursor: ghost ? undefined : beingDragged ? 'grabbing' : 'grab',
+          // Ghosts pass clicks through to the slot beneath — a band spanning
+          // every repeat column must not hijack click-to-add.
+          pointerEvents: ghost ? 'none' : undefined,
           // Blocks own their touches — otherwise the page scrolls instead of dragging.
           touchAction: ghost ? undefined : 'none',
           padding: '0.2rem 0.3rem',
