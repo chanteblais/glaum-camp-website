@@ -50,8 +50,9 @@ organizer wants, not an error).
   ×1 claim; retracting the claim removes the listing unless others piled on).
 - **Home dashboard: the Bring Something widget** — a configurable dashboard
   widget (id `resources`, reorder/hide/resize via the page editor like any
-  other): one compact card — "N items still needed" + the first three item
-  names — where the **whole card** is the link to `/participate#bring`.
+  other): one row per list with gaps — the **list title is the headline**
+  ("Shared Kitchen"), "N items still needed — stove, cooler" the description
+  — and the **whole card** is the link to `/participate#bring`.
   Because the section's content loads client-side (native hash scroll fires
   before it has height), `ResourceCommitments` re-scrolls to `#bring` once
   its data renders. Demand-driven via `getUnmetResourceNeeds`

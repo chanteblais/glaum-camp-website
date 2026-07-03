@@ -482,27 +482,47 @@ let canManagePolls = false
                   </div>
                 ) : null,
 
-                // Unmet shared-resource needs, as one compact click-through
-                // ("2 items still needed" → /participate#bring). Demand-driven
-                // like announcements: hidden once everything is covered.
-                resources: unmetNeeds.length > 0 ? (
-                  <a href="/participate#bring" style={{ border: '1px solid rgba(200,168,72,0.25)', borderRadius: '1rem', background: 'rgba(10,0,20,0.5)', overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box', textDecoration: 'none' }}>
-                    <div style={{ padding: '1rem 1.5rem 0.75rem', borderBottom: '1px solid rgba(200,168,72,0.12)' }}>
-                      <p style={{ fontSize: '0.62rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, margin: 0 }}>Bring Something</p>
-                    </div>
-                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', padding: '1.1rem 1.5rem' }}>
-                      <div style={{ minWidth: 0 }}>
-                        <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.05rem', color: '#C8A848', margin: '0 0 0.25rem' }}>
-                          {unmetNeeds.length} item{unmetNeeds.length === 1 ? '' : 's'} still needed
-                        </p>
-                        <p style={{ fontSize: '0.78rem', opacity: 0.45, margin: 0, color: '#F3EDE6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {unmetNeeds.slice(0, 3).map(n => n.listTitle ? `${n.name} (${n.listTitle})` : n.name).join(' · ')}{unmetNeeds.length > 3 ? ` +${unmetNeeds.length - 3} more` : ''}
-                        </p>
+                // Unmet shared-resource needs, one row per list with gaps —
+                // the LIST is the headline ("Shared Kitchen"), the item count
+                // the description. Whole card clicks through to
+                // /participate#bring. Demand-driven like announcements:
+                // hidden once everything is covered.
+                resources: unmetNeeds.length > 0 ? (() => {
+                  const byList: { title: string; items: typeof unmetNeeds }[] = []
+                  for (const n of unmetNeeds) {
+                    let g = byList.find(x => x.title === n.listTitle)
+                    if (!g) { g = { title: n.listTitle, items: [] }; byList.push(g) }
+                    g.items.push(n)
+                  }
+                  const shown = byList.slice(0, 3)
+                  return (
+                    <a href="/participate#bring" style={{ border: '1px solid rgba(200,168,72,0.25)', borderRadius: '1rem', background: 'rgba(10,0,20,0.5)', overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box', textDecoration: 'none' }}>
+                      <div style={{ padding: '1rem 1.5rem 0.75rem', borderBottom: '1px solid rgba(200,168,72,0.12)' }}>
+                        <p style={{ fontSize: '0.62rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, margin: 0 }}>Bring Something</p>
                       </div>
-                      <span style={{ fontSize: '1rem', color: '#C8A848', opacity: 0.4, flexShrink: 0 }}>→</span>
-                    </div>
-                  </a>
-                ) : null,
+                      <div style={{ flex: 1 }}>
+                        {shown.map((g, i) => (
+                          <div key={g.title || i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', padding: '1rem 1.5rem', borderBottom: i < shown.length - 1 ? '1px solid rgba(200,168,72,0.08)' : 'none' }}>
+                            <div style={{ minWidth: 0 }}>
+                              <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.05rem', color: '#C8A848', margin: '0 0 0.25rem' }}>
+                                {g.title || 'Shared Resources'}
+                              </p>
+                              <p style={{ fontSize: '0.78rem', opacity: 0.45, margin: 0, color: '#F3EDE6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {g.items.length} item{g.items.length === 1 ? '' : 's'} still needed — {g.items.slice(0, 3).map(n => n.name).join(', ')}{g.items.length > 3 ? ', …' : ''}
+                              </p>
+                            </div>
+                            <span style={{ fontSize: '1rem', color: '#C8A848', opacity: 0.4, flexShrink: 0 }}>→</span>
+                          </div>
+                        ))}
+                        {byList.length > 3 && (
+                          <p style={{ margin: 0, padding: '0 1.5rem 0.9rem', fontSize: '0.72rem', opacity: 0.4, fontStyle: 'italic' }}>
+                            +{byList.length - 3} more list{byList.length - 3 === 1 ? '' : 's'} with needs
+                          </p>
+                        )}
+                      </div>
+                    </a>
+                  )
+                })() : null,
 
                 shoutouts: (
                   <ShoutoutWidget
