@@ -5,13 +5,14 @@ import { shiftDurationHours } from './shift-hours'
 // events' real durations × member_shift_signups ∪ the legacy camp_signups
 // single column (deduped).
 //
-// A recurring shift counts once per occurrence — its listed recurrence_days,
-// or every day of the configured event range (same rules as the schedule
-// calendar), so "8 shifts" here matches what the calendar shows. A signup on a
-// recurring shift is a commitment to the whole series (one signable card in
-// the member picker), so it fills every occurrence. Note: member attunement
-// (lib/shift-attunement.ts) still credits a recurring shift's hours ONCE —
-// a known divergence, flagged rather than silently matched.
+// A recurring shift EVENT counts once per occurrence — its listed
+// recurrence_days, or every day of the configured event range (same rules as
+// the schedule calendar), so "8 shifts" here matches what the calendar shows.
+// But shift ATTENDANCE is per-night: one signup = one occurrence's hours (a
+// nightly miso shift doesn't obligate every night) — same count-once credit
+// as member attunement (lib/shift-attunement.ts). The signup row carries no
+// date, so which occurrence a member works is unrecorded; empty-shift counts
+// for a recurring series are therefore occurrences − signups.
 //
 // Deliberately no "% complete" here: an uncapped shift has no defined "full",
 // so the display sticks to facts — scheduled hours, filled people-hours, and
@@ -114,8 +115,8 @@ export async function getShiftHoursOverview(): Promise<ShiftHoursOverview> {
     b.slotCount += occ
     b.scheduledHours += h * occ
     b.signupCount += n
-    b.filledHours += h * n * occ // a series signup works every occurrence
-    if (n === 0) b.emptySlots += occ
+    b.filledHours += h * n // one signup = one occurrence's hours
+    b.emptySlots += Math.max(0, occ - n)
   }
 
   // Registry order (= palette order), untyped bucket last; skip types with no
