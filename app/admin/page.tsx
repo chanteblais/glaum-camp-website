@@ -8,13 +8,19 @@ import { VolunteersSection } from './VolunteersSection'
 import { NotificationBell } from './NotificationBell'
 import { AdminNav } from './AdminNav'
 import { CategoryHeading } from './CategoryHeading'
-import { MEMBERS_CATEGORIES } from './admin-sections'
+import { COMMUNITY_CATEGORIES } from './admin-sections'
 import { AnnouncementsManager } from './AnnouncementsManager'
+import { ResourcesManager } from './ResourcesManager'
 import { getGroupNamesByUser } from '@/lib/groups'
 import { getShiftEventByUser } from '@/lib/shift-signups'
 import { getAdminRunway } from '@/lib/admin-attention'
+import { getAdminResourceLists, getStewardOptions } from '@/lib/admin-program-data'
 import { RoleRequestsSection } from './RoleRequestsSection'
 import { RoleSuggestionsSection } from './RoleSuggestionsSection'
+
+// A failed section fetch degrades to undefined — the manager then runs its own
+// mount fetch and shows its usual retry UI instead of the whole page erroring.
+const safe = <T,>(p: Promise<T>): Promise<T | undefined> => p.catch(() => undefined)
 
 export default async function AdminPage() {
   const { userId } = await auth()
@@ -29,6 +35,8 @@ export default async function AdminPage() {
     signupEventMap,
     runway,
     { data: notifications, error: notificationsError },
+    resourceLists,
+    stewardOptions,
   ] = await Promise.all([
     supabaseAdmin
       .from('volunteers')
@@ -47,6 +55,8 @@ export default async function AdminPage() {
       .select('id, application_id, event_type, message, details, created_at, read_at')
       .order('created_at', { ascending: false })
       .limit(20),
+    safe(getAdminResourceLists()),
+    safe(getStewardOptions()),
   ])
 
   const volunteers = volunteersRaw ?? []
@@ -103,17 +113,17 @@ export default async function AdminPage() {
 
       <div style={{ maxWidth: '960px', margin: '0 auto', padding: '0 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
 
-        <AdminNav sections={MEMBERS_CATEGORIES} runway={runway} />
+        <AdminNav sections={COMMUNITY_CATEGORIES} runway={runway} />
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.5rem' }}>
           <NotificationBell initialNotifications={notifications ?? []} />
         </div>
 
         <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(1.8rem, 5vw, 2.5rem)', color: '#C8A848', marginBottom: '0.5rem', textAlign: 'center' }}>
-          ManyHands Registry
+          Community
         </h1>
         <p style={{ textAlign: 'center', opacity: 0.5, fontSize: '0.85rem', marginBottom: '2.5rem' }}>
-          {pending.length} pending · {approved.length} approved · {rejected.length} rejected · {cancelled.length} cancelled
+          The people of camp, what they hear, and what they&apos;re bringing
         </p>
 
         {dbError && (
@@ -223,6 +233,19 @@ export default async function AdminPage() {
           defaultOpen={false}
         >
           <AnnouncementsManager />
+        </CollapsibleSection>
+
+        {/* ═══════════════ LOGISTICS ═══════════════ */}
+        <CategoryHeading id="logistics" />
+
+        <CollapsibleSection
+          title="Shared Resources"
+          summary={resourceLists
+            ? `${resourceLists.length} list${resourceLists.length === 1 ? '' : 's'} · ${resourceLists.reduce((n, l) => n + l.items.length, 0)} items`
+            : 'Bring Something — needs & claims'}
+          defaultOpen={false}
+        >
+          <ResourcesManager initialLists={resourceLists} initialStewards={stewardOptions} />
         </CollapsibleSection>
 
       </div>
