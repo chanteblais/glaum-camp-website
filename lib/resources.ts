@@ -114,29 +114,43 @@ export async function getMemberResourceView(userId: string): Promise<MemberResou
   }))
 }
 
-// Unmet needs across visible lists, for the home-dashboard "Bring Something"
-// banner: items with a target (offers excluded) whose claims fall short.
-// Demand-driven — the banner renders nothing once everything is covered.
-export type UnmetNeed = { id: string; name: string; listTitle: string; remaining: number }
+// ── Home-dashboard "Bring Something" widget ──────────────────────────────────
+// One glance answers "what does the community still need from me?". Surfaces
+// the single list with the largest shortfall (not every list) with its
+// unit-weighted readiness, plus the caller's own commitments for the personal
+// line. Everything-covered is a real state (celebration), not a hidden one —
+// null only when no visible list has a targeted item (pre-setup: widget
+// renders nothing). Suggestions/offers (quantity_needed NULL) never gate
+// readiness.
+export type ResourceWidgetNeed = { name: string; remaining: number }
+export type ResourceWidgetState = {
+  listTitle: string // '' when everything is covered (community-wide framing)
+  // Units for the surfaced list — community-wide when everything is covered.
+  unitsCovered: number
+  unitsTotal: number
+  percentReady: number // unit-weighted; never rounds up to 100 while short
+  needs: ResourceWidgetNeed[] // the surfaced list's gaps, largest first
+  otherListsShort: number // additional lists that also have gaps
+  allCovered: boolean
+  myClaims: MemberResourceClaim[] // the caller's claims, board order
+}
 
-export async function getUnmetResourceNeeds(): Promise<UnmetNeed[]> {
-  const { data: lists, error } = await supabaseAdmin
-    .from('resource_lists')
-    .select('id, title, sort_order')
-    .eq('visible', true)
-  // Table missing (pre-migration) → no banner rather than a crash.
-  if (error || !lists || lists.length === 0) return []
-
-  const listById = Object.fromEntries(lists.map(l => [l.id, l]))
+export async function getResourceWidgetState(clerkUserId: string | null | undefined): Promise<ResourceWidgetState | null> {
+  // The caller's claims depend on nothing below — fetch alongside the lists.
+  const [myClaims, listsRes] = await Promise.all([
+    getMemberResourceClaims(clerkUserId),
+    supabaseAdmin.from('resource_lists').select('id, title, sort_order').eq('visible', true),
+  ])
+  // Table missing (pre-migration) → no widget rather than a crash.
+  if (listsRes.error || !listsRes.data || listsRes.data.length === 0) return null
+  const lists = listsRes.data
 
   const { data: items } = await supabaseAdmin
     .from('resources')
-    .select('id, list_id, name, quantity_needed, sort_order, created_at')
+    .select('id, list_id, name, quantity_needed')
     .in('list_id', lists.map(l => l.id))
     .not('quantity_needed', 'is', null)
-    .order('sort_order', { ascending: true })
-    .order('created_at', { ascending: true })
-  if (!items || items.length === 0) return []
+  if (!items || items.length === 0) return null
 
   const { data: claims } = await supabaseAdmin
     .from('resource_claims')
@@ -145,17 +159,53 @@ export async function getUnmetResourceNeeds(): Promise<UnmetNeed[]> {
   const claimed: Record<string, number> = {}
   for (const c of claims ?? []) claimed[c.resource_id] = (claimed[c.resource_id] ?? 0) + c.quantity
 
-  return items
-    .map(i => ({
-      id: i.id,
-      name: i.name,
-      listTitle: listById[i.list_id]?.title ?? '',
-      remaining: (i.quantity_needed as number) - (claimed[i.id] ?? 0),
-      _sort: (listById[i.list_id]?.sort_order ?? 0) * 1000 + i.sort_order,
-    }))
-    .filter(i => i.remaining > 0)
-    .sort((a, b) => a._sort - b._sort)
-    .map(({ id, name, listTitle, remaining }) => ({ id, name, listTitle, remaining }))
+  type ListAgg = { title: string; sort: number; covered: number; total: number; needs: ResourceWidgetNeed[] }
+  const agg: Record<string, ListAgg> = Object.fromEntries(
+    lists.map(l => [l.id, { title: l.title, sort: l.sort_order, covered: 0, total: 0, needs: [] }])
+  )
+  for (const i of items) {
+    const a = agg[i.list_id]
+    if (!a) continue
+    const needed = i.quantity_needed as number
+    // Over-fulfillment is allowed on the board but never inflates readiness.
+    const got = Math.min(claimed[i.id] ?? 0, needed)
+    a.total += needed
+    a.covered += got
+    if (got < needed) a.needs.push({ name: i.name, remaining: needed - got })
+  }
+
+  const withTargets = Object.values(agg).filter(a => a.total > 0)
+  if (withTargets.length === 0) return null
+  const short = withTargets.filter(a => a.covered < a.total)
+
+  const percent = (covered: number, total: number) =>
+    covered >= total ? 100 : Math.min(99, Math.round((covered / total) * 100))
+
+  if (short.length === 0) {
+    const covered = withTargets.reduce((s, a) => s + a.covered, 0)
+    const total = withTargets.reduce((s, a) => s + a.total, 0)
+    return { listTitle: '', unitsCovered: covered, unitsTotal: total, percentReady: 100, needs: [], otherListsShort: 0, allCovered: true, myClaims }
+  }
+
+  // "Needs the most attention": largest shortfall in units, then lowest
+  // readiness, then board order.
+  short.sort((a, b) =>
+    (b.total - b.covered) - (a.total - a.covered) ||
+    (a.covered / a.total) - (b.covered / b.total) ||
+    a.sort - b.sort
+  )
+  const top = short[0]
+  top.needs.sort((a, b) => b.remaining - a.remaining)
+  return {
+    listTitle: top.title,
+    unitsCovered: top.covered,
+    unitsTotal: top.total,
+    percentReady: percent(top.covered, top.total),
+    needs: top.needs,
+    otherListsShort: short.length - 1,
+    allCovered: false,
+    myClaims,
+  }
 }
 
 // A member's resource claims, shaped for the Active Commitments card

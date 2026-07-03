@@ -65,16 +65,32 @@ organizer wants, not an error).
     Retracting your own suggestion's last claim removes the listing.
 - **Home dashboard: the Bring Something widget** — a configurable dashboard
   widget (id `resources`, reorder/hide/resize via the page editor like any
-  other): one row per list with gaps — the **list title is the headline**
-  ("Shared Kitchen"), "N items still needed — stove, cooler" the description
-  — and the **whole card** is the link to `/participate#bring`.
-  The page's sections now arrive server-rendered (initial data via
-  `lib/participate-data.ts` / `getMemberResourceView`), but late layout
-  shifts (images, fonts) can still nudge the anchor, so `ResourceCommitments`
-  **pins** `#bring` on every layout change for the first ~3s (ResizeObserver
-  on body; the first wheel/touch cancels). Demand-driven via `getUnmetResourceNeeds`
-  (`lib/resources.ts`, offers excluded): it renders nothing once everything
-  is covered.
+  other). It answers *"what does the community still need from me?"*, not
+  "here is a link to the Resources page" (redesigned 2026-07-03):
+  - **One list, not a directory** — it surfaces only the list currently
+    needing the most attention (largest shortfall in units, then lowest
+    readiness); other lists with gaps compress to "+N more lists could use a
+    hand".
+  - **Collective progress** — "% Ready" in the header (unit-weighted, same
+    math as the board; never rounds up to 100 while short) + a 3px hairline
+    progress bar. A whisper of momentum, not project management.
+  - **Urgency-adaptive copy** — "1 Camping stove still needed." / "Still
+    need 2 × Extension cord." / "7 items still needed — …", plus a purple
+    **Needs attention** chip when ≥5 units short or readiness <50%.
+    Everything covered is a **celebration state** ("✨ Everything Covered",
+    "29 of 30 resources covered — the community is ready."), not a hidden
+    widget — it hides only while **no** visible list has a targeted item.
+  - **Personal line** — with claims: "You're bringing Camping Stove ×2,
+    Cooler — thank you ✦" (gold); without: "You haven't committed anything
+    yet — see what's needed →".
+  - The **whole card** links to `/participate#bring`; data via
+    `getResourceWidgetState` (`lib/resources.ts`, suggestions/offers never
+    gate readiness; over-fulfillment never inflates it). The page's sections
+    arrive server-rendered (initial data via `lib/participate-data.ts` /
+    `getMemberResourceView`), but late layout shifts (images, fonts) can
+    still nudge the anchor, so `ResourceCommitments` **pins** `#bring` on
+    every layout change for the first ~3s (ResizeObserver on body; the first
+    wheel/touch cancels).
 - **Profile → Active Commitments**: each claim renders as a `BRINGING` row
   ("Camping Stove ×2 · Shared Kitchen", with the item's icon when set) via
   `lib/resources.ts` → `getMemberResourceClaims`, and counts toward the
