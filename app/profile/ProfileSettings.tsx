@@ -500,8 +500,8 @@ export function ProfileSettings({ application, suspended = false }: { applicatio
               What happens
             </p>
             <ul style={{ margin: 0, paddingLeft: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              <li style={{ fontSize: '0.85rem', lineHeight: 1.5, opacity: 0.85 }}>You'll be removed from every group and shift you're committed to.</li>
-              <li style={{ fontSize: '0.85rem', lineHeight: 1.5, opacity: 0.85 }}>You won't be able to join groups or sign up for shifts until you resume.</li>
+              <li style={{ fontSize: '0.85rem', lineHeight: 1.5, opacity: 0.85 }}>You'll be released from all your commitments — your role, groups, shifts, and anything you're bringing.</li>
+              <li style={{ fontSize: '0.85rem', lineHeight: 1.5, opacity: 0.85 }}>You won't be able to take on new commitments until you resume.</li>
               <li style={{ fontSize: '0.85rem', lineHeight: 1.5, opacity: 0.85 }}>You can resume anytime from this same menu.</li>
             </ul>
           </div>
@@ -538,7 +538,7 @@ export function ProfileSettings({ application, suspended = false }: { applicatio
       {view === 'resume' && (
         <Panel title="Resume attendance" onClose={closeAll}>
           <p style={{ fontSize: '0.9rem', lineHeight: 1.7, color: '#F3EDE6', opacity: 0.9, marginBottom: '1.25rem' }}>
-            Welcome back! Resuming lifts your suspension right away. Your previous groups and shifts aren't restored automatically — head to Participate to rejoin whatever still fits.
+            Welcome back! Resuming lifts your suspension right away. Your previous commitments aren't restored automatically — head to Participate to pick up your role, groups, shifts, and anything you'd like to bring.
           </p>
           {error && <p style={{ color: '#ff8a8a', fontSize: '0.85rem', marginBottom: '0.75rem' }}>{error}</p>}
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>

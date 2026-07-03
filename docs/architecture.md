@@ -94,7 +94,7 @@ Sign-out flow:
 | `/api/profile/application` | PATCH | Update profile fields |
 | `/api/profile/avatar` | POST | Upload avatar to Supabase Storage |
 | `/api/profile/cancel` | POST | Cancel own application (reason required; mirrors `cancelled` onto `members.status` and releases the member's role + shift slots — `camp_signups` and `member_shift_signups` — same cleanup as the admin remove flow) |
-| `/api/profile/suspend` | POST | Suspend / resume own attendance: `{ suspended: boolean, note? }`. Suspending sets `members.suspended_at` and releases group + shift commitments (`lib/suspension.ts`); resuming lifts the flag (nothing restored). Notifies admins. **Approved members only.** Migration `063` |
+| `/api/profile/suspend` | POST | Suspend / resume own attendance: `{ suspended: boolean, note? }`. Suspending sets `members.suspended_at` and releases **all** commitments — role, groups, shifts, resource claims (`lib/suspension.ts`); resuming lifts the flag (nothing restored). Notifies admins. **Approved members only.** Migration `063` |
 | `/api/admin/[id]/suspend` | POST | Admin suspend / resume a member (by application id): `{ suspended: boolean, note? }`. Same release/lift as the self-serve route via `lib/suspension.ts`. **Admin only.** Migration `063` |
 | `/api/role-suggestions` | POST | Submit a dept/role suggestion |
 | `/api/radio` | POST | Member `voice` radio post (`{ message }` ≤200 chars). **Approved members only; currently UI-less** — writing on `/radio` is broadcasters-only per the 2026-07-03 mockup; this route is reserved for member moments returning. Feed reads are server-rendered (`/radio`, home teaser). See [radio.md](radio.md) |

@@ -4,13 +4,21 @@ import type { MemberRecord } from './members'
 // Member suspension (migration 063) — shared by the self-serve route
 // (/api/profile/suspend) and the admin route (/api/admin/[id]/suspend).
 //
-// Suspending releases the member's group + shift commitments (the same rows
-// the cancel/remove flows clear) but leaves status, role and everything else
-// untouched: a suspended member still sees the whole site, they just hold no
-// commitments and the join endpoints refuse new ones. Lifting the suspension
-// does NOT restore what was released — the member re-joins what still fits.
+// Suspending releases ALL of the member's commitments — their role, groups,
+// shifts, and shared-resource claims (the same rows the cancel/remove flows
+// clear) — but leaves their status untouched: a suspended member still sees
+// the whole site, they just hold nothing and the join endpoints refuse new
+// commitments. Lifting the suspension does NOT restore what was released — the
+// member re-signs for whatever still fits.
 
-export type SuspensionResult = { groupsRemoved: number; shiftsRemoved: number }
+export type SuspensionResult = {
+  roleRemoved: boolean
+  groupsRemoved: number
+  shiftsRemoved: number
+  resourceClaimsRemoved: number
+}
+
+const EMPTY_RESULT: SuspensionResult = { roleRemoved: false, groupsRemoved: 0, shiftsRemoved: 0, resourceClaimsRemoved: 0 }
 
 export async function suspendMember(
   member: MemberRecord,
@@ -30,9 +38,9 @@ export async function suspendMember(
   if (error) throw new Error(error.message)
 
   // Commitments are keyed by clerk_user_id; a never-signed-in member holds none.
-  if (!member.clerk_user_id) return { groupsRemoved: 0, shiftsRemoved: 0 }
+  if (!member.clerk_user_id) return EMPTY_RESULT
 
-  const [groups, shifts] = await Promise.all([
+  const [groups, shifts, campSignup, resourceClaims] = await Promise.all([
     // Leaving a group also leaves its message thread (group_members is the
     // source of truth for thread access — see docs/group-messaging.md).
     supabaseAdmin
@@ -43,15 +51,25 @@ export async function suspendMember(
       .from('member_shift_signups')
       .delete({ count: 'exact' })
       .eq('clerk_user_id', member.clerk_user_id),
-    // Legacy single-shift pointer (pre-redesign): clear the shift, keep the
-    // role — suspension releases commitments, it never touches the role.
+    // Role + legacy single-shift both live on camp_signups — drop the whole
+    // row, same cleanup as the cancel/remove flows.
     supabaseAdmin
       .from('camp_signups')
-      .update({ schedule_event_id: null })
-      .eq('clerk_user_id', member.clerk_user_id)
-      .not('schedule_event_id', 'is', null),
+      .delete({ count: 'exact' })
+      .eq('clerk_user_id', member.clerk_user_id),
+    // Shared-resource claims ("Bring Something") — free them so the board's
+    // totals reflect reality while the member is paused.
+    supabaseAdmin
+      .from('resource_claims')
+      .delete({ count: 'exact' })
+      .eq('clerk_user_id', member.clerk_user_id),
   ])
-  return { groupsRemoved: groups.count ?? 0, shiftsRemoved: shifts.count ?? 0 }
+  return {
+    roleRemoved: (campSignup.count ?? 0) > 0,
+    groupsRemoved: groups.count ?? 0,
+    shiftsRemoved: shifts.count ?? 0,
+    resourceClaimsRemoved: resourceClaims.count ?? 0,
+  }
 }
 
 export async function liftSuspension(member: MemberRecord): Promise<void> {

@@ -95,9 +95,9 @@ export function SuspendMemberButton({
   return (
     <div style={{ width: '100%', maxWidth: '480px', padding: '1.25rem 1.5rem', border: '1px solid rgba(255,180,80,0.35)', borderRadius: '0.75rem', background: 'rgba(255,180,80,0.05)' }}>
       <p style={{ fontSize: '0.9rem', opacity: 0.85, marginBottom: '0.75rem', lineHeight: 1.6 }}>
-        Suspend <strong>{name}</strong>? They'll be removed from every group and shift they're committed to and can't
-        join new ones until resumed. They keep full access to the site, and won't be counted in the participation
-        numbers. Their role is untouched, and you can resume them anytime.
+        Suspend <strong>{name}</strong>? They'll be released from all their commitments — role, groups, shifts, and
+        anything they're bringing — and can't take on new ones until resumed. They keep full access to the site, and
+        won't be counted in the participation numbers. You can resume them anytime.
       </p>
       <textarea
         value={note}

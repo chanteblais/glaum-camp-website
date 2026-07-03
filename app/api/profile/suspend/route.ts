@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     // Already suspended → idempotent success (double-click, stale tab).
     if (member.suspended_at) return NextResponse.json({ success: true })
 
-    const { groupsRemoved, shiftsRemoved } = await suspendMember(member, userId, note)
+    const { roleRemoved, groupsRemoved, shiftsRemoved, resourceClaimsRemoved } = await suspendMember(member, userId, note)
 
     await notifyAdmin({
       applicationId: member.application_id,
@@ -38,8 +38,10 @@ export async function POST(req: NextRequest) {
       details: {
         email: member.email,
         ...(note ? { note } : {}),
+        role_released: roleRemoved,
         groups_released: groupsRemoved,
         shifts_released: shiftsRemoved,
+        resource_claims_released: resourceClaimsRemoved,
       },
     })
   } else {
