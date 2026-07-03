@@ -107,10 +107,10 @@ const MAIN: [number, number][] = [
   // from it, a quick settle, then a slow bright trail past the margin. The
   // fade (not the geometry) extinguishes the line.
   [1030, 196], [1068, 158],
-  [1120, 190], [1185, 226], [1250, 232], [1310, 218], [1355, 186],
-  [1380, 148], [1400, 132],
-  [1425, 168], [1448, 196],
-  [1490, 172], [1540, 186], [1600, 176],
+  [1120, 190], [1185, 226], [1250, 232], [1310, 216], [1352, 184],
+  [1392, 140], [1430, 154],
+  [1462, 188],
+  [1502, 172], [1548, 184], [1600, 177],
 ]
 
 // Echo threads — the braid lives at the EDGES ONLY in the mock: two fine
@@ -182,8 +182,16 @@ function Waveform() {
           <stop offset="0.12" stopColor={LINE} stopOpacity="1" />
           <stop offset="0.48" stopColor={LINE} stopOpacity="1" />
           <stop offset="0.64" stopColor={LINE} stopOpacity="0.5" />
-          <stop offset="0.85" stopColor={LINE} stopOpacity="0.28" />
-          <stop offset="1" stopColor={LINE} stopOpacity="0" />
+          <stop offset="0.8" stopColor={LINE} stopOpacity="0.3" />
+          <stop offset="0.92" stopColor={LINE} stopOpacity="0.14" />
+          <stop offset="1" stopColor={LINE} stopOpacity="0.02" />
+        </linearGradient>
+        {/* the silk: visible only in the final act, for the finest strands */}
+        <linearGradient id="radio-fade-silk" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0.55" stopColor={LINE} stopOpacity="0" />
+          <stop offset="0.72" stopColor={LINE} stopOpacity="0.16" />
+          <stop offset="0.88" stopColor={LINE} stopOpacity="0.2" />
+          <stop offset="1" stopColor={LINE} stopOpacity="0.03" />
         </linearGradient>
         <linearGradient id="radio-fade-core" x1="0" y1="0" x2="1" y2="0">
           <stop offset="0.08" stopColor={LINE_CORE} stopOpacity="0" />
@@ -246,6 +254,13 @@ function Waveform() {
         <path d={smoothPath(ghost(-14, 0.38))} stroke="url(#radio-fade-edges)" strokeWidth="0.7" />
         <path d={smoothPath(ghost(30, 0.62))} stroke="url(#radio-fade-edges)" strokeWidth="0.7" />
         <path d={smoothPath(ghost(-28, 0.45))} stroke="url(#radio-fade-edges)" strokeWidth="0.6" />
+
+        {/* the silk: finest strands unravelling from the line at its end */}
+        <path d={smoothPath(ghost(8, 1.06))} stroke="url(#radio-fade-silk)" strokeWidth="0.5" />
+        <path d={smoothPath(ghost(-12, 0.9))} stroke="url(#radio-fade-silk)" strokeWidth="0.45" />
+        <path d={smoothPath(ghost(24, 0.78))} stroke="url(#radio-fade-silk)" strokeWidth="0.4" />
+        <path d={smoothPath(ghost(-24, 1.12))} stroke="url(#radio-fade-silk)" strokeWidth="0.4" />
+        <path d={smoothPath(ghost(40, 0.95))} stroke="url(#radio-fade-silk)" strokeWidth="0.35" />
 
         {/* the pulse — glow underlay, amber ribbon, bright core. The mock's
             line is proportionally substantial (~2px on a 570px-wide band):
