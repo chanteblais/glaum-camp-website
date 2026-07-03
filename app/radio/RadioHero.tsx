@@ -105,8 +105,8 @@ const MAIN: [number, number][] = [
   // Units beyond 1300 render PAST the content margin (the box overflows
   // right by 4rem; everything ≤1300 stays inside the previous width).
   [1018, 187], [1038, 171], [1060, 186], [1084, 173], [1110, 185], [1138, 174],
-  [1168, 184], [1200, 175], [1234, 183], [1268, 177], [1300, 181],
-  [1336, 176], [1374, 183], [1414, 178], [1456, 182], [1510, 179],
+  [1168, 184], [1200, 173], [1234, 186], [1268, 172], [1300, 185],
+  [1336, 171], [1374, 187], [1414, 172], [1456, 186], [1484, 174], [1510, 182],
 ]
 
 // Echo threads — the braid lives at the EDGES ONLY in the mock: two fine
@@ -284,7 +284,7 @@ export function RadioHero() {
            margin; everything else stays inside the previous width */
         .radio-hero-wave {
           position: absolute;
-          left: 46%;
+          left: 42.5%;
           right: -4rem;
           top: calc(50% + 14px);
           transform: translateY(-50%);
@@ -292,7 +292,7 @@ export function RadioHero() {
         }
         @media (max-width: 700px) {
           .radio-rule { width: 55%; min-width: 0; }
-          .radio-hero-wave { left: 55%; right: -1.5rem; }
+          .radio-hero-wave { left: 51%; right: -1.5rem; }
         }
       ` }} />
 
