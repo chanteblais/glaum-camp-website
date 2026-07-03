@@ -11,6 +11,18 @@ import { ResourcesManager } from '../ResourcesManager'
 import { ShiftSignupToggle } from '../ShiftSignupToggle'
 import { PROGRAM_CATEGORIES } from '../admin-sections'
 import { getAdminRunway } from '@/lib/admin-attention'
+import {
+  getAdminScheduleEvents,
+  getAdminShiftTypes,
+  getAdminRosters,
+  getAdminLeadUpEvents,
+  getAdminResourceLists,
+  getStewardOptions,
+} from '@/lib/admin-program-data'
+
+// A failed section fetch degrades to undefined — the manager then runs its own
+// mount fetch and shows its usual retry UI instead of the whole page erroring.
+const safe = <T,>(p: Promise<T>): Promise<T | undefined> => p.catch(() => undefined)
 
 // Soft shared backdrop that holds each workspace together as one section —
 // a barely-lifted cream wash with a hairline gold edge.
@@ -28,7 +40,17 @@ export default async function ProgramPage() {
 
   if (!(await requireAdmin())) redirect('/')
 
-  const [{ data: configRows }, { data: notifications }, runway] = await Promise.all([
+  const [
+    { data: configRows },
+    { data: notifications },
+    runway,
+    scheduleEvents,
+    shiftTypeRows,
+    rosters,
+    leadUpEvents,
+    resourceLists,
+    stewardOptions,
+  ] = await Promise.all([
     supabaseAdmin
       .from('page_content')
       .select('key, value')
@@ -39,6 +61,14 @@ export default async function ProgramPage() {
       .order('created_at', { ascending: false })
       .limit(20),
     getAdminRunway(),
+    // The managers' section data, server-rendered so the tab paints populated
+    // (no mount-fetch wave) — same assembly the /api/admin routes serve.
+    safe(getAdminScheduleEvents()),
+    safe(getAdminShiftTypes()),
+    safe(getAdminRosters()),
+    safe(getAdminLeadUpEvents()),
+    safe(getAdminResourceLists()),
+    safe(getStewardOptions()),
   ])
   const configMap = Object.fromEntries((configRows ?? []).map(r => [r.key, r.value]))
   const shiftSignupOpen = configMap['config_shift_signup_open'] !== 'false'
@@ -71,7 +101,13 @@ export default async function ProgramPage() {
         <CategoryHeading id="schedule" large />
 
         <div style={workspacePanel}>
-          <ScheduleManager rangeStart={eventRangeStart} rangeEnd={eventRangeEnd}>
+          <ScheduleManager
+            rangeStart={eventRangeStart}
+            rangeEnd={eventRangeEnd}
+            initialEvents={scheduleEvents}
+            initialShiftTypes={shiftTypeRows?.map(t => ({ id: t.id, name: t.name }))}
+            initialRosters={rosters}
+          >
             <ShiftSignupToggle initialOpen={shiftSignupOpen} />
           </ScheduleManager>
         </div>
@@ -80,14 +116,14 @@ export default async function ProgramPage() {
         <CategoryHeading id="lead-up" large />
 
         <div style={workspacePanel}>
-          <LeadUpGatheringsManager rangeStart={eventRangeStart} rangeEnd={eventRangeEnd} />
+          <LeadUpGatheringsManager rangeStart={eventRangeStart} rangeEnd={eventRangeEnd} initialEvents={leadUpEvents} />
         </div>
 
         {/* ═══════════════ SHARED RESOURCES ═══════════════ */}
         <CategoryHeading id="resources" large />
 
         <div style={workspacePanel}>
-          <ResourcesManager />
+          <ResourcesManager initialLists={resourceLists} initialStewards={stewardOptions} />
         </div>
 
       </div>

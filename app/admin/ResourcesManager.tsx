@@ -20,7 +20,7 @@ type ResourceItem = {
   claimed: number
   claimants: Claimant[]
 }
-type ResourceList = {
+export type ResourceList = {
   id: string
   title: string
   description: string | null
@@ -33,7 +33,7 @@ type ResourceList = {
   items: ResourceItem[]
 }
 // The steward dropdown's option pools (at most one steward per list — migration 052).
-type StewardOptions = {
+export type StewardOptions = {
   groups: { id: string; name: string }[]
   departments: { id: string; name: string }[]
   roles: { id: string; name: string; department_name: string | null }[]
@@ -249,10 +249,16 @@ function ProgressPill({ claimed, needed }: { claimed: number; needed: number | n
   )
 }
 
-export function ResourcesManager() {
-  const [lists, setLists] = useState<ResourceList[]>([])
-  const [stewards, setStewards] = useState<StewardOptions>({ groups: [], departments: [], roles: [] })
-  const [loading, setLoading] = useState(true)
+export function ResourcesManager({ initialLists, initialStewards }: {
+  // Server-rendered pages pass these (docs/architecture.md → Auth → "Server-
+  // rendered section data") so the board paints populated; the mount fetch
+  // below runs only when they're absent. The API routes stay the refresh path.
+  initialLists?: ResourceList[]
+  initialStewards?: StewardOptions
+} = {}) {
+  const [lists, setLists] = useState<ResourceList[]>(initialLists ?? [])
+  const [stewards, setStewards] = useState<StewardOptions>(initialStewards ?? { groups: [], departments: [], roles: [] })
+  const [loading, setLoading] = useState(initialLists === undefined)
   const [loadError, setLoadError] = useState(false)
   const [modal, setModal] = useState<
     | { kind: 'add-list' }
@@ -296,7 +302,7 @@ export function ResourcesManager() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { if (initialLists === undefined) load() }, [])
 
   const save = async (url: string, method: 'POST' | 'PATCH', body: unknown) => {
     setSaving(true)

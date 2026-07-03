@@ -12,7 +12,7 @@ import { ScheduleWeekView } from './ScheduleWeekView'
 import { useConfirm } from '../components/ConfirmDialog'
 import { TimeField } from '../components/TimeField'
 
-type ScheduleEvent = {
+export type ScheduleEvent = {
   id: string
   day: string
   time: string
@@ -40,12 +40,12 @@ type ScheduleEvent = {
 }
 
 // Shift types offered when an event is a Shift (Configure → Shift Types registry).
-type ShiftTypeOption = { id: string; name: string }
+export type ShiftTypeOption = { id: string; name: string }
 
 // One holder of a shift, from GET /api/admin/schedule/rosters (member_shift_signups
 // ∪ legacy camp_signups). legacy_only holds have no member_shift_signups row,
 // so the lead toggle can't touch them.
-type RosterEntry = { clerk_user_id: string; name: string; role: 'member' | 'lead'; legacy_only: boolean }
+export type RosterEntry = { clerk_user_id: string; name: string; role: 'member' | 'lead'; legacy_only: boolean }
 
 // Weekday fallback order — only used to sort legacy UNDATED rows among themselves.
 const DAY_ORDER: Record<string, number> = {
@@ -569,13 +569,23 @@ function GroupHeader({ label, sub, count, onAdd, addLabel, color = '#C8A848' }: 
   )
 }
 
-export function ScheduleManager({ rangeStart, rangeEnd, children }: { rangeStart?: string; rangeEnd?: string; children?: React.ReactNode }) {
-  const [events, setEvents] = useState<ScheduleEvent[]>([])
-  const [shiftTypes, setShiftTypes] = useState<ShiftTypeOption[]>([])
-  const [rosters, setRosters] = useState<Record<string, RosterEntry[]>>({})
+export function ScheduleManager({ rangeStart, rangeEnd, initialEvents, initialShiftTypes, initialRosters, children }: {
+  rangeStart?: string
+  rangeEnd?: string
+  // Server-rendered pages pass these (docs/architecture.md → Auth → "Server-
+  // rendered section data") so the manager paints populated; the mount fetches
+  // below run only when a prop is absent. The API routes stay the refresh path.
+  initialEvents?: ScheduleEvent[]
+  initialShiftTypes?: ShiftTypeOption[]
+  initialRosters?: Record<string, RosterEntry[]>
+  children?: React.ReactNode
+}) {
+  const [events, setEvents] = useState<ScheduleEvent[]>(initialEvents ?? [])
+  const [shiftTypes, setShiftTypes] = useState<ShiftTypeOption[]>(initialShiftTypes ?? [])
+  const [rosters, setRosters] = useState<Record<string, RosterEntry[]>>(initialRosters ?? {})
   const [rosterBusy, setRosterBusy] = useState<string | null>(null)
   const [rosterError, setRosterError] = useState<{ eventId: string; message: string } | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(initialEvents === undefined)
   const [loadError, setLoadError] = useState(false)
   const [modal, setModal] = useState<{ mode: 'add'; recurring: boolean; date?: string; time?: string } | { mode: 'edit'; event: ScheduleEvent } | null>(null)
   const [view, setView] = useState<'list' | 'week'>('list')
@@ -601,9 +611,10 @@ export function ScheduleManager({ rangeStart, rangeEnd, children }: { rangeStart
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { if (initialEvents === undefined) load() }, [])
 
   useEffect(() => {
+    if (initialShiftTypes !== undefined) return
     fetch('/api/admin/shift-types')
       .then(r => r.json())
       .then(d => setShiftTypes((d.shiftTypes ?? []).map((t: ShiftTypeOption) => ({ id: t.id, name: t.name }))))
@@ -611,6 +622,7 @@ export function ScheduleManager({ rangeStart, rangeEnd, children }: { rangeStart
   }, [])
 
   useEffect(() => {
+    if (initialRosters !== undefined) return
     fetch('/api/admin/schedule/rosters')
       .then(r => r.json())
       .then(d => setRosters(d.rosters ?? {}))
