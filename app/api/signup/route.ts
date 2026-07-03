@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getApprovedMember, memberDisplayName } from '@/lib/members'
+import { getRoleSignupData } from '@/lib/participate-data'
 
 export async function GET() {
   const { userId } = await auth()
@@ -9,53 +10,16 @@ export async function GET() {
 
   // The approval gate runs alongside the data batch — it only gates the
   // response, not what we fetch, so there's no need to serialize on it.
-  const [application, deptRes, rolesRes, signupRes, roleCounts, eventSignupCounts, scheduleRes, shiftFlagRes] = await Promise.all([
+  // Data assembly lives in lib/participate-data.ts, shared with the
+  // server-rendered /participate page (this route is the client's refresh path).
+  const [application, data] = await Promise.all([
     getApprovedMember(userId),
-    supabaseAdmin.from('departments').select('id, name, description, icon, sort_order').order('sort_order'),
-    supabaseAdmin.from('roles').select('id, name, description, capacity, sort_order, department_id, purpose, responsibilities_before, responsibilities_during, ideal_for, commitment, commitment_period, requires_approval').order('sort_order'),
-    supabaseAdmin.from('camp_signups').select('role_id, schedule_event_id, role_approval_status').eq('clerk_user_id', userId).maybeSingle(),
-    supabaseAdmin.from('camp_signups').select('role_id').not('role_id', 'is', null),
-    supabaseAdmin.from('camp_signups').select('schedule_event_id').not('schedule_event_id', 'is', null),
-    supabaseAdmin.from('schedule_events').select('id, day, time, title, subtitle, icon_type, highlight, is_recurring, capacity').eq('visible', true).order('sort_order'),
-    supabaseAdmin.from('page_content').select('value').eq('key', 'config_shift_signup_open').maybeSingle(),
+    getRoleSignupData(userId),
   ])
 
   if (!application) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const shiftSignupOpen = shiftFlagRes.data?.value !== 'false'
-
-  const roleSignupCounts: Record<string, number> = {}
-  for (const row of roleCounts.data ?? []) {
-    if (row.role_id) roleSignupCounts[row.role_id] = (roleSignupCounts[row.role_id] ?? 0) + 1
-  }
-
-  const evSignupCounts: Record<string, number> = {}
-  for (const row of eventSignupCounts.data ?? []) {
-    if (row.schedule_event_id) evSignupCounts[row.schedule_event_id] = (evSignupCounts[row.schedule_event_id] ?? 0) + 1
-  }
-
-  const rolesWithCounts = (rolesRes.data ?? []).map(r => ({
-    ...r,
-    signed_up: roleSignupCounts[r.id] ?? 0,
-  }))
-
-  const departments = (deptRes.data ?? []).map(d => ({
-    ...d,
-    roles: rolesWithCounts.filter(r => r.department_id === d.id),
-  }))
-
-  // Only include capacity on events so the client knows which are signable
-  const scheduleEvents = (scheduleRes.data ?? []).map(e => ({
-    ...e,
-    signed_up: e.capacity != null ? (evSignupCounts[e.id] ?? 0) : null,
-  }))
-
-  return NextResponse.json({
-    signup: signupRes.data ?? null,
-    departments,
-    scheduleEvents,
-    shiftSignupOpen,
-  })
+  return NextResponse.json(data)
 }
 
 export async function POST(req: NextRequest) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getSelfJoinGroups } from '@/lib/participate-data'
 
 // Member-facing self-service for opt-in groups (e.g. Setup / Teardown / Decor).
 // A group is self-joinable iff its collection has self_join = true. This is a
@@ -37,59 +38,10 @@ export async function GET() {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const ids = await selectableGroupIds()
-  if (ids.size === 0) return NextResponse.json({ groups: [] })
-
-  const { data: groups, error } = await supabaseAdmin
-    .from('groups')
-    .select('id, name, description, icon, icon_image, sort_order, collection_id, required_shift_hours, group_collections(name, sort_order), shift_types:required_shift_type_id(name)')
-    .order('sort_order', { ascending: true })
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  const { data: mine } = await supabaseAdmin
-    .from('group_members')
-    .select('group_id')
-    .eq('clerk_user_id', userId)
-  const joined = new Set((mine ?? []).map(m => m.group_id))
-
-  type Row = {
-    id: string
-    name: string
-    description: string | null
-    icon: string | null
-    icon_image: string | null
-    collection_id: string | null
-    required_shift_hours: number | null
-    // Supabase types the embeds as arrays; runtime returns a single row for a to-one FK.
-    group_collections: { name: string; sort_order: number } | { name: string; sort_order: number }[] | null
-    shift_types: { name: string } | { name: string }[] | null
-  }
-
-  const offered = ((groups ?? []) as unknown as Row[])
-    .filter(g => ids.has(g.id))
-    .map(g => {
-      const col = Array.isArray(g.group_collections) ? g.group_collections[0] : g.group_collections
-      const shiftType = Array.isArray(g.shift_types) ? g.shift_types[0] : g.shift_types
-      return {
-        id: g.id,
-        name: g.name,
-        description: g.description,
-        icon: g.icon,
-        icon_image: g.icon_image,
-        collection_id: g.collection_id,
-        collection_name: col?.name ?? null,
-        collection_sort: col?.sort_order ?? 0,
-        joined: joined.has(g.id),
-        // The shift commitment joining this group carries (null = none) — shown
-        // on the row so members know what they're taking on before they join.
-        shift_commitment: shiftType ? { hours: g.required_shift_hours ?? 1, type: shiftType.name } : null,
-      }
-    })
-    // Order by collection, keeping the existing within-collection sort_order (stable sort).
-    .sort((a, b) => a.collection_sort - b.collection_sort)
-
-  return NextResponse.json({ groups: offered })
+  // Data assembly lives in lib/participate-data.ts, shared with the
+  // server-rendered /participate page (this route is the client's refresh path).
+  const groups = await getSelfJoinGroups(userId)
+  return NextResponse.json({ groups })
 }
 
 export async function POST(req: NextRequest) {

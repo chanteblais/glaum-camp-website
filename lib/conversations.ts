@@ -170,14 +170,24 @@ export async function getMyConversations(userId: string): Promise<MyConversation
   const partIds = (parts ?? []).map(p => p.conversation_id)
   const groupIds = (myGroups ?? []).map(g => g.group_id)
 
-  // Resolve conversation rows — direct (from participant rows) and group (from
-  // membership) lookups are also independent of each other.
-  const [directConvsRes, groupConvsRes] = await Promise.all([
+  // Resolve conversation rows — direct (from participant rows), group (from
+  // membership), and the other participants of my conversations are all
+  // independent of each other. The "others" query scans all my conversations
+  // rather than just the direct ones (which aren't known yet) so it can join
+  // this batch; only direct rows read from it below.
+  const [directConvsRes, groupConvsRes, othersRes] = await Promise.all([
     partIds.length
       ? supabaseAdmin.from('conversations').select('id').eq('type', 'direct').in('id', partIds)
       : Promise.resolve({ data: [] }),
     groupIds.length
       ? supabaseAdmin.from('conversations').select('id, group_id').eq('type', 'group').in('group_id', groupIds)
+      : Promise.resolve({ data: [] }),
+    partIds.length
+      ? supabaseAdmin
+          .from('conversation_participants')
+          .select('conversation_id, clerk_user_id')
+          .in('conversation_id', partIds)
+          .neq('clerk_user_id', userId)
       : Promise.resolve({ data: [] }),
   ])
 
@@ -186,12 +196,7 @@ export async function getMyConversations(userId: string): Promise<MyConversation
   // Direct conversations — resolve the other participant of each.
   const directIds = (directConvsRes.data ?? []).map(c => c.id)
   if (directIds.length) {
-    const { data: others } = await supabaseAdmin
-      .from('conversation_participants')
-      .select('conversation_id, clerk_user_id')
-      .in('conversation_id', directIds)
-      .neq('clerk_user_id', userId)
-    const otherByConv = new Map((others ?? []).map(o => [o.conversation_id, o.clerk_user_id]))
+    const otherByConv = new Map((othersRes.data ?? []).map(o => [o.conversation_id, o.clerk_user_id]))
     for (const id of directIds) {
       result.push({ conversationId: id, type: 'direct', lastReadAt: lastReadByConv.get(id) ?? null, muted: mutedByConv.get(id) ?? false, otherUserId: otherByConv.get(id) })
     }
@@ -211,11 +216,20 @@ export async function getUnreadCount(userId: string): Promise<number> {
   if (!convs.length) return 0
 
   const lastReadByConv = new Map(convs.map(c => [c.conversationId, c.lastReadAt]))
-  const { data: msgs } = await supabaseAdmin
+  // This runs on the nav's 30s unread poll — bound the scan to messages newer
+  // than the oldest read cursor instead of every message ever, unless some
+  // conversation has never been read (null cursor = everything counts).
+  const cursors = convs.map(c => c.lastReadAt)
+  const oldestCursor = cursors.every((c): c is string => !!c)
+    ? cursors.reduce((a, b) => (a < b ? a : b))
+    : null
+  let query = supabaseAdmin
     .from('messages')
     .select('conversation_id, created_at')
     .in('conversation_id', convs.map(c => c.conversationId))
     .neq('sender_clerk_id', userId)
+  if (oldestCursor) query = query.gt('created_at', oldestCursor)
+  const { data: msgs } = await query
   if (!msgs?.length) return 0
 
   let count = 0
