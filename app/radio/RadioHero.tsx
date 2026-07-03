@@ -99,7 +99,9 @@ const MAIN: [number, number][] = [
   [716, 253], [721, 214], [726, 189], [732, 168], [737, 146], [742, 134], [747, 137], [753, 154],
   [758, 175], [763, 188], [768, 194], [774, 194], [784, 186], [795, 201], [805, 189], [816, 149],
   [826, 142], [837, 177], [847, 239], [858, 255], [868, 209], [879, 134], [889, 105], [900, 121],
-  [911, 172], [921, 211], [930, 220], [940, 168], [947, 127], [953, 117], [963, 209], [974, 200],
+  // (this crest/valley pair softened from the raw transcription — the y
+  // rescale had sharpened it into needles)
+  [911, 172], [922, 208], [932, 214], [944, 168], [954, 136], [964, 146], [974, 196], [982, 194],
   [984, 183], [995, 171], [1000, 177],
   // the long tail, phrased like the left side's opening (deep slow swoop,
   // then a sudden pick-up) but in its own voice: a moderate wave out of the
