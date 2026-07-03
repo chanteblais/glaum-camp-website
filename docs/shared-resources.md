@@ -53,9 +53,10 @@ organizer wants, not an error).
   other): one row per list with gaps — the **list title is the headline**
   ("Shared Kitchen"), "N items still needed — stove, cooler" the description
   — and the **whole card** is the link to `/participate#bring`.
-  Because the section's content loads client-side (native hash scroll fires
-  before it has height), `ResourceCommitments` re-scrolls to `#bring` once
-  its data renders. Demand-driven via `getUnmetResourceNeeds`
+  Because the page's sections load client-side (a single scroll gets undone
+  as later content lands above the anchor), `ResourceCommitments` **pins**
+  `#bring` on every layout change for the first ~3s (ResizeObserver on body;
+  the first wheel/touch cancels). Demand-driven via `getUnmetResourceNeeds`
   (`lib/resources.ts`, offers excluded): it renders nothing once everything
   is covered.
 - **Profile → Active Commitments**: each claim renders as a `BRINGING` row

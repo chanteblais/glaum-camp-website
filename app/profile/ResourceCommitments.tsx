@@ -46,14 +46,30 @@ export function ResourceCommitments() {
 
   useEffect(() => { load() }, [])
 
-  // Deep links (/participate#bring, e.g. from the home widget): the section's
-  // content arrives after hydration, so the browser's native hash scroll fires
-  // while this area still has no height and lands at the top. Re-scroll once
-  // the lists are actually rendered.
+  // Deep links (/participate#bring, e.g. from the home widget): the page's
+  // sections load client-side (the shift picker above this one included), so
+  // a single scroll — native or ours — gets undone when later content lands
+  // above the anchor and pushes it down. Instead, pin the anchor on every
+  // layout change for the first few seconds, then let go. The first wheel or
+  // touch hands control back to the user immediately.
   useEffect(() => {
-    if (lists === null || window.location.hash !== '#bring') return
-    document.getElementById('bring')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }, [lists === null])
+    if (window.location.hash !== '#bring') return
+    let cancelled = false
+    const cancel = () => { cancelled = true }
+    window.addEventListener('wheel', cancel, { passive: true })
+    window.addEventListener('touchstart', cancel, { passive: true })
+    const snap = () => { if (!cancelled) document.getElementById('bring')?.scrollIntoView({ block: 'start' }) }
+    const ro = new ResizeObserver(snap)
+    ro.observe(document.body)
+    snap()
+    const stop = setTimeout(() => ro.disconnect(), 3000)
+    return () => {
+      clearTimeout(stop)
+      ro.disconnect()
+      window.removeEventListener('wheel', cancel)
+      window.removeEventListener('touchstart', cancel)
+    }
+  }, [])
 
   // Set my claim to `quantity` (0 = unclaim), optimistically adjusting both
   // my count and the community total by the delta.
