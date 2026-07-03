@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { sendUserEmail, APP_URL } from '@/lib/send-email'
 import { upsertMember } from '@/lib/members'
 import { requireAdmin } from '@/lib/admin-auth'
+import { postSourcedRadioEvent, welcomeRadioPost } from '@/lib/radio'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const userId = await requireAdmin()
@@ -64,6 +65,25 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       event_type: 'application_approved',
       message,
     }])
+
+    // Radio: welcome the new member — once per member (re-approvals and the
+    // migration-061 backfill both mean a welcome may already exist).
+    const { data: alreadyOnAir } = await supabaseAdmin
+      .from('radio_events')
+      .select('id')
+      .eq('kind', 'welcome')
+      .eq('actor_clerk_id', application.clerk_user_id)
+      .limit(1)
+      .maybeSingle()
+    if (!alreadyOnAir) {
+      await postSourcedRadioEvent('welcome', {
+        ...welcomeRadioPost(displayName),
+        actorClerkId: application.clerk_user_id,
+        actorName: displayName,
+        // /members/[id] resolves clerk ids directly — the gold name links home.
+        link: `/members/${application.clerk_user_id}`,
+      })
+    }
 
     // A deleted / unknown Clerk account must not turn the (already committed)
     // approval into a 500 — degrade to the email warning instead.

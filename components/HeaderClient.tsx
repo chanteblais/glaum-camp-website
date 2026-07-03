@@ -33,6 +33,7 @@ const publicNavLinks = [
 // docs/mobile-companion.md, "one product, one IA").
 const memberNavLinks: TabBarLink[] = [
   { href: '/schedule', label: 'Schedule', icon: '/asset-library/icons/gathering.webp' },
+  { href: '/radio', label: 'Radio', icon: '/asset-library/icons/vintage-radio.webp' },
   { href: '/members', label: 'Many Hands', icon: '/asset-library/icons/raised-hand.webp' },
   { href: '/messages', label: 'Messages', badge: true, icon: '/asset-library/icons/envelope.webp' },
   { href: '/participate', label: 'Participate', icon: '/asset-library/icons/signpost.webp' },

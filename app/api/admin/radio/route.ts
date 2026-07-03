@@ -1,0 +1,98 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { supabaseAdmin } from '@/lib/supabase'
+import { requireAdmin } from '@/lib/admin-auth'
+import { postRadioEvent } from '@/lib/radio'
+import { sendUserEmail, APP_URL } from '@/lib/send-email'
+import { SITE_NAME } from '@/lib/site-config'
+import { getAdminRadioEvents } from '@/lib/admin-program-data'
+
+// GET — recent radio events for the manager (all kinds, so admins can curate
+// the automatic ones too). Same assembly the Program page server-renders.
+export async function GET() {
+  const userId = await requireAdmin()
+  if (!userId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  try {
+    return NextResponse.json({ events: await getAdminRadioEvents() })
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : 'Failed to load' }, { status: 500 })
+  }
+}
+
+// POST — organizer broadcast { message, icon?, notify? }. Radio itself never
+// notifies; `notify` is the deliberate exception (bell + announcement email,
+// honouring the member's email_announcements preference — the lead-up pattern).
+export async function POST(req: NextRequest) {
+  const userId = await requireAdmin()
+  if (!userId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const { message, detail, icon, notify } = await req.json().catch(() => ({}))
+  if (typeof message !== 'string' || !message.trim()) {
+    return NextResponse.json({ error: 'message is required' }, { status: 400 })
+  }
+  const body = message.trim().slice(0, 280)
+  const detailValue = typeof detail === 'string' && detail.trim() ? detail.trim().slice(0, 280) : null
+  const iconValue = typeof icon === 'string' && icon.trim() ? icon.trim().slice(0, 200) : '📢'
+
+  const id = await postRadioEvent({
+    kind: 'broadcast',
+    message: body,
+    detail: detailValue,
+    icon: iconValue,
+    createdBy: userId,
+  })
+  if (!id) return NextResponse.json({ error: 'Failed to post' }, { status: 500 })
+
+  let notified = 0
+  let emailed = 0
+  if (notify === true) {
+    const { data: membersRaw } = await supabaseAdmin
+      .from('members')
+      .select('clerk_user_id, email, first_name, preferred_name')
+      .eq('status', 'approved')
+    const recipients = (membersRaw ?? []).filter(m => m.clerk_user_id !== userId)
+
+    const bellRows = recipients
+      .filter(m => m.clerk_user_id)
+      .map(m => ({
+        clerk_user_id: m.clerk_user_id as string,
+        event_type: 'radio_broadcast',
+        message: body,
+        details: { radioEventId: id },
+      }))
+    if (bellRows.length) {
+      await supabaseAdmin.from('user_notifications').insert(bellRows)
+      notified = bellRows.length
+    }
+
+    // Announcement-email preference in one query (default ON when no row).
+    const clerkIds = recipients.map(m => m.clerk_user_id).filter(Boolean) as string[]
+    const optedOut = new Set<string>()
+    if (clerkIds.length) {
+      const { data: prefRows } = await supabaseAdmin
+        .from('notification_preferences')
+        .select('clerk_user_id, email_announcements')
+        .in('clerk_user_id', clerkIds)
+      for (const p of prefRows ?? []) {
+        if (p.email_announcements === false) optedOut.add(p.clerk_user_id)
+      }
+    }
+
+    for (const m of recipients) {
+      if (!m.email) continue
+      if (m.clerk_user_id && optedOut.has(m.clerk_user_id)) continue
+      try {
+        const result = await sendUserEmail(
+          m.email,
+          `${SITE_NAME} Radio: ${body.slice(0, 60)}${body.length > 60 ? '…' : ''}`,
+          `<p>Hi ${m.preferred_name || m.first_name || 'there'},</p><p>${body}</p><p><a href="${APP_URL}/radio">Tune in to Radio</a> for the rest of what's happening around camp ✦</p>`,
+        )
+        if (result.ok) emailed++
+      } catch (err) {
+        console.error('[radio notify] email failed:', err)
+      }
+    }
+  }
+
+  return NextResponse.json({ success: true, id, notified, emailed })
+}

@@ -13,7 +13,7 @@ Glåüm   About · Participate · Schedule · Apply     [Sign in]
 
 **Approved members:**
 ```
-Glåüm   Home · Schedule · Many Hands · Messages · My Profile   [🔔 avatar▾]
+Glåüm   Schedule · Radio · Many Hands · Messages · Participate · My Profile   [🔔 avatar▾]
 ```
 
 - `Messages` shows an unread count badge (polled every 30s via `/api/messages/unread` — `useUnreadMessages` in `MessagesNavLink.tsx`)
@@ -58,7 +58,7 @@ Configurable widgets (order, visibility, and width controlled by admin via the p
 | `polls` | Polls | Active, non-expired admin polls. Members vote inline (approved members only; option indexes validated server-side); results visible to everyone (voted or not) |
 | `events` | Upcoming Gatherings | Pre-camp + at-camp `schedule_events` in the next 14 days. "View full schedule →" links to `/schedule` |
 | `spotlight` | Meet a Member | Left: rotating member spotlight (cycles every minute). Right: Upcoming Gatherings list |
-| `activity` | Recent Activity | Mixed feed of member joins + profile updates, up to 6 items |
+| `activity` | On the Air | The latest 6 **Radio** events with a "Tune in →" link to `/radio` (replaced the old member-joins/profile-updates feed — joins now *are* Radio events). See **Radio** under Authenticated Member Pages + [radio.md](radio.md) |
 
 Fixed bottom section (always present):
 - **Role & Shift + Many Hands** — quick-link grid to `/participate` and `/members`
@@ -262,6 +262,23 @@ Linked from nav as "Many Hands".
 
 ---
 
+### Radio (`/radio`)
+
+**Who:** Approved members
+**What:** The community's **curated feed** — the heartbeat of camp. Full spec: [radio.md](radio.md).
+
+Deliberately not chat (no threads, no replies) and deliberately **not an audit log**: every post passes "would the average member care?" and is written editorially — a headline plus an optional momentum line ("Only one more is still needed!"), all copy centralized in `lib/radio.ts`'s post builders. Headlines light the moment's entity gold (`**…**` → `RadioMessage`). Timestamps whisper from the right; content leads. Day-grouped (Today / Yesterday / date, each rule ending in ✦), newest first, latest 60, signed off with *"That's all for now. Stay tuned."*
+
+**Visual language (her 2026-07-03 mockup):** no cards, **no avatars** — airy hairline rows led by a large raw emoji (or medal art) per kind: `broadcast` 📢 · `welcome` 👋 · `contribution` ✨ · `achievement` 🏅 · `milestone` 🎉 · `voice` ✦ (reserved). Above the feed: a hero header (flourished title, script subtitle, art slot for a future radio illustration) and a **stats band** (`getRadioStats`).
+
+**Writing is broadcasters-only** (currently admins): the on-page composer ("Share an announcement with camp…" → ON AIR) and the GO LIVE bar at the feed's end post `broadcast` via `/api/admin/radio`; non-broadcasters see it locked ("🔒 Broadcasters only."). The member `voice` kind + `POST /api/radio` stay reserved with no UI.
+
+At the top, the **Now / Up next strip** (`RadioNowStrip`) is derived, never stored: the camp-day welcome ("✦ Day 2 of camp") while today is inside the configured event range, plus what's happening now (purple ● pulse line; open-ended events stay "now" for 90 min) and the next thing starting today — from `schedule_events` (visible + on-schedule, `general`/`mandatory` only; shifts are work slots, not atmosphere). The client picks against the member's own clock (their device is at camp; the server is in UTC) and re-checks each minute.
+
+Radio never notifies (Messages interrupt; Radio informs). The one exception is an organizer broadcast posted with **"Also alert members"** — bell + announcement email (`radio_broadcast` bell rows deep-link "Tune in →"). The home dashboard's `activity` widget ("On the Air") teases the latest 6 posts.
+
+---
+
 ## Admin Pages
 
 ### Admin Console (four tabs)
@@ -282,6 +299,7 @@ Sections are collapsible (`CollapsibleSection`) and **default to collapsed** —
 | People | Role Requests | `RoleRequestsSection` | Approve/reject member role claims |
 | People | Role Suggestions | `RoleSuggestionsSection` | Review member-submitted dept/role suggestions |
 | Communication | Announcements | `AnnouncementsManager` | Create/edit/delete member-facing announcements |
+| Communication | Radio | `RadioManager` | The curated feed's console (spec: [radio.md](radio.md)): composer (message ≤280 + detail + emoji + optional **"Also alert members"** bell/email), the **Automatic broadcasts** toggles (`config_radio`), and **Recently on the air** — the latest 40 posts with two-tap Remove (curating the feed is communication work, not programming) |
 | Logistics | Shared Resources | `ResourcesManager` | Gear the community needs, members claim what they'll bring — see [Shared Resources](#shared-resources) (moved here from Program 2026-07-03: coordination is community logistics, not programming) |
 
 (Departments, Groups, Shift Types, Event Dates, Admins, Poll Managers, and Debug live on **Configure**; polls are managed from the home dashboard by admins/poll managers.)

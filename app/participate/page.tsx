@@ -34,7 +34,9 @@ export default async function SignupPage() {
   return (
     <>
       <Header />
-      <main style={{ maxWidth: '860px', margin: '0 auto', padding: '2rem 1.5rem 6rem' }}>
+      {/* 6rem top clears the fixed 64px nav (the /members convention) — at
+          2rem the back link rendered underneath the translucent bar */}
+      <main style={{ maxWidth: '860px', margin: '0 auto', padding: '6rem 1.5rem 6rem' }}>
 
         {/* Back link */}
         <a

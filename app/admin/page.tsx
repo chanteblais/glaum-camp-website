@@ -10,11 +10,13 @@ import { AdminNav } from './AdminNav'
 import { CategoryHeading } from './CategoryHeading'
 import { COMMUNITY_CATEGORIES } from './admin-sections'
 import { AnnouncementsManager } from './AnnouncementsManager'
+import { RadioManager } from './RadioManager'
 import { ResourcesManager } from './ResourcesManager'
 import { getGroupNamesByUser } from '@/lib/groups'
 import { getShiftEventByUser } from '@/lib/shift-signups'
 import { getAdminRunway } from '@/lib/admin-attention'
-import { getAdminResourceLists, getStewardOptions } from '@/lib/admin-program-data'
+import { parseRadioSources } from '@/lib/radio'
+import { getAdminRadioEvents, getAdminResourceLists, getStewardOptions } from '@/lib/admin-program-data'
 import { RoleRequestsSection } from './RoleRequestsSection'
 import { RoleSuggestionsSection } from './RoleSuggestionsSection'
 
@@ -35,6 +37,8 @@ export default async function AdminPage() {
     signupEventMap,
     runway,
     { data: notifications, error: notificationsError },
+    radioEvents,
+    { data: radioConfigRow },
     resourceLists,
     stewardOptions,
   ] = await Promise.all([
@@ -55,6 +59,12 @@ export default async function AdminPage() {
       .select('id, application_id, event_type, message, details, created_at, read_at')
       .order('created_at', { ascending: false })
       .limit(20),
+    safe(getAdminRadioEvents()),
+    supabaseAdmin
+      .from('page_content')
+      .select('value')
+      .eq('key', 'config_radio')
+      .maybeSingle(),
     safe(getAdminResourceLists()),
     safe(getStewardOptions()),
   ])
@@ -233,6 +243,17 @@ export default async function AdminPage() {
           defaultOpen={false}
         >
           <AnnouncementsManager />
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          title="Radio"
+          summary={radioEvents ? `${radioEvents.length} post${radioEvents.length === 1 ? '' : 's'} in the feed` : 'Curate the community feed'}
+          defaultOpen={false}
+        >
+          <RadioManager
+            initialEvents={radioEvents}
+            initialSources={parseRadioSources(radioConfigRow?.value)}
+          />
         </CollapsibleSection>
 
         {/* ═══════════════ LOGISTICS ═══════════════ */}
