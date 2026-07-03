@@ -24,6 +24,18 @@ CREATE TABLE IF NOT EXISTS radio_events (
 CREATE INDEX IF NOT EXISTS radio_events_created_at_idx
   ON radio_events (created_at DESC);
 
+-- Upgrade path: an earlier draft of this migration shipped without `detail`
+-- and with audit-log-voiced 'member' rows ("X joined the camp."). Bring such
+-- a table up to the editorial shape.
+ALTER TABLE radio_events ADD COLUMN IF NOT EXISTS detail TEXT;
+
+UPDATE radio_events
+SET kind = 'welcome',
+    message = 'Welcome ' || COALESCE(NULLIF(actor_name, ''), 'a new member') || ' to Glåüm!',
+    detail = 'Say hello if you see them around camp.',
+    icon = '👋'
+WHERE kind = 'member';
+
 -- Backfill: every approved member gets their welcome at their approval moment.
 -- Idempotent — skips anyone who already has a 'welcome' post.
 INSERT INTO radio_events (kind, message, detail, icon, actor_clerk_id, actor_name, created_at)

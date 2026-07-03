@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
+import { supabaseAdmin } from '@/lib/supabase'
 import { getApprovedMember } from '@/lib/members'
-import { postSourcedRadioEvent } from '@/lib/radio'
+import { parseRadioSources, postRadioEvent } from '@/lib/radio'
 
 // POST — a member puts a moment on the air (kind 'voice'). Radio is an
 // interactive heartbeat, not an organizer-only megaphone: any approved member
@@ -21,14 +22,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'message is required' }, { status: 400 })
   }
 
+  // Source-toggle check inline (not the fire-and-forget helper): the composer
+  // is interactive, so a member deserves a real error — a hook can swallow a
+  // failed post, a composer must not pretend it landed.
+  const { data: configRow } = await supabaseAdmin
+    .from('page_content')
+    .select('value')
+    .eq('key', 'config_radio')
+    .maybeSingle()
+  if (!parseRadioSources(configRow?.value).voice) {
+    return NextResponse.json({ error: 'Member broadcasts are currently off' }, { status: 403 })
+  }
+
   const actorName = member.preferred_name || member.first_name || 'A member'
-  await postSourcedRadioEvent('voice', {
+  const id = await postRadioEvent({
     kind: 'voice',
     message: message.trim().slice(0, 200),
     icon: '✦',
     actorClerkId: userId,
     actorName,
   })
+  if (!id) return NextResponse.json({ error: 'Failed to post — try again' }, { status: 500 })
 
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true, id })
 }
