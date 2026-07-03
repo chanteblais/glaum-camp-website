@@ -110,7 +110,7 @@ Most content cards use a parchment aesthetic:
 
 ### Confirm Dialog
 
-`ConfirmDialog` / `useConfirm()` (`components/ConfirmDialog.tsx`) — in-app replacement for native `confirm()`/`alert()`. Ink card on a dimmed overlay: gold uppercase eyebrow ("✦ A moment of pause"), TokyoDreams title, cream body, pill buttons ("Never mind" ghost + confirm; red accent when `danger`). `notice: true` = single "Understood" button (alert replacement, eyebrow "✦ A small snag"). Promise-based: `const { confirm, confirmDialog } = useConfirm()`, `await confirm({ title, body, confirmLabel, danger })`, render `{confirmDialog}` in the tree. Esc / overlay click cancel. First adopted in `GroupsManager`; other managers still use native `confirm()`.
+`ConfirmDialog` / `useConfirm()` (`components/ConfirmDialog.tsx`) — in-app replacement for native `confirm()`/`alert()`. Ink card on a dimmed overlay: gold uppercase eyebrow ("✦ A moment of pause"), TokyoDreams title, cream body, pill buttons ("Never mind" ghost + confirm; red accent when `danger`). `notice: true` = single "Understood" button (alert replacement, eyebrow "✦ A small snag"). Promise-based: `const { confirm, confirmDialog } = useConfirm()`, `await confirm({ title, body, confirmLabel, danger })`, render `{confirmDialog}` in the tree. Esc / overlay click cancel. Used everywhere — no native `confirm()`/`alert()` calls remain in the app (delete confirmations name the item and use `danger: true`; error alerts use `notice: true`). The one styled sibling is `ShiftConfirmModal` (shift sign-up/cancel), which predates this component.
 
 ### Avatar
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { LoadError } from './LoadError'
+import { useConfirm } from '../components/ConfirmDialog'
 
 // A shift type is just a named, requirement-free KIND of shift (Setup, Service,
 // Tea, …). Requirement-ness lives elsewhere: on a group/role (conditional) or an
@@ -70,6 +71,7 @@ export function ShiftTypesManager() {
   const [creating, setCreating] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { confirm, confirmDialog } = useConfirm()
 
   const load = () => {
     setLoadError(false)
@@ -107,7 +109,14 @@ export function ShiftTypesManager() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Delete this shift type? Events and requirements referencing it will be cleared. This cannot be undone.')) return
+    const st = types.find(t => t.id === id)
+    const ok = await confirm({
+      title: `Delete ${st ? `“${st.name}”` : 'this shift type'}?`,
+      body: 'Events and requirements referencing it will be cleared. This cannot be undone.',
+      confirmLabel: 'Delete type',
+      danger: true,
+    })
+    if (!ok) return
     const res = await fetch(`/api/admin/shift-types/${id}`, { method: 'DELETE' })
     if (res.ok) setTypes(prev => prev.filter(t => t.id !== id))
   }
@@ -155,6 +164,8 @@ export function ShiftTypesManager() {
       {editing && (
         <ShiftTypeModal initial={{ name: editing.name, icon: editing.icon ?? '' }} isNew={false} saving={saving} error={error} onSave={(f) => handleUpdate(editing, f)} onClose={() => setEditing(null)} />
       )}
+
+      {confirmDialog}
     </div>
   )
 }

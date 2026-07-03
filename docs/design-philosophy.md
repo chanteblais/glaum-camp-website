@@ -113,6 +113,10 @@ image-gen → potrace pipeline and its prompt language live in `design/icon-lab/
    drawn with clean minimal linework and whisper-light shading only.
 4. **Icons execute as gilded solid medallions** — gold disc, emblem engraved through to ink,
    thin struck rim. (Third consecutive confirmation of the medallion direction.)
+   *Superseded-in-part 2026-07-02 evening: engraved medallions failed the distance test —
+   "hard to read from far away, and that's mainly what these would be used for." UI icons
+   execute in the SILHOUETTE register instead (verdict 8); the engraved medallion remains the
+   ceremony register for large, contemplative surfaces.*
 5. **Page chrome stays in the calm middle** — neither austere-minimal nor framed-ornate.
    Icons change; the app's current chrome density is approximately right.
 6. **Distinctions are plain gold coins.** No ribbons, pins, or regalia — honours, not medals
@@ -120,6 +124,25 @@ image-gen → potrace pipeline and its prompt language live in `design/icon-lab/
 7. **Hard rule — never cartoon.** Chunky, rounded, "mickey-mousey" hand geometry is banned;
    hand marks come only from the natural-hand generation pipeline, never hand-drawn vector
    approximation.
+
+8. **The icon register — superseded same night by verdict 9.** (Interim silhouette-on-disc
+   exploration; its three laws — chiselled taper, sparse cutouts, palm-base crop — survive
+   and carry into verdict 9.)
+
+9. **THE REGAL REGISTER (2026-07-02 night — final).** After flat, engraved, silhouette, and
+   gilded-vector experiments: *"only the reference has a truly gold, regal feel."* The
+   reference is her own `raised-hand.webp` — icons are **smooth sculpted regal gold**:
+   dimensional emboss, gentle rim light, clean elegant polish. Never busy loot texture,
+   never flat graphic, never glossy plastic, and never de-goldified — gold here is a
+   *material*, carried by tonal range, not a hex fill. Laws within the register:
+   - **The raised hand is the standard.** New subjects are struck by anchoring generation
+     to the hand file itself (style) plus the subject's existing artwork (geometry) via the
+     image-edit endpoint — taste is anchored to loved artifacts, never re-described.
+   - **Cutouts carry depth; a little goes a long way.** Negative space (the lantern's open
+     glass, one tapered flame cut) does more than added ornament; detail lines taper like
+     chisel strokes.
+   - **The hand crops at the palm base.** No wrist, no forearm at icon scale.
+   - Delivered as transparent-background assets in `public/asset-library/icons/`.
 
 ## 8. Status
 

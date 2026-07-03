@@ -2,12 +2,14 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useConfirm } from '../components/ConfirmDialog'
 
 export function RemoveMemberButton({ id, name, redirectAfter }: { id: string; name: string; redirectAfter?: string }) {
   const [confirming, setConfirming] = useState(false)
   const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const { confirm, confirmDialog } = useConfirm()
 
   const handleRemove = async () => {
     setLoading(true)
@@ -19,7 +21,7 @@ export function RemoveMemberButton({ id, name, redirectAfter }: { id: string; na
     if (!res.ok) {
       setLoading(false)
       setConfirming(false)
-      alert('Could not remove this member. Please try again.')
+      await confirm({ title: `Could not remove ${name}`, body: 'Something went wrong — please try again.', notice: true })
       return
     }
     if (redirectAfter) router.push(redirectAfter)
@@ -28,22 +30,25 @@ export function RemoveMemberButton({ id, name, redirectAfter }: { id: string; na
 
   if (!confirming) {
     return (
-      <button
-        onClick={() => setConfirming(true)}
-        style={{
-          padding: '0.4rem 1rem',
-          borderRadius: '9999px',
-          border: '1px solid rgba(255,120,120,0.3)',
-          background: 'transparent',
-          color: '#ffb4b4',
-          fontSize: '0.75rem',
-          letterSpacing: '0.08em',
-          cursor: 'pointer',
-          opacity: 0.85,
-        }}
-      >
-        Remove member
-      </button>
+      <>
+        <button
+          onClick={() => setConfirming(true)}
+          style={{
+            padding: '0.4rem 1rem',
+            borderRadius: '9999px',
+            border: '1px solid rgba(255,120,120,0.3)',
+            background: 'transparent',
+            color: '#ffb4b4',
+            fontSize: '0.75rem',
+            letterSpacing: '0.08em',
+            cursor: 'pointer',
+            opacity: 0.85,
+          }}
+        >
+          Remove member
+        </button>
+        {confirmDialog}
+      </>
     )
   }
 
@@ -107,6 +112,7 @@ export function RemoveMemberButton({ id, name, redirectAfter }: { id: string; na
           Cancel
         </button>
       </div>
+      {confirmDialog}
     </div>
   )
 }

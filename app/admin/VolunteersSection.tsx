@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useConfirm } from '../components/ConfirmDialog'
 
 type Volunteer = {
   id: string
@@ -162,6 +163,7 @@ function PendingVolunteerRow({ volunteer }: { volunteer: Volunteer }) {
   const [approving, setApproving] = useState(false)
   const [removing, setRemoving] = useState(false)
   const router = useRouter()
+  const { confirm, confirmDialog } = useConfirm()
 
   const displayName = volunteer.preferred_name || volunteer.first_name
   const signed = new Date(volunteer.created_at).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })
@@ -173,7 +175,13 @@ function PendingVolunteerRow({ volunteer }: { volunteer: Volunteer }) {
   }
 
   const handleRemove = async () => {
-    if (!confirm(`Decline ${displayName} ${volunteer.last_name}?`)) return
+    const ok = await confirm({
+      title: `Decline ${displayName} ${volunteer.last_name}?`,
+      body: 'Their signup will be removed.',
+      confirmLabel: 'Decline',
+      danger: true,
+    })
+    if (!ok) return
     setRemoving(true)
     await fetch(`/api/admin/volunteer/${volunteer.id}`, { method: 'DELETE' })
     router.refresh()
@@ -262,6 +270,8 @@ function PendingVolunteerRow({ volunteer }: { volunteer: Volunteer }) {
           </div>
         </div>
       )}
+
+      {confirmDialog}
     </div>
   )
 }
@@ -272,9 +282,15 @@ function VolunteerRow({ volunteer }: { volunteer: Volunteer }) {
   const [expanded, setExpanded] = useState(false)
   const [removing, setRemoving] = useState(false)
   const router = useRouter()
+  const { confirm, confirmDialog } = useConfirm()
 
   const handleRemove = async () => {
-    if (!confirm(`Remove ${volunteer.first_name} ${volunteer.last_name} from volunteers?`)) return
+    const ok = await confirm({
+      title: `Remove ${volunteer.first_name} ${volunteer.last_name} from volunteers?`,
+      confirmLabel: 'Remove',
+      danger: true,
+    })
+    if (!ok) return
     setRemoving(true)
     await fetch(`/api/admin/volunteer/${volunteer.id}`, { method: 'DELETE' })
     router.refresh()
@@ -389,6 +405,8 @@ function VolunteerRow({ volunteer }: { volunteer: Volunteer }) {
           </div>
         </div>
       )}
+
+      {confirmDialog}
     </div>
   )
 }

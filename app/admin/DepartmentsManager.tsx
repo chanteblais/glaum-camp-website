@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { AssetImagePicker, type GroupIconOption } from './AssetImagePicker'
 import { isImageIcon } from '@/lib/icon-src'
 import { LoadError } from './LoadError'
+import { useConfirm } from '../components/ConfirmDialog'
 
 type Role = {
   id: string
@@ -481,6 +482,7 @@ export function DepartmentsManager({ groupIconOptions = [] }: { groupIconOptions
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const [shiftTypes, setShiftTypes] = useState<ShiftTypeOption[]>([])
   const [loadError, setLoadError] = useState(false)
+  const { confirm, confirmDialog } = useConfirm()
 
   const load = () => {
     setLoadError(false)
@@ -521,7 +523,14 @@ export function DepartmentsManager({ groupIconOptions = [] }: { groupIconOptions
   }
 
   async function handleDeleteDept(id: string) {
-    if (!confirm('Delete this department and all its roles? This cannot be undone.')) return
+    const dept = departments.find(d => d.id === id)
+    const ok = await confirm({
+      title: `Delete ${dept ? `“${dept.name}”` : 'this department'}?`,
+      body: 'All its roles will be deleted with it. This cannot be undone.',
+      confirmLabel: 'Delete department',
+      danger: true,
+    })
+    if (!ok) return
     const res = await fetch(`/api/admin/departments/${id}`, { method: 'DELETE' })
     if (res.ok) setDepartments(prev => prev.filter(d => d.id !== id))
   }
@@ -546,7 +555,14 @@ export function DepartmentsManager({ groupIconOptions = [] }: { groupIconOptions
   }
 
   async function handleDeleteRole(id: string) {
-    if (!confirm('Delete this role? Any campers signed up for it will lose their role assignment.')) return
+    const role = departments.flatMap(d => d.roles).find(r => r.id === id)
+    const ok = await confirm({
+      title: `Delete ${role ? `“${role.name}”` : 'this role'}?`,
+      body: 'Any campers signed up for it will lose their role assignment.',
+      confirmLabel: 'Delete role',
+      danger: true,
+    })
+    if (!ok) return
     const res = await fetch(`/api/admin/roles/${id}`, { method: 'DELETE' })
     if (res.ok) setDepartments(prev => prev.map(d => ({ ...d, roles: d.roles.filter(r => r.id !== id) })))
   }
@@ -620,6 +636,8 @@ export function DepartmentsManager({ groupIconOptions = [] }: { groupIconOptions
           shiftTypes={shiftTypes}
         />
       )}
+
+      {confirmDialog}
     </div>
   )
 }
