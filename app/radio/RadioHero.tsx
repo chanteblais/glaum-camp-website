@@ -109,8 +109,8 @@ const MAIN: [number, number][] = [
   [1030, 196], [1068, 158],
   [1120, 190], [1185, 226], [1250, 232], [1310, 216], [1352, 184],
   [1392, 140], [1430, 154],
-  [1462, 188],
-  [1502, 172], [1548, 184], [1600, 177],
+  // …and the curve it feeds into settles evenly, barely breathing
+  [1464, 185], [1506, 176], [1552, 181], [1600, 178],
 ]
 
 // Echo threads — the braid lives at the EDGES ONLY in the mock: two fine
