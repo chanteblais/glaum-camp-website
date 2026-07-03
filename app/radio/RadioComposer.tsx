@@ -6,7 +6,7 @@
 // through the admin broadcast route. Non-broadcasters see the composer
 // locked — the feed is theirs to read, the mic is not.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 const INPUT_ID = 'radio-composer-input'
@@ -16,6 +16,16 @@ export function RadioComposer({ isBroadcaster }: { isBroadcaster: boolean }) {
   const [message, setMessage] = useState('')
   const [posting, setPosting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Shorter placeholder on narrow screens — the full line truncates mid-word
+  // at ~380px. Set after mount (JS breakpoint, the house pattern) so SSR and
+  // hydration agree.
+  const [placeholder, setPlaceholder] = useState('Share an announcement with camp…')
+  useEffect(() => {
+    const pick = () => setPlaceholder(window.innerWidth < 700 ? 'Share an announcement…' : 'Share an announcement with camp…')
+    pick()
+    window.addEventListener('resize', pick)
+    return () => window.removeEventListener('resize', pick)
+  }, [])
 
   async function post() {
     if (!message.trim() || posting || !isBroadcaster) return
@@ -61,7 +71,7 @@ export function RadioComposer({ isBroadcaster }: { isBroadcaster: boolean }) {
           onKeyDown={e => { if (e.key === 'Enter') post() }}
           maxLength={280}
           disabled={!isBroadcaster}
-          placeholder="Share an announcement with camp…"
+          placeholder={placeholder}
           style={{
             flex: 1,
             minWidth: 0,

@@ -71,7 +71,10 @@ export default async function RadioPage() {
           the server escapes `>` to `&gt;` and hydration trips (house gotcha). */}
       <style dangerouslySetInnerHTML={{ __html: `
         .radio-stats { display: grid; grid-template-columns: repeat(4, 1fr); }
-        .radio-stat { display: flex; align-items: center; gap: 0.75rem; justify-content: center; padding: 0 0.75rem; min-width: 0; }
+        /* flex-start keeps every NUMBER on the same line regardless of how
+           many lines its label wraps to */
+        .radio-stat { display: flex; align-items: flex-start; gap: 0.75rem; justify-content: center; padding: 0 0.75rem; min-width: 0; }
+        .radio-stat-icon { margin-top: 2px; }
         .radio-stat + .radio-stat { border-left: 1px solid rgba(200,168,72,0.14); }
         .radio-stat-icon { opacity: 0.8; flex-shrink: 0; display: flex; }
         .radio-stat-num { display: block; font-size: 1.25rem; color: #C8A848; line-height: 1.1; }
