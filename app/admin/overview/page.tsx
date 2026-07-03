@@ -279,7 +279,7 @@ export default async function OverviewPage() {
             Shift Hours
           </p>
 
-          {shiftHours.slotCount === 0 ? (
+          {shiftHours.types.length === 0 ? (
             <p style={{ fontSize: '0.85rem', opacity: 0.35, fontStyle: 'italic' }}>No shifts on the schedule yet.</p>
           ) : (
             <>
@@ -288,6 +288,11 @@ export default async function OverviewPage() {
                   <p style={statLabel}>Total Shift Hours</p>
                   <p style={statValue}>{fmtH(shiftHours.totalScheduledHours)}</p>
                   <p style={statSub}>{shiftHours.slotCount} shift{shiftHours.slotCount === 1 ? '' : 's'} across {shiftHours.types.length} type{shiftHours.types.length === 1 ? '' : 's'}</p>
+                </div>
+                <div style={card()}>
+                  <p style={statLabel}>Hours Promised</p>
+                  <p style={statValue}>{fmtH(shiftHours.totalPromisedHours)}</p>
+                  <p style={statSub}>owed by attunement + group/role requirements across {shiftHours.approvedMemberCount} members</p>
                 </div>
                 <div style={card()}>
                   <p style={statLabel}>Hours Filled</p>
@@ -314,7 +319,12 @@ export default async function OverviewPage() {
                         {fmtH(t.scheduledHours)}
                         <span style={{ fontSize: '0.85rem', opacity: 0.55 }}> · {t.slotCount} shift{t.slotCount === 1 ? '' : 's'}</span>
                       </p>
-                      <p style={{ ...statSub, margin: '0.45rem 0 0' }}>
+                      <p style={{ ...statSub, margin: '0.45rem 0 0', opacity: t.promisedHours > 0 ? 0.6 : 0.35 }}>
+                        {t.promisedHours > 0
+                          ? `${fmtH(t.promisedHours)} promised by ${t.promisedMembers} member${t.promisedMembers === 1 ? '' : 's'}`
+                          : 'no hours promised by requirements'}
+                      </p>
+                      <p style={{ ...statSub, margin: '0.15rem 0 0' }}>
                         {fmtH(t.filledHours)} filled · {t.signupCount} signup{t.signupCount === 1 ? '' : 's'}
                       </p>
                       <p style={{ ...statSub, margin: '0.15rem 0 0', color: t.emptySlots > 0 ? '#ffb432' : undefined, opacity: t.emptySlots > 0 ? 0.75 : 0.45 }}>
