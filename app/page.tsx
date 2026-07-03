@@ -328,7 +328,7 @@ let canManagePolls = false
             .dash-attune:hover { border-color: rgba(200,168,72,0.75); background: rgba(200,168,72,0.14); }
             @media (max-width: 680px) {
               .dash-quote-card { display: none !important; }
-              [data-width="half"], [data-width="third"] { flex: 0 0 100% !important; }
+              [data-width="half"], [data-width="third"], [data-width="twothirds"] { flex: 0 0 100% !important; }
               .dash-hero-inner { flex-direction: column; align-items: flex-start; padding: 1.5rem 1.25rem; gap: 1rem; }
               .dash-spotlight  { grid-template-columns: 1fr; }
               .dash-quicklinks { grid-template-columns: 1fr; }
@@ -656,12 +656,13 @@ let canManagePolls = false
                     const w = widths[id]
                     const isHalf = w === 'half'
                     const isThird = w === 'third'
+                    const isTwoThirds = w === 'twothirds'
                     return (
                       <div
                         key={id}
                         data-widget-id={id}
-                        data-width={isHalf ? 'half' : isThird ? 'third' : 'full'}
-                        style={{ flex: isThird ? '0 0 calc(33.333% - 0.833rem)' : isHalf ? '0 0 calc(50% - 0.625rem)' : '0 0 100%', minWidth: 0 }}
+                        data-width={isHalf ? 'half' : isThird ? 'third' : isTwoThirds ? 'twothirds' : 'full'}
+                        style={{ flex: isThird ? '0 0 calc(33.333% - 0.833rem)' : isTwoThirds ? '0 0 calc(66.667% - 0.417rem)' : isHalf ? '0 0 calc(50% - 0.625rem)' : '0 0 100%', minWidth: 0 }}
                       >
                         {widget}
                       </div>

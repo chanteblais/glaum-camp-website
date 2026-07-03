@@ -38,7 +38,7 @@ function getCurrentWidths(): Record<string, string> {
   const widths: Record<string, string> = {}
   getWidgetEls().forEach(el => {
     const w = el.dataset.width
-    if (w === 'half' || w === 'third') widths[el.dataset.widgetId!] = w
+    if (w === 'half' || w === 'third' || w === 'twothirds') widths[el.dataset.widgetId!] = w
   })
   return widths
 }
@@ -255,9 +255,17 @@ export function HomePageEditor({ initialContent }: { initialContent: Content }) 
         transition: opacity 0.15s, background 0.15s;
         user-select: none;
       `
-      const widthLabel = (w: string) => w === 'half' ? '½' : w === 'third' ? '⅓' : '⊞'
+      const widthLabel = (w: string) => w === 'half' ? '½' : w === 'third' ? '⅓' : w === 'twothirds' ? '⅔' : '⊞'
+      // Shared width vocabulary: flex basis per width, and the width that fills
+      // the rest of a row next to a given neighbour (third ↔ twothirds pair up).
+      const flexFor = (w?: string | null) =>
+        w === 'third' ? '0 0 calc(33.333% - 0.833rem)'
+        : w === 'twothirds' ? '0 0 calc(66.667% - 0.417rem)'
+        : w === 'half' ? '0 0 calc(50% - 0.625rem)'
+        : '0 0 100%'
+      const complementOf = (w?: string | null) => w === 'third' ? 'twothirds' : w === 'twothirds' ? 'third' : 'half'
       widthBtn.textContent = widthLabel(widget.dataset.width ?? 'full')
-      widthBtn.title = 'Cycle width: full → half → third'
+      widthBtn.title = 'Cycle width: full → half → third → two-thirds'
 
       handle.innerHTML = `<span style="font-size:15px;opacity:.65;line-height:1">⠿</span><span style="opacity:.55;font-size:10.5px;text-transform:uppercase;letter-spacing:.1em">${WIDGET_LABELS[id] ?? id}</span>`
       handle.appendChild(widthBtn)
@@ -265,16 +273,16 @@ export function HomePageEditor({ initialContent }: { initialContent: Content }) 
       widthBtn.addEventListener('click', (e: MouseEvent) => {
         e.stopPropagation()
         const cur = widget.dataset.width ?? 'full'
-        const next = cur === 'full' ? 'half' : cur === 'half' ? 'third' : 'full'
+        const next = cur === 'full' ? 'half' : cur === 'half' ? 'third' : cur === 'third' ? 'twothirds' : 'full'
         widget.dataset.width = next
-        widget.style.flex = next === 'third' ? '0 0 calc(33.333% - 0.833rem)' : next === 'half' ? '0 0 calc(50% - 0.625rem)' : '0 0 100%'
+        widget.style.flex = flexFor(next)
         widthBtn.textContent = widthLabel(next)
         widthBtn.style.background = next !== 'full' ? 'rgba(200,168,72,0.15)' : ''
         markChanged()
       })
 
       // Reflect initial state
-      if (widget.dataset.width === 'half' || widget.dataset.width === 'third') {
+      if (widget.dataset.width && widget.dataset.width !== 'full') {
         widthBtn.style.background = 'rgba(200,168,72,0.15)'
       }
 
@@ -309,16 +317,17 @@ export function HomePageEditor({ initialContent }: { initialContent: Content }) 
       }
 
       function setAdjacent(other: HTMLElement, goAfter: boolean) {
+        // The neighbour keeps its width (full shrinks to half); the dropped
+        // widget previews at the complement so the pair fills the row.
+        const ow = other.dataset.width
+        const keptWidth = ow === 'third' || ow === 'twothirds' ? ow : 'half'
         if (tempResizedWidget !== other) {
           restoreTempResize()
-          const ow = other.dataset.width
-          tempOriginalFlex = ow === 'third' ? '0 0 calc(33.333% - 0.833rem)' : ow === 'half' ? '0 0 calc(50% - 0.625rem)' : '0 0 100%'
-          const adjFlex = ow === 'third' ? '0 0 calc(33.333% - 0.833rem)' : '0 0 calc(50% - 0.625rem)'
-          other.style.flex = adjFlex
+          tempOriginalFlex = flexFor(ow)
+          other.style.flex = flexFor(keptWidth)
           tempResizedWidget = other
         }
-        const adjFlex = other.dataset.width === 'third' ? '0 0 calc(33.333% - 0.833rem)' : '0 0 calc(50% - 0.625rem)'
-        placeholder!.style.flex = adjFlex
+        placeholder!.style.flex = flexFor(complementOf(keptWidth))
         placeholderHalf = true
         placeholderAdjacent = other
         if (goAfter) {
@@ -356,7 +365,7 @@ export function HomePageEditor({ initialContent }: { initialContent: Content }) 
         placeholder = document.createElement('div')
         placeholder.style.cssText = `
           height: ${rect.height}px;
-          flex: ${widget.dataset.width === 'third' ? '0 0 calc(33.333% - 0.833rem)' : widget.dataset.width === 'half' ? '0 0 calc(50% - 0.625rem)' : '0 0 100%'};
+          flex: ${flexFor(widget.dataset.width)};
           border: 1px dashed rgba(200,168,72,0.3);
           border-radius: 1rem;
           background: rgba(200,168,72,0.03);
@@ -450,33 +459,23 @@ export function HomePageEditor({ initialContent }: { initialContent: Content }) 
           handle.style.cursor = 'grab'
           handle.style.opacity = '0'
 
-          const snapHalf = (el: HTMLElement, btn: HTMLElement) => {
-            el.dataset.width = 'half'
-            el.style.flex = '0 0 calc(50% - 0.625rem)'
-            btn.textContent = '½'
-            btn.style.background = 'rgba(200,168,72,0.15)'
-          }
-          const snapFull = (el: HTMLElement, btn: HTMLElement) => {
-            el.dataset.width = 'full'
-            el.style.flex = '0 0 100%'
-            btn.textContent = '⊞'
-            btn.style.background = ''
-          }
-          const snapThird = (el: HTMLElement, btn: HTMLElement) => {
-            el.dataset.width = 'third'
-            el.style.flex = '0 0 calc(33.333% - 0.833rem)'
-            btn.textContent = '⅓'
-            btn.style.background = 'rgba(200,168,72,0.15)'
+          const snapTo = (w: string) => (el: HTMLElement, btn: HTMLElement) => {
+            el.dataset.width = w
+            el.style.flex = flexFor(w)
+            btn.textContent = widthLabel(w)
+            btn.style.background = w !== 'full' ? 'rgba(200,168,72,0.15)' : ''
           }
 
           if (placeholderHalf) {
-            // Match the adjacent widget's width when placing beside it
+            // Placing beside a neighbour: the neighbour keeps its width (full
+            // shrinks to half) and the dropped widget takes the complement so
+            // the pair fills the row (third ↔ two-thirds, half ↔ half).
             const adjWidth = placeholderAdjacent?.dataset.width ?? 'half'
-            const snap = adjWidth === 'third' ? snapThird : snapHalf
-            snap(widget, widthBtn)
+            const keptWidth = adjWidth === 'third' || adjWidth === 'twothirds' ? adjWidth : 'half'
+            snapTo(complementOf(keptWidth))(widget, widthBtn)
             if (placeholderAdjacent) {
               const adjBtn = widgetWidthBtnMap.get(placeholderAdjacent)
-              if (adjBtn) snap(placeholderAdjacent, adjBtn)
+              if (adjBtn) snapTo(keptWidth)(placeholderAdjacent, adjBtn)
             }
           } else {
             // Restore original width — don't resize when just reordering
