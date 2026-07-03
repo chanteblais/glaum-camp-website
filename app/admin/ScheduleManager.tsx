@@ -84,7 +84,7 @@ function sortByTime(evs: ScheduleEvent[]): ScheduleEvent[] {
 
 const blank = (): Omit<ScheduleEvent, 'id' | 'sort_order'> => ({
   day: '', time: '', title: '', subtitle: '', detail_desc: '',
-  icon_type: 'star', visible: true, highlight: false, is_recurring: false, capacity: null, event_type: null, contribution_type: null, event_date: null, event_category: 'at_camp', participation_type: 'general', shift_type_id: null, requires_ack: false, start_time: null, end_time: null, needs_lead: false, recurrence_days: null,
+  icon_type: '/asset-library/icons/star.webp', visible: true, highlight: false, is_recurring: false, capacity: null, event_type: null, contribution_type: null, event_date: null, event_category: 'at_camp', participation_type: 'general', shift_type_id: null, requires_ack: false, start_time: null, end_time: null, needs_lead: false, recurrence_days: null,
 })
 
 const inputStyle: React.CSSProperties = {
