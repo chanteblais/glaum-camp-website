@@ -27,9 +27,12 @@ type ResourceList = {
 const GOLD = '#C8A848'
 const GREEN = '#7dcf8e'
 
-export function ResourceCommitments() {
+// Server-rendered pages pass the same shape /api/resources returns
+// (lib/resources.ts → getMemberResourceView), so the section renders with its
+// data already in place and skips the fetch-after-hydration round-trip.
+export function ResourceCommitments({ initialLists }: { initialLists?: ResourceList[] }) {
   const router = useRouter()
-  const [lists, setLists] = useState<ResourceList[] | null>(null)
+  const [lists, setLists] = useState<ResourceList[] | null>(initialLists ?? null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   // Inline "Offer it" form — open on at most one list at a time.
@@ -44,11 +47,16 @@ export function ResourceCommitments() {
       .then(d => setLists(d.lists ?? []))
       .catch(() => setLists([]))
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    if (initialLists) return
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  // Deep links (/participate#bring, e.g. from the home widget): the page's
-  // sections load client-side (the shift picker above this one included), so
-  // a single scroll — native or ours — gets undone when later content lands
+  // Deep links (/participate#bring, e.g. from the home widget): the sections
+  // now arrive server-rendered, but late layout shifts (images, fonts) can
+  // still nudge the anchor, and a single scroll — native or ours — gets undone
+  // when later content lands
   // above the anchor and pushes it down. Instead, pin the anchor on every
   // layout change for the first few seconds, then let go. The first wheel or
   // touch hands control back to the user immediately.

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { auth, currentUser, clerkClient } from '@clerk/nextjs/server'
+import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import {
   findGroupConversation,
@@ -83,15 +83,27 @@ export async function POST(req: Request, { params }: { params: { groupId: string
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  if (!(await isGroupMember(params.groupId, userId))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
-
   const { body, parentMessageId } = await req.json()
   if (!body?.trim()) return NextResponse.json({ error: 'body is required' }, { status: 400 })
   if (body.trim().length > 2000) return NextResponse.json({ error: 'Message too long' }, { status: 400 })
 
-  const convId = await getOrCreateGroupConversation(params.groupId)
+  // Membership gate, conversation lookup (read-only here — creation waits for
+  // the gate), and the sender-name snapshot are independent: one round-trip.
+  const [isMember, existingConvId, { data: senderApp }] = await Promise.all([
+    isGroupMember(params.groupId, userId),
+    findGroupConversation(params.groupId),
+    // Snapshot the sender's display name (the messages table has no FK to applications).
+    supabaseAdmin
+      .from('members')
+      .select('preferred_name, first_name')
+      .eq('clerk_user_id', userId)
+      .maybeSingle(),
+  ])
+  if (!isMember) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const convId = existingConvId ?? await getOrCreateGroupConversation(params.groupId)
 
   // Replies are one level deep: a parent must be a top-level message in this
   // conversation (you can't reply to a reply).
@@ -108,14 +120,7 @@ export async function POST(req: Request, { params }: { params: { groupId: string
     parent_message_id = parentMessageId
   }
 
-  // Snapshot the sender's display name (the messages table has no FK to applications).
-  const { data: senderApp } = await supabaseAdmin
-    .from('members')
-    .select('preferred_name, first_name')
-    .eq('clerk_user_id', userId)
-    .maybeSingle()
-  const user = await currentUser()
-  const senderName = senderApp?.preferred_name || senderApp?.first_name || user?.firstName || 'A member'
+  const senderName = senderApp?.preferred_name || senderApp?.first_name || 'A member'
 
   const { data: message, error } = await supabaseAdmin
     .from('messages')
@@ -125,32 +130,35 @@ export async function POST(req: Request, { params }: { params: { groupId: string
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // I've seen everything up to my own post.
-  await markConversationRead(convId, userId)
-
-  // @mentions pierce the quiet default: notify (in-app) + email the mentioned
-  // members. Opted-in members get a throttled activity email. Best-effort — never
-  // block the post on notifications.
-  try {
-    const mentionedIds = await notifyMentions({
-      groupId: params.groupId,
-      messageId: message.id,
-      senderId: userId,
-      senderName,
-      body: body.trim(),
-    })
-    await notifyOptedIn({
-      groupId: params.groupId,
-      conversationId: convId,
-      messageCreatedAt: message.created_at,
-      senderId: userId,
-      senderName,
-      body: body.trim(),
-      excludeIds: mentionedIds,
-    })
-  } catch (err) {
-    console.error('[group message] notify failed:', err)
-  }
+  // Read-cursor bump ("I've seen everything up to my own post") and the notify
+  // chain are independent — run together. @mentions pierce the quiet default:
+  // notify (in-app) + email the mentioned members. Opted-in members get a
+  // throttled activity email. Best-effort — never block the post on notifications.
+  await Promise.all([
+    markConversationRead(convId, userId),
+    (async () => {
+      try {
+        const mentionedIds = await notifyMentions({
+          groupId: params.groupId,
+          messageId: message.id,
+          senderId: userId,
+          senderName,
+          body: body.trim(),
+        })
+        await notifyOptedIn({
+          groupId: params.groupId,
+          conversationId: convId,
+          messageCreatedAt: message.created_at,
+          senderId: userId,
+          senderName,
+          body: body.trim(),
+          excludeIds: mentionedIds,
+        })
+      } catch (err) {
+        console.error('[group message] notify failed:', err)
+      }
+    })(),
+  ])
 
   return NextResponse.json({ message })
 }
@@ -168,17 +176,18 @@ async function notifyMentions(opts: {
   const { groupId, messageId, senderId, senderName, body } = opts
   if (!body.includes('@')) return [] // fast path: no mentions possible
 
+  // Group roster and group name are independent — one round-trip.
+  const [{ data: memberRows }, { data: group }] = await Promise.all([
+    supabaseAdmin.from('group_members').select('clerk_user_id').eq('group_id', groupId),
+    supabaseAdmin.from('groups').select('name').eq('id', groupId).maybeSingle(),
+  ])
   // Group members other than the sender.
-  const { data: memberRows } = await supabaseAdmin
-    .from('group_members')
-    .select('clerk_user_id')
-    .eq('group_id', groupId)
   const memberIds = (memberRows ?? []).map(r => r.clerk_user_id).filter(id => id && id !== senderId)
   if (!memberIds.length) return []
 
   const { data: apps } = await supabaseAdmin
     .from('members')
-    .select('clerk_user_id, first_name, preferred_name')
+    .select('clerk_user_id, first_name, preferred_name, email')
     .in('clerk_user_id', memberIds)
 
   // Which members are mentioned (whole-token match on "@Name").
@@ -189,24 +198,28 @@ async function notifyMentions(opts: {
   })
   if (!mentioned.length) return []
 
-  const { data: group } = await supabaseAdmin.from('groups').select('name').eq('id', groupId).maybeSingle()
   const groupName = group?.name || 'a group'
-  const client = await clerkClient()
   const since = new Date(Date.now() - MENTION_EMAIL_THROTTLE_MS).toISOString()
 
-  for (const a of mentioned) {
+  // Each mentioned member's notification work is independent — run in parallel
+  // (emails come from the member row; no per-recipient Clerk round-trips).
+  await Promise.all(mentioned.map(async a => {
     const recipientId = a.clerk_user_id
     const recipientName = a.preferred_name || a.first_name || 'there'
 
-    // Throttle email (look for a prior mention notification before creating this one).
-    const { data: recent } = await supabaseAdmin
-      .from('user_notifications')
-      .select('id')
-      .eq('clerk_user_id', recipientId)
-      .eq('event_type', 'group_mention')
-      .eq('details->>groupId', groupId)
-      .gte('created_at', since)
-      .limit(1)
+    // Throttle email (look for a prior mention notification before creating this
+    // one) and the email preference — independent checks.
+    const [{ data: recent }, prefs] = await Promise.all([
+      supabaseAdmin
+        .from('user_notifications')
+        .select('id')
+        .eq('clerk_user_id', recipientId)
+        .eq('event_type', 'group_mention')
+        .eq('details->>groupId', groupId)
+        .gte('created_at', since)
+        .limit(1),
+      getNotificationPreferences(recipientId),
+    ])
     const throttled = !!(recent && recent.length)
 
     // In-app notification — always.
@@ -217,20 +230,17 @@ async function notifyMentions(opts: {
       details: { groupId, messageId },
     })
 
-    if (throttled) continue
+    if (throttled) return
 
     // Email — gated by the recipient's message-email preference.
     try {
-      const prefs = await getNotificationPreferences(recipientId)
-      if (!prefs.email_new_message) continue
-      const recipientUser = await client.users.getUser(recipientId)
-      const email = recipientUser.emailAddresses[0]?.emailAddress
-      if (!email) continue
-      await sendGroupMentionEmail({ to: email, recipientName, senderName, groupName, groupId, preview: body })
+      if (!prefs.email_new_message) return
+      if (!a.email) return
+      await sendGroupMentionEmail({ to: a.email, recipientName, senderName, groupName, groupId, preview: body })
     } catch (err) {
       console.error('[group message] mention email failed:', err)
     }
-  }
+  }))
 
   return mentioned.map(a => a.clerk_user_id)
 }
@@ -250,47 +260,50 @@ async function notifyOptedIn(opts: {
 }) {
   const { groupId, conversationId, messageCreatedAt, senderId, senderName, body, excludeIds } = opts
 
-  // Opted-in participants other than the sender (and not already mentioned).
-  const { data: optedIn } = await supabaseAdmin
-    .from('conversation_participants')
-    .select('clerk_user_id')
-    .eq('conversation_id', conversationId)
-    .eq('email_opt_in', true)
-    .neq('clerk_user_id', senderId)
+  // Opted-in participants, the per-conversation burst throttle, and the group
+  // name are independent — one round-trip.
+  const since = new Date(Date.now() - MENTION_EMAIL_THROTTLE_MS).toISOString()
+  const [{ data: optedIn }, { data: priorBurst }, { data: group }] = await Promise.all([
+    // Opted-in participants other than the sender (and not already mentioned).
+    supabaseAdmin
+      .from('conversation_participants')
+      .select('clerk_user_id')
+      .eq('conversation_id', conversationId)
+      .eq('email_opt_in', true)
+      .neq('clerk_user_id', senderId),
+    // Per-conversation throttle: skip if there was another message in the window.
+    supabaseAdmin
+      .from('messages')
+      .select('id')
+      .eq('conversation_id', conversationId)
+      .lt('created_at', messageCreatedAt)
+      .gte('created_at', since)
+      .limit(1),
+    supabaseAdmin.from('groups').select('name').eq('id', groupId).maybeSingle(),
+  ])
   const exclude = new Set([...excludeIds, senderId])
   const recipientIds = (optedIn ?? []).map(p => p.clerk_user_id).filter(id => id && !exclude.has(id))
   if (!recipientIds.length) return
-
-  // Per-conversation throttle: skip if there was another message in the window.
-  const since = new Date(Date.now() - MENTION_EMAIL_THROTTLE_MS).toISOString()
-  const { data: priorBurst } = await supabaseAdmin
-    .from('messages')
-    .select('id')
-    .eq('conversation_id', conversationId)
-    .lt('created_at', messageCreatedAt)
-    .gte('created_at', since)
-    .limit(1)
   if (priorBurst && priorBurst.length) return
 
-  const { data: group } = await supabaseAdmin.from('groups').select('name').eq('id', groupId).maybeSingle()
   const groupName = group?.name || 'a group'
   const { data: apps } = await supabaseAdmin
     .from('members')
-    .select('clerk_user_id, first_name, preferred_name')
+    .select('clerk_user_id, first_name, preferred_name, email')
     .in('clerk_user_id', recipientIds)
-  const nameById = new Map((apps ?? []).map(a => [a.clerk_user_id, a.preferred_name || a.first_name || 'there']))
-  const client = await clerkClient()
+  const memberById = new Map((apps ?? []).map(a => [a.clerk_user_id, a]))
 
-  for (const recipientId of recipientIds) {
+  // Recipients are independent — run in parallel (emails come from the member
+  // row; no per-recipient Clerk round-trips).
+  await Promise.all(recipientIds.map(async recipientId => {
     try {
       const prefs = await getNotificationPreferences(recipientId)
-      if (!prefs.email_new_message) continue
-      const recipientUser = await client.users.getUser(recipientId)
-      const email = recipientUser.emailAddresses[0]?.emailAddress
-      if (!email) continue
-      await sendGroupActivityEmail({ to: email, recipientName: nameById.get(recipientId) || 'there', senderName, groupName, groupId, preview: body })
+      if (!prefs.email_new_message) return
+      const m = memberById.get(recipientId)
+      if (!m?.email) return
+      await sendGroupActivityEmail({ to: m.email, recipientName: m.preferred_name || m.first_name || 'there', senderName, groupName, groupId, preview: body })
     } catch (err) {
       console.error('[group message] opt-in email failed:', err)
     }
-  }
+  }))
 }

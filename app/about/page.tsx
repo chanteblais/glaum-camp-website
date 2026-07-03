@@ -1,29 +1,21 @@
-import { auth, currentUser } from '@clerk/nextjs/server'
+import { auth } from '@clerk/nextjs/server'
 import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
 import { Section, Kicker } from '@/components/Section'
 import { supabaseAdmin } from '@/lib/supabase'
+import { resolveMemberForUser } from '@/lib/members'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AboutPage() {
   const { userId } = await auth()
 
-  let hasApplied = false
-  if (userId) {
-    const user = await currentUser()
-    const email = user?.emailAddresses[0]?.emailAddress
-    const { data } = await supabaseAdmin
-      .from('members')
-      .select('id, status')
-      .or(`clerk_user_id.eq.${userId},email.eq.${email}`)
-      .neq('status', 'cancelled')
-      .limit(1)
-      .maybeSingle()
-    hasApplied = !!data
-  }
-
-  const pageContentResult = await supabaseAdmin.from('page_content').select('key, value')
+  // Member lookup and page content are independent — one round-trip.
+  const [member, pageContentResult] = await Promise.all([
+    userId ? resolveMemberForUser(userId) : Promise.resolve(null),
+    supabaseAdmin.from('page_content').select('key, value'),
+  ])
+  const hasApplied = !!member && member.status !== 'cancelled'
   const contentRows = pageContentResult.data
   const pageContent: Record<string, string> = Object.fromEntries((contentRows ?? []).map(r => [r.key, r.value]))
   const c = (key: string, fallback: string) => pageContent[key] ?? fallback

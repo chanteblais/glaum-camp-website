@@ -996,16 +996,24 @@ function ShiftsPicker({
 
 // ── Section Wrapper (owns state) ──────────────────────────────────────────────
 
-export function SignupSection({ showPickers = true }: { showPickers?: boolean }) {
-  const [departments, setDepartments] = useState<Department[]>([])
-  const [signup, setSignup] = useState<Signup | null>(null)
-  const [shifts, setShifts] = useState<ShiftSlot[]>([])
-  const [owed, setOwed] = useState<OwedReq[]>([])
-  const [shiftTypes, setShiftTypes] = useState<ShiftTypeInfo[]>([])
-  const [shiftSignupOpen, setShiftSignupOpen] = useState(true)
-  const [loading, setLoading] = useState(true)
+// Server-rendered pages pass the same shapes /api/signup and /api/shift-signups
+// return, assembled via lib/participate-data.ts — the section then renders with
+// its data already in place and skips the fetch-after-hydration round-trip.
+export type SignupInitialData = {
+  role: { departments: Department[]; signup: Signup | null }
+  shifts: { shifts: ShiftSlot[]; owed: OwedReq[]; shiftTypes: ShiftTypeInfo[]; shiftSignupOpen: boolean }
+}
 
-  const [selectedRole, setSelectedRole] = useState<string | null>(null)
+export function SignupSection({ showPickers = true, initialData }: { showPickers?: boolean; initialData?: SignupInitialData }) {
+  const [departments, setDepartments] = useState<Department[]>(initialData?.role.departments ?? [])
+  const [signup, setSignup] = useState<Signup | null>(initialData?.role.signup ?? null)
+  const [shifts, setShifts] = useState<ShiftSlot[]>(initialData?.shifts.shifts ?? [])
+  const [owed, setOwed] = useState<OwedReq[]>(initialData?.shifts.owed ?? [])
+  const [shiftTypes, setShiftTypes] = useState<ShiftTypeInfo[]>(initialData?.shifts.shiftTypes ?? [])
+  const [shiftSignupOpen, setShiftSignupOpen] = useState(initialData ? initialData.shifts.shiftSignupOpen !== false : true)
+  const [loading, setLoading] = useState(!initialData)
+
+  const [selectedRole, setSelectedRole] = useState<string | null>(initialData?.role.signup?.role_id ?? null)
   const [saving, setSaving] = useState(false)
   const [signingId, setSigningId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -1013,8 +1021,10 @@ export function SignupSection({ showPickers = true }: { showPickers?: boolean })
   const [showSuggest, setShowSuggest] = useState(false)
 
   // Roles come from the legacy /api/signup; shifts from the many-to-many
-  // /api/shift-signups (owed requirements + held slots + hours).
+  // /api/shift-signups (owed requirements + held slots + hours). Skipped when
+  // the server already rendered the section with initialData.
   useEffect(() => {
+    if (initialData) return
     Promise.all([
       fetch('/api/signup').then(r => r.json()),
       fetch('/api/shift-signups').then(r => r.json()),
@@ -1029,6 +1039,7 @@ export function SignupSection({ showPickers = true }: { showPickers?: boolean })
         setShiftSignupOpen(shiftData.shiftSignupOpen !== false)
       })
       .finally(() => setLoading(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const hasRoles = departments.some(d => d.roles.length > 0)

@@ -1,6 +1,7 @@
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { resolveMember } from '@/lib/members'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,6 +18,24 @@ export async function GET() {
     )
   }
 
+  // Fast path: a linked member row answers everything the nav needs (name,
+  // email, avatar, approval) from one indexed query — no Clerk Backend-API
+  // round-trip, which this route otherwise pays on every page view.
+  const memberRow = await resolveMember(userId)
+  if (memberRow) {
+    return NextResponse.json(
+      {
+        isSignedIn: true,
+        isApproved: memberRow.status === 'approved',
+        firstName: memberRow.preferred_name ?? memberRow.first_name ?? null,
+        email: memberRow.email ?? null,
+        avatarUrl: memberRow.avatar_url ?? null,
+      },
+      { headers: { 'Cache-Control': 'no-store' } }
+    )
+  }
+
+  // No member row (signed-in non-member): resolve identity from Clerk.
   const user = await currentUser()
 
   if (!user) {
