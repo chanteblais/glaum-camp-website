@@ -266,7 +266,7 @@ export function HeaderClient({ initialAuth }: { initialAuth?: NavAuthState }) {
             </div>
           )}
           {[
-            { href: '/about', label: 'About' },
+            { href: '/about', label: 'About Glåüm' },
             ...(isAdmin ? [{ href: '/admin', label: 'Admin' }] : []),
           ].map(({ href, label }) => (
             <Link
