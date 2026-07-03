@@ -6,3 +6,4 @@ node_modules
 out
 tsconfig.tsbuildinfo
 scripts/logs/
+scripts/clerk-id-map.json
