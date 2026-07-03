@@ -1,6 +1,7 @@
-import { auth, currentUser } from '@clerk/nextjs/server'
+import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getApprovedMember } from '@/lib/members'
 import { Header } from '@/components/Header'
 import { MembersGrid, type MemberCard } from './MembersGrid'
 
@@ -8,21 +9,10 @@ export default async function MembersPage() {
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
 
-  // Only approved members can view the directory
-  const user = await currentUser()
-  const email = user?.emailAddresses[0]?.emailAddress
-
-  const { data: viewer } = await supabaseAdmin
-    .from('members')
-    .select('status')
-    .or(`clerk_user_id.eq.${userId},email.eq.${email}`)
-    .eq('status', 'approved')
-    .maybeSingle()
-
-  if (!viewer) redirect('/profile')
-
-  // Fetch approved members and their signups separately, then join in JS
-  const [{ data: members }, { data: signups }] = await Promise.all([
+  // The viewer gate (approved members only) runs alongside the directory
+  // queries — it gates the response, not what we fetch.
+  const [viewer, { data: members }, { data: signups }] = await Promise.all([
+    getApprovedMember(userId),
     supabaseAdmin
       .from('applications')
       .select('id, first_name, preferred_name, avatar_url, clerk_user_id')
@@ -32,6 +22,8 @@ export default async function MembersPage() {
       .from('camp_signups')
       .select('clerk_user_id, role_approval_status, roles ( name, departments ( name, icon ) )'),
   ])
+
+  if (!viewer) redirect('/profile')
 
   const signupByUser = Object.fromEntries(
     (signups ?? []).map(s => [s.clerk_user_id, s])

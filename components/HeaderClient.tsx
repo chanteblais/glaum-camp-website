@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth, useUser } from '@clerk/nextjs'
+import { supabaseResizedUrl } from '@/lib/supabase-image'
 import { UserNotificationBell } from './UserNotificationBell'
 import { NotificationBell } from '@/app/admin/NotificationBell'
 import { MessagesNavLink } from './MessagesNavLink'
@@ -12,7 +13,7 @@ const AUTH_MEMORY_KEY = 'glaum-auth-signed-in'
 const AUTH_NAME_KEY = 'glaum-auth-first-name'
 const AUTH_EMAIL_KEY = 'glaum-auth-email'
 
-type NavAuthState = {
+export type NavAuthState = {
   isSignedIn: boolean
   isApproved?: boolean
   firstName?: string | null
@@ -34,7 +35,11 @@ const memberNavLinks = [
   { href: '/profile', label: 'My Profile' },
 ]
 
-export function HeaderClient() {
+// `initialAuth` comes from the server Header (auth() + member row at render
+// time), so the very first paint already shows the right nav — the Clerk
+// client state, /api/nav-auth fetch, and localStorage fallbacks below only
+// matter when it's absent.
+export function HeaderClient({ initialAuth }: { initialAuth?: NavAuthState }) {
   const { isLoaded, isSignedIn } = useAuth()
   const { user } = useUser()
   const pathname = usePathname()
@@ -44,7 +49,7 @@ export function HeaderClient() {
   const isActiveLink = (href: string) =>
     pathname === href || pathname.startsWith(href + '/')
   const [mounted, setMounted] = useState(false)
-  const [serverAuth, setServerAuth] = useState<NavAuthState | null>(null)
+  const [serverAuth, setServerAuth] = useState<NavAuthState | null>(initialAuth ?? null)
   const [authChecked, setAuthChecked] = useState(false)
   const [hasRememberedAuth, setHasRememberedAuth] = useState(false)
   const [rememberedFirstName, setRememberedFirstName] = useState<string | null>(null)
@@ -54,7 +59,10 @@ export function HeaderClient() {
   const [isMobile, setIsMobile] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  const signedIn = mounted && (Boolean(isSignedIn) || Boolean(serverAuth?.isSignedIn) || hasRememberedAuth)
+  // serverAuth is render-time truth (present from the first SSR paint when the
+  // server passed it), so it isn't gated on `mounted` — that gate is what used
+  // to flash the signed-out nav for a beat on every page load.
+  const signedIn = Boolean(serverAuth?.isSignedIn) || (mounted && (Boolean(isSignedIn) || hasRememberedAuth))
   const isApproved = Boolean(serverAuth?.isApproved)
   const userFirstName = user?.firstName ?? serverAuth?.firstName ?? rememberedFirstName
   const userEmail = user?.primaryEmailAddress?.emailAddress ?? serverAuth?.email ?? rememberedEmail
@@ -109,6 +117,24 @@ export function HeaderClient() {
   useEffect(() => {
     if (!mounted) return
 
+    // The server already resolved auth for this page render — no need to ask
+    // /api/nav-auth again; just keep the localStorage memory in sync.
+    if (initialAuth) {
+      setAuthChecked(true)
+      if (initialAuth.isSignedIn) {
+        window.localStorage.setItem(AUTH_MEMORY_KEY, 'true')
+        setHasRememberedAuth(true)
+      } else {
+        window.localStorage.removeItem(AUTH_MEMORY_KEY)
+        window.localStorage.removeItem(AUTH_NAME_KEY)
+        window.localStorage.removeItem(AUTH_EMAIL_KEY)
+        setHasRememberedAuth(false)
+        setRememberedFirstName(null)
+        setRememberedEmail(null)
+      }
+      return
+    }
+
     let cancelled = false
     let timeoutId: ReturnType<typeof setTimeout> | undefined
 
@@ -151,6 +177,7 @@ export function HeaderClient() {
       cancelled = true
       if (timeoutId) clearTimeout(timeoutId)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mounted])
 
   useEffect(() => {
@@ -208,7 +235,7 @@ export function HeaderClient() {
       >
         {avatarUrl ? (
           <img
-            src={avatarUrl}
+            src={supabaseResizedUrl(avatarUrl, 68) ?? avatarUrl}
             alt={userFirstName ?? 'Profile'}
             style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
           />

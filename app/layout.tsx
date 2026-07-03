@@ -62,6 +62,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       signInUrl="/sign-in"
     >
       <html lang="en">
+        <head>
+          {/* Avatars and group icons load from Supabase Storage — warm up the
+              connection so the first image skips DNS + TLS (~100-300ms). */}
+          {process.env.NEXT_PUBLIC_SUPABASE_URL && (
+            <link rel="preconnect" href={process.env.NEXT_PUBLIC_SUPABASE_URL} />
+          )}
+        </head>
         <body
           className={`${libreBaskerville.variable} ${marcellus.variable} ${cormorantGaramond.variable}`}
           style={{ fontFamily: 'var(--font-libre-baskerville), Georgia, serif' }}

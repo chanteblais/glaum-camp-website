@@ -7,6 +7,7 @@
 // a benign value rather than throwing — a failure must never break the primary
 // application/profile flow. See docs/profile-architecture.md.
 
+import { cache } from 'react'
 import { currentUser } from '@clerk/nextjs/server'
 import { supabaseAdmin } from './supabase'
 
@@ -29,8 +30,12 @@ const MEMBER_COLUMNS =
 
 export type MemberIdentity = Partial<Omit<MemberRecord, 'id' | 'clerk_user_id'>>
 
-/** Find a member by clerk_user_id (preferred), falling back to email. */
-export async function resolveMember(
+/**
+ * Find a member by clerk_user_id (preferred), falling back to email.
+ * Request-cached (React cache): the Header and the page it sits on share one
+ * lookup per render instead of querying twice.
+ */
+export const resolveMember = cache(async function resolveMember(
   clerkUserId: string | null,
   email?: string | null,
 ): Promise<MemberRecord | null> {
@@ -51,7 +56,7 @@ export async function resolveMember(
     console.error('[members] resolveMember failed', e)
   }
   return null
-}
+})
 
 /**
  * Resolve the signed-in user's member row without a Clerk Backend-API
