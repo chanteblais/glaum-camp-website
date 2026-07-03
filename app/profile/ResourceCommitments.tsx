@@ -3,11 +3,13 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
-// The member face of Shared Resources — a preparation board, not an
+// The member face of Shared Resources — a coordination workspace, not an
 // inventory. It answers "what can I do that would be most helpful?" first:
-// a pinned I'M BRINGING card, per-list readiness (84% Ready), items grouped
-// Still Needed → Covered → Suggested, visible names on every commitment
-// (social proof), and expandable rows for detail. See docs/shared-resources.md.
+// a community pulse line, a pinned I'M BRINGING card, one card per list with
+// automatic health (Needs Attention / Almost Ready / Complete) and resource
+// counts ("18 of 22 covered" — not unit percentages), dense task-list rows
+// grouped Still Needed → Covered → Suggested with inline claimant names,
+// and expandable rows for full detail. See docs/shared-resources.md.
 
 type Claimant = { name: string; quantity: number; me: boolean }
 type ResourceItem = {
@@ -31,6 +33,11 @@ type ResourceList = {
   steward_name: string | null
   items: ResourceItem[]
 }
+// Proof that people are preparing together — derived from claim timestamps.
+type ResourcePulse = {
+  contributorsToday: number
+  latest: { name: string; itemName: string; coveredIt: boolean } | null
+}
 
 const GOLD = '#C8A848'
 const GREEN = '#7dcf8e'
@@ -50,9 +57,10 @@ function claimantLine(c: Claimant) {
 // Server-rendered pages pass the same shape /api/resources returns
 // (lib/resources.ts → getMemberResourceView), so the section renders with its
 // data already in place and skips the fetch-after-hydration round-trip.
-export function ResourceCommitments({ initialLists }: { initialLists?: ResourceList[] }) {
+export function ResourceCommitments({ initialLists, initialPulse }: { initialLists?: ResourceList[]; initialPulse?: ResourcePulse }) {
   const router = useRouter()
   const [lists, setLists] = useState<ResourceList[] | null>(initialLists ?? null)
+  const [pulse, setPulse] = useState<ResourcePulse | null>(initialPulse ?? null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -66,7 +74,7 @@ export function ResourceCommitments({ initialLists }: { initialLists?: ResourceL
   const load = () =>
     fetch('/api/resources')
       .then(r => r.json())
-      .then(d => setLists(d.lists ?? []))
+      .then(d => { setLists(d.lists ?? []); setPulse(d.pulse ?? null) })
       .catch(() => setLists([]))
 
   useEffect(() => {
@@ -215,55 +223,61 @@ export function ResourceCommitments({ initialLists }: { initialLists?: ResourceL
     </button>
   )
 
-  const renderItem = (item: ResourceItem) => {
+  const renderItem = (item: ResourceItem, idx: number) => {
     const busy = busyId === item.id
     const isSuggestion = item.needed === null
     const remaining = isSuggestion ? 0 : Math.max(0, (item.needed as number) - item.claimed)
     const covered = !isSuggestion && remaining === 0
     const isOpen = expanded.has(item.id)
     const claimedByMe = item.mine > 0
+    // Names inline on the meta line — scannable social proof (first two).
+    const inlineNames = item.claimants.slice(0, 2).map(c => c.name).join(', ')
+    const moreNames = item.claimants.length - 2
 
     return (
+      // Dense task-list rows: hairline-divided inside the group's container
+      // (a list may grow to dozens of items — scannability wins over chrome).
       <div
         key={item.id}
         id={`res-item-${item.id}`}
         style={{
-          borderRadius: '0.85rem',
-          border: `1px solid ${claimedByMe ? 'rgba(210,57,248,0.45)' : 'rgba(200,168,72,0.18)'}`,
-          background: claimedByMe ? 'rgba(210,57,248,0.06)' : 'rgba(255,255,255,0.02)',
-          transition: 'border-color 0.15s, background 0.15s', opacity: busy ? 0.6 : 1,
-          overflow: 'hidden',
+          borderTop: idx > 0 ? '1px solid rgba(200,168,72,0.1)' : 'none',
+          background: claimedByMe ? 'rgba(210,57,248,0.05)' : 'transparent',
+          transition: 'background 0.15s', opacity: busy ? 0.6 : 1,
         }}
       >
         {/* Compact row — click to expand */}
         <div
           onClick={() => toggleExpanded(item.id)}
-          style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.85rem 1.25rem', cursor: 'pointer' }}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 1rem', cursor: 'pointer' }}
         >
-          <div style={{ width: 44, height: 44, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: 26, height: 26, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {item.icon
               ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={item.icon} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-              : <span style={{ fontSize: '1.4rem', color: GOLD, opacity: 0.45 }}>✦</span>}
+              : <span style={{ fontSize: '0.95rem', color: GOLD, opacity: 0.4 }}>✦</span>}
           </div>
 
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ margin: 0, fontSize: '0.95rem', color: CREAM, fontWeight: 600 }}>{item.name}</p>
+            <p style={{ margin: 0, fontSize: '0.88rem', color: CREAM, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</p>
             {/* What matters most, first: the shortage — not the count. */}
-            {isSuggestion ? (
-              <p style={{ margin: '0.25rem 0 0', fontSize: '0.74rem', color: LAVENDER, opacity: 0.85, fontStyle: 'italic' }}>
-                Suggested by {item.offered_by_me ? 'you' : item.offered_by_name ?? 'a member'}
-                {item.claimed > 0 ? ` · ${item.claimed} being brought` : ' · nobody bringing it yet'}
-              </p>
-            ) : covered ? (
-              <p style={{ margin: '0.25rem 0 0', fontSize: '0.74rem', color: GREEN, opacity: 0.9 }}>
-                ✓ Covered · {item.claimed} of {item.needed} committed
-              </p>
-            ) : (
-              <p style={{ margin: '0.25rem 0 0', fontSize: '0.78rem' }}>
-                <span style={{ color: GOLD, fontWeight: 700 }}>Still need: {remaining}</span>
-                <span style={{ color: CREAM, opacity: 0.4 }}> · {item.claimed} / {item.needed} committed</span>
-              </p>
-            )}
+            <p style={{ margin: '0.1rem 0 0', fontSize: '0.72rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {isSuggestion ? (
+                <span style={{ color: LAVENDER, opacity: 0.85, fontStyle: 'italic' }}>
+                  Suggested by {item.offered_by_me ? 'you' : item.offered_by_name ?? 'a member'}
+                  {item.claimed > 0 ? ` · ${item.claimed} being brought` : ' · nobody bringing it yet'}
+                </span>
+              ) : covered ? (
+                <span style={{ color: GREEN, opacity: 0.9 }}>✓ Covered · {item.claimed} of {item.needed}</span>
+              ) : (
+                <>
+                  <span style={{ color: GOLD, fontWeight: 700 }}>Still need: {remaining}</span>
+                  <span style={{ color: CREAM, opacity: 0.4 }}> · {item.claimed} of {item.needed} committed</span>
+                </>
+              )}
+              {item.claimants.length > 0 && (
+                <span style={{ color: CREAM, opacity: 0.5 }}> · <span style={{ color: GREEN }}>✓</span> {inlineNames}{moreNames > 0 ? ` +${moreNames}` : ''}</span>
+              )}
+            </p>
           </div>
 
           {/* Primary action stays one click away on open needs */}
@@ -271,9 +285,9 @@ export function ResourceCommitments({ initialLists }: { initialLists?: ResourceL
           <span aria-hidden style={{ color: GOLD, opacity: 0.4, fontSize: '0.8rem', flexShrink: 0, transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>›</span>
         </div>
 
-        {/* Expanded detail */}
+        {/* Expanded detail — all the depth, only on demand */}
         {isOpen && (
-          <div style={{ padding: '0 1.25rem 1rem', borderTop: '1px solid rgba(200,168,72,0.1)' }}>
+          <div style={{ padding: '0 1rem 0.95rem 3.4rem', borderTop: '1px solid rgba(200,168,72,0.08)' }}>
             {item.note && (
               <p style={{ margin: '0.8rem 0 0', fontSize: '0.78rem', opacity: 0.55, fontStyle: 'italic', lineHeight: 1.5 }}>{item.note}</p>
             )}
@@ -321,10 +335,15 @@ export function ResourceCommitments({ initialLists }: { initialLists?: ResourceL
 
   const renderList = (list: ResourceList) => {
     const targeted = list.items.filter(i => i.needed !== null)
-    const totalUnits = targeted.reduce((s, i) => s + (i.needed as number), 0)
-    const coveredUnits = targeted.reduce((s, i) => s + Math.min(i.claimed, i.needed as number), 0)
-    const pct = totalUnits > 0 ? Math.round((coveredUnits / totalUnits) * 100) : null
-    const fullyReady = totalUnits > 0 && coveredUnits >= totalUnits
+    // Resource COUNTS, not unit percentages — one generator isn't one fork,
+    // so "18 of 22 resources covered" is harder to misinterpret than "82%".
+    const coveredItems = targeted.filter(i => i.claimed >= (i.needed as number)).length
+    const itemsShort = targeted.length - coveredItems
+    // Automatic list health, worst → best.
+    const status = targeted.length === 0 ? null
+      : itemsShort === 0 ? 'complete'
+      : itemsShort <= 2 || coveredItems / targeted.length >= 0.8 ? 'almost'
+      : 'attention'
 
     const stillNeeded = list.items.filter(i => i.needed !== null && i.claimed < (i.needed as number))
     const covered = list.items.filter(i => i.needed !== null && i.claimed >= (i.needed as number))
@@ -340,10 +359,16 @@ export function ResourceCommitments({ initialLists }: { initialLists?: ResourceL
             <p style={{ margin: 0, fontSize: '1.25rem', letterSpacing: '0.05em', color: GOLD, opacity: 0.95, fontFamily: 'TokyoDreams, serif' }}>
               {list.title}
             </p>
-            {pct !== null && (
-              <p style={{ margin: 0, fontSize: '0.95rem', color: fullyReady ? GREEN : GOLD, fontWeight: 700, letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
-                {pct}% Ready
-              </p>
+            {status && (
+              <span style={{
+                fontSize: '0.6rem', letterSpacing: '0.16em', textTransform: 'uppercase',
+                padding: '0.25rem 0.7rem', borderRadius: '9999px', whiteSpace: 'nowrap',
+                color: status === 'complete' ? GREEN : status === 'almost' ? GOLD : PURPLE,
+                border: `1px solid ${status === 'complete' ? 'rgba(125,207,142,0.45)' : status === 'almost' ? 'rgba(200,168,72,0.45)' : 'rgba(210,57,248,0.4)'}`,
+                background: status === 'complete' ? 'rgba(125,207,142,0.08)' : status === 'almost' ? 'rgba(200,168,72,0.07)' : 'rgba(210,57,248,0.07)',
+              }}>
+                {status === 'complete' ? 'Complete' : status === 'almost' ? 'Almost Ready' : 'Needs Attention'}
+              </span>
             )}
           </div>
           {(list.description || list.steward_name) && (
@@ -351,27 +376,22 @@ export function ResourceCommitments({ initialLists }: { initialLists?: ResourceL
               {[list.description, list.steward_name ? `Stewarded by ${list.steward_name}` : null].filter(Boolean).join(' · ')}
             </p>
           )}
-          {pct !== null && (
+          {status === 'complete' ? (
+            <p style={{ margin: '0.5rem 0 0', fontSize: '0.82rem', color: GREEN, opacity: 0.9 }}>
+              ✨ {list.title} is fully equipped! Thanks to everyone contributing.
+            </p>
+          ) : status ? (
             <>
-              <div style={{ marginTop: '0.6rem', height: '6px', borderRadius: '9999px', background: 'rgba(200,168,72,0.12)', overflow: 'hidden' }}>
-                <div style={{
-                  width: `${pct}%`, height: '100%', borderRadius: '9999px', transition: 'width 0.3s',
-                  background: fullyReady
-                    ? 'linear-gradient(90deg, rgba(125,207,142,0.7), rgba(125,207,142,0.95))'
-                    : 'linear-gradient(90deg, rgba(200,168,72,0.55), rgba(200,168,72,0.9))',
-                }} />
-              </div>
-              {fullyReady ? (
-                <p style={{ margin: '0.5rem 0 0', fontSize: '0.82rem', color: GREEN, opacity: 0.9 }}>
-                  ✨ {list.title} is fully equipped! Thanks to everyone contributing.
-                </p>
-              ) : (
-                <p style={{ margin: '0.4rem 0 0', fontSize: '0.72rem', opacity: 0.45 }}>
-                  {coveredUnits} of {totalUnits} covered
+              {status === 'almost' && (
+                <p style={{ margin: '0.5rem 0 0', fontSize: '0.82rem', color: GOLD, opacity: 0.9 }}>
+                  ✨ {list.title} is almost ready — only {itemsShort} more item{itemsShort === 1 ? '' : 's'} needed.
                 </p>
               )}
+              <p style={{ margin: '0.4rem 0 0', fontSize: '0.72rem', opacity: 0.45 }}>
+                {coveredItems} of {targeted.length} resources covered · {itemsShort} still need{itemsShort === 1 ? 's' : ''} attention
+              </p>
             </>
-          )}
+          ) : null}
         </div>
 
         {/* Items grouped by what needs attention */}
@@ -379,7 +399,7 @@ export function ResourceCommitments({ initialLists }: { initialLists?: ResourceL
           {stillNeeded.length > 0 && (
             <div>
               <p style={{ ...groupLabelStyle, color: GOLD, opacity: 0.75 }}>Still Needed</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              <div style={{ border: '1px solid rgba(200,168,72,0.14)', borderRadius: '0.6rem', overflow: 'hidden' }}>
                 {stillNeeded.map(renderItem)}
               </div>
             </div>
@@ -387,7 +407,7 @@ export function ResourceCommitments({ initialLists }: { initialLists?: ResourceL
           {covered.length > 0 && (
             <div>
               <p style={{ ...groupLabelStyle, color: GREEN, opacity: 0.6 }}>Covered</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', opacity: 0.8 }}>
+              <div style={{ border: '1px solid rgba(200,168,72,0.14)', borderRadius: '0.6rem', overflow: 'hidden', opacity: 0.8 }}>
                 {covered.map(renderItem)}
               </div>
             </div>
@@ -395,7 +415,7 @@ export function ResourceCommitments({ initialLists }: { initialLists?: ResourceL
           {suggested.length > 0 && (
             <div>
               <p style={{ ...groupLabelStyle, color: LAVENDER, opacity: 0.65 }}>Suggested by Members</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              <div style={{ border: '1px solid rgba(200,168,72,0.14)', borderRadius: '0.6rem', overflow: 'hidden' }}>
                 {suggested.map(renderItem)}
               </div>
             </div>
@@ -473,9 +493,23 @@ export function ResourceCommitments({ initialLists }: { initialLists?: ResourceL
     )
   }
 
+  // The pulse — one quiet line of proof that people are preparing together.
+  const pulseLine = !pulse ? null
+    : pulse.contributorsToday >= 3
+      ? `✦ ${pulse.contributorsToday} members contributed resources today — thank you.`
+      : pulse.latest
+        ? pulse.latest.coveredIt
+          ? `✨ ${pulse.latest.name} just covered the last ${pulse.latest.itemName}!`
+          : `✦ ${pulse.latest.name} just committed to bringing ${pulse.latest.itemName}.`
+        : null
+
   return (
     <div>
       {error && <p style={{ color: '#ff8a8a', fontSize: '0.8rem', marginBottom: '0.75rem' }}>{error}</p>}
+
+      {pulseLine && (
+        <p style={{ margin: '0 0 1.25rem', fontSize: '0.8rem', color: GOLD, opacity: 0.7, fontStyle: 'italic' }}>{pulseLine}</p>
+      )}
 
       {/* ── I'M BRINGING — my commitments, pinned up top ── */}
       {myCommitments.length > 0 && (

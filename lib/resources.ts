@@ -28,8 +28,17 @@ export type MemberResourceList = {
   steward_name: string | null
   items: MemberResourceItem[]
 }
+// The community "pulse" — small proof that people are preparing together
+// (derived from claim timestamps; never stored).
+export type ResourcePulse = {
+  contributorsToday: number // distinct members with claim activity in the last 24h
+  latest: { name: string; itemName: string; coveredIt: boolean } | null // most recent claim within 48h
+}
+export type MemberResourceView = { lists: MemberResourceList[]; pulse: ResourcePulse }
 
-export async function getMemberResourceView(userId: string): Promise<MemberResourceList[]> {
+const EMPTY_PULSE: ResourcePulse = { contributorsToday: 0, latest: null }
+
+export async function getMemberResourceView(userId: string): Promise<MemberResourceView> {
   const { data: lists, error } = await supabaseAdmin
     .from('resource_lists')
     .select('id, title, description, visible, sort_order, groups(name), departments(name), roles(name)')
@@ -38,8 +47,8 @@ export async function getMemberResourceView(userId: string): Promise<MemberResou
     .order('created_at', { ascending: true })
 
   // Table missing (pre-migration) → empty section rather than a 500.
-  if (error) return []
-  if (!lists || lists.length === 0) return []
+  if (error) return { lists: [], pulse: EMPTY_PULSE }
+  if (!lists || lists.length === 0) return { lists: [], pulse: EMPTY_PULSE }
 
   const listIds = lists.map(l => l.id)
   const { data: items } = await supabaseAdmin
@@ -55,13 +64,13 @@ export async function getMemberResourceView(userId: string): Promise<MemberResou
   const [offererNames, claimsRes] = await Promise.all([
     memberDisplayNames((items ?? []).map(i => i.offered_by).filter(Boolean) as string[]),
     itemIds.length > 0
-      ? supabaseAdmin.from('resource_claims').select('resource_id, clerk_user_id, quantity').in('resource_id', itemIds)
+      ? supabaseAdmin.from('resource_claims').select('resource_id, clerk_user_id, quantity, updated_at').in('resource_id', itemIds)
       : Promise.resolve({ data: [] }),
   ])
 
   const claimTotals: Record<string, number> = {}
   const mine: Record<string, number> = {}
-  const claimRows = (claimsRes.data ?? []) as { resource_id: string; clerk_user_id: string; quantity: number }[]
+  const claimRows = (claimsRes.data ?? []) as { resource_id: string; clerk_user_id: string; quantity: number; updated_at: string }[]
   for (const c of claimRows) {
     claimTotals[c.resource_id] = (claimTotals[c.resource_id] ?? 0) + c.quantity
     if (c.clerk_user_id === userId) mine[c.resource_id] = c.quantity
@@ -98,13 +107,34 @@ export async function getMemberResourceView(userId: string): Promise<MemberResou
     })
   }
 
+  // The pulse: proof of people preparing together, from claim timestamps.
+  // updated_at (bumped on quantity change) counts a re-commitment as activity.
+  const DAY = 24 * 60 * 60 * 1000
+  const now = Date.now()
+  const itemById = Object.fromEntries((items ?? []).map(i => [i.id, i]))
+  const contributorsToday = new Set(
+    claimRows.filter(c => now - new Date(c.updated_at).getTime() < DAY).map(c => c.clerk_user_id)
+  ).size
+  const latestRow = claimRows
+    .filter(c => now - new Date(c.updated_at).getTime() < 2 * DAY)
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at))[0]
+  const latestItem = latestRow ? itemById[latestRow.resource_id] : undefined
+  const pulse: ResourcePulse = {
+    contributorsToday,
+    latest: latestRow && latestItem ? {
+      name: latestRow.clerk_user_id === userId ? 'You' : claimantNames[latestRow.clerk_user_id] ?? 'A member',
+      itemName: latestItem.name,
+      coveredIt: latestItem.quantity_needed !== null && (claimTotals[latestItem.id] ?? 0) >= (latestItem.quantity_needed as number),
+    } : null,
+  }
+
   // Supabase types the embeds as arrays; runtime returns a single row for a to-one FK.
   type NameEmbed = { name: string } | { name: string }[] | null
   const embedName = (e: NameEmbed) => (Array.isArray(e) ? e[0]?.name : e?.name) ?? null
   type ListRow = { id: string; title: string; description: string | null; groups: NameEmbed; departments: NameEmbed; roles: NameEmbed }
   // Empty visible lists stay: they're valid offer targets (e.g. a catch-all
   // "Odds & Ends" list) — hiding work-in-progress is what `visible` is for.
-  return ((lists ?? []) as unknown as ListRow[]).map(l => ({
+  const memberLists = ((lists ?? []) as unknown as ListRow[]).map(l => ({
     id: l.id,
     title: l.title,
     description: l.description,
@@ -112,6 +142,7 @@ export async function getMemberResourceView(userId: string): Promise<MemberResou
     steward_name: embedName(l.groups) ?? embedName(l.departments) ?? embedName(l.roles),
     items: itemsByList[l.id] ?? [],
   }))
+  return { lists: memberLists, pulse }
 }
 
 // ── Home-dashboard "Bring Something" widget ──────────────────────────────────

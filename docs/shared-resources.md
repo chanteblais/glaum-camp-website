@@ -48,18 +48,33 @@ organizer wants, not an error).
   sibling cards and the suggest box got mistaken for its own card:
   - **I'M BRINGING** — a pinned card of my commitments ("✓ Camping Stove ×2 —
     Shared Kitchen") with per-row *Edit ›* that expands + scrolls to the item.
-  - **Per-list readiness** — "84% Ready" + progress bar + "27 of 32 covered"
-    (unit-weighted: Σ min(claimed, needed) / Σ needed; suggestions excluded).
-    A fully covered list celebrates: *"✨ Shared Kitchen is fully equipped!
-    Thanks to everyone contributing."*
-  - **Status groups** — items grouped **Still Needed** (shortage leads:
-    **"Still need: 3"** bold, count secondary; "I'll bring one" right on the
-    row) → **Covered** (dimmer; "Bring an extra" inside the detail) →
-    **Suggested by Members**.
+  - **Automatic list health** (2026-07-03, replacing the % bar — one
+    generator isn't one fork, so counts are harder to misinterpret than a
+    unit-weighted percentage): a pill by the title — **Needs Attention**
+    (purple) → **Almost Ready** (gold; ≤2 items short or ≥80% of items
+    covered) → **Complete** (green) — plus *"18 of 22 resources covered ·
+    4 still need attention"* (item counts). Almost-ready celebrates *"✨ …
+    is almost ready — only 3 more items needed."*; complete keeps *"✨ …
+    is fully equipped! Thanks to everyone contributing."*
+  - **The pulse** (2026-07-03) — one quiet italic line atop the board,
+    derived from `resource_claims.updated_at` (never stored): *"✦ 3 members
+    contributed resources today — thank you."* (≥3 in 24h), else *"✨ Sarah
+    just covered the last Cooler!"* / *"✦ Sarah just committed to bringing
+    Cooler."* (latest claim within 48h). People preparing together, not
+    inventory being managed.
+  - **Dense task-list rows** (2026-07-03, GitHub-Issues density — lists may
+    grow to dozens of items): hairline-divided rows inside one bordered
+    container per status group — **Still Needed** (shortage leads:
+    **"Still need: 3"** bold; "I'll bring one" right on the row) →
+    **Covered** (dimmer; "Bring an extra" inside the detail) → **Suggested
+    by Members**. Each row: small icon, name, one meta line (shortage/
+    covered/suggested + first two claimant names inline: *"· ✓ Erik, Sarah
+    +1"*). A row I've claimed tints purple.
   - **Expandable rows** — compact by default; expanding shows the note,
     **who's bringing it** (✓ names, quantities, "You" first — social proof,
-    now member-visible), and my −/+/Remove controls. Unclaiming is always
-    allowed; a claimed row shows purple.
+    member-visible), and my −/+/Remove controls. Unclaiming is always
+    allowed. Hierarchy: dashboard = *tell me where I'm needed* → page =
+    *help me take action* → expanded row = *give me all the details*.
   - **Suggest a resource** — the list card's **footer row** (hairline-
     separated, inside the card) reads *"Don't see something? ＋ Suggest a
     resource"* (collaborative planning, replacing
