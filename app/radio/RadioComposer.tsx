@@ -16,12 +16,13 @@ export function RadioComposer({ isBroadcaster }: { isBroadcaster: boolean }) {
   const [message, setMessage] = useState('')
   const [posting, setPosting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // Shorter placeholder on narrow screens — the full line truncates mid-word
-  // at ~380px. Set after mount (JS breakpoint, the house pattern) so SSR and
-  // hydration agree.
+  // Shorter placeholder on narrow screens — the input gets ~190px next to the
+  // mic and the On Air button, so the mobile string must fit that, not just
+  // "be shorter". Set after mount (JS breakpoint, the house pattern) so SSR
+  // and hydration agree.
   const [placeholder, setPlaceholder] = useState('Share an announcement with camp…')
   useEffect(() => {
-    const pick = () => setPlaceholder(window.innerWidth < 700 ? 'Share an announcement…' : 'Share an announcement with camp…')
+    const pick = () => setPlaceholder(window.innerWidth < 700 ? 'Share with camp…' : 'Share an announcement with camp…')
     pick()
     window.addEventListener('resize', pick)
     return () => window.removeEventListener('resize', pick)
@@ -82,6 +83,7 @@ export function RadioComposer({ isBroadcaster }: { isBroadcaster: boolean }) {
             fontStyle: 'italic',
             fontFamily: 'inherit',
             outline: 'none',
+            textOverflow: 'ellipsis',
             opacity: isBroadcaster ? 1 : 0.45,
           }}
         />
