@@ -5,7 +5,7 @@ import { getNotificationPreferences } from '@/lib/notification-prefs'
 
 export const dynamic = 'force-dynamic'
 
-const KEYS = ['email_new_message', 'email_announcements', 'email_application'] as const
+const KEYS = ['email_new_message', 'email_announcements', 'email_application', 'email_attunement_nudges'] as const
 
 // GET /api/profile/notifications — current member's preferences
 export async function GET() {
