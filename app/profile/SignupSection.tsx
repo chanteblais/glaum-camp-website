@@ -587,19 +587,29 @@ function RolePicker({
 
   return (
     <div>
+      {/* Toggle header — collapsed it must still read as a door, not a footnote:
+          kicker between hairlines (the plaque language) over a solid pill button. */}
       <button
         onClick={() => setExpanded(o => !o)}
         aria-expanded={expanded}
         style={{ display: 'block', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'center' }}
       >
-        <p style={{ fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.85, margin: '0 0 0.4rem' }}>
-          Choose a Role
-          <span aria-hidden style={{ fontSize: '0.6rem', opacity: 0.55, marginLeft: '0.45rem', verticalAlign: 'middle' }}>{expanded ? '▲' : '▼'}</span>
-        </p>
-        {!expanded && (
-          <p style={{ fontSize: '0.78rem', opacity: 0.55, margin: 0, lineHeight: 1.6 }}>
-            {allRoles.length} roles across {withRoles.length} department{withRoles.length === 1 ? '' : 's'} — tap to browse{signup?.role_id ? ' or switch' : ''}.
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', margin: expanded ? '0 0 0.4rem' : '0 0 1rem' }}>
+          <span aria-hidden style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.4))' }} />
+          <p style={{ fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.85, margin: 0, whiteSpace: 'nowrap' }}>
+            Choose a Role
+            {expanded && <span aria-hidden style={{ fontSize: '0.6rem', opacity: 0.55, marginLeft: '0.45rem', verticalAlign: 'middle' }}>▲</span>}
           </p>
+          <span aria-hidden style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(200,168,72,0.4), transparent)' }} />
+        </div>
+        {!expanded && (
+          <span style={{
+            display: 'inline-block', padding: '0.5rem 1.3rem', borderRadius: '9999px',
+            border: '1px solid rgba(200,168,72,0.5)', background: 'rgba(200,168,72,0.1)',
+            color: '#FFFACD', fontSize: '0.8rem', letterSpacing: '0.05em',
+          }}>
+            Browse all {allRoles.length} roles ▾
+          </span>
         )}
       </button>
 
@@ -919,7 +929,6 @@ function ShiftsPicker({
     return a.localeCompare(b)
   })
 
-  const owedOutstanding = owed.filter(o => o.heldHours < o.requiredHours).length
   const confirmSignUp = (id: string) => {
     const s = shifts.find(x => x.id === id)
     if (s) setPending({ slot: s, action: 'signup' })
@@ -931,17 +940,6 @@ function ShiftsPicker({
 
   return (
     <div>
-      <p style={{ fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#D239F8', opacity: 0.85, marginBottom: '0.5rem', textAlign: 'center' }}>
-        Shifts
-      </p>
-      <p style={{ fontSize: '0.78rem', opacity: 0.55, textAlign: 'center', margin: '0 0 1rem', lineHeight: 1.6 }}>
-        {owedOutstanding > 0
-          ? 'Sign up for shifts until each requirement below is met. You can hold several — tap a shift to sign up.'
-          : owed.length > 0
-            ? 'Your shift requirements are met — you can still pick up extra shifts.'
-            : 'Tap a shift to sign up for it.'}
-      </p>
-
       <OwedChips owed={owed} shiftTypes={shiftTypes} />
 
       {error && <p style={{ color: '#ff8a8a', fontSize: '0.78rem', textAlign: 'center', margin: '0 0 1rem' }}>{error}</p>}
@@ -1202,7 +1200,7 @@ export function SignupSection({ showPickers = true, initialData }: { showPickers
       {showSuggest && <SuggestRoleModal onClose={() => setShowSuggest(false)} />}
       <CurrentSignupCards signup={signup} departments={departments} heldShifts={heldShifts} shiftTypes={shiftTypes} onOptOut={handleOptOut} onCancelShift={handleCancelShift} onSetLead={handleSetLeadShift} />
 
-      {showPickers && (
+      {showPickers && (<>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
 
           {/* Role picker — every role visible; confirm lives in the detail modal */}
@@ -1229,34 +1227,45 @@ export function SignupSection({ showPickers = true, initialData }: { showPickers
               Don't see a role that fits? Suggest one →
             </button>
           </div>
-
-          {/* Shift picker — hidden while shift signup is closed */}
-          {shifts.length > 0 && shiftSignupOpen && (
-            <div className="shift-panel-breakout" style={{ padding: '1.5rem', border: '1px solid rgba(210,57,248,0.15)', borderRadius: '1rem', background: 'rgba(210,57,248,0.02)' }}>
-              <ShiftsPicker
-                shifts={shifts}
-                owed={owed}
-                shiftTypes={shiftTypes}
-                signingId={signingId}
-                error={shiftError}
-                onSignUp={handleSignUpShift}
-                onCancel={handleCancelShift}
-              />
-            </div>
-          )}
-
-          {shifts.length > 0 && !shiftSignupOpen && (
-            <div style={{ padding: '1.5rem', border: '1px solid rgba(210,57,248,0.15)', borderRadius: '1rem', background: 'rgba(210,57,248,0.02)', textAlign: 'center' }}>
-              <p style={{ fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#D239F8', opacity: 0.85, marginBottom: '0.5rem' }}>
-                Shifts
-              </p>
-              <p style={{ fontSize: '0.85rem', opacity: 0.6, margin: 0, lineHeight: 1.6 }}>
-                Shift times aren't confirmed yet. Shift signup will open here once the schedule is set — check back soon.
-              </p>
-            </div>
-          )}
         </div>
-      )}
+
+        {/* Shifts — a full page section, headed exactly like Bring Something /
+            Your Groups on /participate (gold divider + TokyoDreams h2); the
+            purple shift accent stays on the calendar panel itself. */}
+        {shifts.length > 0 && (
+          <>
+            <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.25), transparent)', margin: '3rem 0 2rem' }} />
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h2 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(1.4rem, 3vw, 2rem)', color: '#C8A848', margin: '0 0 0.5rem', letterSpacing: '0.06em' }}>
+                Shifts
+              </h2>
+              <p style={{ fontSize: '0.9rem', opacity: 0.55, margin: 0, lineHeight: 1.6 }}>
+                {!shiftSignupOpen
+                  ? 'Shift times aren’t confirmed yet. Shift signup will open here once the schedule is set — check back soon.'
+                  : owed.some(o => o.heldHours < o.requiredHours)
+                    ? 'Sign up for shifts until each requirement below is met. You can hold several — tap a shift to sign up.'
+                    : owed.length > 0
+                      ? 'Your shift requirements are met — you can still pick up extra shifts.'
+                      : 'Tap a shift to sign up for it.'}
+              </p>
+            </div>
+
+            {shiftSignupOpen && (
+              <div className="shift-panel-breakout" style={{ padding: '1.5rem', border: '1px solid rgba(210,57,248,0.15)', borderRadius: '1rem', background: 'rgba(210,57,248,0.02)' }}>
+                <ShiftsPicker
+                  shifts={shifts}
+                  owed={owed}
+                  shiftTypes={shiftTypes}
+                  signingId={signingId}
+                  error={shiftError}
+                  onSignUp={handleSignUpShift}
+                  onCancel={handleCancelShift}
+                />
+              </div>
+            )}
+          </>
+        )}
+      </>)}
     </div>
   )
 }
