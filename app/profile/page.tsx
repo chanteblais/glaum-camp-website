@@ -14,6 +14,7 @@ import { PersonalSchedule } from './PersonalSchedule'
 import { AttunementStatus } from './AttunementStatus'
 import { ApprovedCamperPill } from '@/app/ApprovedCamperPill'
 import { getMemberGroups, groupCommitmentMeta } from '@/lib/groups'
+import { getMemberResourceClaims } from '@/lib/resources'
 import { buildAttunementChecklist, memberGroupCounts, requiredItems, attunementHoursSummary } from '@/lib/attunement'
 import { getMemberShiftState } from '@/lib/shift-attunement'
 import { buildMemberFacts } from '@/lib/member-facts'
@@ -113,6 +114,8 @@ export default async function ProfilePage() {
   // `contributions` = group names; `groupMeta` carries each group's icon/description
   // for the commitments card (keyed by name, the shape CommitmentsSection expects).
   const memberGroups = await getMemberGroups(application?.clerk_user_id ?? userId)
+  // Shared-resource claims ("I'll bring one") — BRINGING rows on the commitments card.
+  const resourceClaims = await getMemberResourceClaims(application?.clerk_user_id ?? userId)
   // Full list drives attunement + distinction facts; the profile card shows only
   // groups whose collection is marked visible (show_on_profile).
   const contributions = memberGroups.map(g => g.name)
@@ -187,7 +190,7 @@ export default async function ProfilePage() {
   // Member-authored quote surfaced under the name in the header. (The bio/About
   // narrative shows only on the public profile; here it's edited in Profile Details.)
   const quoteText = typeof profileValues['quote'] === 'string' ? (profileValues['quote'] as string).trim() : ''
-  const commitmentCount = contributions.length + heldShifts.length
+  const commitmentCount = contributions.length + heldShifts.length + resourceClaims.length
   // "Attuned" = the required tier (authored tasks) only; group/role commitments
   // are tracked as a guide below and never gate the status.
   const requiredTasks = requiredItems(attunementTasks)
@@ -483,6 +486,7 @@ export default async function ProfilePage() {
                 role={roleInfo ? { name: roleInfo.name ?? '', description: roleInfo.description ?? null, purpose: roleInfo.purpose ?? null } : null}
                 dept={roleInfo?.departments ? { name: roleInfo.departments.name ?? '', icon: roleInfo.departments.icon ?? null } : null}
                 shifts={heldShifts}
+                bringing={resourceClaims}
                 roleApprovalStatus={campSignup?.role_approval_status ?? null}
                 contributionTypes={groupMeta}
                 showManageLink

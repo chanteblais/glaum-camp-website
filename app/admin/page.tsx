@@ -10,6 +10,7 @@ import { CategoryHeading } from './CategoryHeading'
 import { MANAGE_CATEGORIES } from './admin-sections'
 import { ScheduleManager } from './ScheduleManager'
 import { LeadUpGatheringsManager } from './LeadUpGatheringsManager'
+import { ResourcesManager } from './ResourcesManager'
 import { AnnouncementsManager } from './AnnouncementsManager'
 import { getGroupNamesByUser } from '@/lib/groups'
 import { getShiftEventByUser } from '@/lib/shift-signups'
@@ -231,6 +232,13 @@ export default async function AdminPage() {
           summary="Planning sessions on the runway to the event (members RSVP)"
         >
           <LeadUpGatheringsManager />
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          title="Shared Resources"
+          summary="Gear the community needs — members claim what they'll bring"
+        >
+          <ResourcesManager />
         </CollapsibleSection>
 
         {/* ═══════════════ COMMUNICATION ═══════════════ */}

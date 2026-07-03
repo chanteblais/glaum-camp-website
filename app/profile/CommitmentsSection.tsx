@@ -4,12 +4,15 @@ import type { ContributionType } from '@/lib/application-options'
 import { DEFAULT_CONTRIBUTION_TYPES } from '@/lib/application-options'
 
 export type CommitmentShift = { id: string; title: string; day: string; time: string; icon_type: string; event_date: string | null }
+export type CommitmentBringing = { id: string; resourceName: string; listTitle: string; quantity: number }
 
 type Props = {
   contributions: string[]
   role: { name: string; description: string | null; purpose: string | null } | null
   dept: { name: string; icon: string | null } | null
   shifts: CommitmentShift[]
+  /** Shared-resource claims ("Camping Stove ×2 · Shared Kitchen"). */
+  bringing?: CommitmentBringing[]
   roleApprovalStatus: string | null
   contributionTypes?: ContributionType[]
   showManageLink?: boolean
@@ -35,6 +38,7 @@ const TAG_STYLES: Record<string, { color: string; border: string; bg: string }> 
   LEAD:         { color: '#D239F8', border: 'rgba(210,57,248,0.35)', bg: 'rgba(210,57,248,0.07)' },
   DESIGNATION:  { color: '#D239F8', border: 'rgba(210,57,248,0.35)', bg: 'rgba(210,57,248,0.07)' },
   SHIFT:        { color: '#7dcf8e', border: 'rgba(100,200,120,0.35)', bg: 'rgba(100,200,120,0.07)' },
+  BRINGING:     { color: '#8fc4cf', border: 'rgba(120,190,205,0.35)', bg: 'rgba(120,190,205,0.07)' },
 }
 
 function CircleIcon({ children, size = '56px' }: { children: React.ReactNode; size?: string }) {
@@ -109,11 +113,11 @@ function AccentHeader({ title, compact }: { title: string; compact?: boolean }) 
   )
 }
 
-export function CommitmentsSection({ contributions, role, dept, shifts, roleApprovalStatus, contributionTypes = DEFAULT_CONTRIBUTION_TYPES, showManageLink = false, title = 'Your Commitments', compact = false, hideRole = false }: Props) {
+export function CommitmentsSection({ contributions, role, dept, shifts, bringing = [], roleApprovalStatus, contributionTypes = DEFAULT_CONTRIBUTION_TYPES, showManageLink = false, title = 'Your Commitments', compact = false, hideRole = false }: Props) {
   const metaByValue = Object.fromEntries(contributionTypes.map(t => [t.value, { icon: t.icon, desc: t.description }]))
   // When the designation lives in the header, this card is groups + shifts only.
   const showRole = role && !hideRole
-  const hasAnything = contributions.length > 0 || showRole || shifts.length > 0
+  const hasAnything = contributions.length > 0 || showRole || shifts.length > 0 || bringing.length > 0
   if (!hasAnything) return null
 
   const isPending = roleApprovalStatus === 'pending'
@@ -158,7 +162,7 @@ export function CommitmentsSection({ contributions, role, dept, shifts, roleAppr
               iconSize={iconSize}
               compact={compact}
             />
-            {(contributions.length > 0 || shifts.length > 0) && (
+            {(contributions.length > 0 || shifts.length > 0 || bringing.length > 0) && (
               <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.3), transparent)' }} />
             )}
           </div>
@@ -191,7 +195,7 @@ export function CommitmentsSection({ contributions, role, dept, shifts, roleAppr
                 iconSize={iconSize}
                 compact={compact}
               />
-              {(i < contributions.length - 1 || shifts.length > 0) && (
+              {(i < contributions.length - 1 || shifts.length > 0 || bringing.length > 0) && (
                 <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.3), transparent)' }} />
               )}
             </div>
@@ -213,7 +217,24 @@ export function CommitmentsSection({ contributions, role, dept, shifts, roleAppr
               iconSize={iconSize}
               compact={compact}
             />
-            {i < shifts.length - 1 && (
+            {(i < shifts.length - 1 || bringing.length > 0) && (
+              <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.3), transparent)' }} />
+            )}
+          </div>
+        ))}
+
+        {/* Shared resources the member has claimed ("I'll bring one") */}
+        {bringing.map((b, i) => (
+          <div key={b.id}>
+            <Row
+              circleContent={<span style={{ fontSize: compact ? '1.1rem' : '1.4rem', lineHeight: 1, color: '#8fc4cf', opacity: 0.85 }}>✦</span>}
+              title={b.quantity > 1 ? `${b.resourceName} ×${b.quantity}` : b.resourceName}
+              description={b.listTitle || null}
+              tag="BRINGING"
+              iconSize={iconSize}
+              compact={compact}
+            />
+            {i < bringing.length - 1 && (
               <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.3), transparent)' }} />
             )}
           </div>

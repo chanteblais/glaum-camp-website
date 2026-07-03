@@ -1,6 +1,6 @@
 # Database Schema
 
-All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations in `supabase-migrations/` document incremental changes (latest: `050`; all of `025`–`050` **applied in prod** as of 2026-07-02). Confirm `025` (column renames), `029` (the `application-files` bucket), `033` (group messaging), `034`/`035` (group icon images + `group-badges` bucket, `badge_image` → `icon_image`), `036`–`038` (public profile fields, members/profiles, member distinctions), `039`–`041` (lead-up gatherings + notify/image), `042`–`044` (group collections + per-collection profile visibility + per-collection self-join), `045`–`047` (shifts redesign + shift times), and `048`/`049` (participation leads + per-event lead opt-in; the gathering halves are dropped by `050`) are applied before relying on those features.
+All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations in `supabase-migrations/` document incremental changes (latest: `051`; all of `025`–`050` **applied in prod** as of 2026-07-02; `051` **not yet applied**). Confirm `025` (column renames), `029` (the `application-files` bucket), `033` (group messaging), `034`/`035` (group icon images + `group-badges` bucket, `badge_image` → `icon_image`), `036`–`038` (public profile fields, members/profiles, member distinctions), `039`–`041` (lead-up gatherings + notify/image), `042`–`044` (group collections + per-collection profile visibility + per-collection self-join), `045`–`047` (shifts redesign + shift times), and `048`/`049` (participation leads + per-event lead opt-in; the gathering halves are dropped by `050`) are applied before relying on those features.
 
 ---
 
@@ -545,6 +545,7 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `048_participation_leads.sql` | **Participation leads.** Adds `role` (`'member'`/`'lead'`, default `'member'`) to `member_shift_signups` **and** `lead_up_event_rsvps` — members offer to lead what they join; the role lives on the participation row (dies with the signup; co-leads = multiple lead rows; display-only). Additive + idempotent. *(The `lead_up_event_rsvps` half is dropped by `050`.)* |
 | `049_needs_lead.sql` | **Per-event lead opt-in.** `needs_lead BOOL` (default false) on `schedule_events` **and** `lead_up_events` — whether an event *has* a lead role is the organizer's call at creation; all member lead affordances (048) are gated on it, and the offer moves to signup/RSVP time. Additive + idempotent. *(The `lead_up_events` half is dropped by `050`.)* |
 | `050_scrap_gathering_leads.sql` | **Scrap gathering leads.** Leads become a **shifts-only** concept: drops `lead_up_event_rsvps.role` + `lead_up_events.needs_lead` (the gathering halves of 048/049). **Destructive by design** — discards any recorded gathering-lead offers. Idempotent via `IF EXISTS`. |
+| `051_shared_resources.sql` | **Shared resources.** `resource_lists` + `resources` + `resource_claims` — admin-authored needs ("4 camping stoves"), met by one-click member claims with quantities; totals always derived from claim rows. Additive + idempotent; **must be applied** before the feature works. See [`shared-resources.md`](./shared-resources.md). |
 
 ---
 
@@ -583,6 +584,51 @@ Per-session RSVP to a lead-up gathering. Presence of a row = "I'll be at this pl
 | | | `UNIQUE (lead_up_event_id, clerk_user_id)` |
 
 *(Gathering leads — a `role` column here + `needs_lead` on `lead_up_events` — were built and scrapped 2026-07-02; dropped by migration `050`. Leads are shifts-only.)*
+
+---
+
+### `resource_lists`
+
+A named collection of shared-resource needs ("Shared Kitchen", "Setup Equipment") — the gear members bring to the event. Community-scoped by design: no polymorphic department/event owners (see [`shared-resources.md`](./shared-resources.md) → Non-goals). Managed in Admin → Manage → Shared Resources.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `title` | TEXT | |
+| `description` | TEXT | optional |
+| `group_id` | UUID FK → `groups.id` (ON DELETE SET NULL) | optional *stewarding* group — display context only, never a permission gate |
+| `visible` | BOOL | shown to members on `/signup` → "Bring Something" (hidden = admin work-in-progress) |
+| `sort_order` | INT | default 0; display falls back to `created_at` |
+
+---
+
+### `resources`
+
+One needed item per row within a list.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `list_id` | UUID FK → `resource_lists.id` (ON DELETE CASCADE) | |
+| `name` | TEXT | e.g. "Camping stove" |
+| `note` | TEXT | optional, e.g. "two-burner, with propane" |
+| `quantity_needed` | INT | ≥ 1 |
+| `sort_order` | INT | default 0; display falls back to `created_at` |
+
+---
+
+### `resource_claims`
+
+A member's "I'll bring one" — one row per member per resource, carrying a quantity (three coolers = one row, quantity 3). A claim **is** the confirmation (no pledge→confirm workflow); deleting the row unclaims. Fulfilled totals are always **derived** by summing claim rows — never stored.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `resource_id` | UUID FK → `resources.id` (ON DELETE CASCADE) | |
+| `clerk_user_id` | TEXT | |
+| `quantity` | INT | ≥ 1 (API clamps to 1–99; 0 = delete the row) |
+| `updated_at` | TIMESTAMPTZ | bumped on quantity change |
+| | | `UNIQUE (resource_id, clerk_user_id)` |
 
 ---
 
