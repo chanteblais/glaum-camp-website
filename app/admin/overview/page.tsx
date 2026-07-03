@@ -1,6 +1,7 @@
-import { auth, clerkClient } from '@clerk/nextjs/server'
+import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
+import { requireAdmin } from '@/lib/admin-auth'
 import { NotificationBell } from '@/app/admin/NotificationBell'
 import { AdminNav } from '@/app/admin/AdminNav'
 import { MembersDropdown } from './MembersDropdown'
@@ -53,15 +54,17 @@ export default async function OverviewPage() {
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
 
-  const client = await clerkClient()
-  const user = await client.users.getUser(userId)
-  if (user.publicMetadata?.role !== 'admin') redirect('/')
+  if (!(await requireAdmin())) redirect('/')
 
-  // "Needs attention" digest + runway strip (docs/admin-ux-handoff.md A1/A2).
-  const [attention, runway] = await Promise.all([getAttentionItems(), getAdminRunway()])
-
-  // Fetch data
+  // Everything below is independent — one parallel batch, no waterfalls.
+  // attention/runway = the "Needs attention" digest + runway strip
+  // (docs/admin-ux-handoff.md A1/A2).
   const [
+    attention,
+    runway,
+    shiftEventByUser,
+    groupNamesByUser,
+    { data: groupRows },
     { data: applications },
     { data: signups },
     { data: volunteers },
@@ -69,6 +72,11 @@ export default async function OverviewPage() {
     { data: polls },
     { data: pollVotes },
   ] = await Promise.all([
+    getAttentionItems(),
+    getAdminRunway(),
+    getShiftEventByUser(),
+    getGroupNamesByUser(),
+    supabaseAdmin.from('groups').select('id, name').order('sort_order'),
     supabaseAdmin
       .from('applications')
       .select('id, first_name, last_name, preferred_name, email, status, clerk_user_id, rideshare')
@@ -128,7 +136,6 @@ export default async function OverviewPage() {
   // Build signup lookup. Roles come from camp_signups; "has a shift" uses the
   // shared union with member_shift_signups so Overview agrees with Manage.
   const signupMap = new Map((signups ?? []).map(s => [s.clerk_user_id, s]))
-  const shiftEventByUser = await getShiftEventByUser()
 
   // Members with signup status
   const members = approved.map(a => {
@@ -157,10 +164,6 @@ export default async function OverviewPage() {
 
   // Groups — one card per admin-configured group, so renames/additions in
   // Admin → Groups show up here without code changes.
-  const [groupNamesByUser, { data: groupRows }] = await Promise.all([
-    getGroupNamesByUser(),
-    supabaseAdmin.from('groups').select('id, name').order('sort_order'),
-  ])
   const memberGroupNames = (a: { clerk_user_id?: string | null }) => (a.clerk_user_id ? groupNamesByUser[a.clerk_user_id] ?? [] : [])
   const groupCards = (groupRows ?? []).map(g => ({
     id: g.id as string,

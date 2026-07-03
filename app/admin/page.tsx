@@ -1,6 +1,7 @@
-import { auth, clerkClient } from '@clerk/nextjs/server'
+import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
+import { requireAdmin } from '@/lib/admin-auth'
 import { ApplicationRow } from './ApplicationRow'
 import { CollapsibleSection } from './CollapsibleSection'
 import { VolunteersSection } from './VolunteersSection'
@@ -19,34 +20,38 @@ export default async function AdminPage() {
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
 
-  const client = await clerkClient()
-  const user = await client.users.getUser(userId)
-  if (user.publicMetadata?.role !== 'admin') redirect('/')
+  if (!(await requireAdmin())) redirect('/')
 
-  const { data: volunteersRaw } = await supabaseAdmin
-    .from('volunteers')
-    .select('id, first_name, last_name, preferred_name, email, phone, days_available, preferred_times, shift_interests, other_notes, signup_intent, status, created_at')
-    .in('status', ['active', 'pending'])
-    .order('created_at', { ascending: false })
+  const [
+    { data: volunteersRaw },
+    { data: applications, error: dbError },
+    groupNamesByUser,
+    signupEventMap,
+    runway,
+    { data: notifications, error: notificationsError },
+  ] = await Promise.all([
+    supabaseAdmin
+      .from('volunteers')
+      .select('id, first_name, last_name, preferred_name, email, phone, days_available, preferred_times, shift_interests, other_notes, signup_intent, status, created_at')
+      .in('status', ['active', 'pending'])
+      .order('created_at', { ascending: false }),
+    supabaseAdmin
+      .from('applications')
+      .select('id, clerk_user_id, first_name, last_name, preferred_name, email, status, submitted_at, attendance, membership_type, camped_before, setup_preference')
+      .order('submitted_at', { ascending: false }),
+    getGroupNamesByUser(),
+    getShiftEventByUser(),
+    getAdminRunway(),
+    supabaseAdmin
+      .from('admin_notifications')
+      .select('id, application_id, event_type, message, details, created_at, read_at')
+      .order('created_at', { ascending: false })
+      .limit(20),
+  ])
+
   const volunteers = volunteersRaw ?? []
   const pendingVolunteers = volunteers.filter(v => v.status === 'pending')
   const activeVolunteers = volunteers.filter(v => v.status === 'active')
-
-  const { data: applications, error: dbError } = await supabaseAdmin
-    .from('applications')
-    .select('id, clerk_user_id, first_name, last_name, preferred_name, email, status, submitted_at, attendance, membership_type, camped_before, setup_preference')
-    .order('submitted_at', { ascending: false })
-
-  const groupNamesByUser = await getGroupNamesByUser()
-
-  const signupEventMap = await getShiftEventByUser()
-  const runway = await getAdminRunway()
-
-  const { data: notifications, error: notificationsError } = await supabaseAdmin
-    .from('admin_notifications')
-    .select('id, application_id, event_type, message, details, created_at, read_at')
-    .order('created_at', { ascending: false })
-    .limit(20)
 
   if (dbError) console.error('[Admin] Supabase query error:', dbError)
   if (notificationsError) console.error('[Admin] Notifications query error:', notificationsError)

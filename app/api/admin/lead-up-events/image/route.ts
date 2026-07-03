@@ -1,18 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth, clerkClient } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { requireAdmin } from '@/lib/admin-auth'
 
 const BUCKET = 'lead-up-images'
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 const MAX_BYTES = 5 * 1024 * 1024 // 5 MB
-
-async function requireAdmin() {
-  const { userId } = await auth()
-  if (!userId) return false
-  const client = await clerkClient()
-  const user = await client.users.getUser(userId)
-  return user.publicMetadata?.role === 'admin'
-}
 
 export async function POST(req: NextRequest) {
   if (!(await requireAdmin())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

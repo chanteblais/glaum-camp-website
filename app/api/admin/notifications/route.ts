@@ -1,17 +1,6 @@
 import { NextResponse } from 'next/server'
-import { auth, clerkClient } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
-
-async function requireAdmin() {
-  const { userId } = await auth()
-  if (!userId) return null
-
-  const client = await clerkClient()
-  const user = await client.users.getUser(userId)
-  if (user.publicMetadata?.role !== 'admin') return null
-
-  return userId
-}
+import { requireAdmin } from '@/lib/admin-auth'
 
 export async function GET() {
   if (!(await requireAdmin())) {

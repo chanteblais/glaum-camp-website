@@ -1,16 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth, clerkClient } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { memberDisplayNames } from '@/lib/member-names'
-
-async function requireAdmin() {
-  const { userId } = await auth()
-  if (!userId) return null
-  const client = await clerkClient()
-  const user = await client.users.getUser(userId)
-  if (user.publicMetadata?.role !== 'admin') return null
-  return userId
-}
+import { requireAdmin } from '@/lib/admin-auth'
 
 // Full admin view: every list (visible or not) with its items, and per-item
 // claims carrying display names — the organizer always sees who to chase.
