@@ -67,10 +67,11 @@ Sign-out flow:
 /schedule                Full public camp schedule (accessible to approved members)
 /sign-in                 Clerk sign-in (catch-all route)
 /sign-out                Sign-out redirect page
-/admin                   Admin dashboard (role-gated)
+/admin                   Admin console — Members tab (role-gated; people + communication)
 /admin/[id]              Admin view of a specific application
 /admin/overview          Admin overview / stats
-/admin/configure         Application Builder — configure member + volunteer forms
+/admin/program           Admin Program tab — schedule, lead-up gatherings, shared resources
+/admin/configure         Admin Configure tab — forms, fields, recognition, structure, access
 ```
 
 ---

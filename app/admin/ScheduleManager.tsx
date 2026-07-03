@@ -508,7 +508,7 @@ function GroupHeader({ label, sub, count, onAdd, addLabel, color = '#C8A848' }: 
   )
 }
 
-export function ScheduleManager({ rangeStart, rangeEnd }: { rangeStart?: string; rangeEnd?: string }) {
+export function ScheduleManager({ rangeStart, rangeEnd, children }: { rangeStart?: string; rangeEnd?: string; children?: React.ReactNode }) {
   const [events, setEvents] = useState<ScheduleEvent[]>([])
   const [shiftTypes, setShiftTypes] = useState<ShiftTypeOption[]>([])
   const [rosters, setRosters] = useState<Record<string, RosterEntry[]>>({})
@@ -713,16 +713,21 @@ export function ScheduleManager({ rangeStart, rangeEnd }: { rangeStart?: string;
     whiteSpace: 'nowrap', opacity: 0.75,
   })
 
-  if (loading) return <p style={{ opacity: 0.4, fontStyle: 'italic', fontSize: '0.875rem' }}>Loading…</p>
-  if (loadError) return <LoadError onRetry={() => { setLoading(true); load() }} />
+  if (loading || loadError) return (
+    <div>
+      {children}
+      {loading
+        ? <p style={{ opacity: 0.4, fontStyle: 'italic', fontSize: '0.875rem', marginTop: '0.75rem' }}>Loading…</p>
+        : <LoadError onRetry={() => { setLoading(true); load() }} />}
+    </div>
+  )
 
   return (
     <div>
-      {/* Header: total count + view toggle + global add (per-day adds prefill their date) */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem', gap: '0.75rem', flexWrap: 'wrap' }}>
-        <p style={{ fontSize: '0.68rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, margin: 0 }}>
-          Scheduled Events — {dated.length + undated.length}
-        </p>
+      {/* One controls row opens the workspace: the shift-signup pill (rides
+          in as children) on the left, view + add on the right. */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.85rem', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div>{children}</div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           {/* List ⇄ Week: the list is the working roster; the week grid shows
               time as space (overlaps, gaps, lopsided days). */}

@@ -88,7 +88,7 @@ export async function getAttentionItems(): Promise<AttentionItem[]> {
   if (unnotified) items.push({
     id: `notify-${unnotified.id}`,
     text: `“${unnotified.title}” (${unnotified.event_date ? shortDate(unnotified.event_date) : 'undated'}) hasn't been announced`,
-    verb: 'Notify', href: '/admin#program',
+    verb: 'Notify', href: '/admin/program#lead-up',
   })
 
   // Holds = member_shift_signups ∪ legacy camp_signups.schedule_event_id,
@@ -110,12 +110,12 @@ export async function getAttentionItems(): Promise<AttentionItem[]> {
   if (leadless.length === 1) items.push({
     id: `leadless-${leadless[0].id}`,
     text: `“${leadless[0].title}” is fully signed up but has no lead ✦`,
-    verb: 'Assign', href: '/admin#program',
+    verb: 'Assign', href: '/admin/program#schedule',
   })
   else if (leadless.length > 1) items.push({
     id: 'leadless-shifts',
     text: `${leadless.length} shifts are fully signed up but have no lead ✦`,
-    verb: 'Assign', href: '/admin#program',
+    verb: 'Assign', href: '/admin/program#schedule',
   })
 
   return items.slice(0, 5)
@@ -143,8 +143,8 @@ export async function getAdminRunway(): Promise<AdminRunway> {
 
   const milestones: RunwayMilestone[] = (gatherings ?? [])
     .filter(g => g.event_date)
-    .map(g => ({ label: g.title as string, dateLabel: shortDate(g.event_date as string), href: '/admin#program' }))
-  if (start) milestones.push({ label: 'Camp begins', dateLabel: shortDate(start), href: '/admin#program' })
+    .map(g => ({ label: g.title as string, dateLabel: shortDate(g.event_date as string), href: '/admin/program#lead-up' }))
+  if (start) milestones.push({ label: 'Camp begins', dateLabel: shortDate(start), href: '/admin/program#schedule' })
 
   return { daysToCamp, milestones: milestones.slice(0, 3) }
 }
