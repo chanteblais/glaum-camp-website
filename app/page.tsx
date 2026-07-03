@@ -8,6 +8,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { getMemberGroups } from '@/lib/groups'
 import { buildAttunementChecklist, memberGroupCounts, requiredItems, commitmentItems } from '@/lib/attunement'
 import { getMemberShiftState, EMPTY_MEMBER_SHIFT_STATE } from '@/lib/shift-attunement'
+import { clockLabel } from '@/lib/shift-hours'
 
 import { HomePageEditor } from './HomePageEditor'
 import { supabaseResizedUrl } from '@/lib/supabase-image'
@@ -385,7 +386,7 @@ let canManagePolls = false
               const leadUp = leadUpEvents.map(e => ({
                 id: e.id,
                 day: e.event_date ? new Date(e.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short' }) : 'TBD',
-                time: e.start_time ?? '',
+                time: clockLabel(e.start_time),
                 title: e.title,
                 subtitle: e.location || (e.host ? `with ${e.host}` : null),
                 icon_type: 'star',

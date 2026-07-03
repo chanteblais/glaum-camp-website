@@ -43,9 +43,9 @@ New table `lead_up_events` — deliberately lighter than `schedule_events`:
 | `id` | UUID PK | |
 | `title` | TEXT | |
 | `description` | TEXT | |
-| `event_date` | DATE | real calendar date (not a camp-relative slot label) |
-| `start_time` | TEXT | display time string |
-| `end_time` | TEXT | optional |
+| `event_date` | DATE | real calendar date (not a camp-relative slot label); **required by the editor** since the calendar rework (NULL only on legacy rows) |
+| `start_time` | TEXT | `"HH:MM"` 24-hour since migration `054` (was a display string); **required by the editor**; rendered via `clockLabel` (`lib/shift-hours.ts`) |
+| `end_time` | TEXT | optional, same format |
 | `location` | TEXT | physical place — optional |
 | `link` | TEXT | virtual link (Zoom/Meet) — brainstorms are often remote; optional |
 | `host` | TEXT | who's running it — optional |
@@ -61,7 +61,7 @@ RSVP status set: `going` / `maybe` / `not_going` (or just a binary `going` toggl
 
 ## Where it surfaces
 
-- **Admin:** new manager sibling to `ScheduleManager` (e.g. `LeadUpGatheringsManager.tsx`) — same shape, far fewer fields. New admin tab "Lead-Up Gatherings."
+- **Admin:** new manager sibling to `ScheduleManager` (e.g. `LeadUpGatheringsManager.tsx`) — same shape, far fewer fields. New admin tab "Lead-Up Gatherings." *(Added later:)* the manager is topped by a **month calendar** (`LeadUpCalendar.tsx`) — sparse dates across months are exactly what a month grid is for. Click an empty day to add (date prefilled), click a chip to edit; opens on the next upcoming gathering's month; the configured event range (Configure → Event Dates, passed as `rangeStart`/`rangeEnd` props) is tinted with an "Event" marker so the runway visibly leads somewhere. The editor requires **title + date + start time** (`<input type="time">`, end optional).
 - **Members — home dashboard:** the existing **"Upcoming Gatherings"** widget is already real-date-driven and already splits pre/at-camp (`app/page.tsx:347`). The new table cleanly **replaces the `pre_camp` half** of that widget. ⚠️ Naming overlap to resolve at build: "Upcoming Gatherings" widget vs "Lead-Up Gatherings" — either rename the widget to host these explicitly, or keep the widget as the combined teaser and use "Lead-Up Gatherings" only as the section header / nav.
 - **`/schedule` page:** show the two zones stacked — "Before we gather" (lead-up) → "At camp" (program).
 - **RSVP UI:** a simple "I'll be there" control on each lead-up gathering card with a live headcount; organizer/admin sees the list.

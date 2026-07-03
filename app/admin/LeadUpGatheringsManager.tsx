@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { normaliseToken } from '@/lib/time-format'
+import { to24h } from '@/lib/time-format'
+import { clockLabel } from '@/lib/shift-hours'
 import { LoadError } from './LoadError'
+import { LeadUpCalendar } from './LeadUpCalendar'
 
 type LeadUpEvent = {
   id: string
@@ -119,30 +121,13 @@ function GatheringModal({ initial, isCreate, onSave, onClose, saving, error }: {
     }
   }
 
-  // A time field is invalid only when it's non-empty and unparseable.
-  const startInvalid = !!form.start_time?.trim() && normaliseToken(form.start_time) === null
-  const endInvalid = !!form.end_time?.trim() && normaliseToken(form.end_time) === null
+  // Every gathering needs a real date (so the calendar can place it) and a
+  // start time — no free-text or TBD times. End stays optional.
+  const canSave = !!form.title && !!form.event_date && !!form.start_time
+  const missing = !form.title ? 'a title' : !form.event_date ? 'a date' : !form.start_time ? 'a start time' : null
 
-  // On blur, snap a valid entry to canonical form ("7pm" → "7:00 PM").
-  const normaliseField = (k: 'start_time' | 'end_time') => {
-    const v = form[k]
-    if (!v?.trim()) return
-    const n = normaliseToken(v)
-    if (n) set(k, n)
-  }
-
-  const timeInputStyle = (invalid: boolean): React.CSSProperties =>
-    invalid ? { ...inputStyle, borderColor: 'rgba(255,120,120,0.6)' } : inputStyle
-
-  const handleSubmit = () => {
-    // Saves are gated on validity, so normaliseToken returns a value here.
-    // A hidden gathering can't be notified, so only fan out when it's visible.
-    onSave({
-      ...form,
-      start_time: form.start_time?.trim() ? (normaliseToken(form.start_time) ?? form.start_time) : form.start_time,
-      end_time: form.end_time?.trim() ? (normaliseToken(form.end_time) ?? form.end_time) : form.end_time,
-    }, notify && form.visible)
-  }
+  // A hidden gathering can't be notified, so only fan out when it's visible.
+  const handleSubmit = () => onSave(form, notify && form.visible)
 
   return (
     <>
@@ -170,17 +155,12 @@ function GatheringModal({ initial, isCreate, onSave, onClose, saving, error }: {
             <input style={inputStyle} type="date" value={form.event_date ?? ''} onChange={e => set('event_date', e.target.value || null)} />
           </Field>
           <Field label="Start">
-            <input style={timeInputStyle(startInvalid)} value={form.start_time ?? ''} placeholder="7:00 PM" onChange={e => set('start_time', e.target.value)} onBlur={() => normaliseField('start_time')} />
+            <input type="time" style={inputStyle} value={form.start_time ?? ''} onChange={e => set('start_time', e.target.value || null)} />
           </Field>
-          <Field label="End">
-            <input style={timeInputStyle(endInvalid)} value={form.end_time ?? ''} placeholder="optional" onChange={e => set('end_time', e.target.value)} onBlur={() => normaliseField('end_time')} />
+          <Field label="End (optional)">
+            <input type="time" style={inputStyle} value={form.end_time ?? ''} onChange={e => set('end_time', e.target.value || null)} />
           </Field>
         </div>
-        {(startInvalid || endInvalid) && (
-          <p style={{ color: '#ff8a8a', fontSize: '0.72rem', margin: '-0.5rem 0 1rem' }}>
-            Enter a time like “7:00 PM”, “7pm”, “noon”, or “19:00”.
-          </p>
-        )}
 
         <Field label="Description">
           <textarea rows={3} style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }} value={form.description ?? ''} placeholder="What's this session for?" onChange={e => set('description', e.target.value)} />
@@ -238,11 +218,16 @@ function GatheringModal({ initial, isCreate, onSave, onClose, saving, error }: {
 
         {error && <p style={{ color: '#ff8a8a', fontSize: '0.82rem', marginBottom: '0.75rem' }}>{error}</p>}
 
-        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+          {missing && (
+            <span style={{ fontSize: '0.72rem', color: '#C8A848', opacity: 0.55, fontStyle: 'italic', marginRight: 'auto' }}>
+              Needs {missing}
+            </span>
+          )}
           <button onClick={onClose} style={{ padding: '0.6rem 1.2rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.2)', background: 'transparent', color: '#F3EDE6', cursor: 'pointer', fontSize: '0.82rem', opacity: 0.7 }}>
             Cancel
           </button>
-          <button onClick={handleSubmit} disabled={saving || !form.title || startInvalid || endInvalid} style={{ padding: '0.6rem 1.2rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.45)', background: 'transparent', color: '#FFFACD', cursor: 'pointer', fontSize: '0.82rem', letterSpacing: '0.05em', opacity: saving || !form.title || startInvalid || endInvalid ? 0.5 : 1 }}>
+          <button onClick={handleSubmit} disabled={saving || !canSave} style={{ padding: '0.6rem 1.2rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.45)', background: 'transparent', color: '#FFFACD', cursor: 'pointer', fontSize: '0.82rem', letterSpacing: '0.05em', opacity: saving || !canSave ? 0.5 : 1 }}>
             {saving ? 'Saving…' : 'Save gathering'}
           </button>
         </div>
@@ -251,11 +236,11 @@ function GatheringModal({ initial, isCreate, onSave, onClose, saving, error }: {
   )
 }
 
-export function LeadUpGatheringsManager() {
+export function LeadUpGatheringsManager({ rangeStart, rangeEnd }: { rangeStart?: string; rangeEnd?: string }) {
   const [events, setEvents] = useState<LeadUpEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
-  const [modal, setModal] = useState<{ mode: 'add' } | { mode: 'edit'; event: LeadUpEvent } | null>(null)
+  const [modal, setModal] = useState<{ mode: 'add'; date?: string } | { mode: 'edit'; event: LeadUpEvent } | null>(null)
   const [saving, setSaving] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
   const [notifyingId, setNotifyingId] = useState<string | null>(null)
@@ -376,6 +361,16 @@ export function LeadUpGatheringsManager() {
         Planning &amp; brainstorming sessions on the runway to the event. Members RSVP per session — these are separate from the at-camp schedule and never affect shifts or attunement.
       </p>
 
+      {/* Month calendar — the runway at a glance. Click an empty day to add a
+          gathering there; click a gathering to edit it. */}
+      <LeadUpCalendar
+        events={events}
+        rangeStart={rangeStart}
+        rangeEnd={rangeEnd}
+        onAddDate={iso => { setModal({ mode: 'add', date: iso }); setModalError(null) }}
+        onEdit={ev => { setModal({ mode: 'edit', event: ev }); setModalError(null) }}
+      />
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         {events.length === 0 && <p style={{ opacity: 0.35, fontStyle: 'italic', fontSize: '0.82rem' }}>No gatherings yet.</p>}
         {events.map(ev => {
@@ -410,7 +405,7 @@ export function LeadUpGatheringsManager() {
                 )}
               </p>
               <p style={{ fontSize: '0.7rem', opacity: 0.45, margin: '0.15rem 0 0' }}>
-                {[ev.start_time, ev.location || (ev.link ? 'Online' : null), ev.host].filter(Boolean).join(' · ') || '—'}
+                {[clockLabel(ev.start_time), ev.location || (ev.link ? 'Online' : null), ev.host].filter(Boolean).join(' · ') || '—'}
               </p>
             </div>
 
@@ -460,8 +455,10 @@ export function LeadUpGatheringsManager() {
       {modal && (
         <GatheringModal
           initial={modal.mode === 'edit'
-            ? { title: modal.event.title, description: modal.event.description, event_date: modal.event.event_date, start_time: modal.event.start_time, end_time: modal.event.end_time, location: modal.event.location, link: modal.event.link, host: modal.event.host, image_url: modal.event.image_url, visible: modal.event.visible }
-            : blank()}
+            // Legacy rows store display strings ("7:00 PM") — snap them to the
+            // "HH:MM" the time inputs speak; unparseable values start blank.
+            ? { title: modal.event.title, description: modal.event.description, event_date: modal.event.event_date, start_time: to24h(modal.event.start_time), end_time: to24h(modal.event.end_time), location: modal.event.location, link: modal.event.link, host: modal.event.host, image_url: modal.event.image_url, visible: modal.event.visible }
+            : { ...blank(), event_date: modal.date ?? null }}
           isCreate={modal.mode === 'add'}
           onSave={handleSave}
           onClose={() => setModal(null)}
