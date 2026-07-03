@@ -9,9 +9,10 @@
 // crossing columns moves the day. Overlaps and gaps that are invisible in the
 // list view jump out here.
 //
-// Recurring (daily) events render as ghosted bands in every column — context,
-// not clutter (they have no date, so they stay click-to-edit). Dated events
-// missing a parseable time surface in a fix-me strip below the grid.
+// Recurring events render as ghosted bands in each column they repeat on
+// (recurrence_days NULL = every day) — context, not clutter (they have no
+// single date, so they stay click-to-edit). Dated events missing a parseable
+// time surface in a fix-me strip below the grid.
 
 import { useRef, useState } from 'react'
 import { MANDATORY_HUE, shiftHue, shiftColorIndexMap } from '@/lib/shift-colors'
@@ -34,6 +35,7 @@ type WeekViewEvent = {
   capacity: number | null
   start_time: string | null
   end_time: string | null
+  recurrence_days: string[] | null
 }
 
 type RosterEntry = { role: 'member' | 'lead' }
@@ -64,9 +66,9 @@ function hue(e: WeekViewEvent, shiftIndex: Record<string, number>) {
   if (e.participation_type === 'shift' && e.shift_type_id != null && shiftIndex[e.shift_type_id] != null) {
     return shiftHue(shiftIndex[e.shift_type_id])
   }
-  // Daily recurring wears the manager's recurring purple (same as the "Daily
-  // Recurring" section header + rail chip) — they're usually 'general', which
-  // would otherwise dissolve into the neutral gold chrome.
+  // Recurring wears the manager's recurring purple (same as the "Recurring"
+  // section header + rail chip) — they're usually 'general', which would
+  // otherwise dissolve into the neutral gold chrome.
   if (e.is_recurring) return { rgb: '210,57,248', accent: '#D239F8' }
   return { rgb: '200,168,72', accent: GOLD } // general → house gold
 }
@@ -241,7 +243,7 @@ export function ScheduleWeekView({ events, days, shiftTypes, rosters, onEdit, on
         }}
         {...(ghost ? {} : dragHandlers(ev, start, end))}
         title={ghost
-          ? `${ev.title}${ev.visible ? '' : ' (hidden)'} — daily recurring — click to edit`
+          ? `${ev.title}${ev.visible ? '' : ' (hidden)'} — recurring — click to edit`
           : `${ev.title}${ev.visible ? '' : ' (hidden)'} — click to edit · drag to reschedule`}
         style={{
           position: 'absolute',
@@ -327,8 +329,9 @@ export function ScheduleWeekView({ events, days, shiftTypes, rosters, onEdit, on
                         pointerEvents: 'none',
                       }} />
                     ))}
-                    {/* Daily recurring — ghosted context in every column */}
-                    {recurring.map(ev => block(ev, true))}
+                    {/* Recurring — ghosted context in each column the event repeats on
+                        (recurrence_days NULL = every day) */}
+                    {recurring.filter(ev => !ev.recurrence_days || ev.recurrence_days.includes(day.iso)).map(ev => block(ev, true))}
                     {dayEvents.map(({ e }) => block(e, false, lanes[e.id]?.lane ?? 0, lanes[e.id]?.lanes ?? 1))}
                     {/* Drag preview — the block's landing spot, live times in the corner */}
                     {drag && drag.dayIdx === dayIdx && (() => {

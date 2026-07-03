@@ -15,6 +15,8 @@ type ScheduleEvent = {
   icon_type: string
   highlight: boolean
   is_recurring: boolean
+  // Recurring only: NULL = every day; an array of ISO dates = just those days.
+  recurrence_days?: string[] | null
   event_type: string | null
   event_date: string | null
   participation_type?: string | null
@@ -190,11 +192,16 @@ export function ScheduleCalendarClient({ events, days }: { events: ScheduleEvent
     return (parseEventTimes(a.time).start ?? 9999) - (parseEventTimes(b.time).start ?? 9999)
   })
   const recurring = events.filter(e => e.is_recurring)
+  // True every-day events keep their card section below the grid; recurring
+  // events pinned to specific dates render as blocks in those day columns.
+  const everyDay = recurring.filter(e => !e.recurrence_days)
+  const onDays = recurring.filter(e => e.recurrence_days && e.recurrence_days.length > 0)
+  const recurringOn = (iso: string) => onDays.filter(e => e.recurrence_days!.includes(iso))
   const untimed = regular.filter(e => !e.time)
 
   // Compute display window from actual event times (+ 30 min padding each side)
   const allMinutes: number[] = []
-  regular.forEach(e => {
+  ;[...regular, ...onDays].forEach(e => {
     const { start, end } = parseEventTimes(e.time)
     if (start != null) allMinutes.push(start)
     if (end != null) allMinutes.push(end)
@@ -267,12 +274,12 @@ export function ScheduleCalendarClient({ events, days }: { events: ScheduleEvent
                   borderTop: `1px solid rgba(200,168,72,${label === 'Midnight' || label === 'Noon' ? '0.15' : '0.06'})`,
                 }} />
               ))}
-              {regular.filter(e => columnIso(e) === selectedDay).map(ev => {
+              {[...regular.filter(e => columnIso(e) === selectedDay), ...recurringOn(selectedDay)].map(ev => {
                 const { start, end } = parseEventTimes(ev.time)
                 if (start === null) return null
                 const top = minutesToTop(start, START_HOUR)
                 const height = end ? minutesToHeight(start, end, START_HOUR, END_HOUR) : Math.max(PX_PER_HOUR * 0.75, 32)
-                return <EventBlock key={ev.id} event={ev} style={{ top, height }} />
+                return <EventBlock key={`${ev.id}-${selectedDay}`} event={ev} style={{ top, height }} />
               })}
             </div>
           </div>
@@ -296,7 +303,7 @@ export function ScheduleCalendarClient({ events, days }: { events: ScheduleEvent
           </div>
           <div style={{ flex: 1, display: 'grid', gridTemplateColumns: `repeat(${Math.max(days.length, 1)}, 1fr)`, gap: '0.4rem' }}>
             {days.map(day => {
-              const dayEvents = regular.filter(e => columnIso(e) === day.iso)
+              const dayEvents = [...regular.filter(e => columnIso(e) === day.iso), ...recurringOn(day.iso)]
               return (
                 <div key={day.iso}>
                   <div style={{
@@ -327,7 +334,7 @@ export function ScheduleCalendarClient({ events, days }: { events: ScheduleEvent
                       if (start === null) return null
                       const top = minutesToTop(start, START_HOUR)
                       const height = end ? minutesToHeight(start, end, START_HOUR, END_HOUR) : Math.max(PX_PER_HOUR * 0.75, 32)
-                      return <EventBlock key={ev.id} event={ev} style={{ top, height }} />
+                      return <EventBlock key={`${ev.id}-${day.iso}`} event={ev} style={{ top, height }} />
                     })}
                   </div>
                 </div>
@@ -351,8 +358,8 @@ export function ScheduleCalendarClient({ events, days }: { events: ScheduleEvent
         </div>
       )}
 
-      {/* Every Day — recurring events (compact) */}
-      {recurring.length > 0 && (
+      {/* Every Day — recurring events without picked dates (compact) */}
+      {everyDay.length > 0 && (
         <div style={{ marginTop: '2.5rem' }}>
           <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.2), transparent)', marginBottom: '2rem' }} />
           <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
@@ -361,7 +368,7 @@ export function ScheduleCalendarClient({ events, days }: { events: ScheduleEvent
             </p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1rem' }}>
-            {recurring.map(ev => <RecurringEventCard key={ev.id} event={ev} />)}
+            {everyDay.map(ev => <RecurringEventCard key={ev.id} event={ev} />)}
           </div>
         </div>
       )}

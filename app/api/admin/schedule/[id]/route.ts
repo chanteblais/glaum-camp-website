@@ -21,7 +21,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   // Direct passthrough fields. Legacy contribution_type / event_type / capacity are
   // NOT here — they're derived from participation_type + shift_type_id (see
   // lib/event-type-compat.ts).
-  const allowed = ['day','time','title','subtitle','detail_desc','icon_type','sort_order','visible','highlight','is_recurring','participation_type','shift_type_id','requires_ack','event_date','event_category','start_time','end_time','needs_lead']
+  const allowed = ['day','time','title','subtitle','detail_desc','icon_type','sort_order','visible','highlight','is_recurring','participation_type','shift_type_id','requires_ack','event_date','event_category','start_time','end_time','needs_lead','recurrence_days']
   const updates: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in body) updates[key] = body[key]
@@ -31,6 +31,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const derived = weekdayFromISO(body.event_date)
     if (derived) updates.day = derived
   }
+  // Recurrence days only make sense on recurring events.
+  if ('is_recurring' in body && !body.is_recurring) updates.recurrence_days = null
 
   // Re-derive the legacy columns whenever participation/type/capacity is touched,
   // using the incoming value where present, else the row's current value.

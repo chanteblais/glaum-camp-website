@@ -9,7 +9,7 @@ export async function ScheduleSection() {
   const [{ data: eventsRaw }, { data: shiftTypes }, { data: configRows }] = await Promise.all([
     supabaseAdmin
       .from('schedule_events')
-      .select('id, day, time, title, subtitle, detail_desc, icon_type, highlight, is_recurring, event_type, event_date, participation_type, shift_type_id')
+      .select('id, day, time, title, subtitle, detail_desc, icon_type, highlight, is_recurring, recurrence_days, event_type, event_date, participation_type, shift_type_id')
       .eq('visible', true)
       .order('sort_order', { ascending: true }),
     supabaseAdmin.from('shift_types').select('id').order('sort_order'),

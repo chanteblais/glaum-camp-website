@@ -6,6 +6,7 @@ import { clockLabel } from '@/lib/shift-hours'
 import { LoadError } from './LoadError'
 import { LeadUpCalendar } from './LeadUpCalendar'
 import { useConfirm } from '../components/ConfirmDialog'
+import { TimeField } from '../components/TimeField'
 
 type LeadUpEvent = {
   id: string
@@ -156,10 +157,10 @@ function GatheringModal({ initial, isCreate, onSave, onClose, saving, error }: {
             <input style={inputStyle} type="date" value={form.event_date ?? ''} onChange={e => set('event_date', e.target.value || null)} />
           </Field>
           <Field label="Start">
-            <input type="time" style={inputStyle} value={form.start_time ?? ''} onChange={e => set('start_time', e.target.value || null)} />
+            <TimeField value={form.start_time} onChange={v => set('start_time', v)} />
           </Field>
           <Field label="End (optional)">
-            <input type="time" style={inputStyle} value={form.end_time ?? ''} onChange={e => set('end_time', e.target.value || null)} />
+            <TimeField value={form.end_time} onChange={v => set('end_time', v)} durationFrom={form.start_time} />
           </Field>
         </div>
 

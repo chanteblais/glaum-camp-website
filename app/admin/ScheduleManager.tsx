@@ -10,6 +10,7 @@ import { shiftDurationHours, formatShiftRange, parseHHMM, weekdayFromISO } from 
 import { buildScheduleDays, type ScheduleDay } from '@/lib/schedule-days'
 import { ScheduleWeekView } from './ScheduleWeekView'
 import { useConfirm } from '../components/ConfirmDialog'
+import { TimeField } from '../components/TimeField'
 
 type ScheduleEvent = {
   id: string
@@ -34,6 +35,8 @@ type ScheduleEvent = {
   start_time: string | null
   end_time: string | null
   needs_lead: boolean
+  // Recurring only: NULL = every day; an array of ISO dates = just those days.
+  recurrence_days: string[] | null
 }
 
 // Shift types offered when an event is a Shift (Configure → Shift Types registry).
@@ -81,7 +84,7 @@ function sortByTime(evs: ScheduleEvent[]): ScheduleEvent[] {
 
 const blank = (): Omit<ScheduleEvent, 'id' | 'sort_order'> => ({
   day: '', time: '', title: '', subtitle: '', detail_desc: '',
-  icon_type: 'star', visible: true, highlight: false, is_recurring: false, capacity: null, event_type: null, contribution_type: null, event_date: null, event_category: 'at_camp', participation_type: 'general', shift_type_id: null, requires_ack: false, start_time: null, end_time: null, needs_lead: false,
+  icon_type: 'star', visible: true, highlight: false, is_recurring: false, capacity: null, event_type: null, contribution_type: null, event_date: null, event_category: 'at_camp', participation_type: 'general', shift_type_id: null, requires_ack: false, start_time: null, end_time: null, needs_lead: false, recurrence_days: null,
 })
 
 const inputStyle: React.CSSProperties = {
@@ -123,6 +126,7 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
 
 function EventModal({
   initial,
+  days,
   onSave,
   onClose,
   saving,
@@ -130,6 +134,7 @@ function EventModal({
   shiftTypes,
 }: {
   initial: Omit<ScheduleEvent, 'id' | 'sort_order'>
+  days: ScheduleDay[]
   onSave: (form: Omit<ScheduleEvent, 'id' | 'sort_order'>) => void
   onClose: () => void
   shiftTypes: ShiftTypeOption[]
@@ -142,17 +147,30 @@ function EventModal({
   // The weekday derives from the picked date — no separate Day dropdown to get
   // out of sync (picking the wrong Wednesday used to be an easy mistake).
   const derivedDay = weekdayFromISO(form.event_date)
+
+  // Recurring day chips: NULL means every day (all chips lit); toggling off a
+  // day materialises the subset. Re-selecting everything folds back to NULL so
+  // "every day" keeps auto-covering days if the event range later grows.
+  const toggleRecurrenceDay = (iso: string) => {
+    const all = days.map(d => d.iso)
+    const current = form.recurrence_days ?? all
+    const next = current.includes(iso) ? current.filter(x => x !== iso) : [...current, iso].sort()
+    set('recurrence_days', all.every(a => next.includes(a)) ? null : next)
+  }
+
   // Non-recurring events need a real date so the schedule can place them.
   // Every event needs a start time (no free-text times); shifts also need an
-  // end so their hours can be counted.
+  // end so their hours can be counted. Recurring subsets need ≥ 1 day.
   const canSave = !!form.title
     && (form.is_recurring || !!form.event_date)
     && !!form.start_time
     && (form.participation_type !== 'shift' || !!form.end_time)
+    && (!form.is_recurring || form.recurrence_days == null || form.recurrence_days.length > 0)
   const missing = !form.title ? 'a title'
     : (!form.is_recurring && !form.event_date) ? 'a date'
     : !form.start_time ? 'a start time'
     : (form.participation_type === 'shift' && !form.end_time) ? 'an end time (shift hours need it)'
+    : (form.is_recurring && form.recurrence_days != null && form.recurrence_days.length === 0) ? 'at least one repeat day'
     : null
 
   return (
@@ -197,15 +215,56 @@ function EventModal({
             from them on save. End is optional except for shifts (hours math). */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '0 1rem', alignItems: 'end' }}>
           <Field label="Start">
-            <input type="time" style={inputStyle} value={form.start_time ?? ''} onChange={e => set('start_time', e.target.value || null)} />
+            <TimeField value={form.start_time} onChange={v => set('start_time', v)} />
           </Field>
           <Field label={form.participation_type === 'shift' ? 'End' : 'End (optional)'}>
-            <input type="time" style={inputStyle} value={form.end_time ?? ''} onChange={e => set('end_time', e.target.value || null)} />
+            <TimeField value={form.end_time} onChange={v => set('end_time', v)} durationFrom={form.start_time} />
           </Field>
           <div style={{ marginBottom: '1rem', paddingBottom: '0.6rem', fontSize: '0.82rem', color: '#C8A848', opacity: 0.75, whiteSpace: 'nowrap' }}>
             {shiftDurationHours(form.start_time, form.end_time) > 0 ? `${shiftDurationHours(form.start_time, form.end_time)}h` : '—'}
           </div>
         </div>
+
+        {/* Recurring events pick their days here (no single date to pick above).
+            All chips lit = every day, incl. days added to the range later. */}
+        {form.is_recurring && (
+          <Field label="Repeats on">
+            {days.length === 0 ? (
+              <p style={{ fontSize: '0.78rem', opacity: 0.45, lineHeight: 1.5, margin: 0 }}>
+                Every day. Set the event dates in Configure → Event Dates to choose specific days.
+              </p>
+            ) : (
+              <>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                  {days.map(d => {
+                    const selected = form.recurrence_days == null || form.recurrence_days.includes(d.iso)
+                    return (
+                      <button
+                        key={d.iso}
+                        type="button"
+                        onClick={() => toggleRecurrenceDay(d.iso)}
+                        style={{
+                          padding: '0.35rem 0.75rem', borderRadius: '9999px', cursor: 'pointer',
+                          fontSize: '0.7rem', letterSpacing: '0.06em', whiteSpace: 'nowrap',
+                          border: `1px solid ${selected ? 'rgba(200,168,72,0.6)' : 'rgba(200,168,72,0.2)'}`,
+                          background: selected ? 'rgba(200,168,72,0.12)' : 'transparent',
+                          color: '#C8A848', opacity: selected ? 1 : 0.45,
+                        }}
+                      >
+                        {d.short} {d.date}
+                      </button>
+                    )
+                  })}
+                </div>
+                <p style={{ fontSize: '0.72rem', opacity: 0.4, lineHeight: 1.5, margin: '0.4rem 0 0' }}>
+                  {form.recurrence_days == null
+                    ? 'Every day — including any days later added to the event range.'
+                    : `${form.recurrence_days.length} day${form.recurrence_days.length === 1 ? '' : 's'} selected.`}
+                </p>
+              </>
+            )}
+          </Field>
+        )}
 
         {!form.is_recurring && (
           <Field label="Subtitle — shown in the At a Glance table">
@@ -289,7 +348,7 @@ function EventModal({
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem 1.5rem', marginBottom: '1.25rem' }}>
           <Toggle checked={form.visible} onChange={(v) => set('visible', v)} label="Visible on site" />
           <Toggle checked={form.highlight} onChange={(v) => set('highlight', v)} label="Highlight day" />
-          <Toggle checked={form.is_recurring} onChange={(v) => set('is_recurring', v)} label="Daily recurring" />
+          <Toggle checked={form.is_recurring} onChange={(v) => set('is_recurring', v)} label="Recurring" />
         </div>
 
         {error && <p style={{ color: '#ff8a8a', fontSize: '0.82rem', marginBottom: '0.75rem' }}>{error}</p>}
@@ -329,6 +388,7 @@ function EventRow({
   event,
   shiftTypeName,
   showDay,
+  subLabel,
   drag,
   roster,
   onEdit,
@@ -338,6 +398,7 @@ function EventRow({
   event: ScheduleEvent
   shiftTypeName?: string
   showDay?: boolean
+  subLabel?: string
   drag?: DragHandlers
   roster?: React.ReactNode
   onEdit: () => void
@@ -388,8 +449,8 @@ function EventRow({
           {event.title}
           {event.highlight && <span style={{ color: '#C8A848', opacity: 0.7, marginLeft: '0.4rem' }}>✦</span>}
         </p>
-        {showDay && event.day && (
-          <p style={{ fontSize: '0.68rem', color: '#C8A848', opacity: 0.5, margin: '0.1rem 0 0', letterSpacing: '0.06em' }}>{event.day}</p>
+        {(subLabel ?? (showDay && event.day ? event.day : null)) && (
+          <p style={{ fontSize: '0.68rem', color: '#C8A848', opacity: 0.5, margin: '0.1rem 0 0', letterSpacing: '0.06em' }}>{subLabel ?? event.day}</p>
         )}
       </div>
 
@@ -714,6 +775,14 @@ export function ScheduleManager({ rangeStart, rangeEnd }: { rangeStart?: string;
     }
   }
 
+  // "Every day" or the picked dates ("Jul 22 · Jul 24") under a recurring row.
+  const recurrenceLabel = (ev: ScheduleEvent) => ev.recurrence_days == null
+    ? 'Every day'
+    : [...ev.recurrence_days].sort().map(iso => {
+        const d = new Date(`${iso}T12:00:00`)
+        return isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      }).join(' · ') || 'No days selected'
+
   const rowProps = (ev: ScheduleEvent) => ({
     event: ev,
     shiftTypeName: shiftTypes.find((t) => t.id === ev.shift_type_id)?.name,
@@ -810,7 +879,7 @@ export function ScheduleManager({ rangeStart, rangeEnd }: { rangeStart?: string;
             <button style={chipStyle('#ff8a8a')} onClick={() => jumpTo('undated')}>Undated</button>
           )}
           {recurring.length > 0 && (
-            <button style={chipStyle('#D239F8')} onClick={() => jumpTo('recurring')}>Daily</button>
+            <button style={chipStyle('#D239F8')} onClick={() => jumpTo('recurring')}>Recurring</button>
           )}
         </div>
       )}
@@ -858,7 +927,7 @@ export function ScheduleManager({ rangeStart, rangeEnd }: { rangeStart?: string;
       <div ref={(el) => { sectionRefs.current['recurring'] = el }} style={{ scrollMarginTop: '5.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
           <p style={{ fontSize: '0.68rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#D239F8', opacity: 0.55, margin: 0 }}>
-            Daily Recurring — {recurring.length}
+            Recurring — {recurring.length}
           </p>
           <button
             style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', borderRadius: '9999px', border: '1px solid rgba(210,57,248,0.25)', background: 'transparent', color: '#D239F8', cursor: 'pointer', fontSize: '0.78rem', letterSpacing: '0.06em', opacity: 0.75 }}
@@ -869,7 +938,7 @@ export function ScheduleManager({ rangeStart, rangeEnd }: { rangeStart?: string;
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
           {recurring.length === 0 && <p style={{ opacity: 0.35, fontStyle: 'italic', fontSize: '0.82rem' }}>No recurring events yet.</p>}
-          {recurring.map((ev) => <EventRow key={ev.id} {...rowProps(ev)} drag={dragHandlersFor(ev)} />)}
+          {recurring.map((ev) => <EventRow key={ev.id} {...rowProps(ev)} subLabel={recurrenceLabel(ev)} drag={dragHandlersFor(ev)} />)}
         </div>
       </div>
 
@@ -879,6 +948,7 @@ export function ScheduleManager({ rangeStart, rangeEnd }: { rangeStart?: string;
           initial={modal.mode === 'edit'
             ? modal.event
             : { ...blank(), is_recurring: modal.recurring, event_date: modal.date ?? null, start_time: modal.time ?? null }}
+          days={days}
           onSave={handleSave}
           onClose={() => setModal(null)}
           saving={saving}
