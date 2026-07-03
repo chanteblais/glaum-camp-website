@@ -101,9 +101,9 @@ const MAIN: [number, number][] = [
   [826, 142], [837, 177], [847, 239], [858, 255], [868, 209], [879, 134], [889, 105], [900, 121],
   [911, 172], [921, 211], [930, 220], [940, 168], [947, 127], [953, 117], [963, 209], [974, 200],
   [984, 183], [995, 171], [1000, 177],
-  // the long tail: braid trailing off rightward into nothing
-  [1015, 183], [1035, 176], [1058, 182], [1082, 177], [1108, 181], [1136, 178],
-  [1165, 181], [1200, 179],
+  // the long tail: languid diminishing weave, dissolving — never flatlining
+  [1018, 187], [1038, 171], [1060, 186], [1084, 173], [1110, 185], [1138, 174],
+  [1168, 184], [1200, 175], [1234, 183], [1268, 177], [1300, 181],
 ]
 
 // Echo threads — the braid lives at the EDGES ONLY in the mock: two fine
@@ -116,14 +116,14 @@ const THREAD_B_LEFT: [number, number][] = [
 ]
 const THREAD_B_RIGHT: [number, number][] = [
   [755, 178], [790, 185], [825, 174], [860, 186], [895, 175], [930, 184], [965, 176], [1000, 181],
-  [1040, 177], [1085, 183], [1130, 178], [1200, 180],
+  [1040, 177], [1085, 183], [1130, 178], [1180, 182], [1235, 177], [1300, 180],
 ]
 const THREAD_C_LEFT: [number, number][] = [
   [0, 176], [30, 185], [60, 175], [90, 184], [120, 176], [150, 183], [200, 180], [250, 177], [300, 182],
 ]
 const THREAD_C_RIGHT: [number, number][] = [
   [770, 183], [810, 176], [850, 184], [890, 177], [930, 183], [970, 178], [1000, 176],
-  [1045, 182], [1095, 177], [1150, 181], [1200, 178],
+  [1045, 182], [1095, 177], [1150, 181], [1205, 176], [1255, 182], [1300, 178],
 ]
 
 // The mote field, positions measured off the mockup (r and brightness vary;
@@ -149,9 +149,9 @@ const ghost = (dx: number, k: number): [number, number][] =>
 
 function Waveform() {
   return (
-    // 1200 wide: the extra 200 units are the rightward tail — same rendered
+    // 1300 wide: the extra 300 units are the rightward tail — same rendered
     // footprint, so everything draws smaller and trails further right.
-    <svg viewBox="0 0 1200 500" fill="none" aria-hidden style={{ width: '100%', height: 'auto', display: 'block' }}>
+    <svg viewBox="0 0 1300 500" fill="none" aria-hidden style={{ width: '100%', height: 'auto', display: 'block' }}>
       <defs>
         <filter id="radio-blur" x="-30%" y="-30%" width="160%" height="160%">
           <feGaussianBlur stdDeviation="5" />
@@ -167,18 +167,28 @@ function Waveform() {
             left and dissolves down the long tail on the right */}
         <linearGradient id="radio-fade" x1="0" y1="0" x2="1" y2="0">
           <stop offset="0" stopColor={LINE} stopOpacity="0.12" />
-          <stop offset="0.06" stopColor={LINE} stopOpacity="0.4" />
-          <stop offset="0.15" stopColor={LINE} stopOpacity="1" />
-          <stop offset="0.6" stopColor={LINE} stopOpacity="1" />
-          <stop offset="0.76" stopColor={LINE} stopOpacity="0.35" />
-          <stop offset="0.9" stopColor={LINE} stopOpacity="0.12" />
+          <stop offset="0.055" stopColor={LINE} stopOpacity="0.4" />
+          <stop offset="0.14" stopColor={LINE} stopOpacity="1" />
+          <stop offset="0.56" stopColor={LINE} stopOpacity="1" />
+          <stop offset="0.72" stopColor={LINE} stopOpacity="0.32" />
+          <stop offset="0.88" stopColor={LINE} stopOpacity="0.12" />
           <stop offset="1" stopColor={LINE} stopOpacity="0" />
         </linearGradient>
         <linearGradient id="radio-fade-core" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0.1" stopColor={LINE_CORE} stopOpacity="0" />
-          <stop offset="0.24" stopColor={LINE_CORE} stopOpacity="0.55" />
-          <stop offset="0.56" stopColor={LINE_CORE} stopOpacity="0.55" />
-          <stop offset="0.72" stopColor={LINE_CORE} stopOpacity="0" />
+          <stop offset="0.09" stopColor={LINE_CORE} stopOpacity="0" />
+          <stop offset="0.22" stopColor={LINE_CORE} stopOpacity="0.55" />
+          <stop offset="0.52" stopColor={LINE_CORE} stopOpacity="0.55" />
+          <stop offset="0.68" stopColor={LINE_CORE} stopOpacity="0" />
+        </linearGradient>
+        {/* edge-weighted fade for the outer wisps: present at the quiet
+            ends, ducking through the loud middle */}
+        <linearGradient id="radio-fade-edges" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor={LINE} stopOpacity="0.3" />
+          <stop offset="0.2" stopColor={LINE} stopOpacity="0.25" />
+          <stop offset="0.42" stopColor={LINE} stopOpacity="0.06" />
+          <stop offset="0.6" stopColor={LINE} stopOpacity="0.06" />
+          <stop offset="0.8" stopColor={LINE} stopOpacity="0.25" />
+          <stop offset="1" stopColor={LINE} stopOpacity="0" />
         </linearGradient>
         {/* the edge threads fade at their inner ends — no thin lines cross
             the loud middle */}
@@ -217,6 +227,12 @@ function Waveform() {
         <path d={smoothPath(ghost(56, 0.88))} stroke="url(#radio-fade)" strokeWidth="0.6" opacity="0.06" />
         <path d={smoothPath(ghost(-55, 0.6))} stroke="url(#radio-fade)" strokeWidth="0.5" opacity="0.06" />
         <path d={smoothPath(ghost(70, 0.75))} stroke="url(#radio-fade)" strokeWidth="0.5" opacity="0.05" />
+
+        {/* edge wisps — extra ghosts living at the quiet ends */}
+        <path d={smoothPath(ghost(16, 0.5))} stroke="url(#radio-fade-edges)" strokeWidth="0.8" />
+        <path d={smoothPath(ghost(-14, 0.38))} stroke="url(#radio-fade-edges)" strokeWidth="0.7" />
+        <path d={smoothPath(ghost(30, 0.62))} stroke="url(#radio-fade-edges)" strokeWidth="0.7" />
+        <path d={smoothPath(ghost(-28, 0.45))} stroke="url(#radio-fade-edges)" strokeWidth="0.6" />
 
         {/* the pulse — glow underlay, amber ribbon, bright core. The mock's
             line is proportionally substantial (~2px on a 570px-wide band):
@@ -263,7 +279,7 @@ export function RadioHero() {
           position: absolute;
           left: 46%;
           right: 2%;
-          top: 50%;
+          top: calc(50% + 14px);
           transform: translateY(-50%);
           pointer-events: none;
         }
