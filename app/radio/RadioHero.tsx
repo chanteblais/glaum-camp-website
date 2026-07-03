@@ -101,12 +101,16 @@ const MAIN: [number, number][] = [
   [826, 142], [837, 177], [847, 239], [858, 255], [868, 209], [879, 134], [889, 105], [900, 121],
   [911, 172], [921, 211], [930, 220], [940, 168], [947, 127], [953, 117], [963, 209], [974, 200],
   [984, 183], [995, 171], [1000, 177],
-  // the long tail: the FREQUENCY DROPS — each wave longer than the last,
-  // amplitude easing down slowly. Smooth, slow, never busy. Units beyond
-  // ~1300 render past the content margin (the box overflows right by 4rem);
-  // the fade (not the geometry) extinguishes the line.
-  [1026, 208], [1060, 150], [1102, 204], [1152, 156], [1212, 199],
-  [1284, 161], [1368, 193], [1462, 166], [1510, 176],
+  // the long tail, phrased like the left side's opening (deep slow swoop,
+  // then a sudden pick-up) but in its own voice: a moderate wave out of the
+  // decay, one LONG deep swoop below the baseline, a sharp crest surfacing
+  // from it, a quick settle, then a slow bright trail past the margin. The
+  // fade (not the geometry) extinguishes the line.
+  [1030, 196], [1068, 158],
+  [1120, 190], [1185, 226], [1250, 232], [1310, 218], [1355, 186],
+  [1380, 148], [1400, 132],
+  [1425, 168], [1448, 196],
+  [1490, 172], [1540, 186], [1600, 176],
 ]
 
 // Echo threads — the braid lives at the EDGES ONLY in the mock: two fine
@@ -119,14 +123,14 @@ const THREAD_B_LEFT: [number, number][] = [
 ]
 const THREAD_B_RIGHT: [number, number][] = [
   [755, 178], [790, 185], [825, 174], [860, 186], [895, 175], [930, 184], [965, 176], [1000, 181],
-  [1050, 170], [1110, 190], [1182, 168], [1266, 189], [1362, 170], [1460, 186], [1510, 178],
+  [1050, 170], [1110, 190], [1182, 168], [1266, 189], [1362, 170], [1470, 188], [1600, 175],
 ]
 const THREAD_C_LEFT: [number, number][] = [
   [0, 176], [30, 185], [60, 175], [90, 184], [120, 176], [150, 183], [200, 180], [250, 177], [300, 182],
 ]
 const THREAD_C_RIGHT: [number, number][] = [
   [770, 183], [810, 176], [850, 184], [890, 177], [930, 183], [970, 178], [1000, 176],
-  [1052, 187], [1118, 169], [1196, 188], [1286, 170], [1388, 186], [1490, 173], [1510, 176],
+  [1052, 187], [1118, 169], [1196, 188], [1286, 170], [1388, 186], [1500, 172], [1600, 182],
 ]
 
 // The mote field, positions measured off the mockup (r and brightness vary;
@@ -152,13 +156,13 @@ const ORBS: [number, number, number, number][] = [
 // fade extinguish it.
 const ghost = (dx: number, k: number): [number, number][] =>
   MAIN.map(([x, y]) => [x + dx, Math.round(MID + (y - MID) * k)] as [number, number])
-    .filter(([x]) => x >= 0 && x <= 1495)
+    .filter(([x]) => x >= 0 && x <= 1585)
 
 function Waveform() {
   return (
-    // 1510 wide; units 0-1300 map inside the content margin (previous
-    // footprint), 1300-1510 ride past it on the box's right overflow.
-    <svg viewBox="0 0 1510 500" fill="none" aria-hidden style={{ width: '100%', height: 'auto', display: 'block' }}>
+    // 1600 wide; units 0-1300 map inside the content margin (previous
+    // footprint), 1300-1600 ride past it on the box's right overflow.
+    <svg viewBox="0 0 1600 500" fill="none" aria-hidden style={{ width: '100%', height: 'auto', display: 'block' }}>
       <defs>
         <filter id="radio-blur" x="-30%" y="-30%" width="160%" height="160%">
           <feGaussianBlur stdDeviation="5" />
@@ -177,8 +181,8 @@ function Waveform() {
           <stop offset="0.05" stopColor={LINE} stopOpacity="0.4" />
           <stop offset="0.12" stopColor={LINE} stopOpacity="1" />
           <stop offset="0.48" stopColor={LINE} stopOpacity="1" />
-          <stop offset="0.62" stopColor={LINE} stopOpacity="0.3" />
-          <stop offset="0.8" stopColor={LINE} stopOpacity="0.11" />
+          <stop offset="0.64" stopColor={LINE} stopOpacity="0.5" />
+          <stop offset="0.85" stopColor={LINE} stopOpacity="0.28" />
           <stop offset="1" stopColor={LINE} stopOpacity="0" />
         </linearGradient>
         <linearGradient id="radio-fade-core" x1="0" y1="0" x2="1" y2="0">
@@ -289,7 +293,7 @@ export function RadioHero() {
         .radio-hero-wave {
           position: absolute;
           left: 42.5%;
-          right: -4rem;
+          right: -5.5rem;
           top: calc(50% + 14px);
           transform: translateY(-50%);
           pointer-events: none;
