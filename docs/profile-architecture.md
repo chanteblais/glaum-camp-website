@@ -179,14 +179,21 @@ everything reversible until the new store is proven.
     dismissible prompt out of the box, no admin setup required (Quote stays un-nudged: decorative).
     Helper `profileGaps(fields, values)` derives a member's gaps (enabled · memberEditable ·
     askExisting · empty · not-dismissed-unless-required).
-  - **Surfacing:** the `/profile` **Profile Details** card (Phase 4) is the catch-up surface — a
-    purple callout ("*One more detail / A few details would round out your profile — all optional…*")
-    summarizes the gaps and each gap field is flagged (**Optional** / **Required**) with the input
-    inline. Members fill it right there; the gap clears live as they type. Kept profile-only by
-    design (2026-07-03) — deliberately not surfaced on the dashboard, to stay gentle.
-  - **Dismissal:** optional gaps offer **"Not now"**, persisted in `member_profiles.values` under the
-    reserved `__dismissedFields` key (ignored by registry reads); required gaps can't be dismissed.
-    Handled by `PATCH /api/profile/fields` (`__dismiss`).
+  - **Surfacing:** a prominent **ProfileNudge** banner (`app/profile/ProfileNudge.tsx`) at the **top**
+    of the approved profile body — "*One more detail / N details would round out your profile*" + the
+    gap field names — with **Add now →** (smooth-scrolls to the `#profile-details` card and focuses the
+    first input). Gaps are computed **server-side** in `profile/page.tsx` (`profileGaps` over the loaded
+    `profileValues` + registry) and passed as props, so there's no second fetch or flash. The Profile
+    Details card (Phase 4) below still flags each gap field (**Optional** / **Required**) so it's easy
+    to spot after scrolling; the gap clears live as the member types. Kept **profile-only** by design
+    (2026-07-03) — deliberately not surfaced on the dashboard, to stay gentle.
+  - **Dismissal (two-tier, from the banner):**
+    - **Not now** — a *session* snooze (browser `sessionStorage`, key `glaum-profile-nudge-snoozed`),
+      nothing persisted, so the nudge **returns on the member's next visit** ("remind me again").
+    - **Don't ask again** — persists the optional gap keys into `member_profiles.values.__dismissedFields`
+      (reserved key, ignored by registry reads) via `PATCH /api/profile/fields` (`__dismiss`, accepts an
+      array); those fields never re-prompt. Shown only when at least one gap is optional — **required**
+      gaps can be snoozed but not permanently dismissed.
   - **Answering** reuses the Phase 4 self-edit path (`/api/profile/fields`).
   - **Payoff:** since distinctions read profile values, backfilling retroactively *grants* honours.
   - **To activate (extra fields):** an admin toggles **Catch-up** (and optionally **Required**) on a
