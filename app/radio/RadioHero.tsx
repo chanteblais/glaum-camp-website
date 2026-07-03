@@ -258,6 +258,14 @@ function Waveform() {
         <path d={smoothPath(ghost(60, 0.48))} stroke="url(#radio-fade-edges)" strokeWidth="0.5" />
         <path d={smoothPath(ghost(-58, 0.3))} stroke="url(#radio-fade-edges)" strokeWidth="0.5" />
         <path d={smoothPath(ghost(9, 0.7))} stroke="url(#radio-fade-edges)" strokeWidth="0.45" />
+        <path d={smoothPath(ghost(-8, 0.6))} stroke="url(#radio-fade-edges)" strokeWidth="0.45" />
+        <path d={smoothPath(ghost(22, 0.42))} stroke="url(#radio-fade-edges)" strokeWidth="0.45" />
+        <path d={smoothPath(ghost(-34, 0.66))} stroke="url(#radio-fade-edges)" strokeWidth="0.4" />
+        <path d={smoothPath(ghost(38, 0.54))} stroke="url(#radio-fade-edges)" strokeWidth="0.4" />
+        <path d={smoothPath(ghost(-50, 0.4))} stroke="url(#radio-fade-edges)" strokeWidth="0.4" />
+        <path d={smoothPath(ghost(52, 0.72))} stroke="url(#radio-fade-edges)" strokeWidth="0.35" />
+        <path d={smoothPath(ghost(-66, 0.5))} stroke="url(#radio-fade-edges)" strokeWidth="0.35" />
+        <path d={smoothPath(ghost(70, 0.6))} stroke="url(#radio-fade-edges)" strokeWidth="0.3" />
 
         {/* the silk: finest strands unravelling from the line at its end */}
         <path d={smoothPath(ghost(8, 1.06))} stroke="url(#radio-fade-silk)" strokeWidth="0.5" />
