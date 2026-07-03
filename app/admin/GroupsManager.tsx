@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { AssetImagePicker, type GroupIconOption } from './AssetImagePicker'
 import { LoadError } from './LoadError'
+import { useConfirm } from '../components/ConfirmDialog'
 
 type Group = {
   id: string
@@ -500,6 +501,7 @@ export function GroupsManager({ members }: { members: AssignableMember[] }) {
   const [savingCol, setSavingCol] = useState(false)
   const [colError, setColError] = useState<string | null>(null)
   const [loadError, setLoadError] = useState(false)
+  const { confirm, confirmDialog } = useConfirm()
 
   const load = () => {
     setLoadError(false)
@@ -536,7 +538,14 @@ export function GroupsManager({ members }: { members: AssignableMember[] }) {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Delete this group? All member assignments for it will be removed. This cannot be undone.')) return
+    const group = groups.find(g => g.id === id)
+    const ok = await confirm({
+      title: `Delete ${group ? `“${group.name}”` : 'this group'}?`,
+      body: 'All member assignments for it will be removed. This cannot be undone.',
+      confirmLabel: 'Delete group',
+      danger: true,
+    })
+    if (!ok) return
     const res = await fetch(`/api/admin/groups/${id}`, { method: 'DELETE' })
     if (res.ok) setGroups(prev => prev.filter(g => g.id !== id))
   }
@@ -571,10 +580,32 @@ export function GroupsManager({ members }: { members: AssignableMember[] }) {
   }
 
   async function handleDeleteCol(id: string) {
-    if (!confirm('Delete this group collection? It must be empty first.')) return
+    const col = collections.find(c => c.id === id)
+    const name = col ? `“${col.name}”` : 'this collection'
+    // A collection must be emptied before it can go — say so up front instead
+    // of letting the delete bounce off the server.
+    const remaining = groups.filter(g => g.collection_id === id).length
+    if (remaining > 0) {
+      await confirm({
+        title: `${name} isn’t empty yet`,
+        body: `It still holds ${remaining === 1 ? 'one group' : `${remaining} groups`} — move or delete ${remaining === 1 ? 'it' : 'them'} first.`,
+        notice: true,
+      })
+      return
+    }
+    const ok = await confirm({
+      title: `Delete ${name}?`,
+      body: 'The collection and its settings will be removed.',
+      confirmLabel: 'Delete collection',
+      danger: true,
+    })
+    if (!ok) return
     const res = await fetch(`/api/admin/group-collections/${id}`, { method: 'DELETE' })
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) { alert(data.error ?? 'Could not delete collection.'); return }
+    if (!res.ok) {
+      await confirm({ title: 'Could not delete the collection', body: data.error ?? 'Something went wrong — try again in a moment.', notice: true })
+      return
+    }
     setCollections(prev => prev.filter(c => c.id !== id))
   }
 
@@ -685,6 +716,8 @@ export function GroupsManager({ members }: { members: AssignableMember[] }) {
         saving={savingCol}
         error={colError}
       />}
+
+      {confirmDialog}
     </div>
   )
 }
