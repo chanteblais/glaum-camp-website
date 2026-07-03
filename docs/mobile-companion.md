@@ -96,10 +96,23 @@ Both clients consume the same backend APIs. The backend remains the source of tr
 - **Business logic is already server-side** (`lib/member-facts.ts`, `lib/distinctions.ts`, etc.).
 - **Auth is a non-issue.** Clerk ships native SDKs; existing routes' `auth()` checks accept native session tokens. Same instance, same users.
 
+### App compatibility (standing — check on EVERY member-facing change)
+
+The member site runs inside the native app shell, so the web *is* the app. Whenever a member-facing surface is built or touched, hold it to the webview bar:
+
+1. **Complete in-app navigation.** Never rely on browser chrome — no "the user can hit the browser back button," no URL-bar assumptions. Every surface must be reachable and escapable through on-page UI (the tab bar covers the top level; nested pages need their own way back).
+2. **No popup/new-window flows.** Auth and any future OAuth stay redirect or in-page (no `window.open` flows — they strand members in a webview). External links are explicit `<a target="_blank" rel="noopener">` so the shell can hand them to the system browser.
+3. **Deep-linkable.** Anything worth notifying about has a URL — push taps open internal paths (`lib/push.ts` sends `link`), so a notification without a destination page is a bug.
+4. **Safe areas on fixed chrome.** Any `position: fixed` element respects `env(safe-area-inset-*)` (the tab bar does; a fixed top header needs the top inset once the shell exists).
+5. **Touch-first.** No hover-only affordances on member pages; the existing ~380px pass on all UI work is the app's viewport.
+6. **Notifications through the seam.** New notification-worthy events go through `lib/notify.ts` — never a direct `send-email` call in feature code.
+
+Admin surfaces are exempt (admin is web/desktop, never in the app).
+
 ### Standing disciplines (hold from now on — they cost nothing)
 
 1. **New member-facing logic goes in a `lib/` function returning plain JSON-serializable data**; the server component or API route is a thin caller.
-2. **Notifications flow through one dispatch seam** — "member + event → deliver via their channels." Email is today's only channel; push slots in later as an added channel. Don't scatter direct `send-email` calls in new feature code.
+2. **Notifications flow through one dispatch seam** — "member + event → deliver via their channels." **Built 2026-07-03:** `lib/notify.ts` (`dispatchMemberNotification`) + `lib/push.ts` (FCM HTTP v1, silent no-op until `FIREBASE_SERVICE_ACCOUNT` is set) + `push_tokens` (migration 062) + `POST /api/push/register`. First consumers: DM and group-message notifications (push per message/mention, email keeps its existing throttles). Don't scatter direct `send-email` calls in new feature code.
 3. **Keep the web product's mobile manners.** Since mobile *is* the same product, every responsive improvement to the web (single-column layouts, touch targets, the existing ~380px pass on all UI work) is direct progress toward the mobile client — not throwaway.
 4. **No preemptive refactoring** and no speculative API layer. Don't abstract without a second client.
 

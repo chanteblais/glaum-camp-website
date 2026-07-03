@@ -448,6 +448,21 @@ Per-user state in a conversation. For **direct** conversations both parties get 
 
 ---
 
+### `push_tokens`
+
+Push-notification device tokens — one row per device a member has granted notifications on. Registered by the native app (`POST /api/push/register`), consumed by `lib/push.ts` (FCM HTTP v1), pruned automatically when FCM reports a token unregistered. Added in migration `062`.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `clerk_user_id` | TEXT NOT NULL | indexed |
+| `platform` | TEXT NOT NULL | `'ios'` / `'android'` |
+| `token` | TEXT NOT NULL UNIQUE | FCM registration token (device-scoped; upsert re-homes a device on account switch) |
+| `created_at` | TIMESTAMPTZ NOT NULL | |
+| `last_seen_at` | TIMESTAMPTZ NOT NULL | refreshed on every re-register |
+
+---
+
 ### `shoutouts`
 
 Member-posted shoutouts shown on the home-page member dashboard (the `shoutouts` widget). Added in migration `031`.
@@ -558,6 +573,7 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `058_show_on_schedule.sql` | **Keep events off the schedule page.** Adds `show_on_schedule BOOL NOT NULL DEFAULT true` to `schedule_events`: FALSE = the event skips the schedule page (homepage embed + /schedule) and the home upcoming-events teaser while staying signable/ackable. Additive, non-destructive; **must be applied before deploying** — member queries filter on the new column. |
 | `059_clerk_prod_remap.sql` | **Clerk dev→prod user-ID remap** (RESERVED — file is *generated*, not in the repo, by `scripts/migrate-clerk-to-prod.mjs --execute` once the prod users exist). Rewrites every stored Clerk ID (18 table/column pairs + derived `conversations.direct_key`) from the dev instance to the production instance via a temp mapping table, with per-column verification counts before COMMIT. Non-destructive (pure ID rewrite), re-runnable; apply during the key-swap cutover window. Runbook: [clerk-prod-migration.md](clerk-prod-migration.md). |
 | `060_backfill_missing_members.sql` | **Backfill missing `members` rows from `applications`.** QA sweep 2026-07-03 found 4 approved applications (submitted June 27–30, before the profile-source-of-truth dual-write) with no `members` row — `getApprovedMember` gates every member-only surface on `members.status`, so those campers were locked out of /participate, /schedule, /members and /roles. Inserts a members row for any application with no clerk-id / email / application-id match in `members`. Pure INSERT (non-destructive), idempotent. The systemic hole is also closed in code: `/api/admin/[id]/approve` now mirrors via `upsertMember` (insert-or-update) instead of the update-only `setMemberStatus`. |
+| `062_push_tokens.sql` | **Push notification device tokens** (061 is reserved by the Radio branch). `push_tokens` table: one row per device a member granted notifications on (`clerk_user_id`, `platform` ios/android, unique FCM `token`, `created_at`/`last_seen_at`) + index on `clerk_user_id`. Registered by the native app via `POST /api/push/register`; dead tokens deleted when FCM reports them unregistered. Additive + idempotent; safe to apply before the app exists (`lib/push.ts` no-ops without tokens/config). |
 
 ---
 

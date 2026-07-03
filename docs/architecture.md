@@ -108,6 +108,7 @@ Sign-out flow:
 | `/api/groups/joinable` | GET | Open + listed groups I can self-join (Find-a-group picker) |
 | `/api/groups/[id]/join` | POST | Self-join an open group |
 | `/api/groups/[id]/leave` | POST | Leave an open group (admin-assigned groups → 403) |
+| `/api/push/register` | POST/DELETE | Register (upsert by token) / unregister the calling member's push device token — called by the native app after notification permission and on sign-out |
 | `/api/nav-auth` | GET | Lightweight auth check for nav (returns `isSignedIn`, `isApproved`, name, email, avatarUrl) |
 | `/api/sign-out` | GET | Revoke Clerk sessions (verified identity) + clear session cookies |
 | `/api/badge` | GET | Generate role badge PNG (OG image) |
@@ -185,6 +186,8 @@ See [database.md → Storage Buckets](database.md#storage-buckets) for the canon
 - **Shared `<Header />`** — all member-facing pages use the shared `Header` component (`components/Header.tsx` → `components/HeaderClient.tsx`). Pages no longer manage their own header rows.
 - **Icon art & rendering** — every icon image (built-in asset library and uploads alike) lives on the standard normalized frame: artwork trimmed, scaled so its bounding-box *diagonal* is uniform, centered on a transparent 1536×1024 canvas (`lib/icon-image.ts` for uploads; `scripts/normalize-assets.py` / `scripts/strike-icon.py` for repo assets). Render icons only through `components/IconImage.tsx` (square clipping box, frame sized by height, `fill` = optical size) — never a raw `<img objectFit: contain>`, which shows the frame's margins and halves the art. The Cabinet of Distinctions keeps its own 132% medal scale.
 - **Mobile nav breakpoint** — detected in JS via `window.innerWidth < 768`. Below it, approved members get a fixed bottom tab bar (`components/MobileTabBar.tsx`, rendered by `HeaderClient` from the same `memberNavLinks` list as the desktop nav; hidden on `/admin` and for non-members) and the hamburger shrinks to overflow. The bar injects `body { padding-bottom }` incl. `env(safe-area-inset-bottom)` while mounted.
+- **Notifications go through the seam** — every member-facing notification dispatches via `lib/notify.ts` (`dispatchMemberNotification`: member + kind + push payload + optional email thunk; one preference toggle gates all channels for a kind). Never call `send-email` senders directly from new feature code. Channels: email (Resend) + native push (`lib/push.ts`, FCM HTTP v1 — silent no-op until `FIREBASE_SERVICE_ACCOUNT` is set and devices register).
+- **App compatibility (standing)** — the site runs inside the native app shell, so every member-facing change must hold up in a webview. Checklist in [mobile-companion.md](mobile-companion.md) → App compatibility.
 - **`overflow-x: hidden`** on `html`/`body` to prevent mobile horizontal scroll
 - **Camp signups join** — always fetch `applications` and `camp_signups` separately and join in JS; Supabase can't resolve the FK via nested select
 - **Lazy Supabase client** — `lib/supabase.ts` uses Proxy to avoid build-time env var errors
