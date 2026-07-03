@@ -108,7 +108,7 @@ const MAIN: [number, number][] = [
   // fade (not the geometry) extinguishes the line.
   [1030, 196], [1068, 158],
   [1120, 190], [1185, 226], [1250, 232], [1310, 216], [1352, 184],
-  [1392, 140], [1430, 154],
+  [1392, 149], [1430, 160],
   // …and the curve it feeds into settles evenly, barely breathing
   [1464, 185], [1506, 176], [1552, 181], [1600, 178],
 ]
