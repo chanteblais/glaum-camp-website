@@ -53,7 +53,7 @@ async function clerk(key, method, pathName, body) {
 async function allUsers(key) {
   const users = []
   for (let offset = 0; ; offset += 100) {
-    const page = await clerk(key, 'GET', `/users?limit=100&offset=${offset}&order_by=+created_at`)
+    const page = await clerk(key, 'GET', `/users?limit=100&offset=${offset}`)
     users.push(...page)
     if (page.length < 100) break
   }
