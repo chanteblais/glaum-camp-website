@@ -108,6 +108,10 @@ Most content cards use a parchment aesthetic:
 - Secondary/ghost: transparent with gold or cream border
 - Focus: `outline: 2px solid #D239F8` (purple), offset 2px, `border-radius: 4px`
 
+### Confirm Dialog
+
+`ConfirmDialog` / `useConfirm()` (`components/ConfirmDialog.tsx`) — in-app replacement for native `confirm()`/`alert()`. Ink card on a dimmed overlay: gold uppercase eyebrow ("✦ A moment of pause"), TokyoDreams title, cream body, pill buttons ("Never mind" ghost + confirm; red accent when `danger`). `notice: true` = single "Understood" button (alert replacement, eyebrow "✦ A small snag"). Promise-based: `const { confirm, confirmDialog } = useConfirm()`, `await confirm({ title, body, confirmLabel, danger })`, render `{confirmDialog}` in the tree. Esc / overlay click cancel. First adopted in `GroupsManager`; other managers still use native `confirm()`.
+
 ### Avatar
 
 - 260px circle
