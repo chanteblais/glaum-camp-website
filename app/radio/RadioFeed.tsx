@@ -30,6 +30,12 @@ const clockOf = (ts: string) =>
 
 function RadioRow({ e, last }: { e: RadioEventRow; last: boolean }) {
   const isVoice = e.kind === 'voice'
+  // Human speech (organizer broadcasts, member voices) sits flush-left in
+  // lavender — a person talking stands apart from the automatic moments,
+  // whose emblem column indents them.
+  const isSpeech = e.kind === 'broadcast' || isVoice
+  const hasEntity = e.message.includes('**')
+
   const body = (
     <div style={{ minWidth: 0, flex: 1 }}>
       <p
@@ -37,13 +43,18 @@ function RadioRow({ e, last }: { e: RadioEventRow; last: boolean }) {
           margin: 0,
           fontSize: '1rem',
           lineHeight: 1.5,
-          color: '#F3EDE6',
-          opacity: 0.92,
+          color: isSpeech ? 'rgba(216,180,232,0.95)' : '#F3EDE6',
+          opacity: isSpeech ? 1 : 0.92,
           fontStyle: isVoice ? 'italic' : undefined,
           overflowWrap: 'anywhere',
         }}
       >
-        {isVoice ? e.message : <RadioMessage text={e.message} />}
+        {isSpeech && (
+          <span aria-hidden style={{ marginRight: '0.6rem' }}>
+            {isImageIcon(e.icon) ? null : (e.icon || (isVoice ? '✦' : '📢'))}
+          </span>
+        )}
+        {isVoice ? e.message : <RadioMessage text={e.message} href={hasEntity ? e.link : undefined} />}
       </p>
       {e.detail && (
         <p style={{ margin: '0.3rem 0 0', fontSize: '0.85rem', lineHeight: 1.5, color: '#F3EDE6', opacity: 0.55 }}>
@@ -58,40 +69,47 @@ function RadioRow({ e, last }: { e: RadioEventRow; last: boolean }) {
     </div>
   )
 
+  // A row with a destination but no lit entity (e.g. a hand-written broadcast
+  // with a link) stays clickable as a whole.
+  const wholeRowLink = e.link && !hasEntity && !isVoice
+
   return (
     <article
       style={{
         display: 'flex',
         alignItems: 'flex-start',
-        gap: '1.1rem',
+        gap: isSpeech ? 0 : '1.1rem',
         padding: '1.1rem 0.25rem',
         borderBottom: last ? 'none' : '1px solid rgba(200,168,72,0.1)',
       }}
     >
-      {/* The moment's emblem — a large raw emoji (or medal art), no disc */}
-      <span
-        aria-hidden
-        style={{
-          width: '2.6rem',
-          flexShrink: 0,
-          display: 'flex',
-          justifyContent: 'center',
-          fontSize: '1.7rem',
-          lineHeight: 1.3,
-        }}
-      >
-        {isImageIcon(e.icon) ? <IconImage src={e.icon} size="2.4rem" fill={0.95} /> : (e.icon || '✦')}
-      </span>
+      {/* The moment's emblem — a large raw emoji (or medal art), no disc.
+          Speech rows carry their emoji inline instead. */}
+      {!isSpeech && (
+        <span
+          aria-hidden
+          style={{
+            width: '2.6rem',
+            flexShrink: 0,
+            display: 'flex',
+            justifyContent: 'center',
+            fontSize: '1.7rem',
+            lineHeight: 1.3,
+          }}
+        >
+          {isImageIcon(e.icon) ? <IconImage src={e.icon} size="2.4rem" fill={0.95} /> : (e.icon || '✦')}
+        </span>
+      )}
 
-      {e.link && !isVoice ? (
-        <a href={e.link} style={{ color: 'inherit', textDecoration: 'none', display: 'flex', flex: 1, minWidth: 0 }}>
+      {wholeRowLink ? (
+        <a href={e.link!} style={{ color: 'inherit', textDecoration: 'none', display: 'flex', flex: 1, minWidth: 0 }}>
           {body}
         </a>
       ) : (
         body
       )}
 
-      <span style={{ flexShrink: 0, fontSize: '0.72rem', color: '#F3EDE6', opacity: 0.35, paddingTop: '0.35rem', letterSpacing: '0.04em' }}>
+      <span style={{ flexShrink: 0, fontSize: '0.72rem', color: '#F3EDE6', opacity: 0.35, paddingTop: '0.35rem', letterSpacing: '0.04em', marginLeft: '0.75rem' }}>
         {clockOf(e.created_at)}
       </span>
     </article>

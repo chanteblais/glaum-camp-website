@@ -44,15 +44,23 @@ SET message = 'Welcome **' || COALESCE(NULLIF(actor_name, ''), 'a new member') |
 WHERE kind = 'welcome'
   AND message NOT LIKE '%**%';
 
+-- Link catch-up: welcome names deep-link to the member's profile.
+UPDATE radio_events
+SET link = '/members/' || actor_clerk_id
+WHERE kind = 'welcome'
+  AND link IS NULL
+  AND actor_clerk_id IS NOT NULL;
+
 -- Backfill: every approved member gets their welcome at their approval moment.
 -- Idempotent — skips anyone who already has a 'welcome' post. (**name** is the
 -- gold-highlight convention rendered by components/RadioMessage.tsx.)
-INSERT INTO radio_events (kind, message, detail, icon, actor_clerk_id, actor_name, created_at)
+INSERT INTO radio_events (kind, message, detail, icon, link, actor_clerk_id, actor_name, created_at)
 SELECT
   'welcome',
   'Welcome **' || COALESCE(NULLIF(a.preferred_name, ''), NULLIF(a.first_name, ''), 'a new member') || '** to Glåüm!',
   'Say hello if you see them around camp. 🌿',
   '👋',
+  '/members/' || a.clerk_user_id,   -- /members/[id] resolves clerk ids directly
   a.clerk_user_id,
   COALESCE(NULLIF(a.preferred_name, ''), NULLIF(a.first_name, ''), 'A member'),
   a.reviewed_at

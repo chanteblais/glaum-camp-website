@@ -80,6 +80,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         ...welcomeRadioPost(displayName),
         actorClerkId: application.clerk_user_id,
         actorName: displayName,
+        // /members/[id] resolves clerk ids directly — the gold name links home.
+        link: `/members/${application.clerk_user_id}`,
       })
     }
 

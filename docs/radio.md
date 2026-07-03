@@ -36,7 +36,14 @@ organizer broadcasts can use it too.
 
 No card boxes and **no avatars** — an airy hairline-separated list where a
 large raw emoji (or medal art) is each moment's emblem and gold highlights
-carry the story. Hero header (flourished title, script subtitle, an art slot
+carry the story. The lit entity **is the hyperlink** where a destination
+makes sense (welcome names → the member's profile via
+`/members/{clerk_id}`; contribution items and milestones → the Bring
+Something board) — no invisible whole-row links; a linkless post is just a
+post. **Human speech reads differently from automatic moments**: organizer
+broadcasts and member voices sit flush-left (emoji inline, no emblem
+column) in lavender, so a person talking stands apart from the platform
+narrating. Hero header (flourished title, script subtitle, an art slot
 reserved for a radio illustration in the medallion style), a **stats band**
 (on the air this week / resources claimed / distinctions awarded /
 announcements shared — `getRadioStats`), the day rules end in a ✦, and the
