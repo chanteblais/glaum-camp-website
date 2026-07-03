@@ -156,7 +156,7 @@ export function ScheduleWeekView({ events, days, shiftTypes, rosters, onEdit, on
           left: `calc(${lane * width}% + 2px)`,
           width: `calc(${width}% - 4px)`,
           borderRadius: '0.35rem',
-          border: `1px ${ghost || !ev.visible ? 'dashed' : 'solid'} rgba(${h.rgb},${ghost ? 0.45 : 0.5})`,
+          border: `1px ${!ev.visible ? 'dashed' : 'solid'} rgba(${h.rgb},${ghost ? 0.45 : 0.5})`,
           background: `rgba(${h.rgb},${ghost ? 0.08 : 0.1})`,
           opacity: ev.visible ? (ghost ? 0.8 : 1) : 0.4,
           overflow: 'hidden',
