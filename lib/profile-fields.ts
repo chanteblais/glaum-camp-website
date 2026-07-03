@@ -41,6 +41,12 @@ export type ProfileField = {
   type: ProfileFieldType
   /** Allowed options for single_select / multi_select. */
   options?: string[]
+  /**
+   * multi_select only: options that STAND ALONE — picking one clears every
+   * other selection (e.g. "Newbie" vs. the attended years). Subset of
+   * `options`; see lib/multi-select.ts.
+   */
+  exclusiveOptions?: string[]
   /** Default value when the member has none. */
   default?: ProfileFieldDefault
   /** Visible on the member-facing / public profile. */
@@ -172,12 +178,19 @@ function parseField(raw: unknown): ProfileField | null {
   if (typeof r.label !== 'string' || !r.label) return null
   const type = VALID_TYPES.has(r.type as ProfileFieldType) ? (r.type as ProfileFieldType) : 'text'
   const system = r.system === true || SYSTEM_KEYS.has(r.key)
+  const options = Array.isArray(r.options) ? r.options.map(String) : undefined
+  // Stand-alone options only make sense on multi_select and must stay a subset
+  // of the live options (renames/deletions in the manager prune them).
+  const exclusiveOptions = type === 'multi_select' && Array.isArray(r.exclusiveOptions)
+    ? r.exclusiveOptions.map(String).filter(o => options?.includes(o))
+    : undefined
   return {
     key: r.key,
     label: r.label,
     description: typeof r.description === 'string' ? r.description : undefined,
     type,
-    options: Array.isArray(r.options) ? r.options.map(String) : undefined,
+    options,
+    exclusiveOptions: exclusiveOptions?.length ? exclusiveOptions : undefined,
     default: parseDefault(r.default, type),
     // System fields are inherently non-editable / non-application; never trust
     // saved overrides to loosen that.

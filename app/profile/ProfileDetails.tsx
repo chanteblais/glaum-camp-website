@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { profileGaps, DISMISSED_KEY, type ProfileField } from '@/lib/profile-fields'
+import { toggleMultiValue, splitExclusive } from '@/lib/multi-select'
 
 const GOLD = '#C8A848'
 const PURPLE = '#D239F8'
@@ -54,27 +55,34 @@ function FieldEditor({ field, value, onChange }: {
       )
     case 'multi_select': {
       const vals = Array.isArray(value) ? (value as string[]) : []
+      const exclusive = field.exclusiveOptions ?? []
+      const { regular, standalone } = splitExclusive(field.options ?? [], exclusive)
+      const pill = (o: string) => {
+        const on = vals.includes(o)
+        return (
+          <button
+            key={o}
+            type="button"
+            onClick={() => onChange(toggleMultiValue(vals, o, exclusive))}
+            style={{
+              padding: '0.3rem 0.8rem', borderRadius: '9999px', cursor: 'pointer',
+              fontSize: '0.8rem', fontFamily: 'inherit',
+              border: `1px solid ${on ? GOLD : 'rgba(200,168,72,0.25)'}`,
+              background: on ? 'rgba(200,168,72,0.15)' : 'transparent',
+              color: on ? GOLD : 'rgba(243,237,230,0.6)',
+            }}
+          >
+            {o}
+          </button>
+        )
+      }
       return (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-          {(field.options ?? []).map(o => {
-            const on = vals.includes(o)
-            return (
-              <button
-                key={o}
-                type="button"
-                onClick={() => onChange(on ? vals.filter(x => x !== o) : [...vals, o])}
-                style={{
-                  padding: '0.3rem 0.8rem', borderRadius: '9999px', cursor: 'pointer',
-                  fontSize: '0.8rem', fontFamily: 'inherit',
-                  border: `1px solid ${on ? GOLD : 'rgba(200,168,72,0.25)'}`,
-                  background: on ? 'rgba(200,168,72,0.15)' : 'transparent',
-                  color: on ? GOLD : 'rgba(243,237,230,0.6)',
-                }}
-              >
-                {o}
-              </button>
-            )
-          })}
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.4rem' }}>
+          {regular.map(pill)}
+          {standalone.length > 0 && (
+            <span aria-hidden style={{ fontSize: '0.68rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: GOLD, opacity: 0.5, padding: '0 0.25rem' }}>or</span>
+          )}
+          {standalone.map(pill)}
           {(field.options ?? []).length === 0 && (
             <span style={{ fontSize: '0.78rem', opacity: 0.4, fontStyle: 'italic' }}>No options configured.</span>
           )}

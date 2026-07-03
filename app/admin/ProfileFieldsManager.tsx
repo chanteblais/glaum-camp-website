@@ -256,7 +256,11 @@ export function ProfileFieldsManager({ initialFields }: { initialFields: Profile
                     value={field.type}
                     onChange={e => {
                       const type = e.target.value as ProfileFieldType
-                      patch(idx, { type, options: typeHasOptions(type) ? (field.options ?? []) : undefined })
+                      patch(idx, {
+                        type,
+                        options: typeHasOptions(type) ? (field.options ?? []) : undefined,
+                        exclusiveOptions: type === 'multi_select' ? field.exclusiveOptions : undefined,
+                      })
                     }}
                     style={selectStyle}
                   >
@@ -268,10 +272,49 @@ export function ProfileFieldsManager({ initialFields }: { initialFields: Profile
                     <OptionsInput
                       key={field.key}
                       value={field.options ?? []}
-                      onChange={opts => patch(idx, { options: opts })}
+                      onChange={opts => {
+                        // Keep stand-alones a subset of the live options.
+                        const excl = (field.exclusiveOptions ?? []).filter(o => opts.includes(o))
+                        patch(idx, { options: opts, exclusiveOptions: excl.length ? excl : undefined })
+                      }}
                     />
                   )}
                 </div>
+
+                {/* Stand-alone ("or") options — multi_select only. Picking one on a
+                    form clears every other selection (e.g. "Newbie" vs. the years). */}
+                {field.type === 'multi_select' && (field.options ?? []).length > 1 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                    <span
+                      style={tinyLabel}
+                      title="A stand-alone answer can’t be combined with the rest — picking it clears the other selections. Forms show it after an “— or —” divider."
+                    >Stands alone</span>
+                    {(field.options ?? []).map(o => {
+                      const on = (field.exclusiveOptions ?? []).includes(o)
+                      return (
+                        <button
+                          key={o}
+                          type="button"
+                          onClick={() => {
+                            const cur = field.exclusiveOptions ?? []
+                            const next = on ? cur.filter(x => x !== o) : [...cur, o]
+                            patch(idx, { exclusiveOptions: next.length ? next : undefined })
+                          }}
+                          title={on ? `“${o}” stands alone — click to make it combinable again` : `Make “${o}” a stand-alone answer`}
+                          style={{
+                            padding: '0.15rem 0.6rem', borderRadius: '9999px', cursor: 'pointer',
+                            fontSize: '0.7rem', fontFamily: 'inherit',
+                            border: `1px solid ${on ? 'rgba(210,57,248,0.5)' : 'rgba(200,168,72,0.2)'}`,
+                            background: on ? 'rgba(210,57,248,0.1)' : 'transparent',
+                            color: on ? PURPLE : 'rgba(243,237,230,0.45)',
+                          }}
+                        >
+                          {o}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
 
                 {/* Capability flags */}
                 <FlagRow field={field} onChange={change => patch(idx, change)} />
