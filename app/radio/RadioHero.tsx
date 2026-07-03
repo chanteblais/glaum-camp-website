@@ -96,17 +96,16 @@ const MAIN: [number, number][] = [
   [589, 149], [595, 49], [600, -5], [605, -29], [611, -32], [616, -23], [621, 11], [626, 111],
   [632, 252], [637, 363], [642, 397], [647, 401], [653, 394], [658, 355], [663, 288], [668, 207],
   [674, 117], [679, 64], [684, 58], [689, 67], [695, 114], [700, 178], [705, 253], [711, 278],
-  // Everything after the pulse obeys a strictly falling envelope — once the
-  // signal starts dropping, no crest or valley ever rises above the one
-  // before it (98 -> 62 -> 50 -> 42 -> 36 -> 30 -> 26 -> 22 -> 19 -> 16 ->
-  // 13 -> 7 -> 5 units) while the wavelengths stretch: the frequency
-  // dropping off. The wide swoop and gentle rally survive, tucked under the
-  // envelope; the fade + silk extinguish the line.
-  [716, 253], [740, 118], [768, 230], [800, 138], [836, 216], [876, 150],
-  [920, 206], [968, 158], [1020, 199], [1080, 164],
-  [1140, 196], [1210, 197], [1270, 193],
-  [1330, 167], [1390, 187],
-  [1450, 177], [1520, 182], [1600, 179],
+  // The decay TRENDS downward (98 -> 58 -> 66 -> 44 -> 50 -> 34 -> 28 -> 31
+  // -> 21 -> 17 -> 20 -> 15 -> 8 units) with small organic lifts along the
+  // way — a strictly falling envelope read too symmetrical. Wavelengths
+  // stretch irregularly, crests and valleys sit asymmetric; the frequency
+  // drops off like something real. The fade + silk extinguish the line.
+  [716, 253], [738, 122], [764, 246], [794, 136], [830, 230], [872, 146],
+  [916, 208], [962, 149], [1014, 201], [1074, 163],
+  [1136, 200], [1205, 199], [1268, 194],
+  [1326, 165], [1388, 188],
+  [1448, 176], [1518, 183], [1600, 178],
 ]
 
 // Echo threads — the braid lives at the EDGES ONLY in the mock: two fine
