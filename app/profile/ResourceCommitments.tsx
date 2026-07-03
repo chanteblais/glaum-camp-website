@@ -46,6 +46,15 @@ export function ResourceCommitments() {
 
   useEffect(() => { load() }, [])
 
+  // Deep links (/participate#bring, e.g. from the home widget): the section's
+  // content arrives after hydration, so the browser's native hash scroll fires
+  // while this area still has no height and lands at the top. Re-scroll once
+  // the lists are actually rendered.
+  useEffect(() => {
+    if (lists === null || window.location.hash !== '#bring') return
+    document.getElementById('bring')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [lists === null])
+
   // Set my claim to `quantity` (0 = unclaim), optimistically adjusting both
   // my count and the community total by the delta.
   async function setClaim(item: ResourceItem, quantity: number) {
@@ -208,67 +217,70 @@ export function ResourceCommitments() {
             )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: list.description || list.steward_name ? 0 : '0.65rem' }}>
               {list.items.map(renderItem)}
-            </div>
 
-            {/* Open-ended offers: list gear that isn't asked for */}
-            {offerListId === list.id ? (
-              <div style={{
-                marginTop: '0.75rem', padding: '1rem 1.25rem', borderRadius: '0.85rem',
-                border: '1px dashed rgba(200,168,72,0.35)', background: 'rgba(200,168,72,0.04)',
-              }}>
-                <input
-                  autoFocus
-                  value={offerName}
-                  onChange={e => setOfferName(e.target.value)}
-                  placeholder="What do you have? (e.g. Guitar amp)"
-                  maxLength={80}
-                  style={{
-                    width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,0.05)',
-                    border: '1px solid rgba(200,168,72,0.25)', borderRadius: '0.5rem',
-                    padding: '0.55rem 0.8rem', color: '#F3EDE6', fontSize: '0.85rem', outline: 'none',
-                    fontFamily: 'inherit', marginBottom: '0.5rem',
-                  }}
-                />
-                <input
-                  value={offerNote}
-                  onChange={e => setOfferNote(e.target.value)}
-                  placeholder="Details (optional)"
-                  maxLength={200}
-                  style={{
-                    width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,0.05)',
-                    border: '1px solid rgba(200,168,72,0.2)', borderRadius: '0.5rem',
-                    padding: '0.55rem 0.8rem', color: '#F3EDE6', fontSize: '0.8rem', outline: 'none',
-                    fontFamily: 'inherit', marginBottom: '0.75rem',
-                  }}
-                />
-                <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end' }}>
-                  <button
-                    onClick={() => { setOfferListId(null); setOfferName(''); setOfferNote('') }}
-                    style={{ padding: '0.4rem 0.9rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.2)', background: 'transparent', color: '#F3EDE6', cursor: 'pointer', fontSize: '0.75rem', opacity: 0.7 }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => submitOffer(list.id)}
-                    disabled={offerBusy || !offerName.trim()}
-                    style={{ padding: '0.4rem 0.9rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.45)', background: 'transparent', color: '#FFFACD', cursor: 'pointer', fontSize: '0.75rem', letterSpacing: '0.05em', opacity: offerBusy || !offerName.trim() ? 0.5 : 1 }}
-                  >
-                    {offerBusy ? 'Adding…' : "Offer it — I'll bring it"}
-                  </button>
+              {/* Open-ended offers: list gear that isn't asked for. Rendered as
+                  the stack's final card so it lives inside the list, not under it. */}
+              {offerListId === list.id ? (
+                <div style={{
+                  padding: '1rem 1.25rem', borderRadius: '0.85rem',
+                  border: '1px dashed rgba(200,168,72,0.35)', background: 'rgba(200,168,72,0.04)',
+                }}>
+                  <input
+                    autoFocus
+                    value={offerName}
+                    onChange={e => setOfferName(e.target.value)}
+                    placeholder="What do you have? (e.g. Guitar amp)"
+                    maxLength={80}
+                    style={{
+                      width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(200,168,72,0.25)', borderRadius: '0.5rem',
+                      padding: '0.55rem 0.8rem', color: '#F3EDE6', fontSize: '0.85rem', outline: 'none',
+                      fontFamily: 'inherit', marginBottom: '0.5rem',
+                    }}
+                  />
+                  <input
+                    value={offerNote}
+                    onChange={e => setOfferNote(e.target.value)}
+                    placeholder="Details (optional)"
+                    maxLength={200}
+                    style={{
+                      width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(200,168,72,0.2)', borderRadius: '0.5rem',
+                      padding: '0.55rem 0.8rem', color: '#F3EDE6', fontSize: '0.8rem', outline: 'none',
+                      fontFamily: 'inherit', marginBottom: '0.75rem',
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={() => { setOfferListId(null); setOfferName(''); setOfferNote('') }}
+                      style={{ padding: '0.4rem 0.9rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.2)', background: 'transparent', color: '#F3EDE6', cursor: 'pointer', fontSize: '0.75rem', opacity: 0.7 }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => submitOffer(list.id)}
+                      disabled={offerBusy || !offerName.trim()}
+                      style={{ padding: '0.4rem 0.9rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.45)', background: 'transparent', color: '#FFFACD', cursor: 'pointer', fontSize: '0.75rem', letterSpacing: '0.05em', opacity: offerBusy || !offerName.trim() ? 0.5 : 1 }}
+                    >
+                      {offerBusy ? 'Adding…' : "Offer it — I'll bring it"}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <button
-                onClick={() => { setOfferListId(list.id); setOfferName(''); setOfferNote('') }}
-                style={{
-                  marginTop: '0.75rem', background: 'none', border: 'none', padding: 0,
-                  color: GOLD, opacity: 0.6, cursor: 'pointer', fontSize: '0.75rem',
-                  letterSpacing: '0.05em', fontFamily: 'inherit',
-                }}
-              >
-                Have something that fits? ＋ Offer it
-              </button>
-            )}
+              ) : (
+                <button
+                  onClick={() => { setOfferListId(list.id); setOfferName(''); setOfferNote('') }}
+                  style={{
+                    display: 'block', width: '100%', boxSizing: 'border-box', textAlign: 'center',
+                    padding: '0.8rem 1.25rem', borderRadius: '0.85rem', cursor: 'pointer',
+                    border: '1px dashed rgba(200,168,72,0.3)', background: 'rgba(255,255,255,0.01)',
+                    color: GOLD, opacity: 0.65, fontSize: '0.78rem',
+                    letterSpacing: '0.05em', fontFamily: 'inherit',
+                  }}
+                >
+                  Have something that fits? ＋ Offer it
+                </button>
+              )}
+            </div>
           </div>
         ))}
       </div>

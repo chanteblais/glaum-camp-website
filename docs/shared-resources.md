@@ -44,16 +44,19 @@ organizer wants, not an error).
   group membership is set-once): visible lists with per-item progress and an
   **"I'll bring one"** button; a claimed row grows −/+ steppers and a remove
   control. Unclaiming is always allowed — plans change, and the count simply
-  reflects reality. Each list ends with *"Have something that fits? ＋ Offer
-  it"* → an inline form that lists unrequested gear (offer = item with no
-  target + the offerer's ×1 claim; retracting the claim removes the listing
-  unless others piled on).
+  reflects reality. The last card **inside** each list's stack is the
+  dashed *"Have something that fits? ＋ Offer it"* trigger → an inline form
+  that lists unrequested gear (offer = item with no target + the offerer's
+  ×1 claim; retracting the claim removes the listing unless others piled on).
 - **Home dashboard: the Bring Something widget** — a configurable dashboard
   widget (id `resources`, reorder/hide/resize via the page editor like any
-  other) listing unmet needs (item + "N more needed" pill, top 6 + `+N more`)
-  with a "Claim what you can bring →" footer to `/participate#bring`.
-  Demand-driven via `getUnmetResourceNeeds` (`lib/resources.ts`, offers
-  excluded): it renders nothing once everything is covered.
+  other): one compact card — "N items still needed" + the first three item
+  names — where the **whole card** is the link to `/participate#bring`.
+  Because the section's content loads client-side (native hash scroll fires
+  before it has height), `ResourceCommitments` re-scrolls to `#bring` once
+  its data renders. Demand-driven via `getUnmetResourceNeeds`
+  (`lib/resources.ts`, offers excluded): it renders nothing once everything
+  is covered.
 - **Profile → Active Commitments**: each claim renders as a `BRINGING` row
   ("Camping Stove ×2 · Shared Kitchen", with the item's icon when set) via
   `lib/resources.ts` → `getMemberResourceClaims`, and counts toward the

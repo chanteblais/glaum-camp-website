@@ -482,34 +482,26 @@ let canManagePolls = false
                   </div>
                 ) : null,
 
-                // Unmet shared-resource needs. Demand-driven like announcements:
-                // hidden entirely once the community has everything covered.
+                // Unmet shared-resource needs, as one compact click-through
+                // ("2 items still needed" → /participate#bring). Demand-driven
+                // like announcements: hidden once everything is covered.
                 resources: unmetNeeds.length > 0 ? (
-                  <div style={{ border: '1px solid rgba(200,168,72,0.25)', borderRadius: '1rem', background: 'rgba(10,0,20,0.5)', overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
+                  <a href="/participate#bring" style={{ border: '1px solid rgba(200,168,72,0.25)', borderRadius: '1rem', background: 'rgba(10,0,20,0.5)', overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box', textDecoration: 'none' }}>
                     <div style={{ padding: '1rem 1.5rem 0.75rem', borderBottom: '1px solid rgba(200,168,72,0.12)' }}>
                       <p style={{ fontSize: '0.62rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, margin: 0 }}>Bring Something</p>
                     </div>
-                    <div style={{ flex: 1 }}>
-                      {unmetNeeds.slice(0, 6).map((n, i, shown) => (
-                        <div key={n.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.8rem 1.5rem', borderBottom: i < shown.length - 1 ? '1px solid rgba(200,168,72,0.08)' : 'none' }}>
-                          <p style={{ flex: 1, margin: 0, fontSize: '0.85rem', color: '#EDE0C8', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.name}</p>
-                          <span style={{ flexShrink: 0, fontSize: '0.7rem', color: '#C8A848', border: '1px solid rgba(200,168,72,0.25)', borderRadius: '9999px', padding: '0.15rem 0.6rem', whiteSpace: 'nowrap' }}>
-                            {n.remaining} more needed
-                          </span>
-                        </div>
-                      ))}
-                      {unmetNeeds.length > 6 && (
-                        <p style={{ margin: 0, padding: '0.6rem 1.5rem', fontSize: '0.72rem', opacity: 0.4, fontStyle: 'italic' }}>
-                          +{unmetNeeds.length - 6} more
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', padding: '1.1rem 1.5rem' }}>
+                      <div style={{ minWidth: 0 }}>
+                        <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.05rem', color: '#C8A848', margin: '0 0 0.25rem' }}>
+                          {unmetNeeds.length} item{unmetNeeds.length === 1 ? '' : 's'} still needed
                         </p>
-                      )}
+                        <p style={{ fontSize: '0.78rem', opacity: 0.45, margin: 0, color: '#F3EDE6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {unmetNeeds.slice(0, 3).map(n => n.name).join(' · ')}{unmetNeeds.length > 3 ? ` +${unmetNeeds.length - 3} more` : ''}
+                        </p>
+                      </div>
+                      <span style={{ fontSize: '1rem', color: '#C8A848', opacity: 0.4, flexShrink: 0 }}>→</span>
                     </div>
-                    <div style={{ padding: '0.75rem 1.5rem', borderTop: '1px solid rgba(200,168,72,0.1)' }}>
-                      <a href="/participate#bring" style={{ fontSize: '0.75rem', color: '#C8A848', opacity: 0.7, textDecoration: 'none' }}>
-                        Claim what you can bring →
-                      </a>
-                    </div>
-                  </div>
+                  </a>
                 ) : null,
 
                 shoutouts: (
