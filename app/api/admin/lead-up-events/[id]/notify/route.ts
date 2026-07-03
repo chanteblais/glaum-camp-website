@@ -36,12 +36,13 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ error: 'Make the gathering visible before notifying members.' }, { status: 400 })
   }
 
-  // Approved members, minus the admin doing the sending.
+  // All approved members — including the sending admin, so they see the
+  // blast land exactly as members do.
   const { data: membersRaw } = await supabaseAdmin
     .from('members')
     .select('clerk_user_id, email, first_name, preferred_name')
     .eq('status', 'approved')
-  const recipients = (membersRaw ?? []).filter(m => m.clerk_user_id !== actingUserId)
+  const recipients = membersRaw ?? []
 
   const when = whenLabel(gathering.event_date, gathering.start_time)
   const message = `New lead-up gathering: ${gathering.title}${when ? ` — ${when}` : ''}`

@@ -70,7 +70,7 @@ RSVP status set: `going` / `maybe` / `not_going` (or just a binary `going` toggl
 
 Two admin entry points, both routing to the same fan-out: a **"Notify members on save"** toggle in the **create** modal (shown only when the gathering is "Visible to members"; the create flow notifies right after the POST returns the new id), and a **"Notify members"** button on each row for sending later or re-sending. **Deliberate, not automatic** — the toggle defaults off and isn't shown on edit, so drafts/edits don't spam. `POST /api/admin/lead-up-events/[id]/notify`:
 - requires the gathering be **visible**;
-- inserts a `user_notifications` bell row (`event_type: 'lead_up_gathering'`, deep-links to `/schedule`) for every approved member with an account, minus the acting admin (batch insert);
+- inserts a `user_notifications` bell row (`event_type: 'lead_up_gathering'`, deep-links to `/schedule`) for every approved member with an account, **including the acting admin** (batch insert) — the sender gets the same bell + email as everyone, doubling as delivery confirmation;
 - emails those members via `sendLeadUpGatheringEmail` (`lib/send-email.ts`), **gated by each member's `email_announcements` preference** (default ON), best-effort per recipient;
 - stamps `lead_up_events.notified_at`, which the manager shows as "Notified <date>" and turns the button into a re-send (`↻`). The button reports `Notified N · emailed M` after sending.
 
