@@ -42,10 +42,9 @@ function RadioRow({ e, last }: { e: RadioEventRow; last: boolean }) {
   const body = (
     <div style={{ minWidth: 0, flex: 1, textAlign: isVoice ? 'right' : 'left' }}>
       <p
+        className="radio-row-msg"
         style={{
           margin: 0,
-          fontSize: '1rem',
-          lineHeight: 1.5,
           color: isVoice ? VOICE_PURPLE : isSpeech ? 'rgba(216,180,232,0.95)' : '#F3EDE6',
           opacity: isSpeech ? 1 : 0.92,
           fontStyle: isVoice ? 'italic' : undefined,
@@ -63,12 +62,12 @@ function RadioRow({ e, last }: { e: RadioEventRow; last: boolean }) {
         )}
       </p>
       {e.detail && (
-        <p style={{ margin: '0.3rem 0 0', fontSize: '0.85rem', lineHeight: 1.5, color: '#F3EDE6', opacity: 0.55 }}>
+        <p className="radio-row-detail" style={{ color: '#F3EDE6', opacity: 0.55 }}>
           {e.detail}
         </p>
       )}
       {isVoice && e.actor_name && (
-        <p style={{ margin: '0.3rem 0 0', fontSize: '0.72rem', color: VOICE_SIGNATURE }}>
+        <p className="radio-row-sig" style={{ color: VOICE_SIGNATURE }}>
           — {e.actor_name}
         </p>
       )}
@@ -81,35 +80,25 @@ function RadioRow({ e, last }: { e: RadioEventRow; last: boolean }) {
 
   return (
     <article
+      className="radio-row"
       style={{
         display: 'flex',
         alignItems: 'flex-start',
-        gap: isSpeech ? 0 : '1.1rem',
-        padding: '1.1rem 0.25rem',
+        gap: isSpeech ? 0 : undefined,
         borderBottom: last ? 'none' : '1px solid rgba(200,168,72,0.1)',
       }}
     >
       {/* The moment's emblem — a large raw emoji (or medal art), no disc.
           Speech rows carry their emoji inline instead. */}
       {!isSpeech && (
-        <span
-          aria-hidden
-          style={{
-            width: '2.6rem',
-            flexShrink: 0,
-            display: 'flex',
-            justifyContent: 'center',
-            fontSize: '1.7rem',
-            lineHeight: 1.3,
-          }}
-        >
-          {isImageIcon(e.icon) ? <IconImage src={e.icon} size="2.4rem" fill={0.95} /> : (e.icon || '✦')}
+        <span aria-hidden className="radio-row-emblem" style={{ flexShrink: 0, display: 'flex', justifyContent: 'center', lineHeight: 1.3 }}>
+          {isImageIcon(e.icon) ? <IconImage src={e.icon} size="1.4em" fill={0.95} /> : (e.icon || '✦')}
         </span>
       )}
 
       {/* voices are right-aligned, so their clock keeps the LEFT edge */}
       {isVoice && (
-        <span style={{ flexShrink: 0, fontSize: '0.72rem', color: '#F3EDE6', opacity: 0.35, paddingTop: '0.35rem', letterSpacing: '0.04em', marginRight: '0.75rem' }}>
+        <span className="radio-row-clock" style={{ flexShrink: 0, color: '#F3EDE6', opacity: 0.35, letterSpacing: '0.04em', marginRight: '0.75rem' }}>
           {clockOf(e.created_at)}
         </span>
       )}
@@ -123,13 +112,37 @@ function RadioRow({ e, last }: { e: RadioEventRow; last: boolean }) {
       )}
 
       {!isVoice && (
-        <span style={{ flexShrink: 0, fontSize: '0.72rem', color: '#F3EDE6', opacity: 0.35, paddingTop: '0.35rem', letterSpacing: '0.04em', marginLeft: '0.75rem' }}>
+        <span className="radio-row-clock" style={{ flexShrink: 0, color: '#F3EDE6', opacity: 0.35, letterSpacing: '0.04em', marginLeft: '0.75rem' }}>
           {clockOf(e.created_at)}
         </span>
       )}
     </article>
   )
 }
+
+// Feed metrics live in CSS so mobile can compress the whole rhythm — the
+// desktop scale read bloated at ~380px. (Inline <style> must use
+// dangerouslySetInnerHTML — house gotcha.)
+const FEED_CSS = `
+  .radio-row { padding: 1.1rem 0.25rem; gap: 1.1rem; }
+  .radio-row-emblem { width: 2.6rem; font-size: 1.7rem; }
+  .radio-row-msg { font-size: 1rem; line-height: 1.5; }
+  .radio-row-detail { font-size: 0.85rem; line-height: 1.5; margin: 0.3rem 0 0; }
+  .radio-row-sig { font-size: 0.72rem; margin: 0.3rem 0 0; }
+  .radio-row-clock { font-size: 0.72rem; padding-top: 0.35rem; }
+  .radio-day-section { margin-bottom: 1.5rem; }
+  .radio-signoff { font-size: 0.85rem; margin: 2.5rem 0 0; }
+  @media (max-width: 640px) {
+    .radio-row { padding: 0.65rem 0.05rem; gap: 0.65rem; }
+    .radio-row-emblem { width: 1.7rem; font-size: 1.15rem; }
+    .radio-row-msg { font-size: 0.85rem; line-height: 1.45; }
+    .radio-row-detail { font-size: 0.73rem; margin-top: 0.2rem; }
+    .radio-row-sig { font-size: 0.62rem; margin-top: 0.2rem; }
+    .radio-row-clock { font-size: 0.58rem; padding-top: 0.3rem; }
+    .radio-day-section { margin-bottom: 1.1rem; }
+    .radio-signoff { font-size: 0.72rem; margin: 1.75rem 0 0; }
+  }
+`
 
 export function RadioFeed({ events }: { events: RadioEventRow[] }) {
   if (events.length === 0) {
@@ -151,8 +164,9 @@ export function RadioFeed({ events }: { events: RadioEventRow[] }) {
 
   return (
     <div>
+      <style dangerouslySetInnerHTML={{ __html: FEED_CSS }} />
       {sections.map(section => (
-        <section key={section.label} style={{ marginBottom: '1.5rem' }}>
+        <section key={section.label} className="radio-day-section">
           <h2
             style={{
               fontSize: '0.72rem',
@@ -182,14 +196,8 @@ export function RadioFeed({ events }: { events: RadioEventRow[] }) {
       {/* Sign-off */}
       <p
         aria-hidden
-        style={{
-          textAlign: 'center',
-          fontStyle: 'italic',
-          fontSize: '0.85rem',
-          color: '#C8A848',
-          opacity: 0.55,
-          margin: '2.5rem 0 0',
-        }}
+        className="radio-signoff"
+        style={{ textAlign: 'center', fontStyle: 'italic', color: '#C8A848', opacity: 0.55 }}
       >
         ✦ &nbsp;That's all for now. Stay tuned.&nbsp; ✦
       </p>
