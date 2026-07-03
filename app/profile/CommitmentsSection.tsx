@@ -223,7 +223,7 @@ export function CommitmentsSection({ contributions, role, dept, shifts, roleAppr
       {/* Footer */}
       {showManageLink && (
         <div style={{ padding: '0.5rem 1.5rem 1rem', textAlign: 'center', marginTop: 'auto' }}>
-          <a href="/signup" style={{ fontFamily: 'var(--font-cormorant-garamond), serif', fontSize: '0.72rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.85, textDecoration: 'none', borderBottom: '1px solid rgba(200,168,72,0.35)', paddingBottom: '0.2rem' }}>
+          <a href="/participate" style={{ fontFamily: 'var(--font-cormorant-garamond), serif', fontSize: '0.72rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.85, textDecoration: 'none', borderBottom: '1px solid rgba(200,168,72,0.35)', paddingBottom: '0.2rem' }}>
             View all commitments ›
           </a>
         </div>

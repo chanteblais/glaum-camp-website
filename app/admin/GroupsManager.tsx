@@ -377,7 +377,7 @@ function CollectionModal({
             Visible on member profiles
           </label>
         </Field>
-        <Field label="Self-join" hint="When on, members can join/leave this collection's groups themselves on the Participate page (/signup → Your Contributions). Independent of profile visibility. Turn off for admin-assigned-only collections.">
+        <Field label="Self-join" hint="When on, members can join/leave this collection's groups themselves on the Participate page (/participate → Your Groups). Independent of profile visibility. Turn off for admin-assigned-only collections.">
           <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', fontSize: '0.85rem', color: '#F3EDE6' }}>
             <input type="checkbox" checked={form.self_join} onChange={e => setForm(f => ({ ...f, self_join: e.target.checked }))} style={{ width: 16, height: 16, accentColor: GOLD, cursor: 'pointer' }} />
             Members can self-join on Participate

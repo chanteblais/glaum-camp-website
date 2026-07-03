@@ -50,7 +50,9 @@ Sign-out flow:
 /                        Public homepage (schedule, about) / Member dashboard (if approved)
 /apply                   Application form (4 states, see Features doc)
 /volunteer               Outside volunteer signup
-/profile                 Logged-in member profile + role/shift picker
+/profile                 Logged-in member profile (designation, commitments, distinctions)
+/participate             Participate — role picker, shift calendar, self-join groups (renamed from /signup 2026-07-02; permanent redirect in next.config.js)
+/roles                   Registry of Roles — full departments + roles documentation, claimable in place
 /members                 Member directory (approved members only)
 /members/[id]            Individual member view
 /messages                Member messaging inbox (DMs + group threads, filterable)
@@ -77,7 +79,7 @@ Sign-out flow:
 | `/api/volunteer` | POST | Submit volunteer signup |
 | `/api/signup` | GET/POST | Fetch departments/roles + upsert member **role** selection. Sets `role_approval_status = 'pending'` for roles with `requires_approval = true`. (Shift halves are legacy — shifts moved to `/api/shift-signups`.) |
 | `/api/shift-signups` | GET/POST/DELETE | **Multi-shift signup** (shifts redesign): GET slots + owed hour requirements (incl. `lead_names`/`held_role`), POST sign up for a slot (capacity + signup-open enforced, admin notified; optional `role: 'member'\|'lead'` — omitted keeps the existing role), DELETE cancel (also clears the legacy `camp_signups.schedule_event_id`). Backed by `member_shift_signups`. |
-| `/api/groups/membership` | GET/POST | Self-service opt-in groups for the current member. GET lists groups whose **collection has `self_join` on** (migration `044`; no collection ⇒ not self-joinable) + the member's joined state, **grouped by collection** (each group carries `collection_id`/`collection_name`, ordered by collection `sort_order`); POST `{ group_id, joined }` joins (`source='application'`) or leaves (re-checks the same gate). Separate from the apply form's `group_select` fields, from `show_on_profile` (profile display), and from group `visibility` (Find-a-group). Powers the **Your Groups** section on `/signup`. |
+| `/api/groups/membership` | GET/POST | Self-service opt-in groups for the current member. GET lists groups whose **collection has `self_join` on** (migration `044`; no collection ⇒ not self-joinable) + the member's joined state, **grouped by collection** (each group carries `collection_id`/`collection_name`, ordered by collection `sort_order`); POST `{ group_id, joined }` joins (`source='application'`) or leaves (re-checks the same gate). Separate from the apply form's `group_select` fields, from `show_on_profile` (profile display), and from group `visibility` (Find-a-group). Powers the **Your Groups** section on `/participate`. |
 | `/api/profile/application` | PATCH | Update profile fields |
 | `/api/profile/avatar` | POST | Upload avatar to Supabase Storage |
 | `/api/profile/cancel` | POST | Cancel own application |

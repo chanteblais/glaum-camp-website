@@ -75,18 +75,18 @@ export function buildAttunementChecklist(
           const have = t.collectionId
             ? (state.groupCountsByCollection[t.collectionId] ?? 0)
             : state.totalGroupCount
-          return { id: t.id, label: t.label, done: have >= need, href: '/signup', tier }
+          return { id: t.id, label: t.label, done: have >= need, href: '/participate', tier }
         }
-        case 'role':       return { id: t.id, label: t.label, done: state.roleDone, href: '/signup', tier }
+        case 'role':       return { id: t.id, label: t.label, done: state.roleDone, href: '/participate', tier }
         case 'shift': {
           // "Any shift" (no type) keeps the legacy boolean — one signup counts,
           // regardless of whether that shift's start/end times are set yet.
-          if (!t.shiftTypeId) return { id: t.id, label: t.label, done: state.hasShift, href: '/signup', tier }
+          if (!t.shiftTypeId) return { id: t.id, label: t.label, done: state.hasShift, href: '/participate', tier }
           // Typed task = the universal hours requirement: sum the member's held
           // hours in that shift type against the task's required hours.
           const need = t.requiredHours ?? 1
           const have = state.hoursByShiftType[t.shiftTypeId] ?? 0
-          return { id: t.id, label: `${t.label} — ${have}/${need}h`, done: have >= need, href: '/signup', tier }
+          return { id: t.id, label: `${t.label} — ${have}/${need}h`, done: have >= need, href: '/participate', tier }
         }
         case 'approved':
         default:           return { id: t.id, label: t.label, done: true, tier }
@@ -101,7 +101,7 @@ export function buildAttunementChecklist(
   const derived: AttunementChecklistItem[] = state.shiftSignupOpen
     ? state.derivedShiftRequirements.map(r => {
         const have = state.hoursByShiftType[r.shiftTypeId] ?? 0
-        return { id: r.id, label: `${r.label} — ${have}/${r.requiredHours}h`, done: have >= r.requiredHours, href: '/signup', tier: 'commitment' as const }
+        return { id: r.id, label: `${r.label} — ${have}/${r.requiredHours}h`, done: have >= r.requiredHours, href: '/participate', tier: 'commitment' as const }
       })
     : []
 

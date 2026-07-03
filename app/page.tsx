@@ -556,7 +556,7 @@ let canManagePolls = false
 
             {/* ── MANY HANDS LINK ── */}
             <div className="dash-quicklinks" style={{ marginTop: '1.25rem' }}>
-              <a href="/signup" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem 1.5rem', border: '1px solid rgba(200,168,72,0.18)', borderRadius: '1rem', background: 'rgba(200,168,72,0.03)', textDecoration: 'none' }}>
+              <a href="/participate" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem 1.5rem', border: '1px solid rgba(200,168,72,0.18)', borderRadius: '1rem', background: 'rgba(200,168,72,0.03)', textDecoration: 'none' }}>
                 <div>
                   <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.1rem', color: '#C8A848', margin: '0 0 0.2rem' }}>Role & Shift</p>
                   <p style={{ fontSize: '0.8rem', opacity: 0.45, margin: 0 }}>Choose your role and shift</p>

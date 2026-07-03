@@ -61,8 +61,8 @@ export default async function ApplyPage({ searchParams }: { searchParams: { trac
   if (!isAdmin) {
     if (existing && existing.status === 'pending') redirect('/profile')
     if (existing && existing.status === 'rejected') redirect('/profile')
-    if (existing && existing.status === 'approved') redirect('/profile#role-signup')
-    if (volunteer?.status === 'active') redirect('/profile#role-signup')
+    if (existing && existing.status === 'approved') redirect('/participate')
+    if (volunteer?.status === 'active') redirect('/profile')
   }
 
   // Member track
