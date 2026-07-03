@@ -19,6 +19,9 @@ type Props = {
   avatarUrl: string | null
   pronouns: string | null
   recipientActive?: boolean
+  // Server-rendered thread (when provided) — paints immediately; the mount
+  // fetch below re-syncs and handles marking incoming messages read.
+  initialMessages?: Message[]
 }
 
 const MAX_CHARS = 2000
@@ -32,9 +35,9 @@ function formatTime(iso: string) {
   return d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric', ...(isThisYear ? {} : { year: 'numeric' }), hour: 'numeric', minute: '2-digit' })
 }
 
-export function ThreadClient({ currentUserId, recipientId, displayName, avatarUrl, pronouns, recipientActive = true }: Props) {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [loading, setLoading] = useState(true)
+export function ThreadClient({ currentUserId, recipientId, displayName, avatarUrl, pronouns, recipientActive = true, initialMessages }: Props) {
+  const [messages, setMessages] = useState<Message[]>(initialMessages ?? [])
+  const [loading, setLoading] = useState(initialMessages == null)
   const [body, setBody] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)

@@ -85,8 +85,8 @@ Sign-out flow:
 | `/api/shoutouts` | GET/POST | List visible shoutouts / post one (approved members) |
 | `/api/shoutouts/[id]` | DELETE | Delete a shoutout (author or admin only) |
 | `/api/notifications` | GET/PATCH | Fetch + mark-read user notifications |
-| `/api/messages` | GET/POST | Inbox (direct + group conversations) / send a DM. Backed by the conversations model (`lib/conversations.ts`). |
-| `/api/messages/[userId]` | GET | Direct thread with a member |
+| `/api/messages` | GET/POST | Inbox (direct + group conversations) / send a DM. Backed by the conversations model (`lib/conversations.ts`); the inbox summary lives in `lib/inbox.ts`, shared with the server-rendered `/messages` page (the route is the client's refresh path). |
+| `/api/messages/[userId]` | GET | Direct thread with a member (`lib/inbox.ts` `getDirectThreadMessages`, shared with the server-rendered thread page; the route is the client's poll path) |
 | `/api/messages/[userId]/read` | POST | Mark a direct thread read (advances my `last_read_at`) |
 | `/api/messages/g/[groupId]` | GET/POST | Group thread fetch / post (members-only). POST parses `@mentions` → in-app notification + throttled email. |
 | `/api/messages/g/[groupId]/read` | POST | Mark a group thread read |

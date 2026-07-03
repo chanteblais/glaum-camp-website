@@ -72,6 +72,12 @@ Defined in `globals.css` under `@layer components`:
 | `.gold-divider` | 1px horizontal line, gold gradient, 40% opacity |
 | `.purple-glow` | Box shadow with layered purple glow |
 | `.site-shell` | Full site wrapper — background, dot grid, base text color |
+| `.mobile-stack` | Collapses a hardcoded two-column inline grid (`gridTemplateColumns: '1fr 1fr'`) to one column under 560px (`!important`, since the grids are inline styles). Used by paired form fields (apply wizard, volunteer form, profile settings) and the Your Role / Your Shifts cards. |
+
+### Mobile ergonomics (globals.css, not a class)
+
+- **Form fields are forced to `font-size: 16px` under 768px** (`!important`, overriding inline styles). iOS Safari auto-zooms the page — and leaves it zoomed — when focusing a field styled under 16px; 16px is the threshold that disables that. Don't "fix" a field back down on mobile.
+- **`touch-action: manipulation` on interactive elements** (links, buttons, form controls) disables double-tap-to-zoom and its tap delay; pinch-zoom is unaffected.
 
 ### Layout classes (profile page, defined inline via `<style>`)
 

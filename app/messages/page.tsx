@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getInboxConversations } from '@/lib/inbox'
 import { Header } from '@/components/Header'
 import { MessagesInboxClient } from './MessagesInboxClient'
 import { UnreadCountBadge } from './UnreadCountBadge'
@@ -15,23 +16,28 @@ export default async function MessagesPage() {
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
 
-  // Only approved members
-  const { data: app } = await supabaseAdmin
-    .from('applications')
-    .select('status')
-    .eq('clerk_user_id', userId)
-    .maybeSingle()
+  // The access check, the "New Message" member picker, and the initial inbox
+  // are independent reads — run them together (the page renders with the inbox
+  // already in place; the client only re-fetches to stay fresh).
+  const [{ data: app }, { data: members }, initialConversations] = await Promise.all([
+    // Only approved members
+    supabaseAdmin
+      .from('applications')
+      .select('status')
+      .eq('clerk_user_id', userId)
+      .maybeSingle(),
+    // All other approved members for the "New Message" picker
+    // Phase 5: identity resolution reads the canonical `members` table.
+    supabaseAdmin
+      .from('members')
+      .select('clerk_user_id, first_name, preferred_name, avatar_url')
+      .eq('status', 'approved')
+      .neq('clerk_user_id', userId)
+      .order('first_name', { ascending: true }),
+    getInboxConversations(userId),
+  ])
 
   if (app?.status !== 'approved') redirect('/profile')
-
-  // Fetch all other approved members for the "New Message" picker
-  const { data: members } = await supabaseAdmin
-    // Phase 5: identity resolution reads the canonical `members` table.
-    .from('members')
-    .select('clerk_user_id, first_name, preferred_name, avatar_url')
-    .eq('status', 'approved')
-    .neq('clerk_user_id', userId)
-    .order('first_name', { ascending: true })
 
   const memberOptions: MemberOption[] = (members ?? [])
     .filter(m => m.clerk_user_id)
@@ -59,7 +65,7 @@ export default async function MessagesPage() {
           </div>
         </div>
         <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.3), transparent)', marginBottom: '2.5rem' }} aria-hidden="true" />
-        <MessagesInboxClient currentUserId={userId} members={memberOptions} />
+        <MessagesInboxClient currentUserId={userId} members={memberOptions} initialConversations={initialConversations} />
       </main>
     </div>
   )

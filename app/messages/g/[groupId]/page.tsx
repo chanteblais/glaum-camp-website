@@ -9,48 +9,51 @@ export default async function GroupThreadPage({ params }: { params: { groupId: s
   const { userId: myId } = await auth()
   if (!myId) redirect('/sign-in')
 
-  // Approved members only.
-  const { data: myApp } = await supabaseAdmin
-    .from('applications')
-    .select('status')
-    .eq('clerk_user_id', myId)
-    .maybeSingle()
+  // The access check, group row, roster, and conversation lookup are
+  // independent reads — run them together.
+  const [{ data: myApp }, { data: group }, { data: roster }, convId] = await Promise.all([
+    // Approved members only.
+    supabaseAdmin
+      .from('applications')
+      .select('status')
+      .eq('clerk_user_id', myId)
+      .maybeSingle(),
+    // The group must exist…
+    supabaseAdmin
+      .from('groups')
+      .select('id, name, icon, join_policy')
+      .eq('id', params.groupId)
+      .maybeSingle(),
+    // …and group threads are members-only.
+    supabaseAdmin
+      .from('group_members')
+      .select('clerk_user_id')
+      .eq('group_id', params.groupId),
+    findGroupConversation(params.groupId),
+  ])
+
   if (myApp?.status !== 'approved') redirect('/profile')
-
-  // The group must exist…
-  const { data: group } = await supabaseAdmin
-    .from('groups')
-    .select('id, name, icon, join_policy')
-    .eq('id', params.groupId)
-    .maybeSingle()
   if (!group) notFound()
-
-  // …and group threads are members-only.
-  const { data: roster } = await supabaseAdmin
-    .from('group_members')
-    .select('clerk_user_id')
-    .eq('group_id', params.groupId)
   const memberIds = (roster ?? []).map(r => r.clerk_user_id).filter(Boolean)
   if (!memberIds.includes(myId)) redirect('/messages')
 
-  // Members for @mention autocomplete + highlighting. Includes me so a mention of
-  // me renders highlighted too (the composer autocomplete filters me out).
-  const { data: memberApps } = memberIds.length
-    ? await supabaseAdmin
-        .from('members')
-        .select('clerk_user_id, first_name, preferred_name, avatar_url')
-        .in('clerk_user_id', memberIds)
-        .eq('status', 'approved')
-    : { data: [] }
-  const members = (memberApps ?? []).map(a => ({
+  // Member profiles (for @mention autocomplete + highlighting — includes me so
+  // a mention of me renders highlighted too) and my per-thread prefs.
+  const [memberAppsRes, prefs] = await Promise.all([
+    memberIds.length
+      ? supabaseAdmin
+          .from('members')
+          .select('clerk_user_id, first_name, preferred_name, avatar_url')
+          .in('clerk_user_id', memberIds)
+          .eq('status', 'approved')
+      : Promise.resolve({ data: [] }),
+    convId ? getParticipantPrefs(convId, myId) : Promise.resolve({ muted: false, email_opt_in: false }),
+  ])
+  const members = (memberAppsRes.data ?? []).map(a => ({
     userId: a.clerk_user_id as string,
     displayName: a.preferred_name || a.first_name || 'Member',
     avatarUrl: a.avatar_url ?? null,
   }))
-
-  // My per-thread prefs (mute / email opt-in).
-  const convId = await findGroupConversation(group.id)
-  const prefs = convId ? await getParticipantPrefs(convId, myId) : { muted: false, email_opt_in: false }
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 1 }}>
