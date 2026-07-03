@@ -14,7 +14,7 @@ async function requireAdmin() {
 export async function POST(req: NextRequest) {
   if (!(await requireAdmin())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { list_id, name, note, quantity_needed, sort_order } = await req.json()
+  const { list_id, name, note, quantity_needed, icon, sort_order } = await req.json()
   if (!list_id) return NextResponse.json({ error: 'list_id is required' }, { status: 400 })
   if (!name?.trim()) return NextResponse.json({ error: 'name is required' }, { status: 400 })
 
@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
       name: name.trim(),
       note: note?.trim() || null,
       quantity_needed: needed,
+      icon: icon || null,
       sort_order: sort_order ?? 0,
     })
     .select()

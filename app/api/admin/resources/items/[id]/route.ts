@@ -21,6 +21,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     patch.name = body.name.trim()
   }
   if ('note' in body) patch.note = body.note?.trim() || null
+  if ('icon' in body) patch.icon = body.icon || null
   // Empty/null target = open callout; setting a number turns a member offer
   // into a real need (claims stay attached) — migration 053.
   if ('quantity_needed' in body) {

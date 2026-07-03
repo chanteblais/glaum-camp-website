@@ -7,6 +7,7 @@ type ResourceItem = {
   id: string
   name: string
   note: string | null
+  icon: string | null
   // NULL = an open offer (no set target) — someone listed gear that wasn't asked for.
   needed: number | null
   claimed: number
@@ -144,6 +145,13 @@ export function ResourceCommitments() {
           transition: 'border-color 0.15s, background 0.15s', opacity: busy ? 0.6 : 1,
         }}
       >
+        {/* Icon (matches the Your Groups row treatment: image, else a plain mark) */}
+        <div style={{ width: 48, height: 48, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {item.icon
+            ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={item.icon} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            : <span style={{ fontSize: '1.5rem', color: GOLD, opacity: 0.5 }}>✦</span>}
+        </div>
+
         {/* Name + note + progress */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ margin: 0, fontSize: '0.95rem', color: '#F3EDE6', fontWeight: 600 }}>{item.name}</p>

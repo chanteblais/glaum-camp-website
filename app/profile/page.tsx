@@ -502,7 +502,7 @@ export default async function ProfilePage() {
               </div>
             )}
             <div style={{ marginBottom: '1.5rem' }}>
-              <a href="/signup" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 1.25rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.35)', background: 'rgba(200,168,72,0.06)', color: '#C8A848', textDecoration: 'none', fontSize: '0.82rem', letterSpacing: '0.06em' }}>
+              <a href="/participate" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 1.25rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.35)', background: 'rgba(200,168,72,0.06)', color: '#C8A848', textDecoration: 'none', fontSize: '0.82rem', letterSpacing: '0.06em' }}>
                 ✦ Choose / change your role & shift
               </a>
             </div>

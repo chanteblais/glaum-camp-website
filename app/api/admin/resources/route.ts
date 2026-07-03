@@ -26,7 +26,7 @@ export async function GET() {
 
   const { data: items } = await supabaseAdmin
     .from('resources')
-    .select('id, list_id, name, note, quantity_needed, offered_by, sort_order')
+    .select('id, list_id, name, note, quantity_needed, offered_by, icon, sort_order')
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: true })
 

@@ -24,7 +24,7 @@ export async function GET() {
   const listIds = lists.map(l => l.id)
   const { data: items } = await supabaseAdmin
     .from('resources')
-    .select('id, list_id, name, note, quantity_needed, offered_by, sort_order')
+    .select('id, list_id, name, note, quantity_needed, offered_by, icon, sort_order')
     .in('list_id', listIds)
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: true })
@@ -52,6 +52,7 @@ export async function GET() {
       id: it.id,
       name: it.name,
       note: it.note,
+      icon: it.icon,
       // NULL = open offer (no target) — migration 053.
       needed: it.quantity_needed,
       claimed: claimTotals[it.id] ?? 0,

@@ -42,27 +42,30 @@ export type MemberResourceClaim = {
   resourceName: string
   listTitle: string
   quantity: number
+  icon: string | null
 }
 
 export async function getMemberResourceClaims(clerkUserId: string | null | undefined): Promise<MemberResourceClaim[]> {
   if (!clerkUserId) return []
   const { data, error } = await supabaseAdmin
     .from('resource_claims')
-    .select('id, quantity, resources(name, sort_order, resource_lists(title, sort_order))')
+    .select('id, quantity, resources(name, icon, sort_order, resource_lists(title, sort_order))')
     .eq('clerk_user_id', clerkUserId)
 
   // Table missing (pre-migration) → no rows rather than a crash.
   if (error) return []
 
+  type ResourceEmbed = {
+    name: string
+    icon: string | null
+    sort_order: number
+    resource_lists: { title: string; sort_order: number } | { title: string; sort_order: number }[] | null
+  }
   type Row = {
     id: string
     quantity: number
     // Supabase types the embeds as arrays; runtime returns a single row for a to-one FK.
-    resources: {
-      name: string
-      sort_order: number
-      resource_lists: { title: string; sort_order: number } | { title: string; sort_order: number }[] | null
-    } | { name: string; sort_order: number; resource_lists: { title: string; sort_order: number } | { title: string; sort_order: number }[] | null }[] | null
+    resources: ResourceEmbed | ResourceEmbed[] | null
   }
 
   return ((data ?? []) as unknown as Row[])
@@ -75,10 +78,11 @@ export async function getMemberResourceClaims(clerkUserId: string | null | undef
         resourceName: res.name,
         listTitle: list?.title ?? '',
         quantity: r.quantity,
+        icon: res.icon,
         _sort: (list?.sort_order ?? 0) * 1000 + res.sort_order,
       }
     })
     .filter((c): c is NonNullable<typeof c> => !!c)
     .sort((a, b) => a._sort - b._sort)
-    .map(({ id, resourceName, listTitle, quantity }) => ({ id, resourceName, listTitle, quantity }))
+    .map(({ id, resourceName, listTitle, quantity, icon }) => ({ id, resourceName, listTitle, quantity, icon }))
 }

@@ -4,7 +4,7 @@ import type { ContributionType } from '@/lib/application-options'
 import { DEFAULT_CONTRIBUTION_TYPES } from '@/lib/application-options'
 
 export type CommitmentShift = { id: string; title: string; day: string; time: string; icon_type: string; event_date: string | null }
-export type CommitmentBringing = { id: string; resourceName: string; listTitle: string; quantity: number }
+export type CommitmentBringing = { id: string; resourceName: string; listTitle: string; quantity: number; icon: string | null }
 
 type Props = {
   contributions: string[]
@@ -227,7 +227,14 @@ export function CommitmentsSection({ contributions, role, dept, shifts, bringing
         {bringing.map((b, i) => (
           <div key={b.id}>
             <Row
-              circleContent={<span style={{ fontSize: compact ? '1.1rem' : '1.4rem', lineHeight: 1, color: '#8fc4cf', opacity: 0.85 }}>✦</span>}
+              circleContent={
+                b.icon && isImageIcon(b.icon)
+                  // Same sizing rule as the group icon rows above: normalized icon
+                  // frames size by height and let the margins clip on the round mask.
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={b.icon} alt="" aria-hidden style={{ height: '74%', width: 'auto', maxWidth: 'none', display: 'block' }} />
+                  : <span style={{ fontSize: compact ? '1.1rem' : '1.4rem', lineHeight: 1, color: '#8fc4cf', opacity: 0.85 }}>✦</span>
+              }
               title={b.quantity > 1 ? `${b.resourceName} ×${b.quantity}` : b.resourceName}
               description={b.listTitle || null}
               tag="BRINGING"
@@ -244,7 +251,7 @@ export function CommitmentsSection({ contributions, role, dept, shifts, bringing
       {/* Footer */}
       {showManageLink && (
         <div style={{ padding: '0.5rem 1.5rem 1rem', textAlign: 'center', marginTop: 'auto' }}>
-          <a href="/signup" style={{ fontFamily: 'var(--font-cormorant-garamond), serif', fontSize: '0.72rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.85, textDecoration: 'none', borderBottom: '1px solid rgba(200,168,72,0.35)', paddingBottom: '0.2rem' }}>
+          <a href="/participate" style={{ fontFamily: 'var(--font-cormorant-garamond), serif', fontSize: '0.72rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.85, textDecoration: 'none', borderBottom: '1px solid rgba(200,168,72,0.35)', paddingBottom: '0.2rem' }}>
             View all commitments ›
           </a>
         </div>

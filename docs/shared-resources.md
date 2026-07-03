@@ -35,10 +35,11 @@ organizer wants, not an error).
 
 - **Admin → Manage → Program → Shared Resources** (`ResourcesManager.tsx`):
   create/edit/hide/delete lists (steward picked from one dropdown with
-  Groups / Departments / Roles optgroups), add/edit/delete items, and see
-  per-item progress *with claimant names* — the organizer always knows who
-  to chase.
-- **Member: `/signup` → "Bring Something"** (`ResourceCommitments.tsx`,
+  Groups / Departments / Roles optgroups), add/edit/delete items (incl. an
+  optional **icon** via the shared `AssetImagePicker` — migration `054`,
+  `resources.icon`, departments idiom), and see per-item progress *with
+  claimant names* — the organizer always knows who to chase.
+- **Member: `/participate` → "Bring Something"** (`ResourceCommitments.tsx`,
   anchored `#bring`, **above** Your Groups — needs are live and time-sensitive,
   group membership is set-once): visible lists with per-item progress and an
   **"I'll bring one"** button; a claimed row grows −/+ steppers and a remove
@@ -47,15 +48,16 @@ organizer wants, not an error).
   it"* → an inline form that lists unrequested gear (offer = item with no
   target + the offerer's ×1 claim; retracting the claim removes the listing
   unless others piled on).
-- **Home dashboard: the Bring Something banner** — a slim attention banner
-  (under the Attunement banner) that surfaces unmet needs ("still needed:
-  camping stove (1 more)…", top 3 + `+N more`) and deep-links to
-  `/signup#bring`. Demand-driven via `getUnmetResourceNeeds` (`lib/resources.ts`,
-  offers excluded): it disappears once everything is covered.
+- **Home dashboard: the Bring Something widget** — a configurable dashboard
+  widget (id `resources`, reorder/hide/resize via the page editor like any
+  other) listing unmet needs (item + "N more needed" pill, top 6 + `+N more`)
+  with a "Claim what you can bring →" footer to `/participate#bring`.
+  Demand-driven via `getUnmetResourceNeeds` (`lib/resources.ts`, offers
+  excluded): it renders nothing once everything is covered.
 - **Profile → Active Commitments**: each claim renders as a `BRINGING` row
-  ("Camping Stove ×2 · Shared Kitchen") via `lib/resources.ts` →
-  `getMemberResourceClaims`, and counts toward the Active Commitments stat.
-  Hands act, witnessed.
+  ("Camping Stove ×2 · Shared Kitchen", with the item's icon when set) via
+  `lib/resources.ts` → `getMemberResourceClaims`, and counts toward the
+  Active Commitments stat. Hands act, witnessed.
 
 ## API
 

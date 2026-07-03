@@ -215,7 +215,7 @@ let canManagePolls = false
   const c = (key: string, fallback: string) => pageContent[key] ?? fallback
 
   // ── Dashboard layout (admin-configurable widget order) ────────
-  const DEFAULT_WIDGET_ORDER = ['announcements', 'shoutouts', 'polls', 'events', 'spotlight', 'activity']
+  const DEFAULT_WIDGET_ORDER = ['announcements', 'resources', 'shoutouts', 'polls', 'events', 'spotlight', 'activity']
   let dashLayout: { order: string[]; hidden: string[]; widths?: Record<string, string> } = { order: DEFAULT_WIDGET_ORDER, hidden: [] }
   try {
     if (pageContent['dashboard_layout']) dashLayout = JSON.parse(pageContent['dashboard_layout'])
@@ -382,39 +382,6 @@ let canManagePolls = false
               )
             })()}
 
-            {/* ── BRING SOMETHING BANNER (unmet shared-resource needs) ── */}
-            {unmetNeeds.length > 0 && (() => {
-              const shown = unmetNeeds.slice(0, 3)
-              const more = unmetNeeds.length - shown.length
-              const needsText = shown
-                .map(n => `${n.name.toLowerCase()} (${n.remaining} more)`)
-                .join(', ') + (more > 0 ? ` +${more} more` : '')
-              return (
-                <a
-                  href="/signup#bring"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '1rem',
-                    padding: '0.75rem 1.25rem',
-                    marginBottom: '1.25rem',
-                    borderRadius: '0.75rem',
-                    border: '1px solid rgba(200,168,72,0.25)',
-                    background: 'rgba(200,168,72,0.06)',
-                    textDecoration: 'none',
-                  }}
-                >
-                  <p style={{ margin: 0, fontSize: '0.82rem', color: '#C8A848', opacity: 0.85, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    <span style={{ fontFamily: 'TokyoDreams, serif', letterSpacing: '0.04em' }}>Bring Something</span>
-                    <span style={{ opacity: 0.5, margin: '0 0.5rem' }}>·</span>
-                    <span style={{ fontStyle: 'italic', opacity: 0.7 }}>still needed: {needsText}</span>
-                  </p>
-                  <span style={{ fontSize: '0.75rem', color: '#C8A848', opacity: 0.45, flexShrink: 0 }}>Claim one →</span>
-                </a>
-              )
-            })()}
-
             {/* ── WIDGETS (order + visibility controlled by admin) ── */}
             {(() => {
               const atCamp = upcomingEvents.filter(e => e.event_category !== 'pre_camp')
@@ -515,6 +482,36 @@ let canManagePolls = false
                   </div>
                 ) : null,
 
+                // Unmet shared-resource needs. Demand-driven like announcements:
+                // hidden entirely once the community has everything covered.
+                resources: unmetNeeds.length > 0 ? (
+                  <div style={{ border: '1px solid rgba(200,168,72,0.25)', borderRadius: '1rem', background: 'rgba(10,0,20,0.5)', overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
+                    <div style={{ padding: '1rem 1.5rem 0.75rem', borderBottom: '1px solid rgba(200,168,72,0.12)' }}>
+                      <p style={{ fontSize: '0.62rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, margin: 0 }}>Bring Something</p>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      {unmetNeeds.slice(0, 6).map((n, i, shown) => (
+                        <div key={n.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.8rem 1.5rem', borderBottom: i < shown.length - 1 ? '1px solid rgba(200,168,72,0.08)' : 'none' }}>
+                          <p style={{ flex: 1, margin: 0, fontSize: '0.85rem', color: '#EDE0C8', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.name}</p>
+                          <span style={{ flexShrink: 0, fontSize: '0.7rem', color: '#C8A848', border: '1px solid rgba(200,168,72,0.25)', borderRadius: '9999px', padding: '0.15rem 0.6rem', whiteSpace: 'nowrap' }}>
+                            {n.remaining} more needed
+                          </span>
+                        </div>
+                      ))}
+                      {unmetNeeds.length > 6 && (
+                        <p style={{ margin: 0, padding: '0.6rem 1.5rem', fontSize: '0.72rem', opacity: 0.4, fontStyle: 'italic' }}>
+                          +{unmetNeeds.length - 6} more
+                        </p>
+                      )}
+                    </div>
+                    <div style={{ padding: '0.75rem 1.5rem', borderTop: '1px solid rgba(200,168,72,0.1)' }}>
+                      <a href="/participate#bring" style={{ fontSize: '0.75rem', color: '#C8A848', opacity: 0.7, textDecoration: 'none' }}>
+                        Claim what you can bring →
+                      </a>
+                    </div>
+                  </div>
+                ) : null,
+
                 shoutouts: (
                   <ShoutoutWidget
                     initialShoutouts={shoutouts}
@@ -594,7 +591,7 @@ let canManagePolls = false
 
             {/* ── MANY HANDS LINK ── */}
             <div className="dash-quicklinks" style={{ marginTop: '1.25rem' }}>
-              <a href="/signup" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem 1.5rem', border: '1px solid rgba(200,168,72,0.18)', borderRadius: '1rem', background: 'rgba(200,168,72,0.03)', textDecoration: 'none' }}>
+              <a href="/participate" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem 1.5rem', border: '1px solid rgba(200,168,72,0.18)', borderRadius: '1rem', background: 'rgba(200,168,72,0.03)', textDecoration: 'none' }}>
                 <div>
                   <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.1rem', color: '#C8A848', margin: '0 0 0.2rem' }}>Role & Shift</p>
                   <p style={{ fontSize: '0.8rem', opacity: 0.45, margin: 0 }}>Choose your role and shift</p>

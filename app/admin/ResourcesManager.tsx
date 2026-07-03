@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { LoadError } from './LoadError'
+import { AssetImagePicker } from './AssetImagePicker'
+import { isImageIcon } from '@/lib/icon-src'
 
 type Claimant = { name: string; quantity: number }
 type ResourceItem = {
@@ -11,6 +13,7 @@ type ResourceItem = {
   note: string | null
   // NULL = open callout (member offer, or an admin-authored no-target ask) — migration 053.
   quantity_needed: number | null
+  icon: string | null
   offered_by_name: string | null
   sort_order: number
   claimed: number
@@ -37,7 +40,7 @@ type StewardOptions = {
 
 // Steward encoded as one select value: '' | 'group:<id>' | 'department:<id>' | 'role:<id>'.
 type ListDraft = { title: string; description: string; steward: string; visible: boolean }
-type ItemDraft = { name: string; note: string; quantity_needed: number | '' }
+type ItemDraft = { name: string; note: string; quantity_needed: number | ''; icon: string }
 
 const stewardValue = (l: { group_id: string | null; department_id: string | null; role_id: string | null }) =>
   l.group_id ? `group:${l.group_id}` : l.department_id ? `department:${l.department_id}` : l.role_id ? `role:${l.role_id}` : ''
@@ -53,7 +56,7 @@ const stewardFields = (steward: string) => {
 }
 
 const blankList = (): ListDraft => ({ title: '', description: '', steward: '', visible: true })
-const blankItem = (): ItemDraft => ({ name: '', note: '', quantity_needed: 1 })
+const blankItem = (): ItemDraft => ({ name: '', note: '', quantity_needed: 1, icon: '' })
 
 const inputStyle: React.CSSProperties = {
   width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(200,168,72,0.2)',
@@ -176,15 +179,19 @@ function ListModal({ initial, isCreate, stewards, onSave, onClose, saving, error
   )
 }
 
-function ItemModal({ initial, isCreate, onSave, onClose, saving, error }: {
+function ItemModal({ initial, isCreate, itemId, onSave, onClose, saving, error }: {
   initial: ItemDraft
   isCreate: boolean
+  // Row id for existing items; new items get a generated storage key so an
+  // icon can be uploaded before the row exists (departments-icon idiom).
+  itemId: string | null
   onSave: (form: ItemDraft) => void
   onClose: () => void
   saving: boolean
   error: string | null
 }) {
   const [form, setForm] = useState(initial)
+  const [uploadKey] = useState(() => itemId ?? `new-${Math.random().toString(36).slice(2, 10)}`)
   const set = (k: keyof ItemDraft, v: unknown) => setForm(p => ({ ...p, [k]: v }))
   return (
     <Modal title={isCreate ? 'New item' : 'Edit item'} onClose={onClose}>
@@ -201,6 +208,15 @@ function ItemModal({ initial, isCreate, onSave, onClose, saving, error }: {
       </div>
       <Field label="Note (optional)">
         <input style={inputStyle} value={form.note} placeholder="e.g. two-burner, with propane" onChange={e => set('note', e.target.value)} />
+      </Field>
+      <Field label="Icon (optional)">
+        <AssetImagePicker
+          value={form.icon || undefined}
+          onChange={v => set('icon', v ?? '')}
+          uploadUrl={`/api/admin/resources/items/${encodeURIComponent(uploadKey)}/icon`}
+          primaryCategory="icon"
+          label="Item icon"
+        />
       </Field>
       <p style={{ fontSize: '0.72rem', opacity: 0.4, margin: '-0.5rem 0 1rem', lineHeight: 1.5 }}>
         Leave “Needed” blank for an open callout (no set target). Setting a number on a member offer turns it into a tracked need — claims stay attached.
@@ -390,6 +406,10 @@ export function ResourcesManager() {
             {/* Items */}
             {list.items.map(item => (
               <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 1rem', borderTop: '1px solid rgba(200,168,72,0.06)' }}>
+                {item.icon && isImageIcon(item.icon) && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={item.icon} alt="" style={{ width: '32px', height: '32px', objectFit: 'contain', flexShrink: 0 }} />
+                )}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontSize: '0.84rem', color: '#F3EDE6', margin: 0 }}>
                     {item.name}
@@ -439,9 +459,10 @@ export function ResourcesManager() {
       {(modal?.kind === 'add-item' || modal?.kind === 'edit-item') && (
         <ItemModal
           initial={modal.kind === 'edit-item'
-            ? { name: modal.item.name, note: modal.item.note ?? '', quantity_needed: modal.item.quantity_needed ?? '' }
+            ? { name: modal.item.name, note: modal.item.note ?? '', quantity_needed: modal.item.quantity_needed ?? '', icon: modal.item.icon ?? '' }
             : blankItem()}
           isCreate={modal.kind === 'add-item'}
+          itemId={modal.kind === 'edit-item' ? modal.item.id : null}
           onSave={handleSaveItem}
           onClose={() => setModal(null)}
           saving={saving}
