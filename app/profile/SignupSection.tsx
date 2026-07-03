@@ -352,9 +352,11 @@ function CommitmentPill({ commitment, period }: { commitment: string | null; per
 
 // ── Role Card (compact, scannable) ─────────────────────────────────────────────
 //
-// The picker shows every role at once — department headers + compact cards in a
-// grid, no accordions. Clicking a card opens the full charge in a modal where
-// the confirm lives. Deep reading happens on /roles (the Registry).
+// Expanded, the picker shows every role at once — department headers + compact
+// cards in a grid, no accordions within. Clicking a card opens the full charge
+// in a modal where the confirm lives. Deep reading happens on /roles (the
+// Registry). The picker as a whole starts collapsed once a role is held (the
+// full registry is long and buried the rest of /participate).
 
 function RoleCard({ role, isCurrent, isPending, onOpen }: {
   role: Role
@@ -547,6 +549,16 @@ function RolePicker({
   onConfirm: () => Promise<boolean>
 }) {
   const [openRoleId, setOpenRoleId] = useState<string | null>(null)
+  // Starts collapsed once a role is held — expanded, the registry runs long and
+  // buried the rest of /participate (shifts, resources, groups). A member who
+  // hasn't chosen yet lands with it open: picking is their next step.
+  const [expanded, setExpanded] = useState(signup?.role_id == null)
+
+  // Opting out (in the plaque above) promises "choose a new one below" — make
+  // that true by unfolding when the held role goes away.
+  useEffect(() => {
+    if (!signup?.role_id) setExpanded(true)
+  }, [signup?.role_id])
 
   const withRoles = departments.filter(d => d.roles.length > 0)
   if (withRoles.length === 0) return null
@@ -565,11 +577,33 @@ function RolePicker({
     setOpenRoleId(null)
   }
 
+  // Once a claim lands, fold the registry back down — the plaque above now
+  // carries the role, and the rest of the page comes back into view.
+  async function handleConfirm() {
+    const ok = await onConfirm()
+    if (ok) setExpanded(false)
+    return ok
+  }
+
   return (
     <div>
-      <p style={{ fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.85, marginBottom: '0.4rem', textAlign: 'center' }}>
-        Choose a Role
-      </p>
+      <button
+        onClick={() => setExpanded(o => !o)}
+        aria-expanded={expanded}
+        style={{ display: 'block', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'center' }}
+      >
+        <p style={{ fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.85, margin: '0 0 0.4rem' }}>
+          Choose a Role
+          <span aria-hidden style={{ fontSize: '0.6rem', opacity: 0.55, marginLeft: '0.45rem', verticalAlign: 'middle' }}>{expanded ? '▲' : '▼'}</span>
+        </p>
+        {!expanded && (
+          <p style={{ fontSize: '0.78rem', opacity: 0.55, margin: 0, lineHeight: 1.6 }}>
+            {allRoles.length} roles across {withRoles.length} department{withRoles.length === 1 ? '' : 's'} — tap to browse{signup?.role_id ? ' or switch' : ''}.
+          </p>
+        )}
+      </button>
+
+      {expanded && (<>
       <p style={{ fontSize: '0.78rem', opacity: 0.55, textAlign: 'center', margin: '0 0 1.5rem', lineHeight: 1.6 }}>
         Tap a role to read its full charge and claim it. Or browse the{' '}
         <a href="/roles" style={{ color: '#C8A848', textDecoration: 'underline', textUnderlineOffset: '3px' }}>
@@ -617,6 +651,7 @@ function RolePicker({
           </div>
         ))}
       </div>
+      </>)}
 
       {openRole && (
         <RoleDetailModal
@@ -625,7 +660,7 @@ function RolePicker({
           signup={signup}
           saving={saving}
           error={error}
-          onConfirm={onConfirm}
+          onConfirm={handleConfirm}
           onClose={handleClose}
         />
       )}
