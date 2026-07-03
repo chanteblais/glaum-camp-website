@@ -226,7 +226,9 @@ export function ScheduleCalendarClient({ events, days }: { events: ScheduleEvent
       {isMobile ? (
         // ── Mobile: day tab picker + single column ──
         <div>
-          <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem', overflowX: 'auto', paddingBottom: '0.25rem' }}>
+          {/* Wrap (not scroll): every day tab stays visible on narrow phones —
+              a hidden-scroll rail made SUN/MON undiscoverable at ~390px */}
+          <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
             {days.map(day => {
               const active = selectedDay === day.iso
               return (

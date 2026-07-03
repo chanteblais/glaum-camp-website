@@ -625,19 +625,29 @@ export function HomePageEditor({ initialContent }: { initialContent: Content }) 
 
       {/* ── Floating toggle button ── */}
       {!editMode && (
-        <button
-          onClick={() => setEditMode(true)}
-          style={{
-            position: 'fixed', bottom: '1.5rem', right: '1.5rem', zIndex: 200,
-            padding: '0.55rem 1.1rem', borderRadius: '9999px',
-            border: '1px solid rgba(200,168,72,0.4)',
-            background: 'rgba(10,0,20,0.85)', color: '#C8A848',
-            fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase',
-            cursor: 'pointer', backdropFilter: 'blur(8px)',
-          }}
-        >
-          ✎ Edit Page
-        </button>
+        <>
+          {/* On phones the full pill sits on top of body text — collapse it to
+              a small ✎ disc so it stops covering announcements */}
+          <style>{`@media (max-width: 640px) {
+            .hp-edit-fab { padding: 0.55rem 0.8rem !important; }
+            .hp-edit-fab .hp-edit-fab-label { display: none; }
+          }`}</style>
+          <button
+            className="hp-edit-fab"
+            onClick={() => setEditMode(true)}
+            aria-label="Edit page"
+            style={{
+              position: 'fixed', bottom: '1.5rem', right: '1.5rem', zIndex: 200,
+              padding: '0.55rem 1.1rem', borderRadius: '9999px',
+              border: '1px solid rgba(200,168,72,0.4)',
+              background: 'rgba(10,0,20,0.85)', color: '#C8A848',
+              fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase',
+              cursor: 'pointer', backdropFilter: 'blur(8px)',
+            }}
+          >
+            ✎<span className="hp-edit-fab-label"> Edit Page</span>
+          </button>
+        </>
       )}
 
       {/* ── Side panels ── */}
