@@ -11,6 +11,16 @@ import { ShiftSignupToggle } from '../ShiftSignupToggle'
 import { PROGRAM_CATEGORIES } from '../admin-sections'
 import { getAdminRunway } from '@/lib/admin-attention'
 
+// Soft shared backdrop that holds each workspace together as one section —
+// a barely-lifted cream wash with a hairline gold edge.
+const workspacePanel: React.CSSProperties = {
+  padding: '1.4rem 1.5rem',
+  marginBottom: '3rem',
+  borderRadius: '0.9rem',
+  border: '1px solid rgba(200,168,72,0.14)',
+  background: 'rgba(243,237,230,0.03)',
+}
+
 export default async function ProgramPage() {
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
@@ -61,7 +71,7 @@ export default async function ProgramPage() {
         {/* ═══════════════ SCHEDULE ═══════════════ */}
         <CategoryHeading id="schedule" />
 
-        <div style={{ marginBottom: '3.5rem' }}>
+        <div style={workspacePanel}>
           <ScheduleManager rangeStart={eventRangeStart} rangeEnd={eventRangeEnd}>
             <ShiftSignupToggle initialOpen={shiftSignupOpen} />
           </ScheduleManager>
@@ -70,14 +80,16 @@ export default async function ProgramPage() {
         {/* ═══════════════ LEAD-UP GATHERINGS ═══════════════ */}
         <CategoryHeading id="lead-up" />
 
-        <div style={{ marginBottom: '3.5rem' }}>
+        <div style={workspacePanel}>
           <LeadUpGatheringsManager rangeStart={eventRangeStart} rangeEnd={eventRangeEnd} />
         </div>
 
         {/* ═══════════════ SHARED RESOURCES ═══════════════ */}
         <CategoryHeading id="resources" />
 
-        <ResourcesManager />
+        <div style={workspacePanel}>
+          <ResourcesManager />
+        </div>
 
       </div>
     </div>
