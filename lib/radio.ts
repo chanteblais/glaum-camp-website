@@ -32,7 +32,6 @@ export type RadioEventRow = {
   actor_name: string | null
   link: string | null
   created_at: string
-  avatar_url: string | null
 }
 
 // ── Config (page_content.config_radio) ────────────────────────────
@@ -158,11 +157,14 @@ const midSentence = (name: string) => {
 }
 const article = (noun: string) => (/^[aeiou]/i.test(noun) ? 'an' : 'a')
 
+// `**…**` in a message renders as a gold entity highlight (see
+// components/RadioMessage.tsx) — the person or thing the moment is about.
+
 export function welcomeRadioPost(name: string): RadioEventInput {
   return {
     kind: 'welcome',
-    message: `Welcome ${name} to ${SITE_NAME}!`,
-    detail: 'Say hello if you see them around camp.',
+    message: `Welcome **${name}** to ${SITE_NAME}!`,
+    detail: 'Say hello if you see them around camp. 🌿',
     icon: '👋',
   }
 }
@@ -176,20 +178,18 @@ export function contributionRadioPost(
   remaining: number | null,
 ): RadioEventInput {
   const item = midSentence(itemName)
-  const what = quantity > 1 ? `${quantity} × ${item}` : `${article(item)} ${item}`
-  const isOffer = remaining === null
+  const what = quantity > 1 ? `**${quantity} × ${item}**` : `${article(item)} **${item}**`
   return {
     kind: 'contribution',
-    message: isOffer
-      ? `${actorName} is bringing ${what}.`
-      : `${actorName} just covered ${what}.`,
-    detail: isOffer
-      ? null
-      : remaining <= 0
-        ? 'That one is fully covered now ✦'
-        : remaining === 1
-          ? 'Only one more to go!'
-          : `${remaining} more still needed.`,
+    message: `${actorName} is bringing ${what}.`,
+    detail:
+      remaining === null
+        ? null
+        : remaining <= 0
+          ? 'That was the last one — fully covered! ✦'
+          : remaining === 1
+            ? 'Only one more is still needed! 🙌'
+            : `${remaining} more are still needed.`,
     icon: '✨',
     link: '/participate#bring',
   }
@@ -203,7 +203,7 @@ export function achievementRadioPost(
 ): RadioEventInput {
   return {
     kind: 'achievement',
-    message: `${actorName} earned the ${label} distinction.`,
+    message: `**${actorName}** earned **${label}**.`,
     detail: engraving || null,
     icon: medalIcon || '🏅',
   }
@@ -212,7 +212,7 @@ export function achievementRadioPost(
 export function listMilestoneRadioPost(listTitle: string): RadioEventInput {
   return {
     kind: 'milestone',
-    message: `${listTitle} is now fully equipped.`,
+    message: `**${listTitle}** is now fully equipped.`,
     detail: 'Every item covered — many hands make light work ✦',
     icon: '🎉',
     link: '/participate#bring',
@@ -275,9 +275,8 @@ export async function resourceStateAfterClaim(
 
 // ── Reading ───────────────────────────────────────────────────────
 
-// Latest visible posts, with each actor's CURRENT avatar joined in JS
-// (no FK — same pattern as shoutouts; messages/names stay historical,
-// faces stay fresh).
+// Latest visible posts. No avatar join — the feed's visual language is big
+// emoji + gold entity highlights, not faces (mockup decision 2026-07-03).
 export async function getRadioFeed(limit = 60): Promise<RadioEventRow[]> {
   const { data, error } = await supabaseAdmin
     .from('radio_events')
@@ -289,21 +288,37 @@ export async function getRadioFeed(limit = 60): Promise<RadioEventRow[]> {
     if (error) console.error('[radio] feed read failed', error)
     return []
   }
+  return data
+}
 
-  const actorIds = Array.from(new Set(data.map(e => e.actor_clerk_id).filter(Boolean))) as string[]
-  const avatarMap: Record<string, string | null> = {}
-  if (actorIds.length > 0) {
-    const { data: rows } = await supabaseAdmin
-      .from('applications')
-      .select('clerk_user_id, avatar_url')
-      .in('clerk_user_id', actorIds)
-    for (const r of rows ?? []) avatarMap[r.clerk_user_id] = r.avatar_url
+// The stats band on /radio: posts this week + all-time counts per moment
+// family. Four cheap head-counts in one round-trip.
+export type RadioStats = {
+  postsThisWeek: number
+  contributions: number
+  achievements: number
+  broadcasts: number
+}
+
+export async function getRadioStats(): Promise<RadioStats> {
+  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString()
+  try {
+    const [week, contributions, achievements, broadcasts] = await Promise.all([
+      supabaseAdmin.from('radio_events').select('id', { count: 'exact', head: true }).eq('visible', true).gte('created_at', weekAgo),
+      supabaseAdmin.from('radio_events').select('id', { count: 'exact', head: true }).eq('visible', true).eq('kind', 'contribution'),
+      supabaseAdmin.from('radio_events').select('id', { count: 'exact', head: true }).eq('visible', true).eq('kind', 'achievement'),
+      supabaseAdmin.from('radio_events').select('id', { count: 'exact', head: true }).eq('visible', true).eq('kind', 'broadcast'),
+    ])
+    return {
+      postsThisWeek: week.count ?? 0,
+      contributions: contributions.count ?? 0,
+      achievements: achievements.count ?? 0,
+      broadcasts: broadcasts.count ?? 0,
+    }
+  } catch (e) {
+    console.error('[radio] stats failed', e)
+    return { postsThisWeek: 0, contributions: 0, achievements: 0, broadcasts: 0 }
   }
-
-  return data.map(e => ({
-    ...e,
-    avatar_url: e.actor_clerk_id ? avatarMap[e.actor_clerk_id] ?? null : null,
-  }))
 }
 
 // ── Now / Up next strip (derived, never stored) ───────────────────

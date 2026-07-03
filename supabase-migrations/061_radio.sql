@@ -31,18 +31,27 @@ ALTER TABLE radio_events ADD COLUMN IF NOT EXISTS detail TEXT;
 
 UPDATE radio_events
 SET kind = 'welcome',
-    message = 'Welcome ' || COALESCE(NULLIF(actor_name, ''), 'a new member') || ' to Glåüm!',
-    detail = 'Say hello if you see them around camp.',
+    message = 'Welcome **' || COALESCE(NULLIF(actor_name, ''), 'a new member') || '** to Glåüm!',
+    detail = 'Say hello if you see them around camp. 🌿',
     icon = '👋'
 WHERE kind = 'member';
 
+-- Editorial-markup catch-up for welcomes written before the highlight
+-- convention existed.
+UPDATE radio_events
+SET message = 'Welcome **' || COALESCE(NULLIF(actor_name, ''), 'a new member') || '** to Glåüm!',
+    detail = 'Say hello if you see them around camp. 🌿'
+WHERE kind = 'welcome'
+  AND message NOT LIKE '%**%';
+
 -- Backfill: every approved member gets their welcome at their approval moment.
--- Idempotent — skips anyone who already has a 'welcome' post.
+-- Idempotent — skips anyone who already has a 'welcome' post. (**name** is the
+-- gold-highlight convention rendered by components/RadioMessage.tsx.)
 INSERT INTO radio_events (kind, message, detail, icon, actor_clerk_id, actor_name, created_at)
 SELECT
   'welcome',
-  'Welcome ' || COALESCE(NULLIF(a.preferred_name, ''), NULLIF(a.first_name, ''), 'a new member') || ' to Glåüm!',
-  'Say hello if you see them around camp.',
+  'Welcome **' || COALESCE(NULLIF(a.preferred_name, ''), NULLIF(a.first_name, ''), 'a new member') || '** to Glåüm!',
+  'Say hello if you see them around camp. 🌿',
   '👋',
   a.clerk_user_id,
   COALESCE(NULLIF(a.preferred_name, ''), NULLIF(a.first_name, ''), 'A member'),

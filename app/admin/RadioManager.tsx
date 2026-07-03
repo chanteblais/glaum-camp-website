@@ -50,6 +50,7 @@ export function RadioManager({ initialEvents, initialSources }: {
   const [events, setEvents] = useState<AdminRadioEvent[] | null>(initialEvents ?? null)
   const [loadError, setLoadError] = useState(false)
   const [message, setMessage] = useState('')
+  const [detail, setDetail] = useState('')
   const [icon, setIcon] = useState('')
   const [notify, setNotify] = useState(false)
   const [posting, setPosting] = useState(false)
@@ -78,7 +79,12 @@ export function RadioManager({ initialEvents, initialSources }: {
       const res = await fetch('/api/admin/radio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: message.trim(), icon: icon.trim() || undefined, notify }),
+        body: JSON.stringify({
+          message: message.trim(),
+          detail: detail.trim() || undefined,
+          icon: icon.trim() || undefined,
+          notify,
+        }),
       })
       const d = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -93,6 +99,7 @@ export function RadioManager({ initialEvents, initialSources }: {
           created_at: new Date().toISOString(),
         }, ...(prev ?? [])])
         setMessage('')
+        setDetail('')
         setIcon('')
         setNotify(false)
         setPostStatus(notify ? `On the air — ${d.notified} members alerted, ${d.emailed} emailed.` : 'On the air.')
@@ -144,8 +151,15 @@ export function RadioManager({ initialEvents, initialSources }: {
           onChange={e => setMessage(e.target.value)}
           maxLength={280}
           rows={2}
-          placeholder="Opening Ceremony begins in 30 minutes…"
+          placeholder="Opening Ceremony begins in 30 minutes… (**bold** reads as a gold highlight)"
           style={{ ...inputStyle, resize: 'vertical', minHeight: '3.2rem' }}
+        />
+        <input
+          value={detail}
+          onChange={e => setDetail(e.target.value)}
+          maxLength={280}
+          placeholder="Optional supporting line — e.g. Bring something warm."
+          style={inputStyle}
         />
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <input

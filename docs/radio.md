@@ -25,9 +25,22 @@ settings changes, group description changes — anything that reads like a
 changelog.
 
 The writing is editorial, not mechanical — headline + optional supporting
-line, present-tense, momentum-building ("Only one more to go!"). Content
-leads; **timestamps whisper** (tiny, low-opacity, corner). All copy lives in
-one place: the post builders in `lib/radio.ts`.
+line, present-tense, momentum-building ("Only one more is still needed!").
+Content leads; **timestamps whisper** (tiny, low-opacity, right edge). All
+copy lives in one place: the post builders in `lib/radio.ts`. Headlines
+light the moment's **entity** gold via a `**…**` convention rendered by
+`components/RadioMessage.tsx` ("Sarah is bringing a **camping stove**.") —
+organizer broadcasts can use it too.
+
+## Visual language (from Chante's 2026-07-03 mockup)
+
+No card boxes and **no avatars** — an airy hairline-separated list where a
+large raw emoji (or medal art) is each moment's emblem and gold highlights
+carry the story. Hero header (flourished title, script subtitle, an art slot
+reserved for a radio illustration in the medallion style), a **stats band**
+(on the air this week / resources claimed / distinctions awarded /
+announcements shared — `getRadioStats`), the day rules end in a ✦, and the
+feed signs off with *"That's all for now. Stay tuned."*
 
 ## Post kinds
 
@@ -40,17 +53,28 @@ Each kind has its own card language on `/radio`, so the feed has rhythm:
 | `contribution` | first resource claim + bring-it offers (quantity edits/unclaims silent — retreats are never broadcast) | **on** | ✨, gold detail line | ✨ Sarah just covered a camping stove. · *Only one more to go!* |
 | `achievement` | manual distinction grant (rule-derived earns have no stored moment — daily diff via the cron pattern is a future round) | **on** | medal art, ringed disc, engraved italic detail | 🏅 Erik earned the Setup distinction. |
 | `milestone` | claim that completes a resource list (guarded — one per list completion) | **on** | centered celebration, no disc | 🎉 Shared Kitchen is now fully equipped. |
-| `voice` | any approved member via the `/radio` composer (`POST /api/radio`, ≤200 chars) | **on** | quiet, italic, "— Sarah" attribution | ✦ *The sunset from the tower is unreal right now.* |
+| `voice` | reserved — see "Writing is gated" below | **on** (dormant) | quiet, italic, "— Sarah" attribution | ✦ *The sunset from the tower is unreal right now.* |
 
 Automatic sources are toggleable in `page_content.config_radio`
 (`{ sources: { welcome, contribution, achievement, milestone, voice } }`,
 parsed by `parseRadioSources` — absent key = all on). Organizer broadcasts
 have no toggle; posting one is already the decision.
 
+## Writing is gated (mockup decision 2026-07-03)
+
+Radio is not open-mic: the `/radio` composer ("Share an announcement with
+camp…", ON AIR button, GO LIVE bar at the feed's end) is **broadcasters
+only** — currently admins; the check sits in one place so a grantable
+`canBroadcast` capability (the poll-managers pattern) can widen it later.
+Non-broadcasters see the composer locked ("🔒 Broadcasters only."). It posts
+`broadcast` kind via the admin route. The member `voice` kind and its
+`POST /api/radio` route remain in the schema/API but have no UI — reserved
+in case member moments come back.
+
 ## Surfaces
 
-- **`/radio`** — members-only. Now/Up-next strip → member composer → the feed
-  (day-grouped cards, newest first, latest 60).
+- **`/radio`** — members-only. Hero + stats band → composer → Now/Up-next
+  strip → the feed (day-grouped rows, newest first, latest 60).
 - **Now / Up next strip** — derived at read time, never stored: the camp-day
   welcome ("Day 2 of camp") while today is inside
   `config_event_start_date…end_date`, plus what's happening now and the next

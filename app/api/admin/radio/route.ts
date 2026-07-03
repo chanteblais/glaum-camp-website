@@ -26,16 +26,18 @@ export async function POST(req: NextRequest) {
   const userId = await requireAdmin()
   if (!userId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { message, icon, notify } = await req.json().catch(() => ({}))
+  const { message, detail, icon, notify } = await req.json().catch(() => ({}))
   if (typeof message !== 'string' || !message.trim()) {
     return NextResponse.json({ error: 'message is required' }, { status: 400 })
   }
   const body = message.trim().slice(0, 280)
+  const detailValue = typeof detail === 'string' && detail.trim() ? detail.trim().slice(0, 280) : null
   const iconValue = typeof icon === 'string' && icon.trim() ? icon.trim().slice(0, 200) : '📢'
 
   const id = await postRadioEvent({
     kind: 'broadcast',
     message: body,
+    detail: detailValue,
     icon: iconValue,
     createdBy: userId,
   })

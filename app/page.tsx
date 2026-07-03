@@ -11,6 +11,7 @@ import { getResourceWidgetState } from '@/lib/resources'
 import { buildAttunementChecklist, memberGroupCounts, requiredItems, commitmentItems } from '@/lib/attunement'
 import { getMemberShiftState, EMPTY_MEMBER_SHIFT_STATE } from '@/lib/shift-attunement'
 import { getRadioFeed, type RadioEventRow } from '@/lib/radio'
+import { RadioMessage } from '@/components/RadioMessage'
 import { daysUntilEvent } from '@/lib/camp-event'
 import { clockLabel } from '@/lib/shift-hours'
 
@@ -628,16 +629,13 @@ let canManagePolls = false
                     <div>
                       {recentActivity.map((item, i) => (
                         <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', padding: '0.7rem 1.5rem', borderBottom: i < recentActivity.length - 1 ? '1px solid rgba(200,168,72,0.07)' : 'none' }}>
-                          <div style={{ flexShrink: 0, width: '28px', height: '28px', borderRadius: '50%', overflow: 'hidden', border: '1px solid rgba(111,73,31,0.6)', background: 'rgba(200,168,72,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            {item.avatar_url
-                              // eslint-disable-next-line @next/next/no-img-element
-                              ? <img src={supabaseResizedUrl(item.avatar_url, 56) ?? ''} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                              : item.icon && (item.icon.startsWith('/') || item.icon.startsWith('http'))
-                              ? <IconImage src={item.icon} size="100%" fill={0.8} />
-                              : <span style={{ fontSize: '0.65rem', color: '#C8A848', opacity: 0.75 }}>{item.icon || '✦'}</span>}
-                          </div>
-                          <p style={{ flex: 1, margin: 0, fontSize: '0.82rem', lineHeight: 1.4, opacity: 0.75, minWidth: 0 }}>
-                            {item.message}
+                          <span aria-hidden style={{ flexShrink: 0, width: '28px', display: 'flex', justifyContent: 'center', fontSize: '1.05rem' }}>
+                            {item.icon && (item.icon.startsWith('/') || item.icon.startsWith('http'))
+                              ? <IconImage src={item.icon} size="26px" fill={0.9} />
+                              : (item.icon || '✦')}
+                          </span>
+                          <p style={{ flex: 1, margin: 0, fontSize: '0.82rem', lineHeight: 1.4, opacity: 0.8, minWidth: 0 }}>
+                            <RadioMessage text={item.message} />
                           </p>
                           <span style={{ fontSize: '0.7rem', opacity: 0.3, flexShrink: 0 }}>{timeAgo(item.created_at)}</span>
                         </div>
