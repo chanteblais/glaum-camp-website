@@ -28,7 +28,7 @@ const TOGGLES: { key: keyof Prefs; label: string; description: string }[] = [
   {
     key: 'email_attunement_nudges',
     label: 'Attunement reminders',
-    description: 'Email me a daily reminder while I have outstanding attunement tasks.',
+    description: 'Email me reminders while I have outstanding attunement tasks.',
   },
 ]
 

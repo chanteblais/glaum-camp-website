@@ -3,7 +3,7 @@ import { auth, clerkClient } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { collectOutstandingAttunement } from '@/lib/attunement-nudge'
 import { sendAttunementNudgeEmail } from '@/lib/send-email'
-import { EVENT_NAME } from '@/lib/site-config'
+import { EVENT_NAME, parseAttunementNudgeDays } from '@/lib/site-config'
 import { daysUntilEvent } from '@/lib/camp-event'
 
 export const dynamic = 'force-dynamic'
@@ -11,10 +11,11 @@ export const dynamic = 'force-dynamic'
 // give the function room beyond the default 10s.
 export const maxDuration = 60
 
-// Daily cadence with slack: the cron targets the same hour every day, but
-// Vercel may drift within the hour — 20h treats "roughly a day apart" as due,
-// while still swallowing an accidental double fire.
-const COOLDOWN_HOURS = 20
+// Per-member cadence comes from `config_attunement_nudge_days` (set in the
+// Attunement Tasks manager; 0 = off). The cron still fires daily — each member
+// is only emailed once their cooldown has lapsed. 4h of slack keeps drift in
+// Vercel's fire time from silently pushing everyone a day late.
+const cooldownHours = (nudgeDays: number) => nudgeDays * 24 - 4
 // Resend allows 2 requests/second — space sends out rather than burst.
 const SEND_SPACING_MS = 600
 
@@ -63,13 +64,14 @@ export async function GET(req: NextRequest) {
     for (const l of ledgerRows ?? []) lastSent.set(l.clerk_user_id, l.last_sent_at)
   }
 
-  const cooldownFloor = Date.now() - COOLDOWN_HOURS * 60 * 60 * 1000
-  const { data: startRow } = await supabaseAdmin
+  const { data: cfgRows } = await supabaseAdmin
     .from('page_content')
-    .select('value')
-    .eq('key', 'config_event_start_date')
-    .maybeSingle()
-  const daysUntil = daysUntilEvent(startRow?.value)
+    .select('key, value')
+    .in('key', ['config_event_start_date', 'config_attunement_nudge_days'])
+  const cfg = Object.fromEntries((cfgRows ?? []).map(r => [r.key, r.value]))
+  const daysUntil = daysUntilEvent(cfg['config_event_start_date'])
+  const nudgeDays = parseAttunementNudgeDays(cfg['config_attunement_nudge_days'])
+  const cooldownFloor = Date.now() - cooldownHours(nudgeDays) * 60 * 60 * 1000
 
   const report: { name: string; email: string | null; required: string[]; commitments: string[]; status: string }[] = []
   let sent = 0
@@ -83,6 +85,7 @@ export async function GET(req: NextRequest) {
     }
     report.push(entry)
 
+    if (nudgeDays === 0) { entry.status = 'skipped: reminders off'; continue }
     if (!m.email) { entry.status = 'skipped: no email'; continue }
     if (optedOut.has(m.clerkUserId)) { entry.status = 'skipped: opted out'; continue }
     const last = lastSent.get(m.clerkUserId)
@@ -130,6 +133,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     dryRun,
     caller,
+    nudgeDays,
     daysUntil,
     membersWithOutstanding: outstanding.length,
     sent,

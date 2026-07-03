@@ -150,7 +150,7 @@ Scheduled jobs are declared in `vercel.json` (`crons`) and hit API routes under 
 
 | Route | Schedule | Purpose |
 |---|---|---|
-| `/api/cron/attunement-nudges` | daily 16:00 UTC (9am PT) | Email approved members their outstanding attunement checklist (same `buildAttunementChecklist` as home/profile). Skips: attuned members, opt-outs (`notification_preferences.email_attunement_nudges`), no-email rows, and anyone nudged < 20h ago (`attunement_nudges` ledger). Sends are spaced 600ms apart (Resend rate limit); `maxDuration = 60`. A logged-in **admin** can also GET the route in a browser: **dry-run by default** (JSON report of who'd get what), `?send=1` to really send. |
+| `/api/cron/attunement-nudges` | daily 16:00 UTC (9am PT) | Email approved members their outstanding attunement checklist (same `buildAttunementChecklist` as home/profile). Per-member cadence from `config_attunement_nudge_days` (Off/1/2/3/7 days, default 2; **Reminder emails** select in the Attunement Tasks manager) — the cron fires daily, each member is emailed only once their cadence cooldown lapses (`attunement_nudges` ledger). Also skips: attuned members, opt-outs (`notification_preferences.email_attunement_nudges`), no-email rows. Sends are spaced 600ms apart (Resend rate limit); `maxDuration = 60`. A logged-in **admin** can also GET the route in a browser: **dry-run by default** (JSON report of who'd get what), `?send=1` to really send. |
 
 ---
 
