@@ -181,17 +181,19 @@ export default async function ProfilePage() {
   const attunementTasks = buildAttunementChecklist(attuneConfig['config_attunement_tasks'], attunementState)
   const attunementHours = attunementHoursSummary(attuneConfig['config_attunement_tasks'], attunementState)
 
-  // Member facts → earned distinctions (Cabinet of Distinctions). Facts are
-  // derived from existing data; medals are never persisted — they're recomputed
-  // here from the admin-configured rules. See lib/member-facts.ts + lib/distinctions.ts.
-  const memberFacts = buildMemberFacts({ application, roleInfo, memberGroups, roleApproved })
-  // Distinctions evaluate the merged namespace: stored profile values (Phase 1
-  // member_profiles) ∪ derived system facts. System facts win on any key overlap
-  // (they're authoritative and non-spoofable). Guarded — empty when no member row
-  // exists yet, so this falls back to system-facts-only behavior.
+  // Stored profile values load first: facts read them too (joined_year derives
+  // from reported Gatherings-Attended years). Guarded — empty when no member row
+  // exists yet, so everything falls back to application-data-only behavior.
   const [profileValues, awardIds] = profileMember
     ? await Promise.all([getMemberProfileValues(profileMember.id), getMemberAwards(profileMember.id)])
     : [{} as Record<string, unknown>, null]
+  // Member facts → earned distinctions (Cabinet of Distinctions). Facts are
+  // derived from existing data; medals are never persisted — they're recomputed
+  // here from the admin-configured rules. See lib/member-facts.ts + lib/distinctions.ts.
+  const memberFacts = buildMemberFacts({ application, roleInfo, memberGroups, roleApproved, profileValues })
+  // Distinctions evaluate the merged namespace: stored profile values ∪ derived
+  // system facts. System facts win on any key overlap (they're authoritative and
+  // non-spoofable).
   const awardedIds = awardIds ? new Set(awardIds) : undefined
   const factContext = { ...profileValues, ...memberFacts }
   const earnedDistinctions = evaluateDistinctions(factContext, parseDistinctions(attuneConfig['config_distinctions']), awardedIds)

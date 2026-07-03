@@ -23,6 +23,10 @@ import { parseDistinctions } from '@/lib/distinctions'
 import { parseProfileFields, distinctionCatalog } from '@/lib/profile-fields'
 import { getAdminRunway } from '@/lib/admin-attention'
 
+// "3 groups" / "1 group" — the panel status chips speak in counted nouns.
+const counted = (n: number, singular: string, plural = `${singular}s`) =>
+  `${n} ${n === 1 ? singular : plural}`
+
 export default async function ConfigurePage() {
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
@@ -34,6 +38,7 @@ export default async function ConfigurePage() {
     { data: groupIconRows },
     { collections: groupCollections, uncollected },
     { data: shiftTypeRows },
+    { count: departmentCount },
     { data: notifications },
     { data: applications },
     runway,
@@ -54,6 +59,10 @@ export default async function ConfigurePage() {
     // Shift types — offered as targets for a shift-hours attunement task.
     supabaseAdmin
       .from('shift_types').select('id, name').order('sort_order'),
+    // Department count — the Departments panel's status chip (the manager
+    // itself loads its data client-side).
+    supabaseAdmin
+      .from('departments').select('id', { count: 'exact', head: true }),
     supabaseAdmin
       .from('admin_notifications')
       .select('id, application_id, event_type, message, details, created_at, read_at')
@@ -110,6 +119,30 @@ export default async function ConfigurePage() {
     email: a.email,
   }))
 
+  // ── Panel status chips — the collapsed page doubles as a state-of-the-camp
+  // overview, so each panel header carries a live one-glance count.
+  const customFieldCount = profileFields.filter(f => !f.system && !f.locked).length
+  const systemFieldCount = profileFields.filter(f => f.system).length
+  const activeDistinctions = distinctions.filter(d => d.enabled).length
+  const activeTasks = attunementTasks.filter(t => t.enabled).length
+  const adminCount = adminMembers.filter(m => m.isAdmin).length
+  const pollManagerCount = adminMembers.filter(m => m.canManagePolls && !m.isAdmin).length
+
+  const eventStart = configMap['config_event_start_date'] ?? ''
+  const eventEnd = configMap['config_event_end_date'] ?? ''
+  const fmtDay = (iso: string) => {
+    const d = new Date(`${iso}T00:00:00`)
+    return isNaN(d.getTime()) ? null : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+  const startLabel = eventStart ? fmtDay(eventStart) : null
+  const endLabel = eventEnd ? fmtDay(eventEnd) : null
+  const dayCount = startLabel && endLabel
+    ? Math.round((new Date(`${eventEnd}T00:00:00`).getTime() - new Date(`${eventStart}T00:00:00`).getTime()) / 86400000) + 1
+    : 0
+  const eventDatesStatus = startLabel && endLabel && dayCount > 0
+    ? `${startLabel} – ${endLabel} · ${counted(dayCount, 'day')}`
+    : 'not set'
+
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflowX: 'clip' }}>
 
@@ -133,100 +166,134 @@ export default async function ConfigurePage() {
         </p>
 
         {/* ═══════════════ FORMS & FIELDS ═══════════════ */}
-        <CategoryHeading id="forms" />
+        <CategoryHeading id="forms" large />
 
-        {/* The application form builder lives on its own full-screen page */}
-        <div style={{ marginBottom: '1.5rem' }}>
-          <a
-            href="/admin/configure/application-form"
-            style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              width: '100%', boxSizing: 'border-box',
-              padding: '1rem 1.5rem',
-              borderRadius: '0.75rem',
-              border: '1px solid rgba(200,168,72,0.2)',
-              background: 'rgba(200,168,72,0.03)',
-              color: '#C8A848',
-              textDecoration: 'none',
-              fontSize: '0.88rem',
-              letterSpacing: '0.06em',
-            }}
-          >
-            <span>Application form builder</span>
-            <span style={{ opacity: 0.5 }}>→</span>
-          </a>
-        </div>
+        {/* The application form builder lives on its own full-screen page —
+            styled as a sibling of the panels below so the section reads as one set. */}
+        <a
+          href="/admin/configure/application-form"
+          style={{
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+            flexWrap: 'wrap', gap: '0.5rem 1rem',
+            padding: '1.1rem 1.3rem',
+            marginBottom: '1.1rem',
+            borderRadius: '0.9rem',
+            border: '1px solid rgba(200,168,72,0.14)',
+            background: 'rgba(243,237,230,0.03)',
+            textDecoration: 'none',
+          }}
+        >
+          <span style={{ flex: '1 1 16rem', minWidth: 0 }}>
+            <span style={{ display: 'block', fontSize: '0.78rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: '#C8A848' }}>
+              Application Form
+            </span>
+            <span style={{ display: 'block', marginTop: '0.4rem', fontSize: '0.8rem', lineHeight: 1.5, color: '#F3EDE6', opacity: 0.5 }}>
+              Design the member application — sections, fields, and copy
+            </span>
+          </span>
+          <span style={{ fontSize: '0.75rem', fontStyle: 'italic', color: '#C8A848', opacity: 0.6, whiteSpace: 'nowrap', paddingTop: '0.05rem' }}>
+            open the builder →
+          </span>
+        </a>
 
         <CollapsibleSection
+          panel
           title="Profile Fields"
-          summary="The canonical schema for member profile data"
+          summary="The details you keep about each member — they feed the application form, profiles, and distinction rules"
+          status={`${counted(customFieldCount, 'field')} · ${systemFieldCount} automatic`}
         >
           <ProfileFieldsManager initialFields={profileFields} />
         </CollapsibleSection>
 
         {/* ═══════════════ RECOGNITION & TASKS ═══════════════ */}
-        <CategoryHeading id="recognition" />
+        <CategoryHeading id="recognition" large />
 
         <CollapsibleSection
+          panel
           title="Distinctions"
           summary="Earned medals in each member's Cabinet of Distinctions"
+          status={counted(activeDistinctions, 'medal')}
         >
           <DistinctionsManager initialDistinctions={distinctions} groupIconOptions={groupIconOptions} factCatalog={distinctionFactCatalog} />
         </CollapsibleSection>
 
         <CollapsibleSection
+          panel
           title="Attunement Tasks"
-          summary="Profile checklist items members complete"
+          summary="The checklist each member completes on their profile"
+          status={counted(activeTasks, 'task')}
         >
           <AttunementTasksManager initialTasks={attunementTasks} collections={attunementCollections} totalGroupCount={totalGroupCount} shiftTypes={shiftTypeOptions} initialNudgeDays={parseAttunementNudgeDays(configMap['config_attunement_nudge_days'])} />
         </CollapsibleSection>
 
         {/* ═══════════════ STRUCTURE ═══════════════ */}
-        <CategoryHeading id="structure" />
+        <CategoryHeading id="structure" large />
 
         <CollapsibleSection
+          panel
           title="Event Dates"
           summary="When the event runs — drives the schedule calendars' day columns"
+          status={eventDatesStatus}
         >
           <EventDatesManager
-            initialStart={configMap['config_event_start_date'] ?? ''}
-            initialEnd={configMap['config_event_end_date'] ?? ''}
+            initialStart={eventStart}
+            initialEnd={eventEnd}
           />
         </CollapsibleSection>
 
         <CollapsibleSection
+          panel
           title="Departments"
           summary="Roles grouped by department"
+          status={counted(departmentCount ?? 0, 'department')}
         >
           <DepartmentsManager groupIconOptions={groupIconOptions} />
         </CollapsibleSection>
 
         <CollapsibleSection
+          panel
           title="Groups"
           summary="Group collections and the groups within them — plus who's assigned to each"
+          status={`${counted(groupCollections.length, 'collection')} · ${counted(totalGroupCount, 'group')}`}
         >
           <GroupsManager members={groupMembers} />
         </CollapsibleSection>
 
         <CollapsibleSection
+          panel
           title="Shift Types"
           summary="The kinds of shift members sign up for (Setup, Service, …)"
+          status={counted(shiftTypeOptions.length, 'type')}
         >
           <ShiftTypesManager />
         </CollapsibleSection>
 
         {/* ═══════════════ ACCESS & SYSTEM ═══════════════ */}
-        <CategoryHeading id="system" />
+        <CategoryHeading id="system" large />
 
-        <CollapsibleSection title="Admins" summary="Grant or remove admin access">
+        <CollapsibleSection
+          panel
+          title="Admins"
+          summary="Grant or remove access to this admin console"
+          status={counted(adminCount, 'admin')}
+        >
           <AdminsManager members={adminMembers} />
         </CollapsibleSection>
 
-        <CollapsibleSection title="Poll Managers" summary="Let members manage polls from their dashboard">
+        <CollapsibleSection
+          panel
+          title="Poll Managers"
+          summary="Let members create and edit polls from their dashboard"
+          status={pollManagerCount === 0 ? 'none granted' : counted(pollManagerCount, 'member')}
+        >
           <PollManagersManager members={adminMembers} />
         </CollapsibleSection>
 
-        <CollapsibleSection title="Debug Tools" summary="Testing utilities">
+        <CollapsibleSection
+          panel
+          title="Debug Tools"
+          summary="Testing utilities — for development only"
+        >
           <DebugSection />
         </CollapsibleSection>
 

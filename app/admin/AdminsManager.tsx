@@ -39,12 +39,17 @@ export function AdminsManager({ members }: { members: Member[] }) {
   }
 
   const admins = list.filter(m => m.isAdmin)
-  const filtered = list.filter(m => {
+  const grantable = list.filter(m => {
+    if (m.isAdmin) return false
     if (!search) return true
     const q = search.toLowerCase()
     const name = `${m.preferred_name ?? m.first_name} ${m.last_name}`.toLowerCase()
     return name.includes(q) || m.email.toLowerCase().includes(q)
   })
+  // Untouched, the list shows a taste of who's grantable; search opens it up.
+  // (A capped list beats an inner scrollbox, which trapped the page scroll.)
+  const shown = search ? grantable : grantable.slice(0, 5)
+  const remaining = grantable.length - shown.length
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -88,15 +93,20 @@ export function AdminsManager({ members }: { members: Member[] }) {
             outline: 'none',
           }}
         />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '320px', overflowY: 'auto' }}>
-          {filtered.filter(m => !m.isAdmin).length === 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {grantable.length === 0 && (
             <p style={{ fontSize: '0.8rem', opacity: 0.4, fontStyle: 'italic', padding: '0.5rem 0' }}>
               {search ? 'No members match.' : 'All members are already admins.'}
             </p>
           )}
-          {filtered.filter(m => !m.isAdmin).map(m => (
+          {shown.map(m => (
             <AdminRow key={m.clerk_user_id} member={m} loading={loading === m.clerk_user_id} onToggle={toggle} />
           ))}
+          {remaining > 0 && (
+            <p style={{ fontSize: '0.78rem', opacity: 0.4, fontStyle: 'italic', padding: '0.25rem 0 0', margin: 0 }}>
+              …and {remaining} more — search to find someone specific.
+            </p>
+          )}
         </div>
       </div>
     </div>
