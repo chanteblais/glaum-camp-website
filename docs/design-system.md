@@ -145,18 +145,38 @@ Colours key off `participation_type` + the shift type's palette slot (`lib/shift
 
 | Event | Color |
 |---|---|
-| `general` | Default purple (uncoloured) |
+| `general` | A stable hue from `GENERAL_HUES`, hashed from the event id: crimson → chartreuse → moonlight silver → citron. These four bands are the only parts of the wheel not owned by the shift palette + teal + gold/purple chrome, so a general never impersonates a shift type. More than 4 generals will share hues — the escape hatch is a per-event colour picker, not a fifth band |
 | `mandatory` | Teal (`MANDATORY_HUE`, the old all-hands colour) |
 | `shift` | A hue from `SHIFT_HUES` by the shift type's registry position: ember orange → lake blue → moss green → glåüm magenta → rose pink → gold (cycles). Currently: Decor orange, Setup blue, Teardown green, Service magenta |
 | legacy `event_type` text (`'all_hands'`/`'camp_tending'`/`'service'`) | Old hardcoded styles kept as a fallback for undecorated rows |
 
 Per-shift-type configurable colour is a future hook — a colour field on the Shift Types registry would override the palette index.
 
+**Rule:** any surface that colours an event reads `lib/shift-colors.ts` — never a local palette. This is why the main schedule, personal calendar, shift picker, its requirement chips, and its legend all agree.
+
+### Icon rendering — `IconImage`
+
+`components/IconImage.tsx` is **the one way to render icon art** (asset-library icons, group/department icon uploads). All icon assets live on the standard normalized frame (artwork diagonal-normalized, centered on a transparent 1536×1024 canvas — `scripts/normalize-assets.py`); `IconImage` sizes the frame so the artwork fills a square clipping box (`fill`, default `0.82`; `round` clips to a circle). One `fill` value reads as the same optical size for every icon. Don't hand-tune per-surface `<img>` percentages — that's the drift the component exists to end. (The Cabinet of Distinctions keeps its own medal sizing; everything else renders here.)
+
+### Icon & badge registers (pointers)
+
+Two separate visual registers, both specified in `docs/design-philosophy.md` §7 (verdicts 9–10):
+- **Icons** — smooth sculpted **regal gold**, no disc, read at a glance. Anchor: `public/asset-library/icons/raised-hand.webp`. New subjects strike via `scripts/strike-icon.py`.
+- **Badges (distinction medals)** — warm dimensional embossed gold on a deep aubergine disc, composition-rich. Anchor: `asset-library/distinctions/elder-tree.webp`.
+
+### TimeField
+
+`app/components/TimeField.tsx` — the time input for any HH:MM field (used by ScheduleManager and LeadUpGatheringsManager). New time inputs reuse it rather than raw `<input type="time">`, so time entry behaves the same everywhere.
+
+### Page ornament — the hands margins
+
+Registry-flavoured pages (profile, Many Hands, messages, the admin tabs, volunteer form, track picker) carry the engraved hands margin art: fixed `hands-left.svg`/`hands-right.svg`, full height, `opacity: 0.85`, `pointer-events: none`, `z-index: 0`. Currently duplicated inline per page — when next touched, extract a shared `<PageOrnament />` so the theme stays swappable (ux-review-log finding 22).
+
 ### Department Icons
 
 The `icon` field on `departments` accepts:
 - **Emoji** — rendered as text
-- **Image path** (starts with `/`) — rendered as `<img>` everywhere: admin UI, profile, SignupSection, CommitmentsSection
+- **Image path** (starts with `/`) — rendered via `IconImage` everywhere: admin UI, profile, SignupSection, CommitmentsSection
 
 ---
 

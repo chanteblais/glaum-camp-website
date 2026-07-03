@@ -167,3 +167,8 @@ image-gen → potrace pipeline and its prompt language live in `design/icon-lab/
 - Still open (minor): how the triangle appears in UI beyond the logo (frames? section
   markers? loading states?); the silly↔sacred setpoint for marks (naming-session pair 7
   failed on execution before spirit could be judged — retest with pipeline-quality pieces).
+- **2026-07-03 cohesion pass (full app walk):** the language is holding across member and
+  admin surfaces without retrofit effort — one colour source, one icon renderer, trinity
+  language in the admin chrome, one wink per page. The load-bearing devices and the seams
+  (two unstruck department seals; hands ornament not yet centralized) are recorded in
+  `docs/ux-review-log.md` (sixth pass) — that entry is the "keep doing this" list.

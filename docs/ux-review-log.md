@@ -7,6 +7,82 @@ Newest review at the top. Fixes are only applied once agreed.
 
 ---
 
+## Review — 2026-07-03 (sixth pass: cohesion audit — what's working)
+
+Scope: a full desktop walk of the member surfaces (home, /schedule, /members,
+/participate, /profile, /roles) and all four admin tabs, read against
+`docs/design-philosophy.md`. Purpose of this pass: record what is *cohering* so
+it's preserved deliberately rather than by luck, and catch the seams. Doc
+syncs landed alongside (`design-system.md` caught up to the shipped UI).
+Mobile-width remains blocked in the review browser (window resize ignored —
+macOS full-screen state again); a separate `ux/mobile-overflow` branch exists,
+so mobile is being handled there.
+
+### What's working — keep doing this
+
+1. **One colour source is visibly paying off.** The main schedule grid, the
+   personal calendar, the Participate shift picker, its requirement chips
+   ("Decor 0/3h") and its legend all speak the same hue language because they
+   all read `lib/shift-colors.ts`. Nothing has drifted. Any new surface that
+   colours an event must go through that module — never a local palette.
+2. **The regal icon register reads as one voice.** Schedule event cards, the
+   role-picker medallions, commitment rows, and department seals all render
+   through `IconImage` on the normalized frame — consistent optical size,
+   nothing poking out of round masks. The one-renderer rule held through the
+   icon sweep; keep routing every icon `<img>` through it.
+3. **Trinity language has landed in the chrome, not just the art.** Each admin
+   tab subtitle carries its register (Configure: "Define the forms, fields,
+   recognition, and structure the camp runs on" — triangle; Overview's
+   needs-attention digest — eye; Participate — hands/reciprocity). The runway
+   strip + digest orient an organizer in seconds.
+4. **One wink per page holds.** "All times approximate. Attunement occurs
+   continuously. Results may vary." (schedule) · "sponsored by Shrimp™"
+   (header) · Department of Tiny Hand Services. The ceremony around each wink
+   stays straight-faced, which is exactly the silly-sacred setpoint.
+5. **The profile registry is the strongest page in the app** — the parchment
+   attunement seal against the ink commitments card, the tiered commitments
+   copy ("3h is the expectation — you've pledged 9h more. Many hands indeed."),
+   the stat list. It's the calibration reference for future member surfaces.
+6. **Collapsed-by-default admin sections read as a table of contents** (finding
+   6's fix proved out — Members tab scans in one screen).
+7. **Resolved from the fifth pass:** the nav label/URL mismatch is gone —
+   `/signup` now redirects to `/participate`.
+
+### 21. Two departments still wear the ✦ fallback instead of a struck medallion · Severity: low (visual seam) · Status: proposed
+
+Logistics & Material Relocation and Nourishment have no `departments.icon`, so
+the role picker and the Registry of Roles chips show the plain ✦ ring beside
+five sculpted-gold seals — the one inconsistency on the app's most icon-forward
+surfaces. Data, not code: the library already holds candidates
+(`covered-wagon.webp`, `fruit-bowl.webp`), or fresh subjects strike in minutes
+via `scripts/strike-icon.py`. Needs Chante's pick, then set in admin.
+
+### 22. The hands margin ornament is pasted inline on ~10 pages · Severity: low now, medium for multi-tenant · Status: proposed
+
+The fixed `hands-left.svg`/`hands-right.svg` margin art is a duplicated inline
+`<img>` block in profile, members, messages (×3), all four admin tabs, the
+volunteer form, and the track picker — against the philosophy's own rule that
+ornament enters the UI through centralized, swappable components
+(design-philosophy §5). Extract a shared `<PageOrnament />` next time any of
+those pages is touched; row added to `generalizability-log.md`.
+
+### 23. Overview's "Shift Hours (3 per member)" survived the shifts redesign · Severity: medium (dashboard accuracy) · Status: proposed (upgrade of finding 8's watch)
+
+The section still assumes a flat 3 h/member (`HOURS_PER_MEMBER = 3`), but
+requirements now live on groups/roles/attunement tasks and members hold many
+shifts — Chante alone shows 6/3h with three group commitments. "Total
+committed / still pending" is now derived from a fiction. Rebuild the section
+on the same requirement derivation the attunement checklist uses
+(`lib/attunement.ts`), or drop the hours cards until it can be done right.
+
+### Content notes (yours, no code)
+
+- Home quick-link card "Role & Shift — Choose your role and shift" points at
+  the same place the nav calls "Participate" — two names for one destination;
+  the card copy is editable inline (Edit Page).
+
+---
+
 ## Session close-out — 2026-07-02 (evening)
 
 ### 19. `/admin/[id]` URL says nothing about what it is · Severity: low (advice) · Status: proposed
