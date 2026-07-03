@@ -131,6 +131,7 @@ function EventModal({
   days,
   onSave,
   onClose,
+  onDelete,
   saving,
   error,
   shiftTypes,
@@ -139,6 +140,8 @@ function EventModal({
   days: ScheduleDay[]
   onSave: (form: Omit<ScheduleEvent, 'id' | 'sort_order'>) => void
   onClose: () => void
+  // Edit mode only — deleting an event that doesn't exist yet is meaningless.
+  onDelete?: () => void
   shiftTypes: ShiftTypeOption[]
   saving: boolean
   error: string | null
@@ -360,8 +363,15 @@ function EventModal({
         {error && <p style={{ color: '#ff8a8a', fontSize: '0.82rem', marginBottom: '0.75rem' }}>{error}</p>}
 
         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+          {/* Delete lives here too — from the week view the modal is the only
+              way to reach an event, so it can't be list-row-only. */}
+          {onDelete && (
+            <button onClick={onDelete} style={{ padding: '0.6rem 1.2rem', borderRadius: '9999px', border: '1px solid rgba(255,100,100,0.25)', background: 'transparent', color: '#ff8a8a', cursor: 'pointer', fontSize: '0.82rem', opacity: 0.7, marginRight: 'auto' }}>
+              Delete
+            </button>
+          )}
           {missing && (
-            <span style={{ fontSize: '0.72rem', color: '#C8A848', opacity: 0.55, fontStyle: 'italic', marginRight: 'auto' }}>
+            <span style={{ fontSize: '0.72rem', color: '#C8A848', opacity: 0.55, fontStyle: 'italic', marginRight: onDelete ? undefined : 'auto' }}>
               Needs {missing}
             </span>
           )}
@@ -684,16 +694,19 @@ export function ScheduleManager({ rangeStart, rangeEnd, children }: { rangeStart
     }
   }
 
-  const handleDelete = async (id: string) => {
+  // Returns whether the event was actually deleted, so the edit modal knows
+  // whether to close (a cancelled confirm keeps it open).
+  const handleDelete = async (id: string): Promise<boolean> => {
     const ev = events.find(e => e.id === id)
     const ok = await confirm({
       title: `Delete ${ev ? `“${ev.title}”` : 'this event'}?`,
       confirmLabel: 'Delete event',
       danger: true,
     })
-    if (!ok) return
+    if (!ok) return false
     await fetch(`/api/admin/schedule/${id}`, { method: 'DELETE' })
     setEvents((prev) => prev.filter((e) => e.id !== id))
+    return true
   }
 
   // Drop from the week grid: same-shape PATCH as the modal (structured times +
@@ -980,6 +993,9 @@ export function ScheduleManager({ rangeStart, rangeEnd, children }: { rangeStart
           days={days}
           onSave={handleSave}
           onClose={() => setModal(null)}
+          onDelete={modal.mode === 'edit'
+            ? async () => { if (await handleDelete(modal.event.id)) setModal(null) }
+            : undefined}
           saving={saving}
           error={modalError}
           shiftTypes={shiftTypes}
