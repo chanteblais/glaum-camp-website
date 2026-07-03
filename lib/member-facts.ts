@@ -8,7 +8,8 @@
 // won't fire until a future migration adds the underlying data.
 
 export type MemberFacts = {
-  /** Year the member first applied — best available proxy for "member since". */
+  /** "Member since": earliest reported Gatherings-Attended year, falling back
+   *  to the year they applied through this site. */
   joined_year: number | null
   /** Whole years since joining (current year − joined_year). */
   years_since_joined: number | null
@@ -44,21 +45,43 @@ type ApplicationLike = {
 
 type Group = { name: string }
 
+// Member-reported years of attendance (the "Gatherings Attended" profile
+// field). The earliest one is better "member since" evidence than the year the
+// member applied through this site — the site is younger than the community,
+// so application dates alone would date everyone to the launch year.
+// NOTE: hardcoded admin-defined field key — see docs/generalizability-log.md.
+const ATTENDED_YEARS_KEY = 'gatheringsAttended'
+
+function attendedYears(profileValues?: Record<string, unknown>): number[] {
+  const raw = profileValues?.[ATTENDED_YEARS_KEY]
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map(v => parseInt(String(v), 10))
+    .filter(n => Number.isFinite(n) && n >= 1900 && n <= 2100)
+}
+
 export function buildMemberFacts({
   application,
   roleInfo,
   memberGroups,
   roleApproved,
+  profileValues,
 }: {
   application: ApplicationLike
   roleInfo: RoleInfo
   memberGroups: Group[]
   /** True when the member has an approved (non-pending) role. */
   roleApproved: boolean
+  /** member_profiles.values — lets tenure derive from reported attendance. */
+  profileValues?: Record<string, unknown>
 }): MemberFacts {
-  const joined_year = application?.submitted_at
+  // Joined year = the earliest evidence of membership: reported attendance
+  // years and the year they applied, whichever comes first.
+  const applied_year = application?.submitted_at
     ? new Date(application.submitted_at).getFullYear()
     : null
+  const evidence = [...attendedYears(profileValues), ...(applied_year != null ? [applied_year] : [])]
+  const joined_year = evidence.length ? Math.min(...evidence) : null
   const years_since_joined =
     joined_year != null ? new Date().getFullYear() - joined_year : null
 

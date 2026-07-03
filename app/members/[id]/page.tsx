@@ -106,17 +106,19 @@ export default async function MemberPage({ params }: { params: { id: string } })
     .select('value')
     .eq('key', 'config_distinctions')
     .maybeSingle()
-  const memberFacts = buildMemberFacts({ application: member, roleInfo, memberGroups, roleApproved })
-  // Merged namespace: stored profile values ∪ derived system facts (system wins).
-  // Guarded — falls back to system-facts-only when no member row exists yet.
+  // Stored profile values load first: facts read them too (joined_year derives
+  // from reported Gatherings-Attended years). Guarded — falls back to
+  // application-data-only behavior when no member row exists yet.
   const profileMember = await resolveMember((member.clerk_user_id as string | null) ?? null)
   const profileValues = profileMember ? await getMemberProfileValues(profileMember.id) : {}
   const awardedIds = profileMember ? new Set(await getMemberAwards(profileMember.id)) : undefined
+  const memberFacts = buildMemberFacts({ application: member, roleInfo, memberGroups, roleApproved, profileValues })
+  // Merged namespace: stored profile values ∪ derived system facts (system wins).
   const factContext = { ...profileValues, ...memberFacts }
   const earnedDistinctions = evaluateDistinctions(factContext, parseDistinctions(distRow?.value), awardedIds)
 
   const displayName = member.preferred_name || member.first_name || 'Member'
-  const memberSince = member.submitted_at ? new Date(member.submitted_at as string).getFullYear() : null
+  const memberSince = memberFacts.joined_year
   const deptName = roleApproved ? roleInfo?.departments?.name ?? null : null
   const deptIcon = roleInfo?.departments?.icon ?? null
   const deptDesc = roleApproved ? roleInfo?.departments?.description ?? null : null

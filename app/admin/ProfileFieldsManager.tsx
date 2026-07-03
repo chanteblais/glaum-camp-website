@@ -43,8 +43,8 @@ function keyFromLabel(label: string): string {
 // Plain-English hover hints for the derived facts strip — the labels alone can
 // read like leftovers to a non-programmer.
 const SYSTEM_FIELD_HINTS: Record<string, string> = {
-  joined_year:        'The year they joined',
-  years_since_joined: 'How many years since they joined',
+  joined_year:        'Their earliest Gatherings-Attended year — or the year they applied',
+  years_since_joined: 'How many years since their earliest year',
   group_count:        'How many groups they belong to',
   groups:             'Which groups they belong to',
   designation:        'Their role title',
