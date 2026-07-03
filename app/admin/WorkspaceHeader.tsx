@@ -8,8 +8,8 @@ export function WorkspaceHeader({ title, count }: { title: string; count?: numbe
         padding: '0.7rem 1.1rem',
         marginBottom: '0.85rem',
         borderRadius: '0.5rem',
-        border: '1px solid rgba(200,168,72,0.25)',
-        background: 'linear-gradient(90deg, rgba(200,168,72,0.12), rgba(200,168,72,0.02))',
+        border: '1px solid rgba(210,57,248,0.3)',
+        background: 'linear-gradient(90deg, rgba(210,57,248,0.14), rgba(210,57,248,0.02))',
       }}
     >
       <p style={{ margin: 0, fontSize: '0.85rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C8A848', fontWeight: 400 }}>
