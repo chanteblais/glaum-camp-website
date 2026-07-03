@@ -587,22 +587,34 @@ function RolePicker({
 
   return (
     <div>
-      {/* Toggle header — collapsed it must still read as a door, not a footnote:
-          kicker between hairlines (the plaque language) over a solid pill button. */}
-      <button
-        onClick={() => setExpanded(o => !o)}
-        aria-expanded={expanded}
-        style={{ display: 'block', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'center' }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', margin: expanded ? '0 0 0.4rem' : '0 0 1rem' }}>
-          <span aria-hidden style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.4))' }} />
-          <p style={{ fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.85, margin: 0, whiteSpace: 'nowrap' }}>
-            Choose a Role
-            {expanded && <span aria-hidden style={{ fontSize: '0.6rem', opacity: 0.55, marginLeft: '0.45rem', verticalAlign: 'middle' }}>▲</span>}
-          </p>
-          <span aria-hidden style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(200,168,72,0.4), transparent)' }} />
-        </div>
-        {!expanded && (
+      {/* Collapsed — not a hidden door but a sealed one: every department's
+          emblem on display (the same brass rings as the plaques) so the folded
+          registry still shows what it holds, with the browse pill beneath. */}
+      {!expanded && (
+        <button
+          onClick={() => setExpanded(true)}
+          aria-expanded={false}
+          style={{ display: 'block', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '0.5rem 0', textAlign: 'center' }}
+        >
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '1rem 1.25rem', marginBottom: '1.4rem' }}>
+            {withRoles.map(dept => (
+              <span key={dept.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.45rem', width: '84px' }}>
+                <span style={{
+                  width: '46px', height: '46px', borderRadius: '50%',
+                  border: '1.5px solid #C8A848',
+                  background: 'radial-gradient(circle at 42% 38%, rgba(200,168,72,0.18), rgba(8,0,18,0.85))',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {dept.icon && isImageIcon(dept.icon)
+                    ? <img src={dept.icon} alt="" aria-hidden style={{ width: '72%', height: '72%', objectFit: 'contain', opacity: 0.92 }} />
+                    : <span style={{ fontSize: '1.25rem', lineHeight: 1 }}>{dept.icon ?? '✦'}</span>}
+                </span>
+                <span style={{ fontSize: '0.58rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.6, lineHeight: 1.3 }}>
+                  {dept.name}
+                </span>
+              </span>
+            ))}
+          </div>
           <span style={{
             display: 'inline-block', padding: '0.5rem 1.3rem', borderRadius: '9999px',
             border: '1px solid rgba(200,168,72,0.5)', background: 'rgba(200,168,72,0.1)',
@@ -610,17 +622,19 @@ function RolePicker({
           }}>
             Browse all {allRoles.length} roles ▾
           </span>
-        )}
-      </button>
+        </button>
+      )}
 
       {expanded && (<>
-      <p style={{ fontSize: '0.78rem', opacity: 0.55, textAlign: 'center', margin: '0 0 1.5rem', lineHeight: 1.6 }}>
-        Tap a role to read its full charge and claim it. Or browse the{' '}
-        <a href="/roles" style={{ color: '#C8A848', textDecoration: 'underline', textUnderlineOffset: '3px' }}>
-          Registry of Roles
-        </a>{' '}
-        for the complete record.
-      </p>
+      <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
+        <button
+          onClick={() => setExpanded(false)}
+          aria-expanded={true}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.72rem', color: '#C8A848', opacity: 0.55, letterSpacing: '0.06em', textDecoration: 'underline', textUnderlineOffset: '3px' }}
+        >
+          Fold the registry away ▴
+        </button>
+      </div>
 
       <style>{`
         .role-grid { display: grid; grid-template-columns: 1fr; gap: 0.55rem; }
@@ -1201,10 +1215,24 @@ export function SignupSection({ showPickers = true, initialData }: { showPickers
       <CurrentSignupCards signup={signup} departments={departments} heldShifts={heldShifts} shiftTypes={shiftTypes} onOptOut={handleOptOut} onCancelShift={handleCancelShift} onSetLead={handleSetLeadShift} />
 
       {showPickers && (<>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        {/* Choose a Role — a full page section, headed like Shifts / Bring
+            Something below, so the folded registry can't be scrolled past. */}
+        {hasRoles && (
+          <>
+            <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.25), transparent)', margin: '3rem 0 2rem' }} />
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h2 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(1.4rem, 3vw, 2rem)', color: '#C8A848', margin: '0 0 0.5rem', letterSpacing: '0.06em' }}>
+                Choose a Role
+              </h2>
+              <p style={{ fontSize: '0.9rem', opacity: 0.55, margin: 0, lineHeight: 1.6 }}>
+                Tap a role to read its full charge and claim it. Or browse the{' '}
+                <a href="/roles" style={{ color: '#C8A848', textDecoration: 'underline', textUnderlineOffset: '3px' }}>
+                  Registry of Roles
+                </a>{' '}
+                for the complete record.
+              </p>
+            </div>
 
-          {/* Role picker — every role visible; confirm lives in the detail modal */}
-          {hasRoles && (
             <div style={{ padding: '1.5rem', border: '1px solid rgba(200,168,72,0.15)', borderRadius: '1rem', background: 'rgba(255,255,255,0.01)' }}>
               <RolePicker
                 departments={departments}
@@ -1216,18 +1244,18 @@ export function SignupSection({ showPickers = true, initialData }: { showPickers
                 onConfirm={handleSave}
               />
             </div>
-          )}
 
-          {/* Suggest a role */}
-          <div style={{ textAlign: 'center', padding: '0.5rem 0' }}>
-            <button
-              onClick={() => setShowSuggest(true)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.78rem', color: '#C8A848', opacity: 0.5, letterSpacing: '0.04em', textDecoration: 'underline', textUnderlineOffset: '3px' }}
-            >
-              Don't see a role that fits? Suggest one →
-            </button>
-          </div>
-        </div>
+            {/* Suggest a role */}
+            <div style={{ textAlign: 'center', padding: '0.5rem 0', marginTop: '1.25rem' }}>
+              <button
+                onClick={() => setShowSuggest(true)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.78rem', color: '#C8A848', opacity: 0.5, letterSpacing: '0.04em', textDecoration: 'underline', textUnderlineOffset: '3px' }}
+              >
+                Don't see a role that fits? Suggest one →
+              </button>
+            </div>
+          </>
+        )}
 
         {/* Shifts — a full page section, headed exactly like Bring Something /
             Your Groups on /participate (gold divider + TokyoDreams h2); the
