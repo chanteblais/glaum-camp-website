@@ -726,37 +726,38 @@ export function ScheduleManager({ rangeStart, rangeEnd, children }: { rangeStart
 
   return (
     <div>
-      {/* Header first — then any page-provided controls (the shift-signup
-          toggle rides in as children), then the view controls row. */}
+      {/* Header first, then one controls row: the shift-signup pill (rides in
+          as children) on the left, view + add on the right — one section. */}
       <WorkspaceHeader title="Scheduled Events" count={dated.length + undated.length} />
 
-      {children}
-
-      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '0.85rem', gap: '0.5rem', flexWrap: 'wrap' }}>
-        {/* List ⇄ Week: the list is the working roster; the week grid shows
-            time as space (overlaps, gaps, lopsided days). */}
-        <div style={{ display: 'flex', border: '1px solid rgba(200,168,72,0.25)', borderRadius: '9999px', overflow: 'hidden' }}>
-          {(['list', 'week'] as const).map(v => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              style={{
-                padding: '0.45rem 0.9rem', border: 'none', cursor: 'pointer',
-                fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'capitalize',
-                background: view === v ? 'rgba(200,168,72,0.15)' : 'transparent',
-                color: '#C8A848', opacity: view === v ? 1 : 0.5,
-              }}
-            >
-              {v}
-            </button>
-          ))}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.85rem', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div>{children}</div>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          {/* List ⇄ Week: the list is the working roster; the week grid shows
+              time as space (overlaps, gaps, lopsided days). */}
+          <div style={{ display: 'flex', border: '1px solid rgba(200,168,72,0.25)', borderRadius: '9999px', overflow: 'hidden' }}>
+            {(['list', 'week'] as const).map(v => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                style={{
+                  padding: '0.45rem 0.9rem', border: 'none', cursor: 'pointer',
+                  fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'capitalize',
+                  background: view === v ? 'rgba(200,168,72,0.15)' : 'transparent',
+                  color: '#C8A848', opacity: view === v ? 1 : 0.5,
+                }}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+          <button
+            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.25)', background: 'transparent', color: '#C8A848', cursor: 'pointer', fontSize: '0.78rem', letterSpacing: '0.06em', opacity: 0.75 }}
+            onClick={() => openAdd()}
+          >
+            + Add event
+          </button>
         </div>
-        <button
-          style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.25)', background: 'transparent', color: '#C8A848', cursor: 'pointer', fontSize: '0.78rem', letterSpacing: '0.06em', opacity: 0.75 }}
-          onClick={() => openAdd()}
-        >
-          + Add event
-        </button>
       </div>
 
       {/* Week view — day columns × hour axis; click empty slot to add there */}
