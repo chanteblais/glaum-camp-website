@@ -16,9 +16,10 @@ Glåüm   About · Participate · Schedule · Apply     [Sign in]
 Glåüm   Home · Schedule · Many Hands · Messages · My Profile   [🔔 avatar▾]
 ```
 
-- `Messages` shows an unread count badge (polled every 30s via `/api/messages/unread`)
+- `Messages` shows an unread count badge (polled every 30s via `/api/messages/unread` — `useUnreadMessages` in `MessagesNavLink.tsx`)
 - Avatar dropdown: Admin link (admin only) + Sign out
-- Mobile: hamburger menu with the same contextual links
+- Mobile, public/pending visitors: hamburger menu with the same contextual links
+- **Mobile, approved members: bottom tab bar** (`components/MobileTabBar.tsx`, rendered by `HeaderClient` under the JS `<768px` breakpoint) — the *same* member nav list (one product, one IA: `memberNavLinks` drives both renderings), as icon tabs (regal icons via `IconImage`: gathering / raised-hand / envelope / signpost / hand-mirror), active tab marked with the desktop underline's gradient+dot moved to the tab's top edge, Messages badge included. The hamburger stays as overflow only (name, About, Admin, Sign out). Hidden on `/admin` (admin is a web/desktop workspace) and for non-members. The bar injects `body { padding-bottom }` (+ `env(safe-area-inset-bottom)` for the PWA) so page ends and the Footer stay reachable.
 
 Nav links for non-approved signed-in users (pending/rejected) show the public set — `/apply` is the only meaningful destination for them.
 

@@ -54,6 +54,8 @@ Make the existing experience feel native rather than redesigning it. The current
 
 Several of these (bottom navigation on small screens, touch spacing, transition polish) are ordinary responsive work that can land in the **web product** whenever a surface gets touched — no app required.
 
+> **Landed:** bottom navigation shipped on mobile web 2026-07-03 (`components/MobileTabBar.tsx`) — the member nav list rendered as icon tabs; same surfaces, same order as the desktop top nav.
+
 ---
 
 ## Push notifications — the biggest motivation
