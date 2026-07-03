@@ -41,7 +41,7 @@ function DiamondRule() {
         }}
       />
       <svg
-        width="12" height="12" viewBox="0 0 12 12" fill={GOLD} opacity="0.9" aria-hidden
+        width="9" height="9" viewBox="0 0 12 12" fill={GOLD} opacity="0.9" aria-hidden
         style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}
       >
         <path d="M6 0 l1.6 4.4 4.4 1.6 -4.4 1.6 L6 12 4.4 7.6 0 6 l4.4 -1.6 Z" />
@@ -332,12 +332,13 @@ export function RadioHero() {
           fontFamily: 'var(--font-cormorant-garamond), serif',
           fontStyle: 'italic',
           fontWeight: 500,
-          margin: 0,
+          margin: '0.45rem 0 0',
           fontSize: '1.1rem',
           lineHeight: 1.5,
           letterSpacing: '0.02em',
-          color: WARM,
-          opacity: 0.95,
+          // a step darker than the band's warm gold — present, not popping
+          color: '#C39D5F',
+          opacity: 0.9,
           position: 'relative',
           zIndex: 1,
           maxWidth: '22rem',
