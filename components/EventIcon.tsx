@@ -1,26 +1,15 @@
+import { IconImage } from './IconImage'
+
 export const ICON_TYPES = [
   'tea', 'mirror', 'clipboard', 'people',
   'star', 'dome', 'heart', 'moon', 'sparkle', 'hands',
 ] as const
 
 export function EventIcon({ type, size = 38 }: { type: string; size?: number }) {
-  // Custom uploaded icon — scale up to visually match built-in stroke icons
+  // Image icon (asset library or upload) — the 1.5x box keeps image icons at
+  // the visual weight of the built-in stroke icons below.
   if (type.startsWith('http') || type.startsWith('/')) {
-    const scaledSize = Math.round(size * 1.5)
-    return (
-      <span style={{
-        display: 'block',
-        width: `${scaledSize}px`,
-        height: `${scaledSize}px`,
-        minWidth: `${scaledSize}px`,
-        minHeight: `${scaledSize}px`,
-        backgroundImage: `url(${type})`,
-        backgroundSize: 'contain',
-        backgroundRepeat: 'no-repeat',
-        backgroundPosition: 'center',
-        flexShrink: 0,
-      }} />
-    )
+    return <IconImage src={type} size={Math.round(size * 1.5)} fill={0.88} />
   }
 
   const s = { width: size, height: size }

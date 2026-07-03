@@ -121,8 +121,19 @@ def process(raw_png, dest_webp):
         sys.exit("processing needs numpy + Pillow: pip3 install numpy Pillow")
     img = key_out(Image.open(raw_png), np, Image)
     img = crop_margin(img, np)
-    img.thumbnail((800, 800))
-    img.save(dest_webp, "WEBP", quality=92)
+    # Finish on the app's standard icon frame (lib/icon-image.ts convention —
+    # the same normalization every uploaded icon gets): artwork diagonal scaled
+    # to a fixed target, centered on a transparent 1536x1024 canvas, so every
+    # icon reaches equally far toward the site's circular clips. Keep in sync
+    # with scripts/normalize-assets.py.
+    FRAME_W, FRAME_H, TARGET_DIAGONAL, MAX_SIDE = 1536, 1024, 1060, 980
+    cw, ch = img.size
+    factor = min(TARGET_DIAGONAL / (cw**2 + ch**2) ** 0.5, MAX_SIDE / max(cw, ch))
+    img = img.resize((max(1, round(cw * factor)), max(1, round(ch * factor))),
+                     Image.LANCZOS)
+    frame = Image.new("RGBA", (FRAME_W, FRAME_H), (0, 0, 0, 0))
+    frame.paste(img, ((FRAME_W - img.width) // 2, (FRAME_H - img.height) // 2), img)
+    frame.save(dest_webp, "WEBP", quality=92)
     return img.size
 
 

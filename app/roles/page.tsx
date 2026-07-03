@@ -1,4 +1,5 @@
 import { auth } from '@clerk/nextjs/server'
+import { IconImage } from '@/components/IconImage'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { Header } from '@/components/Header'
@@ -138,7 +139,7 @@ export default async function RolesRegistryPage() {
             >
               {d.icon && (isImageIcon(d.icon)
                 // eslint-disable-next-line @next/next/no-img-element
-                ? <img src={d.icon} alt="" aria-hidden style={{ width: '0.95rem', height: '0.95rem', objectFit: 'contain' }} />
+                ? <IconImage src={d.icon} size="0.95rem" fill={0.92} />
                 : <span style={{ fontSize: '0.85rem' }}>{d.icon}</span>)}
               {d.name}
             </a>
@@ -167,7 +168,7 @@ export default async function RolesRegistryPage() {
               }}>
                 {dept.icon && (isImageIcon(dept.icon)
                   // eslint-disable-next-line @next/next/no-img-element
-                  ? <img src={dept.icon} alt="" aria-hidden style={{ width: '72%', height: '72%', objectFit: 'contain', opacity: 0.92 }} />
+                  ? <IconImage src={dept.icon} size="92%" fill={0.8} opacity={0.92} />
                   : <span style={{ fontSize: '1.7rem', lineHeight: 1 }}>{dept.icon ?? '✦'}</span>)}
               </div>
               <h2 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(1.5rem, 3.5vw, 2rem)', color: '#C8A848', margin: 0, letterSpacing: '0.05em' }}>

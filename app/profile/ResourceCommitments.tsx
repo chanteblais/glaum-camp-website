@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { IconImage } from '@/components/IconImage'
 import { useRouter } from 'next/navigation'
 
 type ResourceItem = {
@@ -181,7 +182,7 @@ export function ResourceCommitments({ initialLists }: { initialLists?: ResourceL
         {/* Icon (matches the Your Groups row treatment: image, else a plain mark) */}
         <div style={{ width: 48, height: 48, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {item.icon
-            ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={item.icon} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            ? /* eslint-disable-next-line @next/next/no-img-element */ <IconImage src={item.icon} size="100%" fill={0.85} />
             : <span style={{ fontSize: '1.5rem', color: GOLD, opacity: 0.5 }}>✦</span>}
         </div>
 

@@ -11,6 +11,8 @@ export async function ScheduleSection() {
       .from('schedule_events')
       .select('id, day, time, title, subtitle, detail_desc, icon_type, highlight, is_recurring, recurrence_days, event_type, event_date, participation_type, shift_type_id')
       .eq('visible', true)
+      // Admin can keep an event off the schedule page while it stays signable.
+      .eq('show_on_schedule', true)
       .order('sort_order', { ascending: true }),
     supabaseAdmin.from('shift_types').select('id').order('sort_order'),
     supabaseAdmin.from('page_content').select('key, value').in('key', ['config_event_start_date', 'config_event_end_date']),

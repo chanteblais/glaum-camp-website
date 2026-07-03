@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { IconImage } from '@/components/IconImage'
 import { isImageIcon } from '@/lib/icon-src'
 import { useConfirm } from '../components/ConfirmDialog'
 
@@ -121,7 +122,7 @@ export function MemberSignupCard({ clerkUserId, role, shifts }: Props) {
                 <p style={{ fontSize: '0.72rem', color: '#C8A848', opacity: 0.5, margin: '0 0 0.15rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
                   {currentRole.department_icon && (
                     isImageIcon(currentRole.department_icon)
-                      ? <img src={currentRole.department_icon} alt="" aria-hidden style={{ width: '0.85rem', height: '0.85rem', objectFit: 'contain' }} />
+                      ? <IconImage src={currentRole.department_icon} size="0.85rem" fill={0.92} />
                       : <span>{currentRole.department_icon}</span>
                   )}
                   {currentRole.department}

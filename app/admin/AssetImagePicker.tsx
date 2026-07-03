@@ -35,15 +35,15 @@ const tinyLabel: React.CSSProperties = {
   textTransform: 'uppercase', whiteSpace: 'nowrap',
 }
 
-// Image sizing inside a tile/preview. `fill` = size by height + clip (like the
-// Cabinet medal) — right for heavily-padded circular badge art. `contain` = whole
-// image, never cropped — right for icons, which fill their frame and aren't round,
-// so they'd lose their tips/edges under `fill`.
+// Image sizing inside a tile/preview. All library art sits on the standard
+// normalized frame (lib/icon-image.ts), so both modes size by HEIGHT and let
+// the frame's wide margins clip: `fill` = the Cabinet-medal scale for circular
+// badge art; `contain` = the icon scale (art ~80% of the tile).
 type TileFit = 'fill' | 'contain'
 function tileImgStyle(fit: TileFit): React.CSSProperties {
   return fit === 'fill'
     ? { height: '132%', width: 'auto', maxWidth: 'none', display: 'block' }
-    : { width: '94%', height: '94%', objectFit: 'contain', display: 'block' }
+    : { height: '110%', width: 'auto', maxWidth: 'none', display: 'block' }
 }
 
 // A single selectable thumbnail.

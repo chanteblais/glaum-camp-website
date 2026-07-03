@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { IconImage } from '@/components/IconImage'
 import { LoadError } from './LoadError'
 import { AssetImagePicker } from './AssetImagePicker'
 import { isImageIcon } from '@/lib/icon-src'
@@ -428,7 +429,7 @@ export function ResourcesManager({ initialLists, initialStewards }: {
               <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 1rem', borderTop: '1px solid rgba(200,168,72,0.06)' }}>
                 {item.icon && isImageIcon(item.icon) && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={item.icon} alt="" style={{ width: '32px', height: '32px', objectFit: 'contain', flexShrink: 0 }} />
+                  <IconImage src={item.icon} size={32} fill={0.85} />
                 )}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontSize: '0.84rem', color: '#F3EDE6', margin: 0 }}>
