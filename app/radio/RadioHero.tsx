@@ -6,7 +6,12 @@
 // a dramatic spike cluster wrapped in warm bloom, then decay. All inline SVG.
 
 const GOLD = '#C8A848'
-const WARM = '#E0B472' // lighter, warmer gold for the line + subtitle
+const WARM = '#E0B472' // lighter, warmer gold for the subtitle
+// The band's colours, sampled from the mockup: the line is a warm amber
+// (#D8A15A avg) with a bright core (#FDD370); the motes burn #E8AC51.
+const LINE = '#DFA55C'
+const LINE_CORE = '#FDD370'
+const ORB = '#E8AC51'
 
 // ((✦)) — broadcast waves around a four-point star.
 function WavesMark() {
@@ -89,20 +94,22 @@ const MAIN: [number, number][] = [
   [984, 183], [995, 171], [1000, 177],
 ]
 
-// Echo threads — the braid lives at the EDGES in the mock: two fine strands
-// weaving tightly around the baseline where the signal is quiet, nearly
-// invisible through the loud middle.
-const THREAD_B: [number, number][] = [
+// Echo threads — the braid lives at the EDGES ONLY in the mock: two fine
+// strands weaving around the baseline where the signal is quiet, absent
+// through the loud middle (no thin lines cross the tall crests). Each
+// segment fades out at its inner end.
+const THREAD_B_LEFT: [number, number][] = [
   [0, 184], [28, 174], [56, 186], [84, 175], [112, 185], [140, 176], [168, 184],
-  [220, 178], [290, 184], [360, 176], [430, 184], [500, 177],
-  [570, 186], [640, 175], [710, 184],
-  [770, 176], [810, 185], [850, 174], [890, 186], [930, 175], [965, 184], [1000, 178],
+  [220, 178], [268, 183], [310, 179],
 ]
-const THREAD_C: [number, number][] = [
-  [0, 176], [30, 185], [60, 175], [90, 184], [120, 176], [150, 183],
-  [230, 182], [310, 176], [390, 183], [470, 177],
-  [550, 182], [630, 178], [700, 182],
-  [780, 184], [820, 175], [860, 185], [900, 176], [940, 184], [975, 176], [1000, 182],
+const THREAD_B_RIGHT: [number, number][] = [
+  [755, 178], [790, 185], [825, 174], [860, 186], [895, 175], [930, 184], [965, 176], [1000, 181],
+]
+const THREAD_C_LEFT: [number, number][] = [
+  [0, 176], [30, 185], [60, 175], [90, 184], [120, 176], [150, 183], [200, 180], [250, 177], [300, 182],
+]
+const THREAD_C_RIGHT: [number, number][] = [
+  [770, 183], [810, 176], [850, 184], [890, 177], [930, 183], [970, 178], [1000, 176],
 ]
 
 // The mote field, positions measured off the mockup (r and brightness vary;
@@ -128,17 +135,35 @@ function Waveform() {
           <feGaussianBlur stdDeviation="5" />
         </filter>
         <radialGradient id="radio-bloom" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor={WARM} stopOpacity="0.28" />
-          <stop offset="45%" stopColor={WARM} stopOpacity="0.1" />
-          <stop offset="100%" stopColor={WARM} stopOpacity="0" />
+          <stop offset="0%" stopColor={ORB} stopOpacity="0.26" />
+          <stop offset="45%" stopColor={ORB} stopOpacity="0.09" />
+          <stop offset="100%" stopColor={ORB} stopOpacity="0" />
         </radialGradient>
         {/* the line fades in from the left edge (picking up the rule's
             hand-off) and out to the right */}
         <linearGradient id="radio-fade" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor={WARM} stopOpacity="0" />
-          <stop offset="0.14" stopColor={WARM} stopOpacity="1" />
-          <stop offset="0.92" stopColor={WARM} stopOpacity="1" />
-          <stop offset="1" stopColor={WARM} stopOpacity="0" />
+          <stop offset="0" stopColor={LINE} stopOpacity="0" />
+          <stop offset="0.14" stopColor={LINE} stopOpacity="1" />
+          <stop offset="0.92" stopColor={LINE} stopOpacity="1" />
+          <stop offset="1" stopColor={LINE} stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id="radio-fade-core" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor={LINE_CORE} stopOpacity="0" />
+          <stop offset="0.14" stopColor={LINE_CORE} stopOpacity="0.55" />
+          <stop offset="0.92" stopColor={LINE_CORE} stopOpacity="0.55" />
+          <stop offset="1" stopColor={LINE_CORE} stopOpacity="0" />
+        </linearGradient>
+        {/* the edge threads fade at their inner ends — no thin lines cross
+            the loud middle */}
+        <linearGradient id="thread-fade-out" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor={GOLD} stopOpacity="0.3" />
+          <stop offset="0.75" stopColor={GOLD} stopOpacity="0.18" />
+          <stop offset="1" stopColor={GOLD} stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id="thread-fade-in" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor={GOLD} stopOpacity="0" />
+          <stop offset="0.25" stopColor={GOLD} stopOpacity="0.18" />
+          <stop offset="1" stopColor={GOLD} stopOpacity="0.3" />
         </linearGradient>
       </defs>
 
@@ -147,25 +172,28 @@ function Waveform() {
         {/* warm halo around the heartbeat */}
         <ellipse cx="622" cy={MID} rx="215" ry="205" fill="url(#radio-bloom)" />
 
-        {/* echo threads (the edge braid) */}
-        <path d={smoothPath(THREAD_C)} stroke={GOLD} strokeWidth="0.9" opacity="0.22" />
-        <path d={smoothPath(THREAD_B)} stroke={GOLD} strokeWidth="1" opacity="0.3" />
+        {/* echo threads — edge segments only, fading at their inner ends */}
+        <path d={smoothPath(THREAD_C_LEFT)} stroke="url(#thread-fade-out)" strokeWidth="0.9" />
+        <path d={smoothPath(THREAD_B_LEFT)} stroke="url(#thread-fade-out)" strokeWidth="1" />
+        <path d={smoothPath(THREAD_C_RIGHT)} stroke="url(#thread-fade-in)" strokeWidth="0.9" />
+        <path d={smoothPath(THREAD_B_RIGHT)} stroke="url(#thread-fade-in)" strokeWidth="1" />
 
-        {/* the pulse — glow underlay, then the ribbon. The mock's line is
-            proportionally substantial (~2px on a 570px-wide band): stroke 3.6
-            here renders ~1.6px at the hero's width. */}
-        <path d={smoothPath(MAIN)} stroke={WARM} strokeWidth="8" opacity="0.16" filter="url(#radio-blur)" />
+        {/* the pulse — glow underlay, amber ribbon, bright core. The mock's
+            line is proportionally substantial (~2px on a 570px-wide band):
+            stroke 3.6 here renders ~1.6px at the hero's width. */}
+        <path d={smoothPath(MAIN)} stroke={LINE} strokeWidth="8" opacity="0.16" filter="url(#radio-blur)" />
         <path d={smoothPath(MAIN)} stroke="url(#radio-fade)" strokeWidth="3.6" strokeLinecap="round" />
+        <path d={smoothPath(MAIN)} stroke="url(#radio-fade-core)" strokeWidth="1.4" strokeLinecap="round" />
       </g>
 
       {/* the mote field (absolute coordinates, measured off the mockup) */}
       {DUST.map(([x, y, r, o], i) => (
-        <circle key={`d${i}`} cx={x} cy={y} r={r} fill={WARM} opacity={o} />
+        <circle key={`d${i}`} cx={x} cy={y} r={r} fill={ORB} opacity={o} />
       ))}
       {ORBS.map(([x, y, r, o], i) => (
         <g key={`o${i}`}>
-          <circle cx={x} cy={y} r={r * 2.6} fill={WARM} opacity={o * 0.25} filter="url(#radio-blur)" />
-          <circle cx={x} cy={y} r={r} fill={WARM} opacity={o} />
+          <circle cx={x} cy={y} r={r * 2.6} fill={ORB} opacity={o * 0.25} filter="url(#radio-blur)" />
+          <circle cx={x} cy={y} r={r} fill={ORB} opacity={o} />
         </g>
       ))}
     </svg>
@@ -192,15 +220,15 @@ export function RadioHero() {
         }
         .radio-hero-wave {
           position: absolute;
-          left: 36%;
-          right: -1.5rem;
+          left: 44%;
+          right: 0;
           top: 50%;
           transform: translateY(-50%);
           pointer-events: none;
         }
         @media (max-width: 700px) {
           .radio-rule { width: 62%; min-width: 0; }
-          .radio-hero-wave { left: 45%; right: -0.75rem; }
+          .radio-hero-wave { left: 50%; right: 0; }
         }
       ` }} />
 
