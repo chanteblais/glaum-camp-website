@@ -35,8 +35,8 @@ function RadioRow({ e, last }: { e: RadioEventRow; last: boolean }) {
   // voices RIGHT-aligned in a deep purple — a voice calling in from the
   // other side of the airwaves.
   const isSpeech = e.kind === 'broadcast' || isVoice
-  const VOICE_PURPLE = 'rgba(206,132,244,0.95)'     // the words: lighter, luminous
-  const VOICE_SIGNATURE = 'rgba(158,68,202,0.9)'    // the signature: deep and dark
+  const VOICE_PURPLE = 'rgba(158,68,202,0.95)'      // the words: deep and dark
+  const VOICE_SIGNATURE = 'rgba(206,132,244,0.85)'  // the signature: lighter, luminous
   const hasEntity = e.message.includes('**')
 
   const body = (

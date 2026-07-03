@@ -340,7 +340,7 @@ export function RadioHero() {
         @media (max-width: 700px) {
           .radio-rule { width: 55%; min-width: 0; }
           /* mobile: hug the rule line (no downward nudge) and sit further left */
-          .radio-hero-wave { left: 44%; right: -1.5rem; top: calc(50% + 4px); }
+          .radio-hero-wave { left: 44%; right: -1.5rem; top: calc(50% + 9px); }
         }
       ` }} />
 
@@ -384,8 +384,8 @@ export function RadioHero() {
           fontSize: '1.1rem',
           lineHeight: 1.5,
           letterSpacing: '0.02em',
-          // two steps darker than the band's warm gold — present, not popping
-          color: '#A98A52',
+          // three steps darker than the band's warm gold — present, not popping
+          color: '#8E7440',
           opacity: 0.88,
           position: 'relative',
           zIndex: 1,
