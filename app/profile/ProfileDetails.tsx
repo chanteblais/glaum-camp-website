@@ -165,9 +165,11 @@ export function ProfileDetails({ title = 'Profile Details' }: { title?: string }
           <span aria-hidden style={{ color: PURPLE, fontSize: '0.9rem', lineHeight: 1.4 }}>✦</span>
           <p style={{ fontSize: '0.82rem', color: '#F4E3FA', opacity: 0.9, margin: 0, lineHeight: 1.6 }}>
             {gaps.length === 1
-              ? 'There’s a detail we’d love you to add'
-              : `There are ${gaps.length} details we’d love you to add`}
-            {' '}— a few things we weren’t asking when you first joined. They’re highlighted below.
+              ? 'One more detail would round out your profile'
+              : `A few details would round out your profile`}
+            {gaps.some(g => g.required)
+              ? ' — they’re highlighted below.'
+              : ' — all optional. Add what you like, or set them aside; they’re highlighted below.'}
           </p>
         </div>
       )}
@@ -183,7 +185,7 @@ export function ProfileDetails({ title = 'Profile Details' }: { title?: string }
                 </label>
                 {isGap && (
                   <span style={{ fontSize: '0.56rem', letterSpacing: '0.1em', textTransform: 'uppercase', padding: '0.12rem 0.5rem', borderRadius: '9999px', border: '1px solid rgba(210,57,248,0.4)', color: PURPLE }}>
-                    {field.required ? 'Required' : 'Please complete'}
+                    {field.required ? 'Required' : 'Optional'}
                   </span>
                 )}
                 {isGap && !field.required && (

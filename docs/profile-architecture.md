@@ -173,21 +173,27 @@ everything reversible until the new store is proven.
   application, but people have already applied." *added-after* === *missing* — no value for the field
   — so no need to track when a field was added.
   - **Registry flags** (`lib/profile-fields.ts`): `askExisting` ("Catch-up" toggle) marks a field to
-    prompt members who lack a value; `required` makes that prompt non-dismissible. Both opt-in (off
-    by default) and editable in `Admin → Profile Fields`. Helper `profileGaps(fields, values)` derives
-    a member's gaps (enabled · memberEditable · askExisting · empty · not-dismissed-unless-required).
+    prompt members who lack a value; `required` makes that prompt non-dismissible. Admin-added fields
+    are opt-in (off by default) and editable in `Admin → Profile Fields`. The locked **Bio** (About)
+    field ships with `askExisting` **on by default** — so a member with no About gets a gentle,
+    dismissible prompt out of the box, no admin setup required (Quote stays un-nudged: decorative).
+    Helper `profileGaps(fields, values)` derives a member's gaps (enabled · memberEditable ·
+    askExisting · empty · not-dismissed-unless-required).
   - **Surfacing:** the `/profile` **Profile Details** card (Phase 4) is the catch-up surface — a
-    purple callout summarizes the gaps and each gap field is flagged (**Please complete** / **Required**)
-    with the input inline. Members fill it right there; the gap clears live as they type.
+    purple callout ("*One more detail / A few details would round out your profile — all optional…*")
+    summarizes the gaps and each gap field is flagged (**Optional** / **Required**) with the input
+    inline. Members fill it right there; the gap clears live as they type. Kept profile-only by
+    design (2026-07-03) — deliberately not surfaced on the dashboard, to stay gentle.
   - **Dismissal:** optional gaps offer **"Not now"**, persisted in `member_profiles.values` under the
     reserved `__dismissedFields` key (ignored by registry reads); required gaps can't be dismissed.
     Handled by `PATCH /api/profile/fields` (`__dismiss`).
   - **Answering** reuses the Phase 4 self-edit path (`/api/profile/fields`).
   - **Payoff:** since distinctions read profile values, backfilling retroactively *grants* honours.
-  - **To activate:** an admin toggles **Catch-up** (and optionally **Required**) on a field in
-    `Admin → Profile Fields`. Until then no one is prompted.
-  - **Future (optional):** a home-dashboard teaser / attunement-task integration (`lib/attunement.ts`)
-    so the prompt also shows off-profile; email nudge for required gaps.
+  - **To activate (extra fields):** an admin toggles **Catch-up** (and optionally **Required**) on a
+    field in `Admin → Profile Fields`. Bio is already on by default (see above), so every profile has
+    at least the About nudge without configuration.
+  - **Deliberately NOT built:** a home-dashboard teaser was considered and declined (2026-07-03) to
+    keep the nudge gentle — profile-only is the chosen surface. Email nudges remain out of scope.
 
 ## Distinctions enhancements (post-Phase-5)
 

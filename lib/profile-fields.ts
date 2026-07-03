@@ -136,7 +136,12 @@ const STORED_DEFAULT_FIELDS: ProfileField[] = [
 // admin-configurable or deletable. Still member-editable + stored. Bio backs the
 // profile's About section, so every member always has it.
 const LOCKED_STORED_FIELDS: ProfileField[] = [
-  { key: 'bio', label: 'Bio', description: 'A short introduction — shown as the "About" section on your profile.', type: 'textarea', public: true, memberEditable: true, applicationEligible: true, distinctionEligible: false, locked: true, enabled: true },
+  // `askExisting` (optional, dismissible) makes an empty About surface as a
+  // gentle "would round out your profile" gap in Profile Details — the built-in
+  // default nudge, so a profile prompts for a bio out of the box with no admin
+  // setup. Not `required`, so a member can wave it away with "Not now". Quote
+  // stays un-nudged (decorative; nagging for it would feel pushy).
+  { key: 'bio', label: 'Bio', description: 'A short introduction — shown as the "About" section on your profile.', type: 'textarea', public: true, memberEditable: true, applicationEligible: true, distinctionEligible: false, askExisting: true, locked: true, enabled: true },
   { key: 'quote', label: 'Quote', description: 'A short line shown under your name.', type: 'text', public: true, memberEditable: true, applicationEligible: true, distinctionEligible: false, locked: true, enabled: true },
 ]
 
