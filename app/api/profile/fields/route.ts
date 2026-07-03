@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { resolveMember, getMemberProfileValues, setProfileValues } from '@/lib/members'
-import { parseProfileFields, storedFields, DISMISSED_KEY, type ProfileField } from '@/lib/profile-fields'
+import { parseProfileFields, storedFields, coerceProfileValue, DISMISSED_KEY, type ProfileField } from '@/lib/profile-fields'
 
 // Member-facing read/write of registry-defined profile fields
 // (member_profiles.values). Phase 4 of profile-as-source-of-truth.
@@ -14,29 +14,6 @@ async function loadStoredFields(): Promise<ProfileField[]> {
     .from('page_content').select('value')
     .eq('key', 'config_profile_fields').maybeSingle()
   return storedFields(parseProfileFields(data?.value))
-}
-
-// Coerce an incoming value to the shape its field type expects, dropping anything
-// invalid (and, for selects, anything not in the allowed options).
-function coerceValue(field: ProfileField, raw: unknown): unknown {
-  switch (field.type) {
-    case 'multi_select': {
-      const arr = Array.isArray(raw) ? raw.map(String) : []
-      return field.options?.length ? arr.filter(v => field.options!.includes(v)) : arr
-    }
-    case 'single_select': {
-      const s = typeof raw === 'string' ? raw : ''
-      return field.options?.length && !field.options.includes(s) ? '' : s
-    }
-    case 'number': {
-      const n = typeof raw === 'number' ? raw : Number(raw)
-      return Number.isFinite(n) ? n : null
-    }
-    case 'boolean':
-      return raw === true || raw === 'true'
-    default: // text, textarea, date
-      return typeof raw === 'string' ? raw : raw == null ? '' : String(raw)
-  }
 }
 
 export async function GET() {
@@ -71,7 +48,7 @@ export async function PATCH(req: NextRequest) {
     if (key.startsWith('__')) continue // reserved control keys handled below
     const field = editable.get(key)
     if (!field) continue // ignore unknown / non-editable keys
-    updates[key] = coerceValue(field, raw)
+    updates[key] = coerceProfileValue(field, raw)
   }
 
   // Catch-up dismissal (Phase 4.5): record which optional prompts the member

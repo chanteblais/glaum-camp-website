@@ -250,7 +250,7 @@ Linked from nav as "Many Hands".
 
 ### Group Thread (`/messages/g/[groupId]`)
 
-**Who:** Members of that group (non-members are redirected to `/messages`; the API returns 403)  
+**Who:** **Approved** members of that group (non-members are redirected to `/messages`; the API returns 403). The thread API checks approved status alongside `group_members` so a lingering membership row from a removed/rejected member never grants access.  
 **What:** A shared thread for a group to coordinate. Every group has one (group messaging — full design in [group-messaging.md](group-messaging.md)).
 
 - Sticky header: back arrow, the group's icon + name. Flat, chronological message list with sender name + avatar; consecutive messages from the same sender are grouped.
@@ -388,7 +388,7 @@ Reached via the **Application Form** link panel at the top of Configure → Form
 Sections:
 - **Header** — avatar, name, status pill, submitted date
 - **Approve / Reject controls** (`AdminActions`) — visible for pending applications
-- **Remove member** (`RemoveMemberButton`) — visible for approved applications. Soft-removes: sets `status = 'cancelled'` with a reason, deletes the member's `camp_signups` (frees their role + shift), and notifies them (in-app + email). Reversible by re-approving.
+- **Remove member** (`RemoveMemberButton`) — visible for approved applications. Soft-removes: sets `status = 'cancelled'` with a reason, deletes the member's `camp_signups` + `member_shift_signups` (frees their role + shifts) **and their `group_members` rows** (group membership grants group-thread access and roster presence, so it must not outlive the membership), and notifies them (in-app + email). Reversible by re-approving (groups/role/shifts are not restored — the member re-joins them). Rejecting a pending application likewise revokes any apply-time group opt-ins.
 - **Role & Shift** (`MemberSignupCard`) — shown when the member has a `clerk_user_id`:
   - Displays current role (department, role name, commitment level, approval status) and **every shift the member holds** (title, time, day — `member_shift_signups` ∪ legacy single, deduped)
   - **"Approve role"** button — appears when `role_approval_status === 'pending'`; calls `PATCH /api/admin/role-requests/[clerkUserId]`

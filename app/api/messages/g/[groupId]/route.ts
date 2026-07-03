@@ -7,6 +7,7 @@ import {
   isGroupMember,
   markConversationRead,
 } from '@/lib/conversations'
+import { getApprovedMember } from '@/lib/members'
 import { getNotificationPreferences } from '@/lib/notification-prefs'
 import { sendGroupMentionEmail, sendGroupActivityEmail } from '@/lib/send-email'
 import { dispatchMemberNotification } from '@/lib/notify'
@@ -22,17 +23,20 @@ function escapeRegExp(s: string): string {
 }
 
 // GET /api/messages/g/[groupId] — the group's thread (flat, chronological).
-// Access is members-only.
+// Access is approved group members only: group_members grants the thread, but a
+// removed/rejected member's row may outlive their membership window, so the
+// approved-status gate runs alongside it.
 export async function GET(_req: Request, { params }: { params: { groupId: string } }) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // Membership check and conversation lookup are independent — run together.
-  const [isMember, convId] = await Promise.all([
+  // Membership + approval checks and conversation lookup are independent — run together.
+  const [isMember, approvedMember, convId] = await Promise.all([
     isGroupMember(params.groupId, userId),
+    getApprovedMember(userId),
     findGroupConversation(params.groupId),
   ])
-  if (!isMember) {
+  if (!isMember || !approvedMember) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
   if (!convId) return NextResponse.json({ messages: [] })
@@ -90,17 +94,20 @@ export async function POST(req: Request, { params }: { params: { groupId: string
 
   // Membership gate, conversation lookup (read-only here — creation waits for
   // the gate), and the sender-name snapshot are independent: one round-trip.
+  // The status check mirrors GET: a lingering group_members row must not let a
+  // removed/rejected member keep posting.
   const [isMember, existingConvId, { data: senderApp }] = await Promise.all([
     isGroupMember(params.groupId, userId),
     findGroupConversation(params.groupId),
-    // Snapshot the sender's display name (the messages table has no FK to applications).
+    // Snapshot the sender's display name (the messages table has no FK to
+    // applications) — status rides along for the approval gate.
     supabaseAdmin
       .from('members')
-      .select('preferred_name, first_name')
+      .select('preferred_name, first_name, status')
       .eq('clerk_user_id', userId)
       .maybeSingle(),
   ])
-  if (!isMember) {
+  if (!isMember || senderApp?.status !== 'approved') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

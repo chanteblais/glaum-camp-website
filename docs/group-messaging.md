@@ -20,6 +20,9 @@ The shipped build follows this design; a few details were refined during impleme
   derive "which groups am I in" from `group_members` (source of truth), and a participant row is
   created **lazily** on first read/post to hold `last_read_at`. Net effect: adding/removing a
   group member needs no messaging wiring — only group *creation* makes the conversation.
+  Thread read/post additionally gates on `members.status === 'approved'` (QA sweep 2026-07-03:
+  a `group_members` row lingering past a removal/rejection must not keep granting access;
+  remove/reject now also delete those rows).
 - **Replies are group-thread only.** DMs stay linear (one-level replies in a 1:1 would be odd).
 - **`@mention` parsing is server-side** against current member display names (the composer
   autocomplete just inserts the exact name), so mentions in replies notify too. Mention →

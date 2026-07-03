@@ -52,7 +52,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   await setMemberStatus(application?.clerk_user_id ?? null, id, 'cancelled')
 
   // Free up their role + shift slots (role lives on camp_signups; shift claims
-  // live on member_shift_signups since the shifts redesign)
+  // live on member_shift_signups since the shifts redesign) and revoke group
+  // memberships — group_members is what grants group-thread access and roster
+  // presence, so it must not outlive the membership.
   if (application?.clerk_user_id) {
     await Promise.all([
       supabaseAdmin
@@ -61,6 +63,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         .eq('clerk_user_id', application.clerk_user_id),
       supabaseAdmin
         .from('member_shift_signups')
+        .delete()
+        .eq('clerk_user_id', application.clerk_user_id),
+      supabaseAdmin
+        .from('group_members')
         .delete()
         .eq('clerk_user_id', application.clerk_user_id),
     ])

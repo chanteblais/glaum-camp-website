@@ -34,6 +34,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   // Dual-write: mirror the rejection onto the canonical member record.
   await setMemberStatus(application?.clerk_user_id ?? null, params.id, 'rejected')
 
+  // Revoke apply-time group opt-ins — group_members grants group-thread access
+  // and roster presence, which a rejected applicant shouldn't keep.
+  if (application?.clerk_user_id) {
+    await supabaseAdmin
+      .from('group_members')
+      .delete()
+      .eq('clerk_user_id', application.clerk_user_id)
+  }
+
   // Notify the applicant
   if (application?.clerk_user_id) {
     const message = 'The Many Hands have reviewed your application. Unfortunately it wasn\'t a fit for this gathering.'
