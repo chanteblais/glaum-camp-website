@@ -520,6 +520,7 @@ export function ScheduleManager({ rangeStart, rangeEnd }: { rangeStart?: string;
   const [view, setView] = useState<'list' | 'week'>('list')
   const [saving, setSaving] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
+  const [moveError, setMoveError] = useState<string | null>(null)
   const draggedId = useRef<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({})
@@ -608,6 +609,30 @@ export function ScheduleManager({ rangeStart, rangeEnd }: { rangeStart?: string;
     if (!ok) return
     await fetch(`/api/admin/schedule/${id}`, { method: 'DELETE' })
     setEvents((prev) => prev.filter((e) => e.id !== id))
+  }
+
+  // Drop from the week grid: same-shape PATCH as the modal (structured times +
+  // derived display string; the server re-derives `day` from event_date).
+  // Optimistic — the block stays where it landed, and snaps back on failure.
+  const handleMove = async (id: string, dateIso: string, start: string, end: string | null) => {
+    const ev = events.find(e => e.id === id)
+    if (!ev) return
+    const prev = events
+    const time = formatShiftRange(start, end) || ev.time
+    setMoveError(null)
+    setEvents(p => p.map(e => e.id === id
+      ? { ...e, event_date: dateIso, day: weekdayFromISO(dateIso) ?? e.day, start_time: start, end_time: end, time }
+      : e))
+    try {
+      const res = await fetch(`/api/admin/schedule/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_date: dateIso, start_time: start, end_time: end, time }),
+      })
+      if (!res.ok) { const d = await res.json().catch(() => null); throw new Error(d?.error) }
+    } catch (e: unknown) {
+      setEvents(prev)
+      setMoveError(e instanceof Error && e.message ? e.message : 'Something went wrong — the event snapped back')
+    }
   }
 
   const handleToggleVisible = async (event: ScheduleEvent) => {
@@ -751,9 +776,13 @@ export function ScheduleManager({ rangeStart, rangeEnd }: { rangeStart?: string;
         </div>
       </div>
 
-      {/* Week view — day columns × hour axis; click empty slot to add there */}
+      {/* Week view — day columns × hour axis; click empty slot to add there,
+          drag a block to move it to a new time/day */}
       {view === 'week' && (
         <div style={{ marginBottom: '1.5rem' }}>
+          {moveError && (
+            <p style={{ color: '#ff8a8a', fontSize: '0.78rem', margin: '0 0 0.6rem' }}>{moveError}</p>
+          )}
           <ScheduleWeekView
             events={events}
             days={days}
@@ -761,6 +790,7 @@ export function ScheduleManager({ rangeStart, rangeEnd }: { rangeStart?: string;
             rosters={rosters}
             onEdit={id => { const ev = events.find(e => e.id === id); if (ev) openEdit(ev) }}
             onAddAt={(iso, time) => openAdd(iso, time)}
+            onMove={handleMove}
           />
         </div>
       )}
