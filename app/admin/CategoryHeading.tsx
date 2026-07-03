@@ -11,7 +11,7 @@ export function CategoryHeading({ id, large }: { id: string; large?: boolean }) 
       style={{
         scrollMarginTop: '6rem',
         fontFamily: 'TokyoDreams, serif',
-        fontSize: large ? '1.5rem' : '1.15rem',
+        fontSize: large ? '1.5rem' : '1.4rem',
         color: '#C8A848',
         opacity: 0.85,
         margin: '3.5rem 0 1.5rem',

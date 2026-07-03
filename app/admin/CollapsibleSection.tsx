@@ -51,12 +51,12 @@ export function CollapsibleSection({
           textAlign: 'left',
         }}
       >
-        <span style={{ fontSize: '0.7rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.7 }}>
+        <span style={{ fontSize: '0.95rem', letterSpacing: '0.16em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.85, flexShrink: 0 }}>
           {title}
         </span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
           {summary && !open && (
-            <span style={{ fontSize: '0.75rem', color: '#F3EDE6', opacity: 0.35 }}>{summary}</span>
+            <span style={{ fontSize: '0.75rem', color: '#F3EDE6', opacity: 0.35, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{summary}</span>
           )}
           <span style={{ fontSize: '0.65rem', color: '#C8A848', opacity: 0.4 }}>
             {open ? '▲' : '▼'}

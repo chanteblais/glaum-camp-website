@@ -1,9 +1,10 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ATTUNEMENT_REQUIREMENTS,
   ATTUNEMENT_NUDGE_OPTIONS,
+  ATTUNEMENT_NUDGE_UTC_HOUR,
   type AttunementRequirement,
   type AttunementTask,
 } from '@/lib/site-config'
@@ -94,6 +95,17 @@ export function AttunementTasksManager({
   // Reminder-email cadence (config_attunement_nudge_days; 0 = off) — saved
   // immediately, a select change is already a deliberate action.
   const [nudgeDays, setNudgeDays] = useState(initialNudgeDays)
+
+  // Next fire of the daily nudge cron, in the viewer's timezone. Computed
+  // after mount — the server render can't know the viewer's zone.
+  const [nextRun, setNextRun] = useState<string | null>(null)
+  useEffect(() => {
+    const now = new Date()
+    const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), ATTUNEMENT_NUDGE_UTC_HOUR))
+    if (next <= now) next.setUTCDate(next.getUTCDate() + 1)
+    const time = next.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    setNextRun(`${next.toDateString() === now.toDateString() ? 'today' : 'tomorrow'} at ${time}`)
+  }, [])
   async function changeNudgeDays(value: number) {
     setNudgeDays(value)
     try {
@@ -179,6 +191,11 @@ export function AttunementTasksManager({
             Members with outstanding tasks get an email at this cadence (mornings). Members can opt out;
             fully attuned members never get one.
           </span>
+          {nudgeDays > 0 && nextRun && (
+            <span style={{ display: 'block', fontSize: '0.72rem', color: GOLD, opacity: 0.65, marginTop: '0.2rem' }}>
+              Next run: {nextRun}
+            </span>
+          )}
         </div>
         <select
           value={nudgeDays}
