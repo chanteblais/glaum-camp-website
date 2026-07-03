@@ -12,7 +12,7 @@
 | [Pre-Production](pre-prod.md) | Checklist of things to complete before going live |
 | [QA Log](qa-log.md) | QA sweeps: what was tested/fixed, known-and-deliberate behaviors (don't re-report), open items, highest-value manual tests |
 | [Multi-Community Roadmap](multi-community.md) | Long-term direction, what's already configurable, phased migration plan |
-| [Mobile Companion](mobile-companion.md) | Long-term mobile app direction — member companion, not the website in a shell; disciplines to hold now |
+| [Mobile — One Product, Two Clients](mobile-companion.md) | Long-term mobile direction — same product and IA on both clients, mobile optimized for quick interactions; disciplines to hold now |
 
 ---
 
