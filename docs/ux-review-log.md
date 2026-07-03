@@ -7,6 +7,34 @@ Newest review at the top. Fixes are only applied once agreed.
 
 ---
 
+## Session close-out — 2026-07-02 (evening)
+
+### 19. `/admin/[id]` URL says nothing about what it is · Severity: low (advice) · Status: proposed
+
+Chanté (the app's own author) mistook an `/admin/<uuid>` link for the public
+profile — three person-views exist (`/admin/[id]` admin dossier, `/members/[id]`
+public profile, `/profile` own profile) and the admin one's URL self-describes
+least. Proposal: rename to `/admin/member/[id]` with a redirect from the old path
+(notification emails link to it), whenever routes are next touched.
+
+### 20. Orphaned `cf_*` keys in `member_profiles.values` — investigated · Status: resolved (explained); cleanup proposed
+
+The ~8 members carrying raw `cf_*` keys (noticed in the 2026-07-02 morning pass):
+all four keys map to live form fields ("Current Attunement Status", "Confirmation",
+"Preferred Role", "Space Requrements") whose `profileFieldKey` binding is now null.
+They're relics of the profile catch-up seeding; the values duplicate
+`applications.custom_answers`, render nowhere, and orphan nothing. **Proposed
+cleanup (needs Chante's go-ahead, ~5-line script):** strip `cf_*` keys from
+`member_profiles.values` so stored profile data is exactly the registry's schema.
+Harmless to leave; mildly confusing to future debugging if kept.
+
+### Content note
+
+- Form field label "Space Requrements" (member-facing, apply form) — typo for
+  "Space Requirements"; fix in the Application Builder (labels rename safely).
+
+---
+
 ## Tier A implementation — 2026-07-02 (from docs/admin-ux-handoff.md, `feat/admin-ux-tier-a`)
 
 Chanté asked for the handoff brief's work to begin. Tier A shipped this round
