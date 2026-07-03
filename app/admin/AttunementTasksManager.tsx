@@ -184,12 +184,13 @@ export function AttunementTasksManager({
           value={nudgeDays}
           onChange={e => changeNudgeDays(parseInt(e.target.value, 10))}
           style={{
-            background: '#1A0A24', color: CREAM, border: '1px solid rgba(200,168,72,0.3)',
-            borderRadius: '0.5rem', padding: '0.4rem 0.6rem', fontSize: '0.8rem', cursor: 'pointer',
+            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(200,168,72,0.2)',
+            borderRadius: '0.3rem', color: CREAM, fontSize: '0.75rem',
+            padding: '0.2rem 0.4rem', outline: 'none', fontFamily: 'inherit', cursor: 'pointer',
           }}
         >
           {ATTUNEMENT_NUDGE_OPTIONS.map(o => (
-            <option key={o.value} value={o.value}>{o.label}</option>
+            <option key={o.value} value={o.value} style={{ background: '#1A0A24' }}>{o.label}</option>
           ))}
         </select>
       </div>
