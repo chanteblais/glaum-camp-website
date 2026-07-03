@@ -143,6 +143,9 @@ image-gen → potrace pipeline and its prompt language live in `design/icon-lab/
      chisel strokes.
    - **The hand crops at the palm base.** No wrist, no forearm at icon scale.
    - Delivered as transparent-background assets in `public/asset-library/icons/`.
+   - The whole method is a tool: `scripts/strike-icon.py` (subject + optional geometry
+     anchor → regal strike → keyed transparent, cropped, webp). Exploration history and
+     galleries are archived under `design/icon-lab/regal/` on the design-exploration branch.
 
 ## 8. Status
 

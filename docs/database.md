@@ -1,6 +1,6 @@
 # Database Schema
 
-All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations in `supabase-migrations/` document incremental changes (latest here: `054`; all of `025`–`050` + `054` **applied in prod** as of 2026-07-02; `051`–`053` live on the shared-resources branch, not in this tree — numbering skips them deliberately). Confirm `025` (column renames), `029` (the `application-files` bucket), `033` (group messaging), `034`/`035` (group icon images + `group-badges` bucket, `badge_image` → `icon_image`), `036`–`038` (public profile fields, members/profiles, member distinctions), `039`–`041` (lead-up gatherings + notify/image), `042`–`044` (group collections + per-collection profile visibility + per-collection self-join), `045`–`047` (shifts redesign + shift times), and `048`/`049` (participation leads + per-event lead opt-in; the gathering halves are dropped by `050`) are applied before relying on those features.
+All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations in `supabase-migrations/` document incremental changes (latest: `055`; all of `025`–`055` **applied in prod** as of 2026-07-02). Confirm `025` (column renames), `029` (the `application-files` bucket), `033` (group messaging), `034`/`035` (group icon images + `group-badges` bucket, `badge_image` → `icon_image`), `036`–`038` (public profile fields, members/profiles, member distinctions), `039`–`041` (lead-up gatherings + notify/image), `042`–`044` (group collections + per-collection profile visibility + per-collection self-join), `045`–`047` (shifts redesign + shift times), and `048`/`049` (participation leads + per-event lead opt-in; the gathering halves are dropped by `050`) are applied before relying on those features.
 
 ---
 
@@ -545,7 +545,11 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `048_participation_leads.sql` | **Participation leads.** Adds `role` (`'member'`/`'lead'`, default `'member'`) to `member_shift_signups` **and** `lead_up_event_rsvps` — members offer to lead what they join; the role lives on the participation row (dies with the signup; co-leads = multiple lead rows; display-only). Additive + idempotent. *(The `lead_up_event_rsvps` half is dropped by `050`.)* |
 | `049_needs_lead.sql` | **Per-event lead opt-in.** `needs_lead BOOL` (default false) on `schedule_events` **and** `lead_up_events` — whether an event *has* a lead role is the organizer's call at creation; all member lead affordances (048) are gated on it, and the offer moves to signup/RSVP time. Additive + idempotent. *(The `lead_up_events` half is dropped by `050`.)* |
 | `050_scrap_gathering_leads.sql` | **Scrap gathering leads.** Leads become a **shifts-only** concept: drops `lead_up_event_rsvps.role` + `lead_up_events.needs_lead` (the gathering halves of 048/049). **Destructive by design** — discards any recorded gathering-lead offers. Idempotent via `IF EXISTS`. |
-| `054_structured_event_times.sql` | **Structured event times everywhere.** Data-only (no schema change): backfills `schedule_events.start_time`/`end_time` from the free-text `time` (fills NULLs only) and converts `lead_up_events.start_time`/`end_time` display strings ("6:00 PM") to `"HH:MM"` in place. Unparseable values are left untouched (code renders them as-is via `clockLabel`). Idempotent. *(051–053 belong to the shared-resources branch.)* |
+| `051_shared_resources.sql` | **Shared resources.** `resource_lists` + `resources` + `resource_claims` — admin-authored needs ("4 camping stoves"), met by one-click member claims with quantities; totals always derived from claim rows. Additive + idempotent; **must be applied** before the feature works. See [`shared-resources.md`](./shared-resources.md). |
+| `052_resource_list_stewards.sql` | **Resource-list stewards beyond groups.** Adds `department_id` + `role_id` to `resource_lists` (both `ON DELETE SET NULL`) + an at-most-one-steward CHECK (`resource_lists_one_steward`, exclusive arc over group/department/role). Stewardship stays display-only. Additive + idempotent. |
+| `053_resource_offers.sql` | **Open-ended resource offers.** `resources.quantity_needed` becomes **nullable** (NULL = open callout, no set target) + adds `offered_by TEXT` (the member who listed it; NULL = admin-authored). Members offer unlisted gear; admins edit a target on (→ tracked need) or delete. Additive + idempotent. |
+| `054_structured_event_times.sql` | **Structured event times everywhere.** Data-only (no schema change): backfills `schedule_events.start_time`/`end_time` from the free-text `time` (fills NULLs only) and converts `lead_up_events.start_time`/`end_time` display strings ("6:00 PM") to `"HH:MM"` in place. Unparseable values are left untouched (code renders them as-is via `clockLabel`). Idempotent. |
+| `055_resource_item_icons.sql` | **Resource item icons.** `resources.icon TEXT` — optional image reference (asset-library path or uploaded `group-badges` URL, `resources/` prefix), following the `departments.icon` idiom. Additive + idempotent. *(Was briefly numbered 054 on the branch; renumbered at merge — 054 was taken by structured event times.)* |
 
 ---
 
@@ -584,6 +588,55 @@ Per-session RSVP to a lead-up gathering. Presence of a row = "I'll be at this pl
 | | | `UNIQUE (lead_up_event_id, clerk_user_id)` |
 
 *(Gathering leads — a `role` column here + `needs_lead` on `lead_up_events` — were built and scrapped 2026-07-02; dropped by migration `050`. Leads are shifts-only.)*
+
+---
+
+### `resource_lists`
+
+A named collection of shared-resource needs ("Shared Kitchen", "Setup Equipment") — the gear members bring to the event. Community-scoped by design: no polymorphic *owners* and no event scoping (see [`shared-resources.md`](./shared-resources.md) → Non-goals). The optional **steward** is a group, department, **or** role — at most one, via the exclusive-arc CHECK `resource_lists_one_steward` (migration `052`) — and is display context only, never a permission gate. Managed in Admin → Manage → Shared Resources.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `title` | TEXT | |
+| `description` | TEXT | optional |
+| `group_id` | UUID FK → `groups.id` (ON DELETE SET NULL) | steward, group flavour |
+| `department_id` | UUID FK → `departments.id` (ON DELETE SET NULL) | steward, department flavour (migration `052`) |
+| `role_id` | UUID FK → `roles.id` (ON DELETE SET NULL) | steward, role flavour (migration `052`) |
+| `visible` | BOOL | shown to members on `/participate` → "Bring Something" (hidden = admin work-in-progress) |
+| `sort_order` | INT | default 0; display falls back to `created_at` |
+
+---
+
+### `resources`
+
+One item per row within a list — either a **need** (has a target) or an **open offer/callout** (no target, migration `053`).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `list_id` | UUID FK → `resource_lists.id` (ON DELETE CASCADE) | |
+| `name` | TEXT | e.g. "Camping stove" |
+| `note` | TEXT | optional, e.g. "two-burner, with propane" |
+| `quantity_needed` | INT | ≥ 1, **or NULL** = open callout with no set target (migration `053`). Admin setting a number on a member offer turns it into a tracked need |
+| `offered_by` | TEXT | clerk_user_id of the member who offered it; NULL = admin-authored (migration `053`). A member retracting their own offer's claim deletes the row if nobody else has claimed |
+| `icon` | TEXT | optional icon image reference (asset-library path or uploaded `group-badges` URL, `resources/` prefix — migration `055`); shown on member cards, admin rows, and profile BRINGING rows |
+| `sort_order` | INT | default 0; display falls back to `created_at` |
+
+---
+
+### `resource_claims`
+
+A member's "I'll bring one" — one row per member per resource, carrying a quantity (three coolers = one row, quantity 3). A claim **is** the confirmation (no pledge→confirm workflow); deleting the row unclaims. Fulfilled totals are always **derived** by summing claim rows — never stored.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `resource_id` | UUID FK → `resources.id` (ON DELETE CASCADE) | |
+| `clerk_user_id` | TEXT | |
+| `quantity` | INT | ≥ 1 (API clamps to 1–99; 0 = delete the row) |
+| `updated_at` | TIMESTAMPTZ | bumped on quantity change |
+| | | `UNIQUE (resource_id, clerk_user_id)` |
 
 ---
 

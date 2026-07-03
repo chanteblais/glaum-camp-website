@@ -6,6 +6,7 @@ import { Section, Kicker, GoldDivider } from '@/components/Section'
 import { ScheduleSection } from '@/components/ScheduleSection'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getMemberGroups } from '@/lib/groups'
+import { getUnmetResourceNeeds } from '@/lib/resources'
 import { buildAttunementChecklist, memberGroupCounts, requiredItems, commitmentItems } from '@/lib/attunement'
 import { getMemberShiftState, EMPTY_MEMBER_SHIFT_STATE } from '@/lib/shift-attunement'
 import { clockLabel } from '@/lib/shift-hours'
@@ -215,7 +216,7 @@ let canManagePolls = false
   const c = (key: string, fallback: string) => pageContent[key] ?? fallback
 
   // ── Dashboard layout (admin-configurable widget order) ────────
-  const DEFAULT_WIDGET_ORDER = ['announcements', 'shoutouts', 'polls', 'events', 'spotlight', 'activity']
+  const DEFAULT_WIDGET_ORDER = ['announcements', 'resources', 'shoutouts', 'polls', 'events', 'spotlight', 'activity']
   let dashLayout: { order: string[]; hidden: string[]; widths?: Record<string, string> } = { order: DEFAULT_WIDGET_ORDER, hidden: [] }
   try {
     if (pageContent['dashboard_layout']) dashLayout = JSON.parse(pageContent['dashboard_layout'])
@@ -259,6 +260,10 @@ let canManagePolls = false
   const commitmentTasks = commitmentItems(attunementTasks)
   const allAttuned = requiredTasks.every(t => t.done)
   const commitmentsOutstanding = commitmentTasks.filter(t => !t.done).length
+
+  // Unmet shared-resource needs → the "Bring Something" banner. Demand-driven:
+  // renders nothing once the community has everything covered.
+  const unmetNeeds = isApproved ? await getUnmetResourceNeeds() : []
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
@@ -477,6 +482,48 @@ let canManagePolls = false
                     </div>
                   </div>
                 ) : null,
+
+                // Unmet shared-resource needs, one row per list with gaps —
+                // the LIST is the headline ("Shared Kitchen"), the item count
+                // the description. Whole card clicks through to
+                // /participate#bring. Demand-driven like announcements:
+                // hidden once everything is covered.
+                resources: unmetNeeds.length > 0 ? (() => {
+                  const byList: { title: string; items: typeof unmetNeeds }[] = []
+                  for (const n of unmetNeeds) {
+                    let g = byList.find(x => x.title === n.listTitle)
+                    if (!g) { g = { title: n.listTitle, items: [] }; byList.push(g) }
+                    g.items.push(n)
+                  }
+                  const shown = byList.slice(0, 3)
+                  return (
+                    <a href="/participate#bring" style={{ border: '1px solid rgba(200,168,72,0.25)', borderRadius: '1rem', background: 'rgba(10,0,20,0.5)', overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box', textDecoration: 'none' }}>
+                      <div style={{ padding: '1rem 1.5rem 0.75rem', borderBottom: '1px solid rgba(200,168,72,0.12)' }}>
+                        <p style={{ fontSize: '0.62rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, margin: 0 }}>Bring Something</p>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        {shown.map((g, i) => (
+                          <div key={g.title || i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', padding: '1rem 1.5rem', borderBottom: i < shown.length - 1 ? '1px solid rgba(200,168,72,0.08)' : 'none' }}>
+                            <div style={{ minWidth: 0 }}>
+                              <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.05rem', color: '#C8A848', margin: '0 0 0.25rem' }}>
+                                {g.title || 'Shared Resources'}
+                              </p>
+                              <p style={{ fontSize: '0.78rem', opacity: 0.45, margin: 0, color: '#F3EDE6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {g.items.length} item{g.items.length === 1 ? '' : 's'} still needed — {g.items.slice(0, 3).map(n => n.name).join(', ')}{g.items.length > 3 ? ', …' : ''}
+                              </p>
+                            </div>
+                            <span style={{ fontSize: '1rem', color: '#C8A848', opacity: 0.4, flexShrink: 0 }}>→</span>
+                          </div>
+                        ))}
+                        {byList.length > 3 && (
+                          <p style={{ margin: 0, padding: '0 1.5rem 0.9rem', fontSize: '0.72rem', opacity: 0.4, fontStyle: 'italic' }}>
+                            +{byList.length - 3} more list{byList.length - 3 === 1 ? '' : 's'} with needs
+                          </p>
+                        )}
+                      </div>
+                    </a>
+                  )
+                })() : null,
 
                 shoutouts: (
                   <ShoutoutWidget

@@ -51,7 +51,7 @@ Sign-out flow:
 /apply                   Application form (4 states, see Features doc)
 /volunteer               Outside volunteer signup
 /profile                 Logged-in member profile (designation, commitments, distinctions)
-/participate             Participate — role picker, shift calendar, self-join groups (renamed from /signup 2026-07-02; permanent redirect in next.config.js)
+/participate             Participate page: role + shift pickers, Bring Something (resources), Your Groups (renamed from /signup 2026-07-02; /signup permanently redirects here via next.config.js)
 /roles                   Registry of Roles — full departments + roles documentation, claimable in place
 /members                 Member directory (approved members only)
 /members/[id]            Individual member view
@@ -80,6 +80,9 @@ Sign-out flow:
 | `/api/signup` | GET/POST | Fetch departments/roles + upsert member **role** selection. Sets `role_approval_status = 'pending'` for roles with `requires_approval = true`. (Shift halves are legacy — shifts moved to `/api/shift-signups`.) |
 | `/api/shift-signups` | GET/POST/DELETE | **Multi-shift signup** (shifts redesign): GET slots + owed hour requirements (incl. `lead_names`/`held_role`), POST sign up for a slot (capacity + signup-open enforced, admin notified; optional `role: 'member'\|'lead'` — omitted keeps the existing role), DELETE cancel (also clears the legacy `camp_signups.schedule_event_id`). Backed by `member_shift_signups`. |
 | `/api/groups/membership` | GET/POST | Self-service opt-in groups for the current member. GET lists groups whose **collection has `self_join` on** (migration `044`; no collection ⇒ not self-joinable) + the member's joined state, **grouped by collection** (each group carries `collection_id`/`collection_name`, ordered by collection `sort_order`); POST `{ group_id, joined }` joins (`source='application'`) or leaves (re-checks the same gate). Separate from the apply form's `group_select` fields, from `show_on_profile` (profile display), and from group `visibility` (Find-a-group). Powers the **Your Groups** section on `/participate`. |
+| `/api/resources` | GET | Shared resources, member view: **visible** lists (empty ones included — they're offer targets) with items, community claimed totals, the caller's own claim quantity (`mine`), and offer attribution (`offered_by_name`/`offered_by_me`). Powers the **Bring Something** section on `/participate`. |
+| `/api/resources/claims` | POST | Set my claim on a resource: `{ resource_id, quantity }` — quantity ≥1 upserts the single per-member claim row (clamped 1–99), 0 removes it. Removing the last claim on **your own offer** deletes the offer row too (retraction). Rejects items on hidden lists. |
+| `/api/resources/offers` | POST | Offer unlisted gear: `{ list_id, name, note }` → creates an open-callout item (`quantity_needed NULL`, `offered_by` = caller, migration `053`) + the offerer's ×1 claim. Visible lists only. |
 | `/api/profile/application` | PATCH | Update profile fields |
 | `/api/profile/avatar` | POST | Upload avatar to Supabase Storage |
 | `/api/profile/cancel` | POST | Cancel own application |
@@ -115,6 +118,11 @@ Sign-out flow:
 | `/api/admin/groups/[id]` | PATCH/DELETE | Update / delete group |
 | `/api/admin/groups/[id]/members` | GET/POST/DELETE | Group roster / add member / remove member (`?clerk_user_id=`) |
 | `/api/admin/groups/[id]/icon` | POST/DELETE | Upload / clear a group's icon image (`group-badges` bucket, `groups/` prefix; sets `groups.icon_image`). Mirrors the avatar route. |
+| `/api/admin/resources` | GET/POST | Shared resources, admin view: all lists (hidden included; `steward_name` resolved from the group/department/role FK) with items, claimed totals, **and claimant names** (via `memberDisplayNames`) / create a list (at most one steward id enforced) |
+| `/api/admin/resources/[id]` | PATCH/DELETE | Update / delete a resource list (items + claims cascade) |
+| `/api/admin/resources/items` | POST | Add an item to a list |
+| `/api/admin/resources/items/[id]` | PATCH/DELETE | Update / delete an item (claims cascade) |
+| `/api/admin/resources/items/[id]/icon` | POST | Upload a resource item icon (`group-badges` bucket, `resources/` prefix; returns URL, stored in `resources.icon`). Mirrors the departments icon route. |
 | `/api/admin/distinctions/[id]/icon` | POST | Upload distinction medal art (`group-badges` bucket, `distinctions/` prefix; returns URL, stored in `config_distinctions`). Used by the shared `AssetImagePicker`. |
 | `/api/admin/departments/[id]/icon` | POST | Upload a department icon (`group-badges` bucket, `departments/` prefix; returns URL, stored in `departments.icon`). `[id]` is the row id or a client-generated key for not-yet-saved departments. |
 | `/api/admin/schedule` | GET/POST | List / create schedule events |
