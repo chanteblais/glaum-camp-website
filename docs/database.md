@@ -1,6 +1,6 @@
 # Database Schema
 
-All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations in `supabase-migrations/` document incremental changes (latest here: `056`; all of `025`–`055` **applied in prod** as of 2026-07-02, `056` **pending**). Confirm `025` (column renames), `029` (the `application-files` bucket), `033` (group messaging), `034`/`035` (group icon images + `group-badges` bucket, `badge_image` → `icon_image`), `036`–`038` (public profile fields, members/profiles, member distinctions), `039`–`041` (lead-up gatherings + notify/image), `042`–`044` (group collections + per-collection profile visibility + per-collection self-join), `045`–`047` (shifts redesign + shift times), and `048`/`049` (participation leads + per-event lead opt-in; the gathering halves are dropped by `050`) are applied before relying on those features.
+All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations in `supabase-migrations/` document incremental changes (latest here: `057`; all of `025`–`056` **applied in prod** as of 2026-07-02, `057` **pending**). Confirm `025` (column renames), `029` (the `application-files` bucket), `033` (group messaging), `034`/`035` (group icon images + `group-badges` bucket, `badge_image` → `icon_image`), `036`–`038` (public profile fields, members/profiles, member distinctions), `039`–`041` (lead-up gatherings + notify/image), `042`–`044` (group collections + per-collection profile visibility + per-collection self-join), `045`–`047` (shifts redesign + shift times), and `048`/`049` (participation leads + per-event lead opt-in; the gathering halves are dropped by `050`) are applied before relying on those features.
 
 ---
 
@@ -239,7 +239,8 @@ Public camp schedule entries. **Reworked by the shifts redesign** (see [shifts-r
 | `icon_type` | TEXT | Icon identifier: a built-in glyph name (legacy) or an image URL from the asset library / upload (`AssetImagePicker`) |
 | `visible` | BOOL | Whether shown on public schedule |
 | `highlight` | BOOL | Whether visually highlighted |
-| `is_recurring` | BOOL | Daily recurring (no date) |
+| `is_recurring` | BOOL | Recurring (no single date) |
+| `recurrence_days` | TEXT[] | Recurring only: NULL = repeats every day of the event range; an array of ISO dates = repeats on just those days (057) |
 | `sort_order` | INT | |
 | `event_date` | DATE | The event's real calendar date. **Required for non-recurring events** (editor enforces); drives calendar day columns, admin list ordering, and Upcoming Gatherings filtering |
 | `participation_type` | TEXT | `'general'` (optional/info) / `'shift'` (signable slots) / `'mandatory'` (everyone attends). Migration `046` |
@@ -552,6 +553,7 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `054_structured_event_times.sql` | **Structured event times everywhere.** Data-only (no schema change): backfills `schedule_events.start_time`/`end_time` from the free-text `time` (fills NULLs only) and converts `lead_up_events.start_time`/`end_time` display strings ("6:00 PM") to `"HH:MM"` in place. Unparseable values are left untouched (code renders them as-is via `clockLabel`). Idempotent. |
 | `055_resource_item_icons.sql` | **Resource item icons.** `resources.icon TEXT` — optional image reference (asset-library path or uploaded `group-badges` URL, `resources/` prefix), following the `departments.icon` idiom. Additive + idempotent. *(Was briefly numbered 054 on the branch; renumbered at merge — 054 was taken by structured event times.)* |
 | `056_attunement_nudges.sql` | **Attunement nudge emails.** Adds `email_attunement_nudges BOOL` (default TRUE) to `notification_preferences` + the `attunement_nudges` send ledger (one row per member: `last_sent_at`, `outstanding_count`, `nudge_count`). Additive + idempotent; **must be applied before deploying** the nudge branch — `getNotificationPreferences` selects the new column, and an errored select fails open to all-defaults-ON. |
+| `057_recurrence_days.sql` | **Recurring events on chosen dates.** Adds `recurrence_days TEXT[]` (default NULL) to `schedule_events`: NULL = every day (old behavior, existing rows untouched), an array of ISO dates = only those days. Additive, non-destructive; **must be applied before deploying** this branch — the member `ScheduleSection` selects the new column. |
 
 ---
 

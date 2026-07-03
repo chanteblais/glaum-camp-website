@@ -4,15 +4,19 @@
 // vertical hour axis (the same visual language as the member calendar,
 // components/ScheduleCalendarClient.tsx: same hour scale, same shift-type
 // hues), with admin interactions on top: click a block to edit it, click an
-// empty slot to add an event with that date + time prefilled. Overlaps and
-// gaps that are invisible in the list view jump out here.
+// empty slot to add an event with that date + time prefilled, and drag a block
+// to reschedule it — vertical moves the time (15-minute snap, duration kept),
+// crossing columns moves the day. Overlaps and gaps that are invisible in the
+// list view jump out here.
 //
-// Recurring (daily) events render as ghosted bands in every column — context,
-// not clutter. Dated events missing a parseable time surface in a fix-me
-// strip below the grid.
+// Recurring events render as ghosted bands in each column they repeat on
+// (recurrence_days NULL = every day) — context, not clutter (they have no
+// single date, so they stay click-to-edit). Dated events missing a parseable
+// time surface in a fix-me strip below the grid.
 
+import { useRef, useState } from 'react'
 import { MANDATORY_HUE, shiftHue, shiftColorIndexMap } from '@/lib/shift-colors'
-import { parseHHMM } from '@/lib/shift-hours'
+import { parseHHMM, formatShiftRange } from '@/lib/shift-hours'
 import { rangeTo24h } from '@/lib/time-format'
 import type { ScheduleDay } from '@/lib/schedule-days'
 
@@ -31,12 +35,21 @@ type WeekViewEvent = {
   capacity: number | null
   start_time: string | null
   end_time: string | null
+  recurrence_days: string[] | null
 }
 
 type RosterEntry = { role: 'member' | 'lead' }
 
 const PX_PER_HOUR = 56
 const GOLD = '#C8A848'
+const HEADER_H = 46 // day-column header height — the hour grid starts below it
+const DRAG_SNAP_MIN = 15
+
+// Minutes-from-midnight → "HH:MM" (mod 24h, so an overnight block's end wraps).
+function toHHMM(mins: number): string {
+  const m = ((Math.round(mins) % 1440) + 1440) % 1440
+  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+}
 
 // Minutes from midnight, structured times first, legacy free text as fallback.
 function eventMinutes(e: WeekViewEvent): { start: number | null; end: number | null } {
@@ -53,9 +66,9 @@ function hue(e: WeekViewEvent, shiftIndex: Record<string, number>) {
   if (e.participation_type === 'shift' && e.shift_type_id != null && shiftIndex[e.shift_type_id] != null) {
     return shiftHue(shiftIndex[e.shift_type_id])
   }
-  // Daily recurring wears the manager's recurring purple (same as the "Daily
-  // Recurring" section header + rail chip) — they're usually 'general', which
-  // would otherwise dissolve into the neutral gold chrome.
+  // Recurring wears the manager's recurring purple (same as the "Recurring"
+  // section header + rail chip) — they're usually 'general', which would
+  // otherwise dissolve into the neutral gold chrome.
   if (e.is_recurring) return { rgb: '210,57,248', accent: '#D239F8' }
   return { rgb: '200,168,72', accent: GOLD } // general → house gold
 }
@@ -99,13 +112,14 @@ function buildHourLabels(startHour: number, endHour: number) {
   return labels
 }
 
-export function ScheduleWeekView({ events, days, shiftTypes, rosters, onEdit, onAddAt }: {
+export function ScheduleWeekView({ events, days, shiftTypes, rosters, onEdit, onAddAt, onMove }: {
   events: WeekViewEvent[]
   days: ScheduleDay[]
   shiftTypes: { id: string; name: string }[]
   rosters: Record<string, RosterEntry[]>
   onEdit: (id: string) => void
   onAddAt: (dateIso: string, startTime: string) => void
+  onMove: (id: string, dateIso: string, startTime: string, endTime: string | null) => void
 }) {
   const shiftIndex = shiftColorIndexMap(shiftTypes)
   const dated = events.filter(e => !e.is_recurring && e.event_date)
@@ -133,6 +147,80 @@ export function ScheduleWeekView({ events, days, shiftTypes, rosters, onEdit, on
     onAddAt(iso, `${String(Math.floor(snapped / 60)).padStart(2, '0')}:${String(snapped % 60).padStart(2, '0')}`)
   }
 
+  // Drag-to-reschedule. Pointer events (not HTML5 drag-and-drop) so the block
+  // tracks the cursor with grid snapping and works on touch. A press only
+  // becomes a drag past a small movement threshold — below it, pointerup is a
+  // plain click and opens the editor as before. The live position lives in
+  // `drag` (state, drives the preview block); the rest of the gesture lives in
+  // a ref so pointermove doesn't depend on stale closures.
+  const [drag, setDrag] = useState<{ id: string; dayIdx: number; startMin: number; durMin: number | null } | null>(null)
+  const dragRef = useRef<{
+    id: string; pointerId: number; downX: number; downY: number
+    durMin: number | null; grabOffsetMin: number
+    origDayIdx: number; origStartMin: number
+    lastDayIdx: number; lastStartMin: number; active: boolean
+  } | null>(null)
+  const colsRef = useRef<HTMLDivElement>(null) // the day-columns grid, for pointer → day/time math
+  const suppressClick = useRef(false) // eat the click that fires right after a drag ends
+
+  // Pointer coordinates → (day column, snapped start minute). The column comes
+  // from X across the grid (the 0.4rem gaps are negligible next to a column);
+  // the minute from Y below the day headers, minus where in the block the
+  // grab happened so the block doesn't jump to the cursor.
+  const dragPos = (clientX: number, clientY: number, d: { grabOffsetMin: number; durMin: number | null }) => {
+    const rect = colsRef.current!.getBoundingClientRect()
+    const dayIdx = Math.max(0, Math.min(days.length - 1, Math.floor(((clientX - rect.left) / rect.width) * days.length)))
+    const raw = START_HOUR * 60 + ((clientY - rect.top - HEADER_H) / PX_PER_HOUR) * 60 - d.grabOffsetMin
+    const snapped = Math.round(raw / DRAG_SNAP_MIN) * DRAG_SNAP_MIN
+    const startMin = Math.max(START_HOUR * 60, Math.min(snapped, END_HOUR * 60 - (d.durMin ?? 45)))
+    return { dayIdx, startMin }
+  }
+
+  const dragHandlers = (ev: WeekViewEvent, startMin: number, endMin: number | null) => ({
+    onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.button !== 0) return
+      const origDayIdx = days.findIndex(d => d.iso === ev.event_date)
+      if (origDayIdx === -1) return
+      const rect = e.currentTarget.getBoundingClientRect()
+      dragRef.current = {
+        id: ev.id, pointerId: e.pointerId, downX: e.clientX, downY: e.clientY,
+        durMin: endMin != null ? endMin - startMin : null,
+        grabOffsetMin: ((e.clientY - rect.top) / PX_PER_HOUR) * 60,
+        origDayIdx, origStartMin: startMin,
+        lastDayIdx: origDayIdx, lastStartMin: startMin, active: false,
+      }
+      e.currentTarget.setPointerCapture(e.pointerId)
+    },
+    onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => {
+      const d = dragRef.current
+      if (!d || d.id !== ev.id || e.pointerId !== d.pointerId) return
+      if (!d.active) {
+        if (Math.abs(e.clientX - d.downX) + Math.abs(e.clientY - d.downY) < 5) return
+        d.active = true
+      }
+      const pos = dragPos(e.clientX, e.clientY, d)
+      d.lastDayIdx = pos.dayIdx
+      d.lastStartMin = pos.startMin
+      setDrag({ id: d.id, dayIdx: pos.dayIdx, startMin: pos.startMin, durMin: d.durMin })
+    },
+    onPointerUp: () => {
+      const d = dragRef.current
+      dragRef.current = null
+      if (!d || d.id !== ev.id) return
+      setDrag(null)
+      if (!d.active) return // plain click — the onClick handler opens the editor
+      suppressClick.current = true
+      if (d.lastDayIdx === d.origDayIdx && d.lastStartMin === d.origStartMin) return
+      onMove(
+        ev.id,
+        days[d.lastDayIdx].iso,
+        toHHMM(d.lastStartMin),
+        d.durMin != null ? toHHMM(d.lastStartMin + d.durMin) : null,
+      )
+    },
+    onPointerCancel: () => { dragRef.current = null; setDrag(null) },
+  })
+
   const block = (ev: WeekViewEvent, ghost: boolean, lane = 0, lanes = 1) => {
     const { start, end } = eventMinutes(ev)
     if (start == null) return null
@@ -144,11 +232,19 @@ export function ScheduleWeekView({ events, days, shiftTypes, rosters, onEdit, on
     const n = roster?.length ?? 0
     const noLead = ev.participation_type === 'shift' && ev.needs_lead && n > 0 && !roster?.some(r => r.role === 'lead')
     const width = 100 / lanes
+    const beingDragged = !ghost && drag?.id === ev.id
     return (
       <div
         key={ev.id}
-        onClick={e => { e.stopPropagation(); onEdit(ev.id) }}
-        title={`${ev.title}${ev.visible ? '' : ' (hidden)'}${ghost ? ' — daily recurring' : ''} — click to edit`}
+        onClick={e => {
+          e.stopPropagation()
+          if (suppressClick.current) { suppressClick.current = false; return }
+          onEdit(ev.id)
+        }}
+        {...(ghost ? {} : dragHandlers(ev, start, end))}
+        title={ghost
+          ? `${ev.title}${ev.visible ? '' : ' (hidden)'} — recurring — click to edit`
+          : `${ev.title}${ev.visible ? '' : ' (hidden)'} — click to edit · drag to reschedule`}
         style={{
           position: 'absolute',
           top,
@@ -156,11 +252,13 @@ export function ScheduleWeekView({ events, days, shiftTypes, rosters, onEdit, on
           left: `calc(${lane * width}% + 2px)`,
           width: `calc(${width}% - 4px)`,
           borderRadius: '0.35rem',
-          border: `1px ${!ev.visible ? 'dashed' : 'solid'} rgba(${h.rgb},${ghost ? 0.45 : 0.5})`,
+          border: `1px ${!ev.visible || beingDragged ? 'dashed' : 'solid'} rgba(${h.rgb},${ghost ? 0.45 : 0.5})`,
           background: `rgba(${h.rgb},${ghost ? 0.08 : 0.1})`,
-          opacity: ev.visible ? (ghost ? 0.8 : 1) : 0.4,
+          opacity: beingDragged ? 0.3 : ev.visible ? (ghost ? 0.8 : 1) : 0.4,
           overflow: 'hidden',
-          cursor: 'pointer',
+          cursor: ghost ? 'pointer' : beingDragged ? 'grabbing' : 'grab',
+          // Blocks own their touches — otherwise the page scrolls instead of dragging.
+          touchAction: ghost ? undefined : 'none',
           padding: '0.2rem 0.3rem',
           boxShadow: ev.highlight ? '0 0 10px rgba(200,168,72,0.35)' : undefined,
         }}
@@ -198,8 +296,8 @@ export function ScheduleWeekView({ events, days, shiftTypes, rosters, onEdit, on
             ))}
           </div>
           {/* Day columns */}
-          <div style={{ flex: 1, display: 'grid', gridTemplateColumns: `repeat(${Math.max(days.length, 1)}, 1fr)`, gap: '0.4rem' }}>
-            {days.map(day => {
+          <div ref={colsRef} style={{ flex: 1, display: 'grid', gridTemplateColumns: `repeat(${Math.max(days.length, 1)}, 1fr)`, gap: '0.4rem' }}>
+            {days.map((day, dayIdx) => {
               const dayEvents = dated
                 .filter(e => e.event_date === day.iso)
                 .map(e => ({ e, m: eventMinutes(e) }))
@@ -231,9 +329,37 @@ export function ScheduleWeekView({ events, days, shiftTypes, rosters, onEdit, on
                         pointerEvents: 'none',
                       }} />
                     ))}
-                    {/* Daily recurring — ghosted context in every column */}
-                    {recurring.map(ev => block(ev, true))}
+                    {/* Recurring — ghosted context in each column the event repeats on
+                        (recurrence_days NULL = every day) */}
+                    {recurring.filter(ev => !ev.recurrence_days || ev.recurrence_days.includes(day.iso)).map(ev => block(ev, true))}
                     {dayEvents.map(({ e }) => block(e, false, lanes[e.id]?.lane ?? 0, lanes[e.id]?.lanes ?? 1))}
+                    {/* Drag preview — the block's landing spot, live times in the corner */}
+                    {drag && drag.dayIdx === dayIdx && (() => {
+                      const ev = dated.find(e => e.id === drag.id)
+                      if (!ev) return null
+                      const h = hue(ev, shiftIndex)
+                      return (
+                        <div style={{
+                          position: 'absolute',
+                          top: ((drag.startMin / 60) - START_HOUR) * PX_PER_HOUR,
+                          height: Math.max((drag.durMin ?? 45) / 60 * PX_PER_HOUR, 26),
+                          left: '2px', right: '2px',
+                          borderRadius: '0.35rem',
+                          border: `1px solid ${h.accent}`,
+                          background: `rgba(${h.rgb},0.22)`,
+                          boxShadow: '0 6px 18px rgba(0,0,0,0.45)',
+                          pointerEvents: 'none', zIndex: 5,
+                          overflow: 'hidden', padding: '0.2rem 0.3rem',
+                        }}>
+                          <p style={{ fontSize: '0.6rem', color: h.accent, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {formatShiftRange(toHHMM(drag.startMin), drag.durMin != null ? toHHMM(drag.startMin + drag.durMin) : null)}
+                          </p>
+                          <p style={{ fontSize: '0.66rem', color: '#F3EDE6', margin: '0.1rem 0 0', lineHeight: 1.25, fontWeight: 600, overflow: 'hidden' }}>
+                            {ev.title}
+                          </p>
+                        </div>
+                      )
+                    })()}
                   </div>
                 </div>
               )

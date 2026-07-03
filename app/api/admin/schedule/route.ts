@@ -65,6 +65,8 @@ export async function POST(req: NextRequest) {
       visible: body.visible ?? true,
       highlight: body.highlight ?? false,
       is_recurring: body.is_recurring ?? false,
+      // Recurring only: NULL = every day; an array of ISO dates = those days.
+      recurrence_days: body.is_recurring ? (body.recurrence_days ?? null) : null,
       participation_type,
       shift_type_id,
       // Every event carries structured times (not just shifts) — the display
