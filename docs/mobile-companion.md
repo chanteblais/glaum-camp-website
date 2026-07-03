@@ -1,6 +1,6 @@
 # Mobile — One Product, Two Clients
 
-Direction set 2026-07-03, **revised same day** after the home-screen concept round (see History below). Nothing here is scheduled to be built before What If (July 23, 2026) — the web application remains the priority until the platform proves itself there. This document exists so that decisions made **now** don't make the mobile client difficult later.
+Direction set 2026-07-03, **revised same day** after the home-screen concept round (see History below). **Launch target: before What If (July 23, 2026)** — decided later the same day; the app ships as a real installable app (TestFlight/store distribution), not as an installed PWA (see Explicitly rejected).
 
 > **Sibling doc:** [`multi-community.md`](./multi-community.md). The two long-term tracks demand the *same* foundation — a real API boundary, server-side business logic, config over hardcoding. The post–What If foundation phase serves both; there is no separate "mobile workstream."
 
@@ -34,6 +34,7 @@ Both clients navigate the same surfaces:
 
 - **A separate mobile philosophy.** No mobile-only paradigm centered on a single concept — a Radio-led home, a daily briefing, a glance dashboard. Those were explored (concept round 1) and set aside: they'd require members to learn a second mental model, which is unnecessary complexity.
 - **Admin on mobile.** Department/role/distinction/profile-field configuration, event and resource management, application review — all stay web. Unchanged from v1 of this direction.
+- **The PWA-install route — tried with real members, rejected (2026-07-03).** Getting people through iOS Share → Add to Home Screen is too much friction; members don't complete it. Do not re-propose installed-PWA launches, install-nag cards, or the iOS 16.4 Web-Push-on-installed-PWA "bridge" — anything that depends on members having installed the PWA is built on a dead dependency. (The PWA shell remains as a harmless bonus; webview *technology* like Capacitor is a separate question and is not rejected — the rejection is the install/distribution path.)
 
 ---
 
@@ -72,7 +73,7 @@ Examples of what mobile should deliver:
 Two notes:
 
 1. Several of these are **scheduled** notifications ("starts in 30 minutes"). The Vercel Cron pattern established by attunement nudges (`/api/cron/attunement-nudges`) already prototypes the delivery mechanism for time-triggered sends.
-2. **Bridge option:** since iOS 16.4, installed PWAs can receive Web Push. If push pressure arrives before a native client exists, the current PWA shell could deliver real notifications without one. (Current standing decision remains email-first.)
+2. Push delivers via **native push (APNs/FCM) through the installed app** — the Web-Push-on-installed-PWA bridge is off the table (see Explicitly rejected). The dispatch seam is channel-agnostic either way: email today, native push when the app ships; members without the app stay on email.
 
 ---
 
@@ -108,10 +109,9 @@ Both clients consume the same backend APIs. The backend remains the source of tr
 
 These get better with What If data — do not settle them now:
 
-- **Client technology.** "One product, two clients" reopens the wrapped-web route: a thin native shell (e.g. Capacitor) around the existing responsive UI would deliver push, camera/QR, haptics, and offline caching without rebuilding screens — versus a native-UI client (e.g. Expo/React Native) for maximum interaction quality. This is now the main open question, and it's a cheaper one than it was under the two-products framing.
+- **Client technology.** "One product, two clients" reopens the wrapped-web route: a thin native shell (e.g. Capacitor) around the existing responsive UI would deliver push, camera/QR, haptics, and offline caching without rebuilding screens — versus a native-UI client (e.g. Expo/React Native) for maximum interaction quality. Either way, distribution is a real app install (TestFlight/stores) — the pre–What If launch timeline favors the wrapped-web shell.
 - Offline strategy beyond schedule caching
 - QR check-in and maps
-- Native push vs. Web-Push-on-PWA sequencing
 
 ---
 
