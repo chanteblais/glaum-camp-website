@@ -45,6 +45,14 @@ Rules:
    git worktree remove ../glaum-<branch>
    ```
    (Claude sessions: the EnterWorktree tool does this for you.)
+
+   **Worktree gotcha — env files don't come along.** `.env.local` is untracked,
+   so a fresh worktree has none and every page that touches Supabase 500s with
+   "Missing Supabase admin env vars" (hit 2026-07-02). Symlink it before
+   starting a dev server there:
+   ```bash
+   ln -s <main-checkout>/.env.local .env.local
+   ```
 3. **Never `git add -A` / `git add .` in the shared checkout.** Stage explicit
    paths only — the tree may contain another session's (or Chante's) in-flight
    files.

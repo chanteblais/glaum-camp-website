@@ -30,7 +30,7 @@ const memberNavLinks = [
   { href: '/schedule', label: 'Schedule' },
   { href: '/members', label: 'Many Hands' },
   { href: '/messages', label: 'Messages', badge: true },
-  { href: '/signup', label: 'Participate' },
+  { href: '/participate', label: 'Participate' },
   { href: '/profile', label: 'My Profile' },
 ]
 

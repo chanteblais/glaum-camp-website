@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 // ── Transition compat (shifts redesign) ───────────────────────────────────────
 // The admin schedule editor now tags each event with a participation type
 // (general | shift | mandatory) and, for shifts, a shift_type_id. The member-facing
-// readers (PersonalSchedule, the /signup grid) still read the legacy
+// readers (PersonalSchedule, the /participate grid) still read the legacy
 // `contribution_type` / `event_type` / `capacity` columns until the member side is
 // migrated. To keep the live member schedule working, the admin write path DERIVES
 // those legacy columns from the chosen participation type. This shim is removed in
