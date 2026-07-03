@@ -158,10 +158,7 @@ export default async function OverviewPage() {
   const complete = members.filter(m => m.hasRole && m.hasShift && !m.rolePending).length
   const incomplete = members.length - complete
 
-  // Hours — real math from the shift schedule (getShiftHoursOverview): each
-  // signup contributes its slot's duration; "needed" = capacity × duration
-  // (uncapped slots count one person).
-  const unfilledHours = Math.max(0, Math.round((shiftHours.totalNeededHours - shiftHours.totalFilledHours) * 100) / 100)
+  // Hours — real math from the shift schedule (getShiftHoursOverview).
   const fmtH = (n: number) => `${parseFloat(n.toFixed(2))}h`
 
   // Groups — one card per admin-configured group, so renames/additions in
@@ -288,53 +285,47 @@ export default async function OverviewPage() {
             <>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div style={card()}>
+                  <p style={statLabel}>Total Shift Hours</p>
+                  <p style={statValue}>{fmtH(shiftHours.totalScheduledHours)}</p>
+                  <p style={statSub}>{shiftHours.slotCount} shift{shiftHours.slotCount === 1 ? '' : 's'} across {shiftHours.types.length} type{shiftHours.types.length === 1 ? '' : 's'}</p>
+                </div>
+                <div style={card()}>
                   <p style={statLabel}>Hours Filled</p>
                   <p style={{ ...statValue, color: shiftHours.totalFilledHours > 0 ? '#7dcf8e' : '#C8A848' }}>{fmtH(shiftHours.totalFilledHours)}</p>
                   <p style={statSub}>{shiftHours.totalSignups} signup{shiftHours.totalSignups === 1 ? '' : 's'} by {shiftHours.memberCount} member{shiftHours.memberCount === 1 ? '' : 's'}</p>
                 </div>
                 <div style={card()}>
-                  <p style={statLabel}>Still Unfilled</p>
-                  <p style={{ ...statValue, color: unfilledHours > 0 ? '#ffb432' : '#7dcf8e' }}>{fmtH(unfilledHours)}</p>
-                  <p style={statSub}>of {fmtH(shiftHours.totalNeededHours)} needed</p>
-                </div>
-                <div style={card()}>
-                  <p style={statLabel}>Shift Slots</p>
-                  <p style={statValue}>{shiftHours.slotCount}</p>
-                  <p style={statSub}>{shiftHours.types.length} shift type{shiftHours.types.length === 1 ? '' : 's'} on the schedule</p>
+                  <p style={statLabel}>Empty Shifts</p>
+                  <p style={{ ...statValue, color: shiftHours.emptySlots > 0 ? '#ffb432' : '#7dcf8e' }}>{shiftHours.emptySlots}</p>
+                  <p style={statSub}>{shiftHours.emptySlots > 0 ? 'shifts with no signups yet' : 'every shift has someone'}</p>
                 </div>
               </div>
 
-              {/* Per-type breakdown, coloured to match the schedule's shift palette */}
+              {/* Per-type breakdown, coloured to match the schedule's shift palette.
+                  Facts only — an uncapped shift has no defined "full", so no
+                  completion bars/percentages here. */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
                 {shiftHours.types.map(t => {
                   const hue = t.paletteIndex >= 0 ? shiftHue(t.paletteIndex) : { rgb: '200,168,72', accent: '#C8A848' }
-                  const pct = t.neededHours > 0
-                    ? Math.min(100, Math.round((t.filledHours / t.neededHours) * 100))
-                    : (t.filledHours > 0 ? 100 : 0)
                   return (
                     <div key={t.id ?? 'untyped'} style={{ ...card(), borderColor: `rgba(${hue.rgb},0.25)`, background: `rgba(${hue.rgb},0.04)` }}>
                       <p style={{ ...statLabel, color: hue.accent, opacity: 0.85 }}>{t.name}</p>
                       <p style={{ ...statValue, fontSize: '1.6rem', color: hue.accent }}>
-                        {fmtH(t.filledHours)}
-                        <span style={{ fontSize: '0.85rem', opacity: 0.55 }}> / {fmtH(t.neededHours)}</span>
+                        {fmtH(t.scheduledHours)}
+                        <span style={{ fontSize: '0.85rem', opacity: 0.55 }}> · {t.slotCount} shift{t.slotCount === 1 ? '' : 's'}</span>
                       </p>
-                      <div style={{ height: '6px', borderRadius: '9999px', background: 'rgba(255,255,255,0.06)', overflow: 'hidden', margin: '0.5rem 0 0.55rem' }}>
-                        <div style={{ height: '100%', width: `${pct}%`, borderRadius: '9999px', background: hue.accent }} />
-                      </div>
-                      <p style={{ ...statSub, margin: 0 }}>
-                        {t.signupCount} signup{t.signupCount === 1 ? '' : 's'} · {t.slotCount} shift{t.slotCount === 1 ? '' : 's'}
-                        {t.uncappedSlots > 0 ? ` · ${t.uncappedSlots} uncapped` : ''}
+                      <p style={{ ...statSub, margin: '0.45rem 0 0' }}>
+                        {fmtH(t.filledHours)} filled · {t.signupCount} signup{t.signupCount === 1 ? '' : 's'}
+                      </p>
+                      <p style={{ ...statSub, margin: '0.15rem 0 0', color: t.emptySlots > 0 ? '#ffb432' : undefined, opacity: t.emptySlots > 0 ? 0.75 : 0.45 }}>
+                        {t.emptySlots > 0
+                          ? `${t.emptySlots} of ${t.slotCount} shift${t.slotCount === 1 ? '' : 's'} empty`
+                          : 'every shift has someone'}
                       </p>
                     </div>
                   )
                 })}
               </div>
-
-              {shiftHours.uncappedSlots > 0 && (
-                <p style={{ fontSize: '0.65rem', opacity: 0.3, margin: '0.75rem 0 0' }}>
-                  Uncapped shifts count as needing one person; extra signups can push a type past 100%.
-                </p>
-              )}
             </>
           )}
         </section>
