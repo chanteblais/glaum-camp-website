@@ -40,15 +40,17 @@ export function shiftColorIndexMap(shiftTypes: { id: string }[]): Record<string,
 // General events used to share one neutral styling, which made neighbours like
 // the Community Dinner and the Salon read as twins once generals landed on the
 // calendar as blocks. Each general event now wears a stable hue of its own,
-// hashed from its id. Kept visually apart from SHIFT_HUES, MANDATORY_HUE, and
-// the gold/purple chrome.
+// hashed from its id. The shift palette + teal mandatory + gold/purple chrome
+// already own most of the wheel (orange, blue, green, magenta, pink, gold,
+// teal, purple), so these live in the bands nothing else uses — red, yellow,
+// chartreuse, silver — rather than squeezing between existing hues and reading
+// "same-ish" at block-tint opacity (v1's orchid sat right next to the Service
+// magenta).
 export const GENERAL_HUES: Hue[] = [
-  { rgb: '235,185,80', accent: '#ebb950' },  // honey
-  { rgb: '150,120,250', accent: '#9678fa' }, // iris
-  { rgb: '120,205,225', accent: '#78cde1' }, // glacier
-  { rgb: '255,140,110', accent: '#ff8c6e' }, // coral
-  { rgb: '170,215,120', accent: '#aad778' }, // pear
-  { rgb: '225,120,205', accent: '#e178cd' }, // orchid
+  { rgb: '235,85,95', accent: '#f0616e' },   // crimson
+  { rgb: '170,215,110', accent: '#aad76e' }, // chartreuse
+  { rgb: '205,210,230', accent: '#cdd2e6' }, // moonlight silver
+  { rgb: '240,205,90', accent: '#f0cd5a' },  // citron
 ]
 
 export function generalHue(seed: string): Hue {

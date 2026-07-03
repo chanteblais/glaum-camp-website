@@ -10,10 +10,10 @@
 // list view jump out here.
 //
 // Recurring events render as ghosted bands in each column they repeat on
-// (recurrence_days NULL = every day) — context, not clutter. The ghosts are
-// click-through: they'd otherwise swallow add-at-slot clicks across every
-// column they span (edit recurring events from the Recurring list below).
-// Dated events missing a parseable time surface in a fix-me strip below.
+// (recurrence_days NULL = every day) — context, not clutter. A ghost's body is
+// click-through (it would otherwise swallow add-at-slot clicks across every
+// column it spans) but its text label still opens the editor. Dated events
+// missing a parseable time surface in a fix-me strip below.
 
 import { useRef, useState } from 'react'
 import { MANDATORY_HUE, shiftHue, shiftColorIndexMap, generalHue } from '@/lib/shift-colors'
@@ -255,8 +255,10 @@ export function ScheduleWeekView({ events, days, shiftTypes, rosters, onEdit, on
           opacity: beingDragged ? 0.3 : ev.visible ? (ghost ? 0.8 : 1) : 0.4,
           overflow: 'hidden',
           cursor: ghost ? undefined : beingDragged ? 'grabbing' : 'grab',
-          // Ghosts pass clicks through to the slot beneath — a band spanning
-          // every repeat column must not hijack click-to-add.
+          // The ghost's BODY passes clicks through to the slot beneath — a band
+          // spanning every repeat column must not hijack click-to-add. Its text
+          // label (below) stays clickable, so the event itself is still one
+          // click away.
           pointerEvents: ghost ? 'none' : undefined,
           // Blocks own their touches — otherwise the page scrolls instead of dragging.
           touchAction: ghost ? undefined : 'none',
@@ -264,17 +266,23 @@ export function ScheduleWeekView({ events, days, shiftTypes, rosters, onEdit, on
           boxShadow: ev.highlight ? '0 0 10px rgba(200,168,72,0.35)' : undefined,
         }}
       >
-        <p style={{ fontSize: '0.6rem', color: h.accent, margin: 0, opacity: 0.8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {ev.time}
-        </p>
-        <p style={{ fontSize: '0.66rem', color: '#F3EDE6', margin: '0.1rem 0 0', lineHeight: 1.25, fontWeight: 600, overflow: 'hidden' }}>
-          {ev.title}
-        </p>
-        {ev.participation_type === 'shift' && (
-          <p style={{ fontSize: '0.58rem', color: h.accent, margin: '0.1rem 0 0', opacity: 0.85, whiteSpace: 'nowrap' }}>
-            {n}{ev.capacity != null ? `/${ev.capacity}` : ''} signed up{noLead ? ' · ✦ no lead' : ''}
+        <div
+          onClick={ghost ? e => { e.stopPropagation(); onEdit(ev.id) } : undefined}
+          title={ghost ? `${ev.title}${ev.visible ? '' : ' (hidden)'} — recurring — click to edit` : undefined}
+          style={ghost ? { pointerEvents: 'auto', cursor: 'pointer' } : undefined}
+        >
+          <p style={{ fontSize: '0.6rem', color: h.accent, margin: 0, opacity: 0.8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {ev.time}
           </p>
-        )}
+          <p style={{ fontSize: '0.66rem', color: '#F3EDE6', margin: '0.1rem 0 0', lineHeight: 1.25, fontWeight: 600, overflow: 'hidden' }}>
+            {ev.title}
+          </p>
+          {ev.participation_type === 'shift' && (
+            <p style={{ fontSize: '0.58rem', color: h.accent, margin: '0.1rem 0 0', opacity: 0.85, whiteSpace: 'nowrap' }}>
+              {n}{ev.capacity != null ? `/${ev.capacity}` : ''} signed up{noLead ? ' · ✦ no lead' : ''}
+            </p>
+          )}
+        </div>
       </div>
     )
   }

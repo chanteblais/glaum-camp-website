@@ -57,7 +57,7 @@ function eventTypeStyle(event: ScheduleEvent) {
   }
   if (event.event_type && EVENT_TYPE_STYLES[event.event_type]) return EVENT_TYPE_STYLES[event.event_type]
   const hue = generalHue(event.id)
-  return { border: `rgba(${hue.rgb},0.45)`, background: `rgba(${hue.rgb},0.09)`, text: hue.accent }
+  return { border: `rgba(${hue.rgb},0.5)`, background: `rgba(${hue.rgb},0.12)`, text: hue.accent }
 }
 
 // Parse the first time in a string like "9:00 PM – 11:00 PM" → minutes from midnight
