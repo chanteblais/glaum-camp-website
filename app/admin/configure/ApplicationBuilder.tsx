@@ -6,6 +6,7 @@ import { mergeMemberConfig } from '@/lib/form-config'
 import { parseProfileFields, applicationFields } from '@/lib/profile-fields'
 import { DEFAULT_TRACK_COPY, type TrackCopy } from '@/lib/site-config'
 import { AdminNav } from '../AdminNav'
+import { useConfirm } from '../../components/ConfirmDialog'
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 
@@ -734,6 +735,7 @@ export function ApplicationBuilder({
   const [saveError, setSaveError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'member' | 'volunteer'>('member')
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set())
+  const { confirm, confirmDialog } = useConfirm()
   // All groups, for the "Group selection" field's group picker.
   const [allGroups, setAllGroups] = useState<{ id: string; name: string }[]>([])
   useEffect(() => {
@@ -888,14 +890,19 @@ export function ApplicationBuilder({
 
   // ── Delete / add step ──
 
-  function handleDeleteStep(stepKey: string) {
+  async function handleDeleteStep(stepKey: string) {
     const step = memberConfig.steps.find(s => s.key === stepKey)
     if (!step) return
     const hasRequiredCore = step.fields.some(f => f.required && !f.canHide)
-    const msg = hasRequiredCore
-      ? `Delete "${step.title}"? It has required fields — applicants won't see them.`
-      : `Delete "${step.title}"? This cannot be undone without resetting to defaults.`
-    if (!window.confirm(msg)) return
+    const ok = await confirm({
+      title: `Delete “${step.title}”?`,
+      body: hasRequiredCore
+        ? "It has required fields — applicants won't see them."
+        : 'This cannot be undone without resetting to defaults.',
+      confirmLabel: 'Delete section',
+      danger: true,
+    })
+    if (!ok) return
     const next = { ...memberConfig, steps: memberConfig.steps.filter(s => s.key !== stepKey) }
     setMemberConfig(next)
     patch('config_member_form', next)
@@ -938,8 +945,14 @@ export function ApplicationBuilder({
     patch('config_member_form', next)
   }
 
-  function handleResetMemberForm() {
-    if (!window.confirm('Reset the member application form to its default sections and fields? Custom fields, text blocks, deletions, and layout changes will be lost. (The open/closed status is kept.)')) return
+  async function handleResetMemberForm() {
+    const ok = await confirm({
+      title: 'Reset the member application form to its defaults?',
+      body: 'Custom fields, text blocks, deletions, and layout changes will be lost. (The open/closed status is kept.)',
+      confirmLabel: 'Reset form',
+      danger: true,
+    })
+    if (!ok) return
     const fresh = mergeMemberConfig({ open: memberConfig.open })
     setMemberConfig(fresh)
     setExpandedSteps(new Set())
@@ -1234,6 +1247,8 @@ export function ApplicationBuilder({
 
 
       </div>
+
+      {confirmDialog}
     </div>
   )
 }

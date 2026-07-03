@@ -8,6 +8,7 @@ import {
   type ProfileField,
   type ProfileFieldType,
 } from '@/lib/profile-fields'
+import { useConfirm } from '../components/ConfirmDialog'
 
 const GOLD = '#C8A848'
 const PURPLE = '#D239F8'
@@ -113,6 +114,7 @@ export function ProfileFieldsManager({ initialFields }: { initialFields: Profile
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const { confirm, confirmDialog } = useConfirm()
   // Keys that already existed when the manager loaded — these may have member
   // answers saved against them (member_profiles.values is keyed by field key), so
   // their key must stay stable. Renaming such a field's LABEL never re-keys it.
@@ -287,7 +289,14 @@ export function ProfileFieldsManager({ initialFields }: { initialFields: Profile
                   style={{ background: 'none', border: 'none', cursor: idx === stored.length - 1 ? 'default' : 'pointer', color: GOLD, opacity: idx === stored.length - 1 ? 0.2 : 0.5, fontSize: '0.75rem', padding: '0.1rem' }}
                 >▼</button>
                 <button
-                  onClick={() => { if (!window.confirm(`Remove "${field.label}"?`)) return; commitStored(stored.filter((_, i) => i !== idx)) }}
+                  onClick={async () => {
+                    const ok = await confirm({
+                      title: `Remove “${field.label}”?`,
+                      confirmLabel: 'Remove field',
+                      danger: true,
+                    })
+                    if (ok) commitStored(stored.filter((_, i) => i !== idx))
+                  }}
                   title="Remove"
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ff8a8a', opacity: 0.45, fontSize: '0.8rem', padding: '0.1rem', marginTop: '0.15rem' }}
                 >✕</button>
@@ -356,6 +365,8 @@ export function ProfileFieldsManager({ initialFields }: { initialFields: Profile
         {error && <p style={{ fontSize: '0.78rem', color: '#ff8a8a', margin: 0 }}>{error}</p>}
         {!error && saved && <p style={{ fontSize: '0.72rem', color: GOLD, opacity: 0.6, margin: 0 }}>Saved ✓</p>}
       </div>
+
+      {confirmDialog}
     </div>
   )
 }

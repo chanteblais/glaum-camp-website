@@ -1,16 +1,24 @@
 'use client'
 
 import { useState } from 'react'
+import { useConfirm } from '../components/ConfirmDialog'
 
 export function DebugSection() {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<{ name: string; deleted: string[] } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const { confirm, confirmDialog } = useConfirm()
 
   async function handleReset() {
     if (!email.trim()) return
-    if (!confirm(`Reset all application data for ${email}? This cannot be undone.`)) return
+    const ok = await confirm({
+      title: `Reset all application data for ${email}?`,
+      body: 'This cannot be undone.',
+      confirmLabel: 'Reset user',
+      danger: true,
+    })
+    if (!ok) return
     setLoading(true)
     setResult(null)
     setError(null)
@@ -52,6 +60,7 @@ export function DebugSection() {
           ✓ Reset <strong>{result.name}</strong> — deleted: {result.deleted.join(', ')}
         </p>
       )}
+      {confirmDialog}
     </div>
   )
 }
