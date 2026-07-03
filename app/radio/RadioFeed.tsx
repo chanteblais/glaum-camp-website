@@ -30,32 +30,36 @@ const clockOf = (ts: string) =>
 
 function RadioRow({ e, last }: { e: RadioEventRow; last: boolean }) {
   const isVoice = e.kind === 'voice'
-  // Human speech sits flush-left, apart from the automatic moments (whose
-  // emblem column indents them) — organizer broadcasts in lavender, member
-  // voices in the accent purple so a member's own words stand out most.
+  // Human speech sits apart from the automatic moments (whose emblem column
+  // indents them): organizer broadcasts flush-left in lavender; member
+  // voices RIGHT-aligned in a deep purple — a voice calling in from the
+  // other side of the airwaves.
   const isSpeech = e.kind === 'broadcast' || isVoice
-  const speechColor = isVoice ? 'rgba(224,140,255,0.95)' : 'rgba(216,180,232,0.95)'
+  const VOICE_PURPLE = 'rgba(178,82,222,0.95)'
   const hasEntity = e.message.includes('**')
 
   const body = (
-    <div style={{ minWidth: 0, flex: 1 }}>
+    <div style={{ minWidth: 0, flex: 1, textAlign: isVoice ? 'right' : 'left' }}>
       <p
         style={{
           margin: 0,
           fontSize: '1rem',
           lineHeight: 1.5,
-          color: isSpeech ? speechColor : '#F3EDE6',
+          color: isVoice ? VOICE_PURPLE : isSpeech ? 'rgba(216,180,232,0.95)' : '#F3EDE6',
           opacity: isSpeech ? 1 : 0.92,
           fontStyle: isVoice ? 'italic' : undefined,
           overflowWrap: 'anywhere',
         }}
       >
-        {isSpeech && (
+        {isSpeech && !isVoice && (
           <span aria-hidden style={{ marginRight: '0.6rem' }}>
-            {isImageIcon(e.icon) ? null : (e.icon || (isVoice ? '✦' : '📢'))}
+            {isImageIcon(e.icon) ? null : (e.icon || '📢')}
           </span>
         )}
         {isVoice ? e.message : <RadioMessage text={e.message} href={hasEntity ? e.link : undefined} />}
+        {isVoice && (
+          <span aria-hidden style={{ marginLeft: '0.6rem', opacity: 0.8 }}>{e.icon || '✦'}</span>
+        )}
       </p>
       {e.detail && (
         <p style={{ margin: '0.3rem 0 0', fontSize: '0.85rem', lineHeight: 1.5, color: '#F3EDE6', opacity: 0.55 }}>
@@ -63,7 +67,7 @@ function RadioRow({ e, last }: { e: RadioEventRow; last: boolean }) {
         </p>
       )}
       {isVoice && e.actor_name && (
-        <p style={{ margin: '0.3rem 0 0', fontSize: '0.72rem', color: 'rgba(224,140,255,0.8)', opacity: 0.75 }}>
+        <p style={{ margin: '0.3rem 0 0', fontSize: '0.72rem', color: VOICE_PURPLE, opacity: 0.8 }}>
           — {e.actor_name}
         </p>
       )}
@@ -102,6 +106,13 @@ function RadioRow({ e, last }: { e: RadioEventRow; last: boolean }) {
         </span>
       )}
 
+      {/* voices are right-aligned, so their clock keeps the LEFT edge */}
+      {isVoice && (
+        <span style={{ flexShrink: 0, fontSize: '0.72rem', color: '#F3EDE6', opacity: 0.35, paddingTop: '0.35rem', letterSpacing: '0.04em', marginRight: '0.75rem' }}>
+          {clockOf(e.created_at)}
+        </span>
+      )}
+
       {wholeRowLink ? (
         <a href={e.link!} style={{ color: 'inherit', textDecoration: 'none', display: 'flex', flex: 1, minWidth: 0 }}>
           {body}
@@ -110,9 +121,11 @@ function RadioRow({ e, last }: { e: RadioEventRow; last: boolean }) {
         body
       )}
 
-      <span style={{ flexShrink: 0, fontSize: '0.72rem', color: '#F3EDE6', opacity: 0.35, paddingTop: '0.35rem', letterSpacing: '0.04em', marginLeft: '0.75rem' }}>
-        {clockOf(e.created_at)}
-      </span>
+      {!isVoice && (
+        <span style={{ flexShrink: 0, fontSize: '0.72rem', color: '#F3EDE6', opacity: 0.35, paddingTop: '0.35rem', letterSpacing: '0.04em', marginLeft: '0.75rem' }}>
+          {clockOf(e.created_at)}
+        </span>
+      )}
     </article>
   )
 }

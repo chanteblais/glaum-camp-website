@@ -56,64 +56,70 @@ function smoothPath(pts: [number, number][]): string {
   return d
 }
 
+// Trace coordinates use a 180 baseline; the svg wraps them in a +30 shift so
+// the 420-tall canvas has air for the mote field above and below.
 const MID = 180
 
 // The main pulse: quiet braid → growing swells → jagged mid-cluster → the
 // heartbeat spike → decay → quiet braid.
+// Transcribed from assets/radio_mockup.png: the actual extrema were extracted
+// per-column from the gold pixels (baseline y=313 in the source), then scaled
+// into this viewBox. The crests are ROUND — extrema sit ~35 viewBox units
+// apart, so the Catmull-Rom smoother produces her generous U-shaped swings,
+// not needles.
 const MAIN: [number, number][] = [
   // quiet braid in
-  [0, 180], [36, 177], [72, 183], [108, 178], [144, 182],
-  // gentle swells, growing
-  [178, 170], [212, 190], [246, 164], [280, 194],
-  // the rhythmic mid-cluster — even wavelengths, consistent height
-  [310, 146], [336, 210], [362, 142], [388, 214], [414, 146], [440, 206],
-  // calm shoulder before the event
-  [464, 172], [486, 186],
-  // the pulse
-  [502, 170], [514, 214], [526, 44], [539, 338], [552, 22], [565, 304], [578, 106], [590, 216],
-  // decay, quickly polite again
-  [612, 158], [640, 204], [668, 160], [696, 196],
-  // braid out
-  [730, 174], [768, 186], [806, 176], [844, 184], [882, 178], [922, 182], [960, 179], [1000, 180],
+  [0, 180], [40, 176], [80, 183], [120, 177], [160, 182],
+  // first swells
+  [198, 145], [239, 215], [268, 172], [298, 196],
+  // taller pair
+  [335, 128], [370, 232],
+  // the little m-wiggle
+  [400, 171], [417, 187], [435, 168], [456, 184],
+  // building
+  [479, 155], [500, 196],
+  // the cluster: crest · deep valley · GIANT crest · deepest valley · tall crest · valley
+  [537, 113], [570, 285], [610, 37], [645, 330], [684, 97], [712, 253],
+  // decay: small m, then still-substantial swells
+  [745, 150], [768, 201], [784, 171], [798, 189],
+  [821, 147], [854, 230], [891, 128], [926, 207], [956, 138], [982, 198],
+  [1000, 180],
 ]
 
-// Echo threads — the braid: they hug the baseline, cross the main line in
-// the quiet sections, and rise faintly with the spike (offset so the burst
-// reads as several strands of the same signal).
+// Echo threads — the braid lives at the EDGES in the mock: two fine strands
+// weaving tightly around the baseline where the signal is quiet, nearly
+// invisible through the loud middle.
 const THREAD_B: [number, number][] = [
-  [0, 183], [30, 187], [62, 176], [95, 185], [128, 176], [160, 184],
-  [200, 190], [235, 170], [270, 192], [305, 168],
-  [340, 190], [375, 160], [410, 196], [445, 158], [480, 190],
-  [505, 168], [520, 240], [532, 96], [544, 268], [556, 104], [568, 216], [582, 158],
-  [610, 190], [645, 164], [680, 192], [715, 170],
-  [755, 184], [795, 172], [835, 183], [875, 176], [915, 182], [958, 178], [1000, 181],
+  [0, 184], [28, 174], [56, 186], [84, 175], [112, 185], [140, 176], [168, 184],
+  [220, 178], [290, 184], [360, 176], [430, 184], [500, 177],
+  [570, 186], [640, 175], [710, 184],
+  [770, 176], [810, 185], [850, 174], [890, 186], [930, 175], [965, 184], [1000, 178],
 ]
 const THREAD_C: [number, number][] = [
-  [0, 177], [35, 182], [70, 175], [105, 181], [140, 176], [175, 182],
-  [215, 174], [255, 184], [295, 173], [335, 183],
-  [380, 172], [425, 184], [470, 173],
-  [510, 190], [526, 140], [540, 210], [554, 146], [570, 190],
-  [615, 176], [660, 184], [705, 175], [755, 181], [805, 176], [860, 181], [915, 177], [1000, 179],
+  [0, 176], [30, 185], [60, 175], [90, 184], [120, 176], [150, 183],
+  [230, 182], [310, 176], [390, 183], [470, 177],
+  [550, 182], [630, 178], [700, 182],
+  [780, 184], [820, 175], [860, 185], [900, 176], [940, 184], [975, 176], [1000, 182],
 ]
 
-// Motes: dust along the band, bright blooming orbs crowding the spike, and a
-// few glowing nodes sitting right on the trace.
+// The mote field, positions measured off the mockup (r and brightness vary;
+// coordinates are absolute on the 1000×420 canvas).
 const DUST: [number, number, number, number][] = [
-  [120, 150, 0.9, 0.3], [180, 205, 0.8, 0.25], [250, 130, 1.1, 0.35],
-  [310, 220, 0.9, 0.3], [365, 120, 1.2, 0.4], [415, 235, 0.9, 0.3],
-  [455, 110, 1.0, 0.35], [640, 120, 1.0, 0.35], [700, 230, 0.9, 0.28],
-  [760, 140, 1.1, 0.32], [830, 200, 0.8, 0.25], [890, 160, 0.9, 0.28],
+  [140, 130, 1.1, 0.3], [290, 250, 0.9, 0.25], [380, 90, 1.0, 0.3],
+  [545, 175, 1.1, 0.4], [665, 330, 0.9, 0.28], [845, 145, 1.0, 0.3],
+  [250, 330, 0.9, 0.25], [960, 260, 0.8, 0.25],
 ]
 const ORBS: [number, number, number, number][] = [
-  [498, 96, 2.2, 0.85], [516, 260, 1.8, 0.7], [528, 70, 3.1, 1],
-  [540, 300, 2.4, 0.8], [552, 120, 2.0, 0.9], [566, 240, 1.6, 0.65],
-  [488, 190, 1.5, 0.6], [590, 88, 1.9, 0.75], [606, 250, 1.5, 0.55],
-  [470, 250, 1.4, 0.5], [630, 180, 1.3, 0.5],
+  [500, 19, 4.0, 0.95], [642, 30, 3.0, 0.8], [777, 68, 4.0, 0.9],
+  [426, 105, 3.2, 0.7], [565, 115, 2.8, 0.85], [751, 114, 2.0, 0.6],
+  [170, 168, 3.2, 0.7], [333, 163, 2.0, 0.55], [60, 236, 2.8, 0.6],
+  [225, 294, 3.4, 0.75], [465, 265, 2.4, 0.6], [716, 286, 3.0, 0.7],
+  [931, 233, 2.4, 0.6], [912, 313, 3.8, 0.85], [465, 353, 2.8, 0.65],
 ]
 
 function Waveform() {
   return (
-    <svg viewBox="0 0 1000 360" fill="none" aria-hidden style={{ width: '100%', height: 'auto', display: 'block' }}>
+    <svg viewBox="0 0 1000 420" fill="none" aria-hidden style={{ width: '100%', height: 'auto', display: 'block' }}>
       <defs>
         <filter id="radio-blur" x="-30%" y="-30%" width="160%" height="160%">
           <feGaussianBlur stdDeviation="5" />
@@ -133,24 +139,29 @@ function Waveform() {
         </linearGradient>
       </defs>
 
-      {/* warm halo around the heartbeat */}
-      <ellipse cx="540" cy={MID} rx="200" ry="150" fill="url(#radio-bloom)" />
+      {/* baseline-relative art shifts +30 into the taller canvas */}
+      <g transform="translate(0 30)">
+        {/* warm halo around the heartbeat */}
+        <ellipse cx="622" cy={MID} rx="210" ry="165" fill="url(#radio-bloom)" />
 
-      {/* echo threads (the braid) */}
-      <path d={smoothPath(THREAD_C)} stroke={GOLD} strokeWidth="0.8" opacity="0.22" />
-      <path d={smoothPath(THREAD_B)} stroke={GOLD} strokeWidth="0.9" opacity="0.3" />
+        {/* echo threads (the edge braid) */}
+        <path d={smoothPath(THREAD_C)} stroke={GOLD} strokeWidth="0.9" opacity="0.22" />
+        <path d={smoothPath(THREAD_B)} stroke={GOLD} strokeWidth="1" opacity="0.3" />
 
-      {/* the pulse — glow underlay, then the hairline */}
-      <path d={smoothPath(MAIN)} stroke={WARM} strokeWidth="3.5" opacity="0.18" filter="url(#radio-blur)" />
-      <path d={smoothPath(MAIN)} stroke="url(#radio-fade)" strokeWidth="1.1" strokeLinecap="round" />
+        {/* the pulse — glow underlay, then the ribbon. The mock's line is
+            proportionally substantial (~2px on a 570px-wide band): stroke 3.6
+            here renders ~1.6px at the hero's width. */}
+        <path d={smoothPath(MAIN)} stroke={WARM} strokeWidth="8" opacity="0.16" filter="url(#radio-blur)" />
+        <path d={smoothPath(MAIN)} stroke="url(#radio-fade)" strokeWidth="3.6" strokeLinecap="round" />
+      </g>
 
-      {/* dust + blooming orbs */}
+      {/* the mote field (absolute coordinates, measured off the mockup) */}
       {DUST.map(([x, y, r, o], i) => (
         <circle key={`d${i}`} cx={x} cy={y} r={r} fill={WARM} opacity={o} />
       ))}
       {ORBS.map(([x, y, r, o], i) => (
         <g key={`o${i}`}>
-          <circle cx={x} cy={y} r={r * 3.2} fill={WARM} opacity={o * 0.22} filter="url(#radio-blur)" />
+          <circle cx={x} cy={y} r={r * 2.6} fill={WARM} opacity={o * 0.25} filter="url(#radio-blur)" />
           <circle cx={x} cy={y} r={r} fill={WARM} opacity={o} />
         </g>
       ))}
@@ -193,11 +204,11 @@ export function RadioHero() {
       <h1
         style={{
           fontFamily: 'var(--font-cormorant-garamond), serif',
-          fontWeight: 600,
-          fontSize: 'clamp(2.6rem, 7vw, 3.8rem)',
+          fontWeight: 400,
+          fontSize: 'clamp(2.4rem, 6.5vw, 3.5rem)',
           color: GOLD,
           margin: 0,
-          letterSpacing: '0.16em',
+          letterSpacing: '0.22em',
           textTransform: 'uppercase',
           display: 'flex',
           alignItems: 'center',
