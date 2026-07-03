@@ -3,10 +3,12 @@ import { memberDisplayNames } from './member-names'
 
 // ── Member view (Participate → Bring Something) ──────────────────────────────
 // Every VISIBLE list with its items, the community-wide claimed total per item,
-// and the caller's own claim quantity. Who else claimed what is admin-facing
-// detail — members see totals only. Shared by GET /api/resources (the client's
+// the caller's own claim quantity, and WHO has committed (names — social proof
+// on the preparation board; members are a trusted community and seeing
+// "✓ Erik ✓ Sarah" is the point). Shared by GET /api/resources (the client's
 // refresh path) and the server-rendered /participate page (initial data).
 
+export type MemberResourceClaimant = { name: string; quantity: number; me: boolean }
 export type MemberResourceItem = {
   id: string
   name: string
@@ -15,6 +17,7 @@ export type MemberResourceItem = {
   needed: number | null
   claimed: number
   mine: number
+  claimants: MemberResourceClaimant[]
   offered_by_name: string | null
   offered_by_me: boolean
 }
@@ -58,10 +61,25 @@ export async function getMemberResourceView(userId: string): Promise<MemberResou
 
   const claimTotals: Record<string, number> = {}
   const mine: Record<string, number> = {}
-  for (const c of claimsRes.data ?? []) {
+  const claimRows = (claimsRes.data ?? []) as { resource_id: string; clerk_user_id: string; quantity: number }[]
+  for (const c of claimRows) {
     claimTotals[c.resource_id] = (claimTotals[c.resource_id] ?? 0) + c.quantity
     if (c.clerk_user_id === userId) mine[c.resource_id] = c.quantity
   }
+
+  // Claimant names depend on the claim rows, so this lookup can't join the
+  // batch above.
+  const claimantNames = await memberDisplayNames(claimRows.map(c => c.clerk_user_id))
+  const claimantsByItem: Record<string, MemberResourceClaimant[]> = {}
+  for (const c of claimRows) {
+    ;(claimantsByItem[c.resource_id] ??= []).push({
+      name: c.clerk_user_id === userId ? 'You' : claimantNames[c.clerk_user_id] ?? 'A member',
+      quantity: c.quantity,
+      me: c.clerk_user_id === userId,
+    })
+  }
+  // My own commitment leads each list.
+  for (const list of Object.values(claimantsByItem)) list.sort((a, b) => Number(b.me) - Number(a.me))
 
   const itemsByList: Record<string, MemberResourceItem[]> = {}
   for (const it of items ?? []) {
@@ -74,6 +92,7 @@ export async function getMemberResourceView(userId: string): Promise<MemberResou
       needed: it.quantity_needed,
       claimed: claimTotals[it.id] ?? 0,
       mine: mine[it.id] ?? 0,
+      claimants: claimantsByItem[it.id] ?? [],
       offered_by_name: it.offered_by ? offererNames[it.offered_by] ?? 'a member' : null,
       offered_by_me: it.offered_by === userId,
     })

@@ -2,15 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
-// List something that isn't asked for ("I have a guitar amp — useful?").
-// Creates an open-callout item (quantity_needed NULL, offered_by = caller,
-// migration 053) plus the offerer's own ×1 claim. No approval queue — an
-// offer is a listing; admins edit it into a real need or delete noise.
+// Suggest a resource the organizers haven't listed ("we'll want sharp
+// knives" / "I have a guitar amp — useful?"). Creates an open-callout item
+// (quantity_needed NULL, offered_by = caller, migration 053); when the
+// suggester can bring it themselves (`bring`, default true) their ×1 claim
+// is seeded too. No approval queue — a suggestion is collaborative planning;
+// admins set a target on a good one (→ tracked need) or delete noise.
 export async function POST(req: NextRequest) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { list_id, name, note } = await req.json()
+  const { list_id, name, note, bring } = await req.json()
   if (!list_id) return NextResponse.json({ error: 'list_id is required' }, { status: 400 })
   if (!name?.trim()) return NextResponse.json({ error: 'name is required' }, { status: 400 })
 
@@ -35,14 +37,16 @@ export async function POST(req: NextRequest) {
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Offering it means bringing it — seed the offerer's claim.
-  const { error: claimError } = await supabaseAdmin
-    .from('resource_claims')
-    .insert({ resource_id: item.id, clerk_user_id: userId, quantity: 1 })
-  if (claimError) {
-    // Don't leave a claimless orphan offer behind.
-    await supabaseAdmin.from('resources').delete().eq('id', item.id)
-    return NextResponse.json({ error: claimError.message }, { status: 500 })
+  // Seed the suggester's claim when they're bringing it themselves.
+  if (bring !== false) {
+    const { error: claimError } = await supabaseAdmin
+      .from('resource_claims')
+      .insert({ resource_id: item.id, clerk_user_id: userId, quantity: 1 })
+    if (claimError) {
+      // Don't leave an orphan suggestion behind on a failed claim.
+      await supabaseAdmin.from('resources').delete().eq('id', item.id)
+      return NextResponse.json({ error: claimError.message }, { status: 500 })
+    }
   }
 
   return NextResponse.json({ success: true, item })

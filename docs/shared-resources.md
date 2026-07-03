@@ -41,13 +41,28 @@ organizer wants, not an error).
   claimant names* — the organizer always knows who to chase.
 - **Member: `/participate` → "Bring Something"** (`ResourceCommitments.tsx`,
   anchored `#bring`, **above** Your Groups — needs are live and time-sensitive,
-  group membership is set-once): visible lists with per-item progress and an
-  **"I'll bring one"** button; a claimed row grows −/+ steppers and a remove
-  control. Unclaiming is always allowed — plans change, and the count simply
-  reflects reality. The last card **inside** each list's stack is the
-  dashed *"Have something that fits? ＋ Offer it"* trigger → an inline form
-  that lists unrequested gear (offer = item with no target + the offerer's
-  ×1 claim; retracting the claim removes the listing unless others piled on).
+  group membership is set-once): a **preparation board**, not an inventory —
+  it answers *"what can I do that would be most helpful?"* first (redesigned
+  2026-07-02 on Chante's direction):
+  - **I'M BRINGING** — a pinned card of my commitments ("✓ Camping Stove ×2 —
+    Shared Kitchen") with per-row *Edit ›* that expands + scrolls to the item.
+  - **Per-list readiness** — "84% Ready" + progress bar + "27 of 32 covered"
+    (unit-weighted: Σ min(claimed, needed) / Σ needed; suggestions excluded).
+    A fully covered list celebrates: *"✨ Shared Kitchen is fully equipped!
+    Thanks to everyone contributing."*
+  - **Status groups** — items grouped **Still Needed** (shortage leads:
+    **"Still need: 3"** bold, count secondary; "I'll bring one" right on the
+    row) → **Covered** (dimmer; "Bring an extra" inside the detail) →
+    **Suggested by Members**.
+  - **Expandable rows** — compact by default; expanding shows the note,
+    **who's bringing it** (✓ names, quantities, "You" first — social proof,
+    now member-visible), and my −/+/Remove controls. Unclaiming is always
+    allowed; a claimed row shows purple.
+  - **Suggest a resource** — the dashed last card reads *"Don't see
+    something? ＋ Suggest a resource"* (collaborative planning, replacing
+    "Offer it"); the form has an **"I can bring one myself"** checkbox
+    (default on → seeds the ×1 claim; off = pure suggestion for organizers).
+    Retracting your own suggestion's last claim removes the listing.
 - **Home dashboard: the Bring Something widget** — a configurable dashboard
   widget (id `resources`, reorder/hide/resize via the page editor like any
   other): one row per list with gaps — the **list title is the headline**
@@ -72,12 +87,14 @@ organizer wants, not an error).
 - `PATCH/DELETE /api/admin/resources/[id]` — update / delete a list
 - `POST /api/admin/resources/items`, `PATCH/DELETE /api/admin/resources/items/[id]` — items
 - `GET /api/resources` — member view: visible lists + items + totals + own claim
-  + offer attribution
+  + suggestion attribution + **claimant names** (`claimants: [{ name, quantity,
+  me }]`, "You" first — the board's social proof)
 - `POST /api/resources/claims` — `{ resource_id, quantity }`; quantity 0 removes
   the claim, otherwise upserts. Quantity clamped to 1–99. Removing the last
-  claim on your own offer deletes the offer row (retraction).
-- `POST /api/resources/offers` — `{ list_id, name, note }`; creates the
-  open-callout item + the offerer's ×1 claim.
+  claim on your own suggestion deletes its row (retraction).
+- `POST /api/resources/offers` — `{ list_id, name, note, bring }`; creates the
+  open-callout item, plus the suggester's ×1 claim unless `bring: false`
+  (a pure suggestion for organizers).
 
 ## Non-goals (deliberate, revisit post–What If)
 
