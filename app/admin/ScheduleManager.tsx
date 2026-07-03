@@ -37,6 +37,8 @@ export type ScheduleEvent = {
   needs_lead: boolean
   // Recurring only: NULL = every day; an array of ISO dates = just those days.
   recurrence_days: string[] | null
+  // Off = kept off the schedule page + home teaser (still signable/ackable).
+  show_on_schedule: boolean
 }
 
 // Shift types offered when an event is a Shift (Configure → Shift Types registry).
@@ -84,7 +86,7 @@ function sortByTime(evs: ScheduleEvent[]): ScheduleEvent[] {
 
 const blank = (): Omit<ScheduleEvent, 'id' | 'sort_order'> => ({
   day: '', time: '', title: '', subtitle: '', detail_desc: '',
-  icon_type: '/asset-library/icons/star.webp', visible: true, highlight: false, is_recurring: false, capacity: null, event_type: null, contribution_type: null, event_date: null, event_category: 'at_camp', participation_type: 'general', shift_type_id: null, requires_ack: false, start_time: null, end_time: null, needs_lead: false, recurrence_days: null,
+  icon_type: '/asset-library/icons/star.webp', visible: true, highlight: false, is_recurring: false, capacity: null, event_type: null, contribution_type: null, event_date: null, event_category: 'at_camp', participation_type: 'general', shift_type_id: null, requires_ack: false, start_time: null, end_time: null, needs_lead: false, recurrence_days: null, show_on_schedule: true,
 })
 
 const inputStyle: React.CSSProperties = {
@@ -129,6 +131,7 @@ function EventModal({
   days,
   onSave,
   onClose,
+  onDelete,
   saving,
   error,
   shiftTypes,
@@ -137,6 +140,8 @@ function EventModal({
   days: ScheduleDay[]
   onSave: (form: Omit<ScheduleEvent, 'id' | 'sort_order'>) => void
   onClose: () => void
+  // Edit mode only — deleting an event that doesn't exist yet is meaningless.
+  onDelete?: () => void
   shiftTypes: ShiftTypeOption[]
   saving: boolean
   error: string | null
@@ -349,13 +354,24 @@ function EventModal({
           <Toggle checked={form.visible} onChange={(v) => set('visible', v)} label="Visible on site" />
           <Toggle checked={form.highlight} onChange={(v) => set('highlight', v)} label="Highlight day" />
           <Toggle checked={form.is_recurring} onChange={(v) => set('is_recurring', v)} label="Recurring" />
+          {/* Off = not on the schedule page / home teaser, but members can
+              still sign up or acknowledge it (unlike Visible, which hides it
+              from members everywhere). */}
+          <Toggle checked={form.show_on_schedule} onChange={(v) => set('show_on_schedule', v)} label="Show on schedule page" />
         </div>
 
         {error && <p style={{ color: '#ff8a8a', fontSize: '0.82rem', marginBottom: '0.75rem' }}>{error}</p>}
 
         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+          {/* Delete lives here too — from the week view the modal is the only
+              way to reach an event, so it can't be list-row-only. */}
+          {onDelete && (
+            <button onClick={onDelete} style={{ padding: '0.6rem 1.2rem', borderRadius: '9999px', border: '1px solid rgba(255,100,100,0.25)', background: 'transparent', color: '#ff8a8a', cursor: 'pointer', fontSize: '0.82rem', opacity: 0.7, marginRight: 'auto' }}>
+              Delete
+            </button>
+          )}
           {missing && (
-            <span style={{ fontSize: '0.72rem', color: '#C8A848', opacity: 0.55, fontStyle: 'italic', marginRight: 'auto' }}>
+            <span style={{ fontSize: '0.72rem', color: '#C8A848', opacity: 0.55, fontStyle: 'italic', marginRight: onDelete ? undefined : 'auto' }}>
               Needs {missing}
             </span>
           )}
@@ -458,6 +474,14 @@ function EventRow({
       {event.participation_type !== 'general' && (
         <span style={{ fontSize: '0.6rem', color: PARTICIPATION_BADGE[event.participation_type] ?? '#C8A848', opacity: 0.9, border: `1px solid ${(PARTICIPATION_BADGE[event.participation_type] ?? '#C8A848')}55`, borderRadius: '9999px', padding: '0.1rem 0.5rem', flexShrink: 0, letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
           {event.participation_type === 'shift' ? (shiftTypeName ?? 'Shift') : 'Mandatory'}
+        </span>
+      )}
+      {!event.show_on_schedule && (
+        <span
+          title="Not shown on the schedule page or home teaser (members can still sign up / acknowledge)"
+          style={{ fontSize: '0.6rem', color: '#C8A848', opacity: 0.55, border: '1px dashed rgba(200,168,72,0.35)', borderRadius: '9999px', padding: '0.1rem 0.5rem', flexShrink: 0, letterSpacing: '0.05em', whiteSpace: 'nowrap' }}
+        >
+          off schedule
         </span>
       )}
 
@@ -589,6 +613,16 @@ export function ScheduleManager({ rangeStart, rangeEnd, initialEvents, initialSh
   const [loadError, setLoadError] = useState(false)
   const [modal, setModal] = useState<{ mode: 'add'; recurring: boolean; date?: string; time?: string } | { mode: 'edit'; event: ScheduleEvent } | null>(null)
   const [view, setView] = useState<'list' | 'week'>('list')
+
+  // The toggle remembers itself across visits (it kept resetting to List).
+  // Read after mount — the server render can't see localStorage.
+  useEffect(() => {
+    if (localStorage.getItem('admin-schedule-view') === 'week') setView('week')
+  }, [])
+  const switchView = (v: 'list' | 'week') => {
+    setView(v)
+    try { localStorage.setItem('admin-schedule-view', v) } catch {}
+  }
   const [saving, setSaving] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
   const [moveError, setMoveError] = useState<string | null>(null)
@@ -672,16 +706,19 @@ export function ScheduleManager({ rangeStart, rangeEnd, initialEvents, initialSh
     }
   }
 
-  const handleDelete = async (id: string) => {
+  // Returns whether the event was actually deleted, so the edit modal knows
+  // whether to close (a cancelled confirm keeps it open).
+  const handleDelete = async (id: string): Promise<boolean> => {
     const ev = events.find(e => e.id === id)
     const ok = await confirm({
       title: `Delete ${ev ? `“${ev.title}”` : 'this event'}?`,
       confirmLabel: 'Delete event',
       danger: true,
     })
-    if (!ok) return
+    if (!ok) return false
     await fetch(`/api/admin/schedule/${id}`, { method: 'DELETE' })
     setEvents((prev) => prev.filter((e) => e.id !== id))
+    return true
   }
 
   // Drop from the week grid: same-shape PATCH as the modal (structured times +
@@ -841,7 +878,7 @@ export function ScheduleManager({ rangeStart, rangeEnd, initialEvents, initialSh
             {(['list', 'week'] as const).map(v => (
               <button
                 key={v}
-                onClick={() => setView(v)}
+                onClick={() => switchView(v)}
                 style={{
                   padding: '0.45rem 0.9rem', border: 'none', cursor: 'pointer',
                   fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'capitalize',
@@ -968,6 +1005,9 @@ export function ScheduleManager({ rangeStart, rangeEnd, initialEvents, initialSh
           days={days}
           onSave={handleSave}
           onClose={() => setModal(null)}
+          onDelete={modal.mode === 'edit'
+            ? async () => { if (await handleDelete(modal.event.id)) setModal(null) }
+            : undefined}
           saving={saving}
           error={modalError}
           shiftTypes={shiftTypes}

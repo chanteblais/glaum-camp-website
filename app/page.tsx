@@ -101,6 +101,8 @@ let canManagePolls = false
           .from('schedule_events')
           .select('id, day, time, title, subtitle, icon_type, event_date, event_category')
           .eq('visible', true)
+          // The teaser previews the schedule page — off-schedule events skip it too.
+          .eq('show_on_schedule', true)
           .not('event_type', 'eq', 'camp_tending')
           .or(`event_date.is.null,event_date.lte.${new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)}`)
           .or(`event_date.is.null,event_date.gte.${new Date().toISOString().slice(0, 10)}`)
@@ -151,6 +153,7 @@ let canManagePolls = false
           .from('schedule_events')
           .select('event_date')
           .eq('visible', true)
+          .eq('show_on_schedule', true)
           .gte('event_date', new Date().toISOString().slice(0, 10))
           .order('event_date', { ascending: true })
           .limit(1)

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { EventIcon } from '@/components/EventIcon'
-import { MANDATORY_HUE, shiftHue } from '@/lib/shift-colors'
+import { MANDATORY_HUE, shiftHue, generalHue } from '@/lib/shift-colors'
 import { firstIsoByWeekday, type ScheduleDay } from '@/lib/schedule-days'
 
 type ScheduleEvent = {
@@ -30,14 +30,15 @@ type ScheduleEvent = {
 const PX_PER_HOUR = 56
 
 // Colour scheme (lib/shift-colors.ts): mandatory = the old all-hands teal;
-// each shift type gets a distinct hue from the palette by registry position.
+// each shift type gets a distinct hue from the palette by registry position;
+// general events wear their own stable hue hashed from the event id (they
+// used to share one neutral styling, which made neighbours read as twins).
 // The legacy event_type text keys are kept as a fallback for undecorated rows.
 const EVENT_TYPE_STYLES: Record<string, { border: string; background: string; text: string }> = {
   all_hands:    { border: 'rgba(40,200,190,0.45)',  background: 'rgba(40,200,190,0.1)',  text: '#28c8be' },
   camp_tending: { border: 'rgba(240,90,20,0.55)',   background: 'rgba(240,90,20,0.12)',  text: '#e6781e' },
   service:      { border: 'rgba(240,100,180,0.5)',   background: 'rgba(240,100,180,0.1)',  text: '#f064b4' },
 }
-const DEFAULT_STYLE = { border: 'rgba(200,168,72,0.15)', background: 'rgba(255,255,255,0.03)', text: '#F3EDE6' }
 
 // True when the event carries a colour of its own (bolder title treatment).
 function isColored(event: ScheduleEvent): boolean {
@@ -55,8 +56,8 @@ function eventTypeStyle(event: ScheduleEvent) {
     return { border: `rgba(${hue.rgb},0.5)`, background: `rgba(${hue.rgb},0.1)`, text: hue.accent }
   }
   if (event.event_type && EVENT_TYPE_STYLES[event.event_type]) return EVENT_TYPE_STYLES[event.event_type]
-  if (event.highlight) return { border: 'rgba(200,168,72,0.25)', background: 'rgba(200,168,72,0.04)', text: '#F3EDE6' }
-  return DEFAULT_STYLE
+  const hue = generalHue(event.id)
+  return { border: `rgba(${hue.rgb},0.5)`, background: `rgba(${hue.rgb},0.12)`, text: hue.accent }
 }
 
 // Parse the first time in a string like "9:00 PM – 11:00 PM" → minutes from midnight
@@ -103,10 +104,14 @@ function buildHourLabels(startHour: number, endHour: number) {
 // ── Recurring Event Card (compact, expandable) ────────────────────────────────
 
 function RecurringEventCard({ event }: { event: ScheduleEvent }) {
+  // The card wears the same hue the event has on the calendar grids — one
+  // identity per event, wherever it appears. Border + time label carry it;
+  // a full background tint reads heavy at card size.
+  const style = eventTypeStyle(event)
   return (
-    <div style={{ padding: '1.25rem', border: '1px solid rgba(200,168,72,0.15)', borderRadius: '0.85rem', background: 'rgba(200,168,72,0.03)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+    <div style={{ padding: '1.25rem', border: `1px solid ${style.border}`, borderRadius: '0.85rem', background: 'rgba(255,255,255,0.02)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
       {event.time && (
-        <p style={{ fontSize: '0.68rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.85, margin: 0, textAlign: 'center' }}>
+        <p style={{ fontSize: '0.68rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: style.text, opacity: 0.85, margin: 0, textAlign: 'center' }}>
           {event.time}
         </p>
       )}
