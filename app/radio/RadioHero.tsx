@@ -21,15 +21,17 @@ function WavesMark() {
   )
 }
 
-// The ornamental rule — hairline with a four-point diamond at its heart.
+// The ornamental rule — hairline with a four-point diamond at its heart,
+// fading to nothing at its right end so the frequency band can pick the
+// line up mid-air.
 function DiamondRule() {
   return (
-    <div aria-hidden style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', margin: '1rem 0 1.2rem', maxWidth: '26rem' }}>
-      <span style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(200,168,72,0.55), rgba(200,168,72,0.25))' }} />
-      <svg width="12" height="12" viewBox="0 0 12 12" fill={GOLD} opacity="0.85" aria-hidden>
+    <div aria-hidden style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', width: '100%' }}>
+      <span style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(200,168,72,0.55), rgba(200,168,72,0.3))' }} />
+      <svg width="12" height="12" viewBox="0 0 12 12" fill={GOLD} opacity="0.85" aria-hidden style={{ flexShrink: 0 }}>
         <path d="M6 0 l1.6 4.4 4.4 1.6 -4.4 1.6 L6 12 4.4 7.6 0 6 l4.4 -1.6 Z" />
       </svg>
-      <span style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(200,168,72,0.25), rgba(200,168,72,0.05))' }} />
+      <span style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(200,168,72,0.3), rgba(200,168,72,0))' }} />
     </div>
   )
 }
@@ -115,10 +117,11 @@ function Waveform() {
           <stop offset="45%" stopColor={WARM} stopOpacity="0.1" />
           <stop offset="100%" stopColor={WARM} stopOpacity="0" />
         </radialGradient>
-        {/* the line fades in from the left edge and out to the right */}
+        {/* the line fades in from the left edge (picking up the rule's
+            hand-off) and out to the right */}
         <linearGradient id="radio-fade" x1="0" y1="0" x2="1" y2="0">
           <stop offset="0" stopColor={WARM} stopOpacity="0" />
-          <stop offset="0.08" stopColor={WARM} stopOpacity="1" />
+          <stop offset="0.14" stopColor={WARM} stopOpacity="1" />
           <stop offset="0.92" stopColor={WARM} stopOpacity="1" />
           <stop offset="1" stopColor={WARM} stopOpacity="0" />
         </linearGradient>
@@ -151,68 +154,85 @@ function Waveform() {
 
 export function RadioHero() {
   return (
-    <div style={{ position: 'relative', padding: '1.5rem 0 2rem' }}>
-      <style>{`
+    <div style={{ position: 'relative', padding: '0.5rem 0 1.5rem' }}>
+      {/* The frequency band centers itself on the rule's own 1px row, so its
+          baseline IS the rule's line — the rule fades out, the band fades in,
+          one continuous thread with the pulse erupting from it. (Inline
+          <style> must use dangerouslySetInnerHTML — React escapes ' and >
+          in children and hydration trips on the mismatch.) */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        .radio-rule-row {
+          position: relative;
+          height: 1px;
+          margin: 1rem 0 0.9rem;
+        }
+        .radio-rule {
+          width: 40%;
+          min-width: 15rem;
+        }
         .radio-hero-wave {
           position: absolute;
-          right: -1rem;
+          left: 36%;
+          right: -1.5rem;
           top: 50%;
           transform: translateY(-50%);
-          width: 58%;
-          max-width: 34rem;
           pointer-events: none;
         }
         @media (max-width: 700px) {
-          .radio-hero-wave {
-            position: static;
-            transform: none;
-            width: 100%;
-            max-width: none;
-            margin-top: 0.5rem;
-          }
+          .radio-rule { width: 62%; min-width: 0; }
+          .radio-hero-wave { left: 45%; right: -0.75rem; }
         }
-      `}</style>
-      <div style={{ position: 'relative', zIndex: 1, maxWidth: '30rem' }}>
-        <h1
-          style={{
-            fontFamily: 'var(--font-cormorant-garamond), serif',
-            fontWeight: 600,
-            fontSize: 'clamp(2.6rem, 7vw, 3.8rem)',
-            color: GOLD,
-            margin: 0,
-            letterSpacing: '0.16em',
-            textTransform: 'uppercase',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1.1rem',
-            lineHeight: 1,
-          }}
-        >
-          <WavesMark />
-          Radio
-        </h1>
-        <DiamondRule />
-        <p
-          style={{
-            fontFamily: 'var(--font-cormorant-garamond), serif',
-            fontStyle: 'italic',
-            fontWeight: 500,
-            margin: 0,
-            fontSize: '1.35rem',
-            lineHeight: 1.5,
-            letterSpacing: '0.02em',
-            color: WARM,
-            opacity: 0.95,
-          }}
-        >
-          the pulse of camp —<br />
-          tune in to what's happening around you.
-        </p>
+      ` }} />
+
+      <h1
+        style={{
+          fontFamily: 'var(--font-cormorant-garamond), serif',
+          fontWeight: 600,
+          fontSize: 'clamp(2.6rem, 7vw, 3.8rem)',
+          color: GOLD,
+          margin: 0,
+          letterSpacing: '0.16em',
+          textTransform: 'uppercase',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '1.1rem',
+          lineHeight: 1,
+          position: 'relative',
+          zIndex: 1,
+        }}
+      >
+        <WavesMark />
+        Radio
+      </h1>
+
+      <div className="radio-rule-row" aria-hidden>
+        <div className="radio-rule">
+          <DiamondRule />
+        </div>
+        <div className="radio-hero-wave">
+          <Waveform />
+        </div>
       </div>
 
-      <div className="radio-hero-wave">
-        <Waveform />
-      </div>
+      <p
+        style={{
+          fontFamily: 'var(--font-cormorant-garamond), serif',
+          fontStyle: 'italic',
+          fontWeight: 500,
+          margin: 0,
+          fontSize: '1.1rem',
+          lineHeight: 1.5,
+          letterSpacing: '0.02em',
+          color: WARM,
+          opacity: 0.95,
+          position: 'relative',
+          zIndex: 1,
+          maxWidth: '22rem',
+        }}
+      >
+        the pulse of camp —<br />
+        tune in to what's happening around you.
+      </p>
     </div>
   )
 }
