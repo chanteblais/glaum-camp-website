@@ -496,7 +496,7 @@ let canManagePolls = false
                           {unmetNeeds.length} item{unmetNeeds.length === 1 ? '' : 's'} still needed
                         </p>
                         <p style={{ fontSize: '0.78rem', opacity: 0.45, margin: 0, color: '#F3EDE6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {unmetNeeds.slice(0, 3).map(n => n.name).join(' · ')}{unmetNeeds.length > 3 ? ` +${unmetNeeds.length - 3} more` : ''}
+                          {unmetNeeds.slice(0, 3).map(n => n.listTitle ? `${n.name} (${n.listTitle})` : n.name).join(' · ')}{unmetNeeds.length > 3 ? ` +${unmetNeeds.length - 3} more` : ''}
                         </p>
                       </div>
                       <span style={{ fontSize: '1rem', color: '#C8A848', opacity: 0.4, flexShrink: 0 }}>→</span>

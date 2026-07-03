@@ -3,19 +3,21 @@ import { supabaseAdmin } from './supabase'
 // Unmet needs across visible lists, for the home-dashboard "Bring Something"
 // banner: items with a target (offers excluded) whose claims fall short.
 // Demand-driven — the banner renders nothing once everything is covered.
-export type UnmetNeed = { id: string; name: string; remaining: number }
+export type UnmetNeed = { id: string; name: string; listTitle: string; remaining: number }
 
 export async function getUnmetResourceNeeds(): Promise<UnmetNeed[]> {
   const { data: lists, error } = await supabaseAdmin
     .from('resource_lists')
-    .select('id')
+    .select('id, title, sort_order')
     .eq('visible', true)
   // Table missing (pre-migration) → no banner rather than a crash.
   if (error || !lists || lists.length === 0) return []
 
+  const listById = Object.fromEntries(lists.map(l => [l.id, l]))
+
   const { data: items } = await supabaseAdmin
     .from('resources')
-    .select('id, name, quantity_needed, sort_order, created_at')
+    .select('id, list_id, name, quantity_needed, sort_order, created_at')
     .in('list_id', lists.map(l => l.id))
     .not('quantity_needed', 'is', null)
     .order('sort_order', { ascending: true })
@@ -30,8 +32,16 @@ export async function getUnmetResourceNeeds(): Promise<UnmetNeed[]> {
   for (const c of claims ?? []) claimed[c.resource_id] = (claimed[c.resource_id] ?? 0) + c.quantity
 
   return items
-    .map(i => ({ id: i.id, name: i.name, remaining: (i.quantity_needed as number) - (claimed[i.id] ?? 0) }))
+    .map(i => ({
+      id: i.id,
+      name: i.name,
+      listTitle: listById[i.list_id]?.title ?? '',
+      remaining: (i.quantity_needed as number) - (claimed[i.id] ?? 0),
+      _sort: (listById[i.list_id]?.sort_order ?? 0) * 1000 + i.sort_order,
+    }))
     .filter(i => i.remaining > 0)
+    .sort((a, b) => a._sort - b._sort)
+    .map(({ id, name, listTitle, remaining }) => ({ id, name, listTitle, remaining }))
 }
 
 // A member's resource claims, shaped for the Active Commitments card

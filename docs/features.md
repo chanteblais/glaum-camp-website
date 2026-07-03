@@ -52,7 +52,7 @@ Configurable widgets (order, visibility, and width controlled by admin via the p
 | Widget ID | Default label | Content |
 |---|---|---|
 | `announcements` | Announcements | Visible, non-expired admin announcements; pinned first. Hidden if empty |
-| `resources` | Bring Something | One compact click-through card — "N items still needed" + the first 3 item names — the **whole card** links to `/participate#bring` (`getUnmetResourceNeeds` in `lib/resources.ts`, offers excluded). Demand-driven: hidden once everything's covered |
+| `resources` | Bring Something | One compact click-through card — "N items still needed" + the first 3 items, each with its list ("Camping Stove (Shared Kitchen)") — the **whole card** links to `/participate#bring` (`getUnmetResourceNeeds` in `lib/resources.ts`, offers excluded). Demand-driven: hidden once everything's covered |
 | `shoutouts` | Shoutouts | Member-posted shoutouts (newest first). Approved members post via a "✦ Share a shoutout" button at the bottom that opens an inline composer; authors and admins can delete (✕). See **Shoutouts** under Supporting Features |
 | `polls` | Polls | Active, non-expired admin polls. Members vote inline; results visible to everyone (voted or not) |
 | `events` | Upcoming Gatherings | Pre-camp + at-camp `schedule_events` in the next 14 days. "View full schedule →" links to `/schedule` |
