@@ -224,6 +224,7 @@ export default async function ProfilePage() {
 
   // ── Header pieces (alignment-neutral; the layout wrapper sets alignment) ──
   const isApproved = application?.status === 'approved'
+  const isSuspended = !!profileMember?.suspended_at
   // Member-authored quote surfaced under the name in the header. (The bio/About
   // narrative shows only on the public profile; here it's edited in Profile Details.)
   const quoteText = typeof profileValues['quote'] === 'string' ? (profileValues['quote'] as string).trim() : ''
@@ -255,7 +256,7 @@ export default async function ProfilePage() {
           {displayName}
         </h1>
         {application && (application.status === 'approved' || application.status === 'pending') && (
-          <ProfileSettings application={application} />
+          <ProfileSettings application={application} suspended={isSuspended} />
         )}
         {volunteer && volunteer.status === 'active' && !application && (
           <VolunteerSettings volunteer={volunteer} />
@@ -395,6 +396,19 @@ export default async function ProfilePage() {
       <img src="/hands-right.svg" alt="" aria-hidden style={{ position: 'fixed', right: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
       <RememberSignedIn firstName={user?.firstName} email={email} />
       <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '5.5rem 1.5rem 3rem', position: 'relative', zIndex: 1 }}>
+
+        {isSuspended && (
+          <div style={{ marginBottom: '1.75rem', padding: '1rem 1.4rem', border: '1px solid rgba(255,180,80,0.35)', borderRadius: '0.85rem', background: 'rgba(255,180,80,0.07)', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: '220px' }}>
+              <p style={{ fontSize: '0.7rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: '#ffcf80', margin: '0 0 0.35rem' }}>
+                Attendance suspended
+              </p>
+              <p style={{ fontSize: '0.88rem', lineHeight: 1.6, opacity: 0.85, margin: 0 }}>
+                Your commitments are paused and you can't join groups or shifts right now. You still have full access to the community. Resume anytime from the settings menu by your name.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Name header — shown for application and volunteer tracks. Approved members
             with a designation get the 3-column registry header; everyone else gets a

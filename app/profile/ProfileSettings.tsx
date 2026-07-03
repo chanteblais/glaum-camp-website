@@ -57,15 +57,16 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-export function ProfileSettings({ application }: { application: ApplicationData }) {
+export function ProfileSettings({ application, suspended = false }: { application: ApplicationData; suspended?: boolean }) {
   const router = useRouter()
   const menuRef = useRef<HTMLDivElement>(null)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [view, setView] = useState<'menu' | 'edit' | 'cancel' | null>(null)
+  const [view, setView] = useState<'menu' | 'edit' | 'cancel' | 'suspend' | 'resume' | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [cancelReason, setCancelReason] = useState('')
+  const [suspendNote, setSuspendNote] = useState('')
 
   const [form, setForm] = useState({
     preferred_name: application.preferred_name ?? '',
@@ -144,12 +145,13 @@ export function ProfileSettings({ application }: { application: ApplicationData 
     setSuccess(null)
   }
 
-  const openPanel = (next: 'edit' | 'cancel') => {
+  const openPanel = (next: 'edit' | 'cancel' | 'suspend' | 'resume') => {
     setMenuOpen(false)
     setView(next)
     setError(null)
     setSuccess(null)
     if (next === 'cancel') setCancelReason('')
+    if (next === 'suspend') setSuspendNote('')
   }
 
   const handleSave = async () => {
@@ -188,6 +190,28 @@ export function ProfileSettings({ application }: { application: ApplicationData 
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to cancel attendance')
+
+      router.refresh()
+      closeAll()
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Something went wrong')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSuspendToggle = async (nextSuspended: boolean) => {
+    setSaving(true)
+    setError(null)
+
+    try {
+      const res = await fetch('/api/profile/suspend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ suspended: nextSuspended, note: suspendNote.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Something went wrong')
 
       router.refresh()
       closeAll()
@@ -269,6 +293,13 @@ export function ProfileSettings({ application }: { application: ApplicationData 
             style={menuItemStyle}
           >
             Edit profile
+          </button>
+          <button
+            type="button"
+            onClick={() => openPanel(suspended ? 'resume' : 'suspend')}
+            style={{ ...menuItemStyle, color: '#C8A848', borderTop: '1px solid rgba(200,168,72,0.12)' }}
+          >
+            {suspended ? 'Resume attendance' : 'Suspend attendance'}
           </button>
           <button
             type="button"
@@ -454,6 +485,75 @@ export function ProfileSettings({ application }: { application: ApplicationData 
               }}
             >
               {saving ? 'Cancelling…' : 'Confirm cancellation'}
+            </button>
+          </div>
+        </Panel>
+      )}
+
+      {view === 'suspend' && (
+        <Panel title="Suspend attendance" onClose={closeAll}>
+          <p style={{ fontSize: '0.9rem', lineHeight: 1.7, color: '#F3EDE6', opacity: 0.9, marginBottom: '1rem' }}>
+            Life happens. Suspending pauses your commitments while you stay part of the community — you'll keep full access to the site, the schedule, and messages.
+          </p>
+          <div style={{ padding: '1rem 1.25rem', border: '1px solid rgba(255,180,80,0.3)', borderRadius: '0.75rem', background: 'rgba(255,180,80,0.06)', marginBottom: '1.25rem' }}>
+            <p style={{ fontSize: '0.7rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#ffcf80', marginBottom: '0.6rem' }}>
+              What happens
+            </p>
+            <ul style={{ margin: 0, paddingLeft: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <li style={{ fontSize: '0.85rem', lineHeight: 1.5, opacity: 0.85 }}>You'll be removed from every group and shift you're committed to.</li>
+              <li style={{ fontSize: '0.85rem', lineHeight: 1.5, opacity: 0.85 }}>You won't be able to join groups or sign up for shifts until you resume.</li>
+              <li style={{ fontSize: '0.85rem', lineHeight: 1.5, opacity: 0.85 }}>You can resume anytime from this same menu.</li>
+            </ul>
+          </div>
+          <Field label="Note to organizers (optional)">
+            <textarea
+              rows={3}
+              value={suspendNote}
+              onChange={(e) => setSuspendNote(e.target.value)}
+              placeholder="Anything you'd like the organizers to know…"
+              style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6 }}
+            />
+          </Field>
+          {error && <p style={{ color: '#ff8a8a', fontSize: '0.85rem', marginBottom: '0.75rem' }}>{error}</p>}
+          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+            <button type="button" onClick={closeAll} style={secondaryBtnStyle}>Never mind</button>
+            <button
+              type="button"
+              onClick={() => handleSuspendToggle(true)}
+              disabled={saving}
+              style={{
+                ...primaryBtnStyle,
+                borderColor: 'rgba(255,180,80,0.5)',
+                color: '#ffcf80',
+                opacity: saving ? 0.45 : 1,
+                cursor: saving ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {saving ? 'Suspending…' : 'Suspend my attendance'}
+            </button>
+          </div>
+        </Panel>
+      )}
+
+      {view === 'resume' && (
+        <Panel title="Resume attendance" onClose={closeAll}>
+          <p style={{ fontSize: '0.9rem', lineHeight: 1.7, color: '#F3EDE6', opacity: 0.9, marginBottom: '1.25rem' }}>
+            Welcome back! Resuming lifts your suspension right away. Your previous groups and shifts aren't restored automatically — head to Participate to rejoin whatever still fits.
+          </p>
+          {error && <p style={{ color: '#ff8a8a', fontSize: '0.85rem', marginBottom: '0.75rem' }}>{error}</p>}
+          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+            <button type="button" onClick={closeAll} style={secondaryBtnStyle}>Not yet</button>
+            <button
+              type="button"
+              onClick={() => handleSuspendToggle(false)}
+              disabled={saving}
+              style={{
+                ...primaryBtnStyle,
+                opacity: saving ? 0.45 : 1,
+                cursor: saving ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {saving ? 'Resuming…' : 'Resume my attendance'}
             </button>
           </div>
         </Panel>

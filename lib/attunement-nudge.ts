@@ -36,7 +36,9 @@ export async function collectOutstandingAttunement(): Promise<MemberAttunement[]
     supabaseAdmin
       .from('members')
       .select('clerk_user_id, email, first_name, preferred_name, avatar_url')
-      .eq('status', 'approved'),
+      .eq('status', 'approved')
+      // Suspended members have no commitments to chase — don't nudge them (063).
+      .is('suspended_at', null),
     supabaseAdmin
       .from('page_content')
       .select('key, value')

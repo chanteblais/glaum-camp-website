@@ -66,6 +66,7 @@ export default async function OverviewPage() {
     groupNamesByUser,
     { data: groupRows },
     { data: applications },
+    { data: suspendedRows },
     { data: signups },
     { data: volunteers },
     { data: notifications },
@@ -81,6 +82,14 @@ export default async function OverviewPage() {
       .from('applications')
       .select('id, first_name, last_name, preferred_name, email, status, clerk_user_id, rideshare')
       .order('submitted_at', { ascending: false }),
+    // Suspended members (migration 063) — excluded from every participation
+    // count below and surfaced in their own box, so paused commitments don't
+    // muddy the organizer's numbers.
+    supabaseAdmin
+      .from('members')
+      .select('clerk_user_id')
+      .eq('status', 'approved')
+      .not('suspended_at', 'is', null),
     supabaseAdmin
       .from('camp_signups')
       .select('clerk_user_id, role_id, role_approval_status'),
@@ -104,7 +113,15 @@ export default async function OverviewPage() {
   ])
 
   const all = applications ?? []
-  const approved = all.filter(a => a.status === 'approved')
+  // Suspended members are approved but paused — kept out of the participation
+  // math and shown in their own box (migration 063). Matched by clerk_user_id.
+  const suspendedClerkIds = new Set(
+    (suspendedRows ?? []).map(r => r.clerk_user_id).filter((id): id is string => !!id)
+  )
+  const isSuspended = (a: { clerk_user_id?: string | null }) => !!a.clerk_user_id && suspendedClerkIds.has(a.clerk_user_id)
+  const approvedAll = all.filter(a => a.status === 'approved')
+  const approved = approvedAll.filter(a => !isSuspended(a))
+  const suspendedCount = approvedAll.length - approved.length
   const pending = all.filter(a => a.status === 'pending')
   const activeVolunteers = volunteers ?? []
 
@@ -196,7 +213,7 @@ export default async function OverviewPage() {
           Overview
         </h1>
         <p style={{ textAlign: 'center', opacity: 0.4, fontSize: '0.85rem', marginBottom: '2.5rem' }}>
-          {pending.length} pending · {approved.length} approved
+          {pending.length} pending · {approved.length} approved{suspendedCount > 0 ? ` · ${suspendedCount} suspended` : ''}
         </p>
 
         {/* ── NEEDS ATTENTION (A1) — the console's to-do surface ── */}
@@ -264,6 +281,13 @@ export default async function OverviewPage() {
               <p style={{ ...statValue, color: '#D239F8' }}>{activeVolunteers.length}</p>
               <p style={statSub}>outside volunteers</p>
             </div>
+            {suspendedCount > 0 && (
+              <div style={{ ...card(), borderColor: 'rgba(255,180,80,0.3)', background: 'rgba(255,180,80,0.05)' }}>
+                <p style={{ ...statLabel, color: '#ffcf80' }}>Suspended</p>
+                <p style={{ ...statValue, color: '#ffcf80' }}>{suspendedCount}</p>
+                <p style={statSub}>paused — not counted above</p>
+              </div>
+            )}
           </div>
 
           {/* Member list */}

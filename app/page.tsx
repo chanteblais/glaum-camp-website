@@ -235,7 +235,7 @@ let canManagePolls = false
   // approved-only (its widget only renders for approved members anyway).
   const isApprovedForBatch = application?.status === 'approved'
   const shiftClerkId = (application?.clerk_user_id as string | null) ?? userId
-  const [pageContentResult, memberGroups, shiftState, resourceWidget] = await Promise.all([
+  const [pageContentResult, memberGroups, shiftState, resourceWidget, suspendedResult] = await Promise.all([
     pageContentQuery,
     // Groups the member belongs to (replaces the old setup_preference "contributions").
     getMemberGroups(application?.clerk_user_id as string | null),
@@ -243,7 +243,13 @@ let canManagePolls = false
     // "Bring Something" widget state: the list needing the most attention +
     // the member's own commitments. null = no targeted items yet (hidden).
     isApprovedForBatch ? getResourceWidgetState(shiftClerkId) : Promise.resolve(null),
+    // Suspension flag (063) — a suspended member holds no commitments, so we
+    // swap the attunement banner for a "paused" notice instead of nagging them.
+    isApprovedForBatch && application?.clerk_user_id
+      ? supabaseAdmin.from('members').select('suspended_at').eq('clerk_user_id', application.clerk_user_id as string).maybeSingle()
+      : Promise.resolve({ data: null }),
   ])
+  const isSuspended = !!(suspendedResult?.data?.suspended_at)
   const contentRows = pageContentResult.data
   const pageContent: Record<string, string> = Object.fromEntries((contentRows ?? []).map(r => [r.key, r.value]))
   const c = (key: string, fallback: string) => pageContent[key] ?? fallback
@@ -392,8 +398,25 @@ let canManagePolls = false
               </div>
             </div>
 
+            {/* ── SUSPENDED NOTICE (replaces the attunement nudge while paused) ── */}
+            {isSuspended && (
+              <a href="/profile" style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.25rem', padding: '1rem 1.4rem', borderRadius: '0.9rem', border: '1px solid rgba(255,180,80,0.4)', background: 'rgba(255,180,80,0.08)', textDecoration: 'none' }}>
+                <div style={{ flex: 1, minWidth: '220px' }}>
+                  <p style={{ margin: '0 0 0.3rem', color: '#ffcf80' }}>
+                    <span style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.05rem', letterSpacing: '0.04em' }}>Attendance paused</span>
+                  </p>
+                  <p style={{ margin: 0, fontSize: '0.82rem', fontStyle: 'italic', color: '#F3EDE6', opacity: 0.75, lineHeight: 1.5 }}>
+                    Your commitments are on hold. Everything's still here to explore — resume anytime from your profile.
+                  </p>
+                </div>
+                <span style={{ flexShrink: 0, padding: '0.45rem 1.1rem', border: '1px solid rgba(255,180,80,0.5)', borderRadius: '9999px', background: 'rgba(255,180,80,0.08)', fontSize: '0.7rem', letterSpacing: '0.16em', color: '#ffcf80' }}>
+                  MANAGE →
+                </span>
+              </a>
+            )}
+
             {/* ── ATTUNEMENT BANNER (required tasks outstanding, or commitments to fill) ── */}
-            {(!allAttuned || commitmentsOutstanding > 0) && (() => {
+            {!isSuspended && (!allAttuned || commitmentsOutstanding > 0) && (() => {
               const outstandingTasks = requiredTasks.filter(t => !t.done)
               const outstanding = outstandingTasks.length
               const doneCount = requiredTasks.length - outstanding
