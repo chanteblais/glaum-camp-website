@@ -374,3 +374,17 @@ Delete confirmations are consistent (native `confirm()`) — no action needed.
 Overview's Shift Hours section assumes a flat 3 h/member. The agreed shifts model
 puts required hours on shift types. No action now — the redesign should rebuild this
 section; noting it so it doesn't survive by accident.
+
+### 11. The PWA service worker was pinning stale icon art in prod · Severity: medium · Status: **fixed 2026-07-03**
+
+Sibling of #10: `public/sw.js` matched every same-origin `.webp` as an
+"immutable" static asset and served it **cache-first, forever**. The asset
+library is mutable art under stable names (icons and medals get re-struck in
+place), so every installed PWA kept the pre-normalization icons — new sizing
+CSS + old tight-cropped art = icons overflowing their display boxes (reported
+from the schedule's event-icon picker).
+
+**Fixed:** `/asset-library/` excluded from SW caching (network + HTTP etags —
+the files are ≤320px now, and Vercel serves them `must-revalidate`) + cache
+bumped to `glaum-static-v3` so activation purges the poisoned entries. After
+the deploy, one reload installs the new worker; the next paints fresh art.
