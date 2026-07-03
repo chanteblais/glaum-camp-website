@@ -1,4 +1,4 @@
-import { auth, currentUser } from '@clerk/nextjs/server'
+import { auth } from '@clerk/nextjs/server'
 import { redirect, notFound } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { Header } from '@/components/Header'
@@ -6,7 +6,7 @@ import { supabaseResizedUrl } from '@/lib/supabase-image'
 import { getMemberGroups, type MemberGroup } from '@/lib/groups'
 import { buildMemberFacts } from '@/lib/member-facts'
 import { parseDistinctions, evaluateDistinctions } from '@/lib/distinctions'
-import { resolveMember, getMemberProfileValues } from '@/lib/members'
+import { resolveMember, getMemberProfileValues, getApprovedMember } from '@/lib/members'
 import { parseProfileFields, storedFields } from '@/lib/profile-fields'
 import { getMemberAwards } from '@/lib/distinction-awards'
 import { CabinetOfDistinctions } from '@/app/profile/CabinetOfDistinctions'
@@ -58,61 +58,60 @@ export default async function MemberPage({ params }: { params: { id: string } })
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
 
-  // Only approved members can view other profiles
-  const user = await currentUser()
-  const email = user?.emailAddresses[0]?.emailAddress
-
-  const { data: viewer } = await supabaseAdmin
-    .from('members')
-    .select('status')
-    .or(`clerk_user_id.eq.${userId},email.eq.${email}`)
-    .eq('status', 'approved')
-    .maybeSingle()
-
-  if (!viewer) redirect('/profile')
-
-  // Fetch target member
+  // Viewer gate + target member fetch are independent — one parallel batch.
+  // getApprovedMember is the standard clerk_user_id-first lookup (email
+  // fallback only on a miss), so no Clerk Backend-API call on the hot path.
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.id)
+  const [viewer, { data: member }] = await Promise.all([
+    getApprovedMember(userId),
+    supabaseAdmin
+      .from('applications')
+      .select('id, first_name, preferred_name, pronouns, avatar_url, clerk_user_id, submitted_at, status, camped_before')
+      .eq('status', 'approved')
+      .eq(isUuid ? 'id' : 'clerk_user_id', params.id)
+      .maybeSingle(),
+  ])
 
-  const { data: member } = await supabaseAdmin
-    .from('applications')
-    .select('id, first_name, preferred_name, pronouns, avatar_url, clerk_user_id, submitted_at, status, camped_before')
-    .eq('status', 'approved')
-    .eq(isUuid ? 'id' : 'clerk_user_id', params.id)
-    .maybeSingle()
-
+  // Only approved members can view other profiles
+  if (!viewer) redirect('/profile')
   if (!member) notFound()
 
-  // Fetch their camp signup with role + dept
-  const { data: campSignup } = member.clerk_user_id
-    ? await supabaseAdmin
-        .from('camp_signups')
-        .select('role_id, role_approval_status, roles(name, description, purpose, department_id, departments(name, icon, description))')
-        .eq('clerk_user_id', member.clerk_user_id)
-        .maybeSingle()
-    : { data: null }
+  // Everything below depends only on the member row: signup with role + dept,
+  // group affiliations, the two page_content configs (one keyed read), and the
+  // canonical member record.
+  const [{ data: campSignup }, memberGroups, { data: cfgRows }, profileMember] = await Promise.all([
+    member.clerk_user_id
+      ? supabaseAdmin
+          .from('camp_signups')
+          .select('role_id, role_approval_status, roles(name, description, purpose, department_id, departments(name, icon, description))')
+          .eq('clerk_user_id', member.clerk_user_id)
+          .maybeSingle()
+      : { data: null },
+    // Group affiliations — the member's "Contributions" (Setup / Decor / Teardown …).
+    getMemberGroups(member.clerk_user_id as string | null),
+    supabaseAdmin
+      .from('page_content')
+      .select('key, value')
+      .in('key', ['config_distinctions', 'config_profile_fields']),
+    resolveMember((member.clerk_user_id as string | null) ?? null),
+  ])
+  const cfgMap: Record<string, string | undefined> = Object.fromEntries((cfgRows ?? []).map(r => [r.key, r.value]))
 
   const roleInfo = campSignup?.roles as { name?: string; description?: string | null; purpose?: string | null; departments?: { name?: string; icon?: string; description?: string | null } | null } | null
   const roleApproved = !!campSignup?.role_id && campSignup?.role_approval_status !== 'pending'
 
-  // Group affiliations — the member's "Contributions" (Setup / Decor / Teardown …).
-  const memberGroups = await getMemberGroups(member.clerk_user_id as string | null)
+  // Merged namespace: stored profile values ∪ derived system facts (system wins).
+  // Guarded — falls back to system-facts-only when no member row exists yet.
+  const [profileValues, awardedIdList] = profileMember
+    ? await Promise.all([getMemberProfileValues(profileMember.id), getMemberAwards(profileMember.id)])
+    : [{} as Record<string, unknown>, null]
+  const awardedIds = awardedIdList ? new Set(awardedIdList) : undefined
 
   // Earned medals — derived from facts against the admin's distinction rules
   // (store-the-facts, derive-the-badge). Never persisted; recomputed per render.
-  const { data: distRow } = await supabaseAdmin
-    .from('page_content')
-    .select('value')
-    .eq('key', 'config_distinctions')
-    .maybeSingle()
   const memberFacts = buildMemberFacts({ application: member, roleInfo, memberGroups, roleApproved })
-  // Merged namespace: stored profile values ∪ derived system facts (system wins).
-  // Guarded — falls back to system-facts-only when no member row exists yet.
-  const profileMember = await resolveMember((member.clerk_user_id as string | null) ?? null)
-  const profileValues = profileMember ? await getMemberProfileValues(profileMember.id) : {}
-  const awardedIds = profileMember ? new Set(await getMemberAwards(profileMember.id)) : undefined
   const factContext = { ...profileValues, ...memberFacts }
-  const earnedDistinctions = evaluateDistinctions(factContext, parseDistinctions(distRow?.value), awardedIds)
+  const earnedDistinctions = evaluateDistinctions(factContext, parseDistinctions(cfgMap['config_distinctions']), awardedIds)
 
   const displayName = member.preferred_name || member.first_name || 'Member'
   const memberSince = member.submitted_at ? new Date(member.submitted_at as string).getFullYear() : null
@@ -148,9 +147,7 @@ export default async function MemberPage({ params }: { params: { id: string } })
   // skills are excluded — they render in their own dedicated spots (About column,
   // under-name quote, Skills & Gifts), so listing them here would double up.
   const DEDICATED_FIELD_KEYS = new Set(['bio', 'quote', 'skills'])
-  const { data: pfRow } = await supabaseAdmin
-    .from('page_content').select('value').eq('key', 'config_profile_fields').maybeSingle()
-  const publicProfileFields = storedFields(parseProfileFields(pfRow?.value))
+  const publicProfileFields = storedFields(parseProfileFields(cfgMap['config_profile_fields']))
     .filter(f => f.public && !DEDICATED_FIELD_KEYS.has(f.key))
     .map(f => ({ field: f, value: profileValues[f.key] }))
     .filter(({ value }) => value != null && value !== '' && !(Array.isArray(value) && value.length === 0))

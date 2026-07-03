@@ -1,6 +1,7 @@
-import { auth, currentUser, clerkClient } from '@clerk/nextjs/server'
+import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
+import { requireAdmin } from '@/lib/admin-auth'
 import { mergeMemberConfig, mergeVolunteerConfig } from '@/lib/form-config'
 import { DEFAULT_AGREEMENT_ITEMS, DEFAULT_ATTENDANCE_OPTIONS, parseTrackCopy } from '@/lib/site-config'
 import { parseContributionTypes } from '@/lib/application-options'
@@ -11,20 +12,14 @@ export default async function ApplyPage({ searchParams }: { searchParams: { trac
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
 
-  const user = await currentUser()
-  const email = user?.emailAddresses[0]?.emailAddress ?? ''
-
   const isAdminPreview = searchParams.admin_preview === '1'
 
-  // Check if requester is admin (for preview bypass)
-  let isAdmin = false
-  if (isAdminPreview) {
-    const client = await clerkClient()
-    const clerkUser = await client.users.getUser(userId)
-    isAdmin = clerkUser.publicMetadata?.role === 'admin'
-  }
-
-  const [{ data: existing }, { data: volunteer }, { data: configRows }] = await Promise.all([
+  // currentUser() is a Clerk Backend-API round-trip (needed for the wizard's
+  // email prefill) — it runs inside the batch, never on its own line. The
+  // admin-preview check rides along via requireAdmin (session claims).
+  const [user, adminId, { data: existing }, { data: volunteer }, { data: configRows }] = await Promise.all([
+    currentUser(),
+    isAdminPreview ? requireAdmin() : null,
     supabaseAdmin.from('members').select('id, status').eq('clerk_user_id', userId).maybeSingle(),
     supabaseAdmin.from('volunteers').select('id, status').eq('clerk_user_id', userId).maybeSingle(),
     supabaseAdmin.from('page_content').select('key, value').in('key', [
@@ -36,6 +31,9 @@ export default async function ApplyPage({ searchParams }: { searchParams: { trac
       'config_track_picker',
     ]),
   ])
+
+  const email = user?.emailAddresses[0]?.emailAddress ?? ''
+  const isAdmin = !!adminId
 
   const configMap = Object.fromEntries((configRows ?? []).map(r => [r.key, r.value]))
 

@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { clockRangeLabel } from '@/lib/shift-hours'
+import { supabaseResizedUrl } from '@/lib/supabase-image'
 
-type LeadUpEvent = {
+export type LeadUpEvent = {
   id: string
   title: string
   description: string | null
@@ -35,12 +36,18 @@ function timeLabel(ev: LeadUpEvent): string {
   return clockRangeLabel(ev.start_time, ev.end_time)
 }
 
-export function LeadUpGatherings() {
-  const [events, setEvents] = useState<LeadUpEvent[]>([])
-  const [loading, setLoading] = useState(true)
+export function LeadUpGatherings({ initialEvents }: {
+  // Server-rendered pages pass this (docs/architecture.md → Auth → "Server-
+  // rendered section data") so the section paints populated; the mount fetch
+  // below runs only when it's absent. The API route stays the refresh path.
+  initialEvents?: LeadUpEvent[]
+} = {}) {
+  const [events, setEvents] = useState<LeadUpEvent[]>(initialEvents ?? [])
+  const [loading, setLoading] = useState(initialEvents === undefined)
   const [pending, setPending] = useState<string | null>(null)
 
   useEffect(() => {
+    if (initialEvents !== undefined) return
     fetch('/api/lead-up-events')
       .then(r => r.ok ? r.json() : { events: [] })
       .then(json => setEvents(json.events ?? []))
@@ -98,7 +105,7 @@ export function LeadUpGatherings() {
             }}>
               {ev.image_url && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={ev.image_url} alt="" style={{ width: '100%', height: '170px', objectFit: 'cover', display: 'block', borderBottom: '1px solid rgba(200,168,72,0.15)' }} />
+                <img src={supabaseResizedUrl(ev.image_url, 800, 340) ?? ''} alt="" style={{ width: '100%', height: '170px', objectFit: 'cover', display: 'block', borderBottom: '1px solid rgba(200,168,72,0.15)' }} />
               )}
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.1rem', padding: '1.1rem 1.25rem' }}>
               {/* Date block */}
