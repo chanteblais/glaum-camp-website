@@ -70,6 +70,7 @@ export default async function RadioPage() {
       {/* Child combinators in inline <style> need dangerouslySetInnerHTML —
           the server escapes `>` to `&gt;` and hydration trips (house gotcha). */}
       <style dangerouslySetInnerHTML={{ __html: `
+        .radio-main { max-width: 760px; margin: 0 auto; padding: 5.5rem 1.5rem 6rem; }
         .radio-stats { display: grid; grid-template-columns: repeat(4, 1fr); }
         /* flex-start keeps every NUMBER on the same line regardless of how
            many lines its label wraps to */
@@ -85,9 +86,21 @@ export default async function RadioPage() {
           .radio-stat-icon svg { width: 15px; height: 15px; }
           .radio-stat-num { font-size: 0.9rem; }
           .radio-stat-label { font-size: 0.5rem; }
+          /* the whole page tightens: narrower gutters, smaller gaps between
+             bands. !important beats the components' inline (desktop) values;
+             bottom padding stays 6rem for the fixed tab bar. */
+          .radio-main { padding: 4.75rem 1rem 6rem; }
+          .radio-stats { padding: 0.5rem 0.25rem !important; margin-bottom: 1.2rem !important; }
+          .radio-composer { margin-bottom: 1.4rem !important; }
+          .radio-composer-box { gap: 0.5rem !important; padding: 0.5rem 0.5rem 0.5rem 0.85rem !important; }
+          .radio-composer-btn { padding: 0.5rem 0.85rem !important; }
+          .radio-now { padding: 0.8rem 1rem !important; margin-bottom: 1.4rem !important; }
+          .radio-now-welcome { font-size: 0.95rem !important; }
+          .radio-golive { padding: 0.8rem 1rem !important; margin-top: 1.5rem !important; gap: 0.75rem !important; }
+          .radio-golive-desc { display: none; }
         }
       ` }} />
-      <main style={{ maxWidth: '760px', margin: '0 auto', padding: '5.5rem 1.5rem 6rem' }}>
+      <main className="radio-main">
 
         {/* ── Hero (RadioHero: waves mark, diamond rule, script subtitle,
                frequency waveform — her banner mockup) ── */}

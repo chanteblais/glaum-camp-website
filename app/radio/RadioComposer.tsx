@@ -52,8 +52,9 @@ export function RadioComposer({ isBroadcaster }: { isBroadcaster: boolean }) {
   }
 
   return (
-    <div style={{ marginBottom: '2.5rem' }}>
+    <div className="radio-composer" style={{ marginBottom: '2.5rem' }}>
       <div
+        className="radio-composer-box"
         style={{
           display: 'flex',
           gap: '0.75rem',
@@ -88,6 +89,7 @@ export function RadioComposer({ isBroadcaster }: { isBroadcaster: boolean }) {
           }}
         />
         <button
+          className="radio-composer-btn"
           onClick={post}
           disabled={posting || !message.trim() || !isBroadcaster}
           style={{
@@ -124,6 +126,7 @@ export function RadioComposer({ isBroadcaster }: { isBroadcaster: boolean }) {
 export function GoLiveBar() {
   return (
     <button
+      className="radio-golive"
       onClick={() => {
         const input = document.getElementById(INPUT_ID) as HTMLInputElement | null
         input?.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -146,7 +149,7 @@ export function GoLiveBar() {
     >
       <span aria-hidden style={{ fontSize: '0.95rem', opacity: 0.85 }}>((•))</span>
       <span style={{ fontSize: '0.78rem', letterSpacing: '0.16em', textTransform: 'uppercase' }}>Go Live</span>
-      <span style={{ fontSize: '0.85rem', color: '#F3EDE6', opacity: 0.55 }}>Share an announcement with everyone.</span>
+      <span className="radio-golive-desc" style={{ fontSize: '0.85rem', color: '#F3EDE6', opacity: 0.55 }}>Share an announcement with everyone.</span>
       <span aria-hidden style={{ marginLeft: 'auto', opacity: 0.6 }}>→</span>
     </button>
   )

@@ -54,6 +54,7 @@ export function RadioNowStrip({ welcome, todayEvents }: {
 
   return (
     <div
+      className="radio-now"
       style={{
         border: '1px solid rgba(200,168,72,0.25)',
         borderRadius: '0.9rem',
@@ -66,7 +67,7 @@ export function RadioNowStrip({ welcome, todayEvents }: {
       }}
     >
       {welcome && (
-        <p style={{ margin: 0, fontFamily: 'TokyoDreams, serif', color: '#C8A848', fontSize: '1.05rem', letterSpacing: '0.06em' }}>
+        <p className="radio-now-welcome" style={{ margin: 0, fontFamily: 'TokyoDreams, serif', color: '#C8A848', fontSize: '1.05rem', letterSpacing: '0.06em' }}>
           ✦ {welcome}
         </p>
       )}
