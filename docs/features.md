@@ -46,7 +46,7 @@ Nav links for non-approved signed-in users (pending/rejected) show the public se
 Fixed top sections (always present, not reorderable):
 1. **Hero banner** — welcome greeting, countdown to event, hero tagline (`home_tagline`, editable inline)
 2. **Attunement + Commitments** — side-by-side (`dash-grid`)
-3. **Attunement banner** (renders only while actionable): card with the eye-in-triangle ornament, named outstanding required tasks (first 3 + "+n more"), a done/total progress bar, and a pill CTA → `/profile`. When required tasks are done but commitments remain, a gentler variant (no bar, "View commitments") shows instead
+3. **Attunement banner** (renders only while actionable): card with the eye-in-triangle ornament, named outstanding required tasks (first 3 + "+n more"), a done/total progress bar, and a pill CTA → `/profile`. When required tasks are done but commitments remain, a gentler variant (no bar, "View commitments") shows instead. On mobile (<680px) it collapses to one compact row — small icon · "Attunement" · count ("X OF Y", or "N COMMITMENTS" when attuned) · chevron — task names, bar, and pill hidden
 
 Configurable widgets (order, visibility, and width controlled by admin via the page editor):
 

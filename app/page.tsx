@@ -315,13 +315,22 @@ let canManagePolls = false
               transition: border-color 0.2s ease, background 0.2s ease;
             }
             .dash-attune:hover { border-color: rgba(200,168,72,0.75); background: rgba(200,168,72,0.14); }
+            .dash-attune-meta-mobile, .dash-attune-chev { display: none; }
             @media (max-width: 680px) {
               .dash-quote-card { display: none !important; }
               [data-width="half"], [data-width="third"], [data-width="twothirds"] { flex: 0 0 100% !important; }
               .dash-hero-inner { flex-direction: column; align-items: flex-start; padding: 1.5rem 1.25rem; gap: 1rem; }
               .dash-spotlight  { grid-template-columns: 1fr; }
               .dash-quicklinks { grid-template-columns: 1fr; }
-              .dash-attune { padding: 0.9rem 1rem; gap: 0.9rem; }
+              /* Collapse the attunement banner to one compact row: icon · title · count · chevron.
+                 !important overrides the components' inline styles (IconImage box, title margin). */
+              .dash-attune { padding: 0.6rem 0.9rem; gap: 0.7rem; flex-wrap: nowrap; }
+              .dash-attune > span:first-of-type { width: 30px !important; height: 30px !important; }
+              .dash-attune-body { min-width: 0 !important; }
+              .dash-attune-title { margin: 0 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+              .dash-attune-detail, .dash-attune-bar, .dash-attune-cta { display: none !important; }
+              .dash-attune-meta-mobile { display: inline; }
+              .dash-attune-chev { display: inline; }
             }
           ` }} />
 
@@ -393,16 +402,21 @@ let canManagePolls = false
               return (
                 <a href="/profile" className="dash-attune" style={{ marginBottom: '1.25rem', textDecoration: 'none' }}>
                   <IconImage src="/asset-library/icons/eye-in-triangle.webp" size={54} fill={0.85} />
-                  <div style={{ flex: 1, minWidth: '220px' }}>
-                    <p style={{ margin: '0 0 0.3rem', color: '#C8A848' }}>
+                  <div className="dash-attune-body" style={{ flex: 1, minWidth: '220px' }}>
+                    <p className="dash-attune-title" style={{ margin: '0 0 0.3rem', color: '#C8A848' }}>
                       <span style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.05rem', letterSpacing: '0.04em' }}>Attunement</span>
                       {!allAttuned && requiredTasks.length > 0 && (
                         <span style={{ fontSize: '0.72rem', letterSpacing: '0.14em', opacity: 0.6, marginLeft: '0.75rem' }}>
                           {doneCount} OF {requiredTasks.length}
                         </span>
                       )}
+                      {allAttuned && (
+                        <span className="dash-attune-meta-mobile" style={{ fontSize: '0.72rem', letterSpacing: '0.14em', opacity: 0.6, marginLeft: '0.75rem' }}>
+                          {commitmentsOutstanding} COMMITMENT{commitmentsOutstanding === 1 ? '' : 'S'}
+                        </span>
+                      )}
                     </p>
-                    <p style={{ margin: 0, fontSize: '0.82rem', fontStyle: 'italic', color: '#F3EDE6', opacity: 0.75, lineHeight: 1.5 }}>
+                    <p className="dash-attune-detail" style={{ margin: 0, fontSize: '0.82rem', fontStyle: 'italic', color: '#F3EDE6', opacity: 0.75, lineHeight: 1.5 }}>
                       {!allAttuned
                         ? <>
                             {named.map((t, i) => (
@@ -417,12 +431,12 @@ let canManagePolls = false
                         : <>Attuned — {commitmentsOutstanding} commitment{commitmentsOutstanding === 1 ? '' : 's'} still to fill.</>}
                     </p>
                     {!allAttuned && requiredTasks.length > 0 && (
-                      <div style={{ marginTop: '0.55rem', height: '3px', borderRadius: '2px', background: 'rgba(200,168,72,0.18)', overflow: 'hidden' }}>
+                      <div className="dash-attune-bar" style={{ marginTop: '0.55rem', height: '3px', borderRadius: '2px', background: 'rgba(200,168,72,0.18)', overflow: 'hidden' }}>
                         <div style={{ width: `${Math.round((doneCount / requiredTasks.length) * 100)}%`, height: '100%', background: '#C8A848' }} />
                       </div>
                     )}
                   </div>
-                  <span style={{
+                  <span className="dash-attune-cta" style={{
                     flexShrink: 0,
                     padding: '0.45rem 1.1rem',
                     border: '1px solid rgba(200,168,72,0.5)',
@@ -432,6 +446,7 @@ let canManagePolls = false
                   }}>
                     {allAttuned ? 'VIEW COMMITMENTS' : 'COMPLETE THE CHECKLIST'} →
                   </span>
+                  <span className="dash-attune-chev" aria-hidden style={{ flexShrink: 0, color: '#C8A848', opacity: 0.7, fontSize: '0.9rem' }}>→</span>
                 </a>
               )
             })()}

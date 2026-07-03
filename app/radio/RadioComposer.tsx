@@ -16,12 +16,13 @@ export function RadioComposer({ isBroadcaster }: { isBroadcaster: boolean }) {
   const [message, setMessage] = useState('')
   const [posting, setPosting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // Shorter placeholder on narrow screens — the full line truncates mid-word
-  // at ~380px. Set after mount (JS breakpoint, the house pattern) so SSR and
-  // hydration agree.
+  // Shorter placeholder on narrow screens — the input gets ~190px next to the
+  // mic and the On Air button, so the mobile string must fit that, not just
+  // "be shorter". Set after mount (JS breakpoint, the house pattern) so SSR
+  // and hydration agree.
   const [placeholder, setPlaceholder] = useState('Share an announcement with camp…')
   useEffect(() => {
-    const pick = () => setPlaceholder(window.innerWidth < 700 ? 'Share an announcement…' : 'Share an announcement with camp…')
+    const pick = () => setPlaceholder(window.innerWidth < 700 ? 'Share with camp…' : 'Share an announcement with camp…')
     pick()
     window.addEventListener('resize', pick)
     return () => window.removeEventListener('resize', pick)
@@ -51,8 +52,9 @@ export function RadioComposer({ isBroadcaster }: { isBroadcaster: boolean }) {
   }
 
   return (
-    <div style={{ marginBottom: '2.5rem' }}>
+    <div className="radio-composer" style={{ marginBottom: '2.5rem' }}>
       <div
+        className="radio-composer-box"
         style={{
           display: 'flex',
           gap: '0.75rem',
@@ -82,10 +84,12 @@ export function RadioComposer({ isBroadcaster }: { isBroadcaster: boolean }) {
             fontStyle: 'italic',
             fontFamily: 'inherit',
             outline: 'none',
+            textOverflow: 'ellipsis',
             opacity: isBroadcaster ? 1 : 0.45,
           }}
         />
         <button
+          className="radio-composer-btn"
           onClick={post}
           disabled={posting || !message.trim() || !isBroadcaster}
           style={{
@@ -122,6 +126,7 @@ export function RadioComposer({ isBroadcaster }: { isBroadcaster: boolean }) {
 export function GoLiveBar() {
   return (
     <button
+      className="radio-golive"
       onClick={() => {
         const input = document.getElementById(INPUT_ID) as HTMLInputElement | null
         input?.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -144,7 +149,7 @@ export function GoLiveBar() {
     >
       <span aria-hidden style={{ fontSize: '0.95rem', opacity: 0.85 }}>((•))</span>
       <span style={{ fontSize: '0.78rem', letterSpacing: '0.16em', textTransform: 'uppercase' }}>Go Live</span>
-      <span style={{ fontSize: '0.85rem', color: '#F3EDE6', opacity: 0.55 }}>Share an announcement with everyone.</span>
+      <span className="radio-golive-desc" style={{ fontSize: '0.85rem', color: '#F3EDE6', opacity: 0.55 }}>Share an announcement with everyone.</span>
       <span aria-hidden style={{ marginLeft: 'auto', opacity: 0.6 }}>→</span>
     </button>
   )

@@ -310,13 +310,14 @@ function Waveform() {
 
 export function RadioHero() {
   return (
-    <div style={{ position: 'relative', padding: '0.5rem 0 1.5rem' }}>
+    <div className="radio-hero" style={{ position: 'relative' }}>
       {/* The frequency band centers itself on the rule's own 1px row, so its
           baseline IS the rule's line — the rule fades out, the band fades in,
           one continuous thread with the pulse erupting from it. (Inline
           <style> must use dangerouslySetInnerHTML — React escapes ' and >
           in children and hydration trips on the mismatch.) */}
       <style dangerouslySetInnerHTML={{ __html: `
+        .radio-hero { padding: 0.5rem 0 1.5rem; }
         .radio-rule-row {
           position: relative;
           height: 1px;
@@ -338,9 +339,13 @@ export function RadioHero() {
           pointer-events: none;
         }
         @media (max-width: 700px) {
+          .radio-hero { padding: 0.25rem 0 1rem; }
           .radio-rule { width: 55%; min-width: 0; }
+          .radio-rule-row { margin: 0.8rem 0 0.7rem; }
           /* mobile: hug the rule line (no downward nudge) and sit further left */
           .radio-hero-wave { left: 50%; right: -1.5rem; top: calc(50% + 9px); }
+          /* !important beats the subtitle's inline (desktop) metrics */
+          .radio-hero-sub { font-size: 0.95rem !important; margin-top: 0.3rem !important; }
         }
       ` }} />
 
@@ -376,6 +381,7 @@ export function RadioHero() {
       </div>
 
       <p
+        className="radio-hero-sub"
         style={{
           fontFamily: 'var(--font-cormorant-garamond), serif',
           fontStyle: 'italic',
