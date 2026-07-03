@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getApprovedMember } from '@/lib/members'
-import { postSourcedRadioEvent, getRadioActorName, resourceCommitmentMessage } from '@/lib/radio'
+import { postSourcedRadioEvent, getRadioActorName, contributionRadioPost } from '@/lib/radio'
 
 // Suggest a resource the organizers haven't listed ("we'll want sharp
 // knives" / "I have a guitar amp — useful?"). Creates an open-callout item
@@ -56,15 +56,13 @@ export async function POST(req: NextRequest) {
     }
 
     // Radio: an offer with "I'll bring it" is the same commitment moment as a
-    // first claim (bare suggestions without a claim stay silent).
+    // first claim (bare suggestions without a claim stay silent). Open offers
+    // have no target, so the copy is "is bringing" with no countdown.
     const actorName = await getRadioActorName(userId)
-    await postSourcedRadioEvent('resource', {
-      kind: 'resource',
-      message: resourceCommitmentMessage(actorName, item.name, 1),
-      icon: '✨',
+    await postSourcedRadioEvent('contribution', {
+      ...contributionRadioPost(actorName, item.name, 1, null),
       actorClerkId: userId,
       actorName,
-      link: '/participate#bring',
     })
   }
 

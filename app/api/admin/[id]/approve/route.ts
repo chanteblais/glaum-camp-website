@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { sendUserEmail, APP_URL } from '@/lib/send-email'
 import { upsertMember } from '@/lib/members'
 import { requireAdmin } from '@/lib/admin-auth'
-import { postSourcedRadioEvent } from '@/lib/radio'
+import { postSourcedRadioEvent, welcomeRadioPost } from '@/lib/radio'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const userId = await requireAdmin()
@@ -66,20 +66,18 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       message,
     }])
 
-    // Radio: announce the new member — once per member (re-approvals and the
-    // migration-061 backfill both mean an event may already exist).
+    // Radio: welcome the new member — once per member (re-approvals and the
+    // migration-061 backfill both mean a welcome may already exist).
     const { data: alreadyOnAir } = await supabaseAdmin
       .from('radio_events')
       .select('id')
-      .eq('kind', 'member')
+      .eq('kind', 'welcome')
       .eq('actor_clerk_id', application.clerk_user_id)
       .limit(1)
       .maybeSingle()
     if (!alreadyOnAir) {
-      await postSourcedRadioEvent('member', {
-        kind: 'member',
-        message: `${displayName} joined the camp.`,
-        icon: '✦',
+      await postSourcedRadioEvent('welcome', {
+        ...welcomeRadioPost(displayName),
         actorClerkId: application.clerk_user_id,
         actorName: displayName,
       })

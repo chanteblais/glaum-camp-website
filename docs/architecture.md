@@ -95,6 +95,7 @@ Sign-out flow:
 | `/api/profile/avatar` | POST | Upload avatar to Supabase Storage |
 | `/api/profile/cancel` | POST | Cancel own application (reason required; mirrors `cancelled` onto `members.status` and releases the member's role + shift slots — `camp_signups` and `member_shift_signups` — same cleanup as the admin remove flow) |
 | `/api/role-suggestions` | POST | Submit a dept/role suggestion |
+| `/api/radio` | POST | Put a member moment on the air (`{ message }` ≤200 chars → a `voice` radio post). **Approved members only.** Feed reads are server-rendered (`/radio`, home teaser). See [radio.md](radio.md) |
 | `/api/shoutouts` | GET/POST | List visible shoutouts / post one (approved members) |
 | `/api/shoutouts/[id]` | DELETE | Delete a shoutout (author or admin only) |
 | `/api/notifications` | GET/PATCH | Fetch + mark-read user notifications |
@@ -151,8 +152,8 @@ Sign-out flow:
 | `/api/admin/announcements` | GET/POST | List visible announcements / create new |
 | `/api/admin/announcements/all` | GET | List all announcements including hidden (admin only) |
 | `/api/admin/announcements/[id]` | PATCH/DELETE | Update / delete announcement |
-| `/api/admin/radio` | GET/POST | Recent radio events (manager list, same assembly the Program tab server-renders) / post an organizer broadcast — optional `notify` = bell + announcement email (lead-up notify pattern). See [radio.md](radio.md) |
-| `/api/admin/radio/[id]` | DELETE | Remove a radio event (feed curation, any kind) |
+| `/api/admin/radio` | GET/POST | Recent radio posts (manager list, same assembly the Program tab server-renders) / post an organizer broadcast — optional `notify` = bell + announcement email (lead-up notify pattern). See [radio.md](radio.md) |
+| `/api/admin/radio/[id]` | DELETE | Remove a radio post (feed curation, any kind) |
 | `/api/admin/page-content` | GET/PATCH | Read / upsert any `page_content` row — used for homepage copy (`home_*`) and form configs (`config_member_form`, `config_volunteer_form`) |
 
 ### Cron (Vercel Cron)

@@ -3,7 +3,7 @@ import { grantDistinction, revokeDistinction } from '@/lib/distinction-awards'
 import { requireAdmin } from '@/lib/admin-auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { parseDistinctions } from '@/lib/distinctions'
-import { postSourcedRadioEvent } from '@/lib/radio'
+import { postSourcedRadioEvent, achievementRadioPost } from '@/lib/radio'
 
 // Admin manual grant / revoke of a distinction for a member.
 //   POST   { distinctionId, note? }      → grant
@@ -38,10 +38,8 @@ export async function POST(req: NextRequest, { params }: { params: { memberId: s
     const rule = parseDistinctions(configRow?.value).find(r => r.id === distinctionId)
     if (member && rule) {
       const actorName = member.preferred_name || member.first_name || 'A member'
-      await postSourcedRadioEvent('distinction', {
-        kind: 'distinction',
-        message: `${actorName} received the ${rule.label} distinction.`,
-        icon: rule.image || rule.glyph || '🏅',
+      await postSourcedRadioEvent('achievement', {
+        ...achievementRadioPost(actorName, rule.label, rule.engraving, rule.image || rule.glyph),
         actorClerkId: member.clerk_user_id,
         actorName,
         link: `/members/${params.memberId}`,

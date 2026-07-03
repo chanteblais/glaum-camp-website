@@ -1,19 +1,32 @@
-// Radio — the community broadcast feed (docs/radio.md).
+// Radio — the curated community feed (docs/radio.md).
 //
-// Stored events live in radio_events and are written by postRadioEvent from
-// the route where the moment happens. Time-derived items (the Now / Up next
-// strip) are never stored — the server supplies the day's candidate events
-// and the client picks what's live against the member's own clock (the
-// member's device is at camp; the server is in UTC).
+// Radio is NOT an audit log. Every post must pass "would the average member
+// care?" — it records moments, not database changes, in an editorial voice:
+// a headline (message) plus an optional supporting line (detail) that gives
+// the moment momentum ("Only one more to go!").
+//
+// Stored posts live in radio_events, written by the route where the moment
+// happens. Time-derived items (the Now / Up next strip) are never stored —
+// the server supplies the day's candidate events and the client picks what's
+// live against the member's own clock (their device is at camp; the server
+// is in UTC).
 
 import { supabaseAdmin } from '@/lib/supabase'
+import { SITE_NAME } from '@/lib/site-config'
 
-export type RadioKind = 'broadcast' | 'member' | 'resource' | 'distinction'
+export type RadioKind =
+  | 'broadcast'     // 📢 organizer announcement
+  | 'welcome'       // 👋 a new member joins
+  | 'contribution'  // ✨ someone covers a needed resource
+  | 'achievement'   // 🏅 a distinction is earned
+  | 'milestone'     // 🎉 a community goal completes
+  | 'voice'         // ✦ a member puts a moment on the air
 
 export type RadioEventRow = {
   id: string
   kind: string
   message: string
+  detail: string | null
   icon: string | null
   actor_clerk_id: string | null
   actor_name: string | null
@@ -27,15 +40,19 @@ export type RadioEventRow = {
 // Organizer broadcasts have no toggle — posting one is already the decision.
 
 export type RadioSources = {
-  member: boolean       // ✦ Sarah joined the camp.
-  resource: boolean     // ✨ Sarah committed to bringing a camping stove.
-  distinction: boolean  // 🏅 Erik received the Setup distinction.
+  welcome: boolean       // 👋 Welcome Sarah to Glåüm!
+  contribution: boolean  // ✨ Sarah just covered a camping stove.
+  achievement: boolean   // 🏅 Erik earned the Setup distinction.
+  milestone: boolean     // 🎉 Shared Kitchen is now fully equipped.
+  voice: boolean         // ✦ member posts (the composer on /radio)
 }
 
 export const DEFAULT_RADIO_SOURCES: RadioSources = {
-  member: true,
-  resource: true,
-  distinction: true,
+  welcome: true,
+  contribution: true,
+  achievement: true,
+  milestone: true,
+  voice: true,
 }
 
 export function parseRadioSources(raw?: string | null): RadioSources {
@@ -43,9 +60,11 @@ export function parseRadioSources(raw?: string | null): RadioSources {
   try {
     const sources = (JSON.parse(raw)?.sources ?? {}) as Partial<Record<keyof RadioSources, unknown>>
     return {
-      member: sources.member !== false,
-      resource: sources.resource !== false,
-      distinction: sources.distinction !== false,
+      welcome: sources.welcome !== false,
+      contribution: sources.contribution !== false,
+      achievement: sources.achievement !== false,
+      milestone: sources.milestone !== false,
+      voice: sources.voice !== false,
     }
   } catch {
     return { ...DEFAULT_RADIO_SOURCES }
@@ -57,6 +76,7 @@ export function parseRadioSources(raw?: string | null): RadioSources {
 export type RadioEventInput = {
   kind: RadioKind
   message: string
+  detail?: string | null
   icon?: string | null
   actorClerkId?: string | null
   actorName?: string | null
@@ -73,6 +93,7 @@ export async function postRadioEvent(event: RadioEventInput): Promise<string | n
       .insert([{
         kind: event.kind,
         message: event.message,
+        detail: event.detail ?? null,
         icon: event.icon ?? null,
         actor_clerk_id: event.actorClerkId ?? null,
         actor_name: event.actorName ?? null,
@@ -110,7 +131,7 @@ export async function postSourcedRadioEvent(
   }
 }
 
-// First name for a radio line ("Sarah committed to…") — Radio is
+// First name for a radio line ("Sarah just covered…") — Radio is
 // members-only, so first names are the right register.
 export async function getRadioActorName(clerkUserId: string): Promise<string> {
   try {
@@ -125,28 +146,142 @@ export async function getRadioActorName(clerkUserId: string): Promise<string> {
   }
 }
 
-// "Sarah committed to bringing a camping stove." Item names are stored
-// Sentence-cased ("Camping stove") — lowercase mid-sentence unless the name
-// looks like a proper noun / acronym (second letter already uppercase).
-export function resourceCommitmentMessage(actorName: string, itemName: string, quantity: number): string {
-  const trimmed = itemName.trim()
-  const item = /^[A-Z][a-z]/.test(trimmed)
-    ? trimmed[0].toLowerCase() + trimmed.slice(1)
-    : trimmed
-  if (quantity > 1) return `${actorName} committed to bringing ${quantity} × ${item}.`
-  const article = /^[aeiou]/i.test(item) ? 'an' : 'a'
-  return `${actorName} committed to bringing ${article} ${item}.`
+// ── Editorial copy ────────────────────────────────────────────────
+// The voice of the feed lives here, in one place. Headlines are warm and
+// present-tense; details give momentum. Item names are stored Sentence-cased
+// ("Camping stove") — lowercase mid-sentence unless the name looks like a
+// proper noun / acronym.
+
+const midSentence = (name: string) => {
+  const trimmed = name.trim()
+  return /^[A-Z][a-z]/.test(trimmed) ? trimmed[0].toLowerCase() + trimmed.slice(1) : trimmed
+}
+const article = (noun: string) => (/^[aeiou]/i.test(noun) ? 'an' : 'a')
+
+export function welcomeRadioPost(name: string): RadioEventInput {
+  return {
+    kind: 'welcome',
+    message: `Welcome ${name} to ${SITE_NAME}!`,
+    detail: 'Say hello if you see them around camp.',
+    icon: '👋',
+  }
+}
+
+// remaining = how many of this item are still uncovered AFTER this claim
+// (null for open offers with no target).
+export function contributionRadioPost(
+  actorName: string,
+  itemName: string,
+  quantity: number,
+  remaining: number | null,
+): RadioEventInput {
+  const item = midSentence(itemName)
+  const what = quantity > 1 ? `${quantity} × ${item}` : `${article(item)} ${item}`
+  const isOffer = remaining === null
+  return {
+    kind: 'contribution',
+    message: isOffer
+      ? `${actorName} is bringing ${what}.`
+      : `${actorName} just covered ${what}.`,
+    detail: isOffer
+      ? null
+      : remaining <= 0
+        ? 'That one is fully covered now ✦'
+        : remaining === 1
+          ? 'Only one more to go!'
+          : `${remaining} more still needed.`,
+    icon: '✨',
+    link: '/participate#bring',
+  }
+}
+
+export function achievementRadioPost(
+  actorName: string,
+  label: string,
+  engraving?: string | null,
+  medalIcon?: string | null,
+): RadioEventInput {
+  return {
+    kind: 'achievement',
+    message: `${actorName} earned the ${label} distinction.`,
+    detail: engraving || null,
+    icon: medalIcon || '🏅',
+  }
+}
+
+export function listMilestoneRadioPost(listTitle: string): RadioEventInput {
+  return {
+    kind: 'milestone',
+    message: `${listTitle} is now fully equipped.`,
+    detail: 'Every item covered — many hands make light work ✦',
+    icon: '🎉',
+    link: '/participate#bring',
+  }
+}
+
+// ── Milestone detection ───────────────────────────────────────────
+// After a claim lands, report the claimed item's remaining need and whether
+// the whole list just became fully covered. One post per list completion —
+// guarded against refires by an existing-milestone check (quantities bounce;
+// the feed shouldn't).
+
+export async function resourceStateAfterClaim(
+  resourceId: string,
+  listId: string,
+): Promise<{ remaining: number | null; listJustCompleted: boolean; listTitle: string | null }> {
+  try {
+    const [{ data: items }, { data: list }] = await Promise.all([
+      supabaseAdmin.from('resources').select('id, quantity_needed').eq('list_id', listId),
+      supabaseAdmin.from('resource_lists').select('title').eq('id', listId).maybeSingle(),
+    ])
+    const itemIds = (items ?? []).map(i => i.id)
+    const { data: claims } = itemIds.length
+      ? await supabaseAdmin.from('resource_claims').select('resource_id, quantity').in('resource_id', itemIds)
+      : { data: [] as { resource_id: string; quantity: number }[] }
+
+    const claimedByItem: Record<string, number> = {}
+    for (const c of claims ?? []) {
+      claimedByItem[c.resource_id] = (claimedByItem[c.resource_id] ?? 0) + c.quantity
+    }
+
+    let remaining: number | null = null
+    const tracked = (items ?? []).filter(i => i.quantity_needed !== null)
+    let listCovered = tracked.length > 0
+    for (const item of items ?? []) {
+      const itemRemaining =
+        item.quantity_needed === null ? null : Math.max(0, item.quantity_needed - (claimedByItem[item.id] ?? 0))
+      if (item.id === resourceId) remaining = itemRemaining
+      if (itemRemaining !== null && itemRemaining > 0) listCovered = false
+    }
+
+    let listJustCompleted = false
+    if (listCovered && list?.title) {
+      const { data: existing } = await supabaseAdmin
+        .from('radio_events')
+        .select('id')
+        .eq('kind', 'milestone')
+        .eq('message', listMilestoneRadioPost(list.title).message)
+        .limit(1)
+        .maybeSingle()
+      listJustCompleted = !existing
+    }
+
+    return { remaining, listJustCompleted, listTitle: list?.title ?? null }
+  } catch (e) {
+    console.error('[radio] resource state failed', e)
+    return { remaining: null, listJustCompleted: false, listTitle: null }
+  }
 }
 
 // ── Reading ───────────────────────────────────────────────────────
 
-// Latest visible events, with each actor's CURRENT avatar joined in JS
+// Latest visible posts, with each actor's CURRENT avatar joined in JS
 // (no FK — same pattern as shoutouts; messages/names stay historical,
 // faces stay fresh).
 export async function getRadioFeed(limit = 60): Promise<RadioEventRow[]> {
   const { data, error } = await supabaseAdmin
     .from('radio_events')
-    .select('id, kind, message, icon, actor_clerk_id, actor_name, link, created_at')
+    .select('id, kind, message, detail, icon, actor_clerk_id, actor_name, link, created_at')
     .eq('visible', true)
     .order('created_at', { ascending: false })
     .limit(limit)
@@ -210,14 +345,14 @@ export async function getRadioNowData(): Promise<RadioNowData> {
 
   // The welcome line only makes sense while camp is actually running.
   let welcome: string | null = null
-  if (rangeStart && rangeEnd && rangeStart <= today && today <= rangeEnd) {
+  const inRange = rangeStart && rangeEnd && rangeStart <= today && today <= rangeEnd
+  if (inRange) {
     const dayNumber = Math.round(
       (new Date(`${today}T12:00:00`).getTime() - new Date(`${rangeStart}T12:00:00`).getTime()) / 86400000,
     ) + 1
     welcome = `Day ${dayNumber} of camp`
   }
 
-  const inRange = rangeStart && rangeEnd && rangeStart <= today && today <= rangeEnd
   const todayEvents = (events ?? [])
     .filter(e => {
       if (!e.start_time) return false

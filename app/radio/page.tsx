@@ -4,6 +4,7 @@ import { getApprovedMember } from '@/lib/members'
 import { getRadioFeed, getRadioNowData } from '@/lib/radio'
 import { Header } from '@/components/Header'
 import { RadioNowStrip } from './RadioNowStrip'
+import { RadioComposer } from './RadioComposer'
 import { RadioFeed } from './RadioFeed'
 
 export const dynamic = 'force-dynamic'
@@ -22,7 +23,7 @@ export default async function RadioPage() {
   return (
     <>
       <Header />
-      <main style={{ maxWidth: '680px', margin: '0 auto', padding: '2rem 1.5rem 6rem' }}>
+      <main style={{ maxWidth: '680px', margin: '0 auto', padding: '6rem 1.5rem 6rem' }}>
 
         <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
           <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', color: '#C8A848', margin: '0 0 0.5rem', letterSpacing: '0.06em' }}>
@@ -36,6 +37,8 @@ export default async function RadioPage() {
         <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.25), transparent)', marginBottom: '2rem' }} />
 
         <RadioNowStrip welcome={nowData.welcome} todayEvents={nowData.todayEvents} />
+
+        <RadioComposer />
 
         <RadioFeed events={events} />
 

@@ -362,22 +362,23 @@ Admin-posted updates shown to all approved members on the dashboard.
 
 ### `radio_events`
 
-The stored half of **Radio** — the community broadcast feed (migration `061`; spec [radio.md](radio.md)). One row per broadcast moment; written by `postRadioEvent` / `postSourcedRadioEvent` (`lib/radio.ts`) from the route where the moment happens (application approve, resource claim/offer, manual distinction grant, organizer composer). The Now / Up next strip on `/radio` is **derived at read time** and never stored here.
+The stored half of **Radio** — the curated community feed (migration `061`; spec [radio.md](radio.md)). One row per *moment* — Radio is editorial, **not an audit log** ("would the average member care?"). Written by `postRadioEvent` / `postSourcedRadioEvent` (`lib/radio.ts`, which also holds all the copy builders) from the route where the moment happens (application approve → welcome, resource claim/offer → contribution, list completion → milestone, manual distinction grant → achievement, organizer composer → broadcast, member composer → voice). The Now / Up next strip on `/radio` is **derived at read time** and never stored here.
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | UUID PK | |
-| `kind` | TEXT NOT NULL | `'broadcast'` / `'member'` / `'resource'` / `'distinction'` — open set, no CHECK (new kinds need no migration) |
-| `message` | TEXT NOT NULL | The full card line, actor name inline ("Sarah committed to bringing a camping stove.") |
+| `kind` | TEXT NOT NULL | `'broadcast'` / `'welcome'` / `'contribution'` / `'achievement'` / `'milestone'` / `'voice'` — open set, no CHECK (new kinds need no migration) |
+| `message` | TEXT NOT NULL | The headline, actor name inline ("Welcome Sarah to Glåüm!") |
+| `detail` | TEXT | Optional supporting line ("Only one more to go!" / a medal's engraving) |
 | `icon` | TEXT | Emoji or asset-library image path |
-| `actor_clerk_id` | TEXT | Member the event is about; their **current** avatar is joined at read time (shoutouts pattern) |
+| `actor_clerk_id` | TEXT | Member the moment is about; their **current** avatar is joined at read time (shoutouts pattern) |
 | `actor_name` | TEXT | Display name denormalized at write time — the feed is a historical record |
 | `link` | TEXT | Optional internal deep link (e.g. `/participate#bring`) |
 | `created_by` | TEXT | Admin clerk_user_id, organizer broadcasts only |
 | `visible` | BOOL | Default `true` (admin delete removes the row outright; the column is future curation headroom) |
 | `created_at` | TIMESTAMPTZ | Feed order (indexed DESC) |
 
-Migration `061` also **backfills** one `member` event per approved application from `reviewed_at`, so the feed launches populated. Automatic sources are toggleable via `page_content.config_radio`.
+Migration `061` also **backfills** one `welcome` post per approved application from `reviewed_at`, so the feed launches populated. Automatic sources are toggleable via `page_content.config_radio`.
 
 ---
 
@@ -408,7 +409,7 @@ Admin-editable copy for the homepage. One row per key.
 - `config_shift_signup_open` — string `'true'`/`'false'` (defaults open when absent). When `'false'`, the `/participate` shift calendar is hidden behind a "times not confirmed" notice, `/api/shift-signups` POST rejects new signups (cancelling stays allowed), and shift-requirement attunement lines (authored + derived) are hidden from the checklist. Toggled via Admin → Program → Schedule (`ShiftSignupToggle.tsx`).
 - `config_event_start_date` / `config_event_end_date` — `"YYYY-MM-DD"` strings: the event's overall date range. The schedule calendars (`ScheduleSection` → `ScheduleCalendarClient`) show a day column for every date in this range (∪ any real event dates outside it — `lib/schedule-days.ts`). Managed via Admin → Configure → Structure → **Event Dates** (`EventDatesManager.tsx`). The start date also drives the home-banner countdown and the nudge emails' "gathers in N days" line (`lib/camp-event.ts` `daysUntilEvent`).
 - `config_attunement_nudge_days` — string integer: days between attunement nudge emails per member (`'0'` = off; absent/invalid → default `2`). Parsed by `parseAttunementNudgeDays` (`lib/site-config.ts`); consumed by `/api/cron/attunement-nudges`; set via the **Reminder emails** cadence select in the Attunement Tasks manager (Admin → Configure).
-- `config_radio` — JSON `{ sources: { member, resource, distinction } }`: which automatic Radio sources broadcast (absent key / malformed = all **on**). Parsed by `parseRadioSources` (`lib/radio.ts`); toggled in Admin → Program → Radio (`RadioManager.tsx`). Organizer broadcasts have no toggle. See [radio.md](radio.md).
+- `config_radio` — JSON `{ sources: { welcome, contribution, achievement, milestone, voice } }`: which automatic Radio sources post (absent key / malformed = all **on**). Parsed by `parseRadioSources` (`lib/radio.ts`); toggled in Admin → Program → Radio (`RadioManager.tsx`). Organizer broadcasts have no toggle. See [radio.md](radio.md).
 - `config_distinctions` — JSON array of `DistinctionRule` objects (`{ id, label, description?, image?, glyph?, engraving?, yearFact?, conditions[], enabled }`) driving the profile **Cabinet of Distinctions**. `image` is an asset-library path or uploaded URL; `engraving` is an optional short static caption (≤32 chars) shown under the medal. Each rule's `conditions` (`{ fact, op, value }`, all must pass) are evaluated against derived member facts — **earned medals are never stored** (see [features.md](features.md#distinctions)). Managed via Admin → Distinctions (`DistinctionsManager.tsx`). Parsed/evaluated by `lib/distinctions.ts` (`parseDistinctions`/`evaluateDistinctions`); facts come from `lib/member-facts.ts` (`buildMemberFacts`). Falls back to `DEFAULT_DISTINCTIONS`.
 
 - `config_profile_fields` — JSON array of `ProfileField` objects (`{ key, label, type, options?, default?, public, memberEditable, applicationEligible, distinctionEligible, askExisting?, required?, system?, enabled }`) — the **Profile Field registry** defining each member profile detail field (bio, quote, + admin-added). Managed via Admin → Configure → **Profile Fields** (`ProfileFieldsManager.tsx`); parsed by `parseProfileFields` in `lib/profile-fields.ts`, falling back to `DEFAULT_PROFILE_FIELDS`. `public` = **Visible** on the member profile (off = admin-only, shown on `/admin/[id]`); `key` is the stable identity that member answers are stored under in `member_profiles.values`. See [profile-architecture.md](profile-architecture.md) and [features.md](features.md).
@@ -580,7 +581,7 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `058_show_on_schedule.sql` | **Keep events off the schedule page.** Adds `show_on_schedule BOOL NOT NULL DEFAULT true` to `schedule_events`: FALSE = the event skips the schedule page (homepage embed + /schedule) and the home upcoming-events teaser while staying signable/ackable. Additive, non-destructive; **must be applied before deploying** — member queries filter on the new column. |
 | `059_clerk_prod_remap.sql` | **Clerk dev→prod user-ID remap** (RESERVED — file is *generated*, not in the repo, by `scripts/migrate-clerk-to-prod.mjs --execute` once the prod users exist). Rewrites every stored Clerk ID (18 table/column pairs + derived `conversations.direct_key`) from the dev instance to the production instance via a temp mapping table, with per-column verification counts before COMMIT. Non-destructive (pure ID rewrite), re-runnable; apply during the key-swap cutover window. Runbook: [clerk-prod-migration.md](clerk-prod-migration.md). |
 | `060_backfill_missing_members.sql` | **Backfill missing `members` rows from `applications`.** QA sweep 2026-07-03 found 4 approved applications (submitted June 27–30, before the profile-source-of-truth dual-write) with no `members` row — `getApprovedMember` gates every member-only surface on `members.status`, so those campers were locked out of /participate, /schedule, /members and /roles. Inserts a members row for any application with no clerk-id / email / application-id match in `members`. Pure INSERT (non-destructive), idempotent. The systemic hole is also closed in code: `/api/admin/[id]/approve` now mirrors via `upsertMember` (insert-or-update) instead of the update-only `setMemberStatus`. |
-| `061_radio.sql` | **Radio.** Creates `radio_events` (the community broadcast feed — see [radio.md](radio.md)) + DESC index on `created_at`, and backfills one `member` ("joined the camp") event per approved application from `reviewed_at`. Additive + idempotent (guarded backfill), non-destructive; **must be applied before deploying** — the home dashboard teaser and `/radio` read the new table. |
+| `061_radio.sql` | **Radio.** Creates `radio_events` (the curated community feed — see [radio.md](radio.md)) + DESC index on `created_at`, and backfills one `welcome` post per approved application from `reviewed_at`. Additive + idempotent (guarded backfill), non-destructive; **must be applied before deploying** — the home dashboard teaser and `/radio` read the new table. |
 
 ---
 

@@ -18,15 +18,19 @@ export type AdminRadioEvent = {
 
 const KIND_LABEL: Record<string, string> = {
   broadcast: 'Broadcast',
-  member: 'New member',
-  resource: 'Commitment',
-  distinction: 'Distinction',
+  welcome: 'Welcome',
+  contribution: 'Contribution',
+  achievement: 'Achievement',
+  milestone: 'Milestone',
+  voice: 'Member voice',
 }
 
 const SOURCE_ROWS: { key: keyof RadioSources; label: string; example: string }[] = [
-  { key: 'member', label: 'New members', example: '✦ Sarah joined the camp.' },
-  { key: 'resource', label: 'Resource commitments', example: '✨ Sarah committed to bringing a camping stove.' },
-  { key: 'distinction', label: 'Distinction grants', example: '🏅 Erik received the Setup distinction.' },
+  { key: 'welcome', label: 'Welcomes', example: '👋 Welcome Sarah to Glåüm!' },
+  { key: 'contribution', label: 'Contributions', example: '✨ Sarah just covered a camping stove.' },
+  { key: 'achievement', label: 'Achievements', example: '🏅 Erik earned the Setup distinction.' },
+  { key: 'milestone', label: 'Milestones', example: '🎉 Shared Kitchen is now fully equipped.' },
+  { key: 'voice', label: 'Member voices', example: '✦ Members posting from the /radio composer.' },
 ]
 
 const inputStyle: React.CSSProperties = {
@@ -128,8 +132,9 @@ export function RadioManager({ initialEvents, initialSources }: {
   return (
     <div>
       <p style={{ fontSize: '0.82rem', opacity: 0.5, margin: '0 0 1.25rem', lineHeight: 1.6 }}>
-        Radio is the community's broadcast feed — members tune in at <span style={{ color: '#C8A848' }}>/radio</span>.
-        Post announcements here; the platform adds its own events as camp life happens.
+        Radio is the community's curated feed — members tune in at <span style={{ color: '#C8A848' }}>/radio</span>.
+        Post announcements here; the platform adds moments (welcomes, contributions, achievements,
+        milestones) as camp life happens, and members can put their own on the air.
       </p>
 
       {/* Composer */}

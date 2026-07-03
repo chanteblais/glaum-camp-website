@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getApprovedMember } from '@/lib/members'
-import { postSourcedRadioEvent, getRadioActorName, resourceCommitmentMessage } from '@/lib/radio'
+import {
+  postSourcedRadioEvent,
+  getRadioActorName,
+  contributionRadioPost,
+  listMilestoneRadioPost,
+  resourceStateAfterClaim,
+} from '@/lib/radio'
 
 // Set the caller's claim on a resource. quantity >= 1 upserts the single
 // per-member claim row; quantity 0 removes it (unclaiming is always allowed —
@@ -25,7 +31,7 @@ export async function POST(req: NextRequest) {
   // Only items on a member-visible list can be claimed.
   const { data: resource } = await supabaseAdmin
     .from('resources')
-    .select('id, name, offered_by, resource_lists(visible)')
+    .select('id, name, list_id, offered_by, resource_lists(visible)')
     .eq('id', resource_id)
     .maybeSingle()
   const list = Array.isArray(resource?.resource_lists) ? resource?.resource_lists[0] : resource?.resource_lists
@@ -53,8 +59,6 @@ export async function POST(req: NextRequest) {
       }
     }
   } else {
-    // Radio broadcasts only the FIRST claim on an item (a new commitment) —
-    // quantity edits are silent, and unclaims are never broadcast.
     const { data: priorClaim } = await supabaseAdmin
       .from('resource_claims')
       .select('id')
@@ -70,16 +74,22 @@ export async function POST(req: NextRequest) {
       )
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+    // Radio: only the FIRST claim on an item is a moment (a new commitment) —
+    // quantity edits are silent, and unclaims are never broadcast.
     if (!priorClaim && resource.name) {
-      const actorName = await getRadioActorName(userId)
-      await postSourcedRadioEvent('resource', {
-        kind: 'resource',
-        message: resourceCommitmentMessage(actorName, resource.name, qty),
-        icon: '✨',
+      const [actorName, state] = await Promise.all([
+        getRadioActorName(userId),
+        resourceStateAfterClaim(resource_id, resource.list_id),
+      ])
+      await postSourcedRadioEvent('contribution', {
+        ...contributionRadioPost(actorName, resource.name, qty, state.remaining),
         actorClerkId: userId,
         actorName,
-        link: '/participate#bring',
       })
+      // A claim that completes the whole list is a community milestone.
+      if (state.listJustCompleted && state.listTitle) {
+        await postSourcedRadioEvent('milestone', listMilestoneRadioPost(state.listTitle))
+      }
     }
   }
 
