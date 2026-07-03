@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { EventIcon } from '@/components/EventIcon'
 import { AssetImagePicker } from './AssetImagePicker'
+import { WorkspaceHeader } from './WorkspaceHeader'
 import { LoadError } from './LoadError'
 import { isImageIcon } from '@/lib/icon-src'
 import { rangeTo24h } from '@/lib/time-format'
@@ -715,9 +716,7 @@ export function ScheduleManager({ rangeStart, rangeEnd, children }: { rangeStart
 
   if (loading || loadError) return (
     <div>
-      <p style={{ fontSize: '0.95rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: '#C8A848', fontWeight: 600, margin: '0 0 1rem' }}>
-        Scheduled Events
-      </p>
+      <WorkspaceHeader title="Scheduled Events" />
       {children}
       {loading
         ? <p style={{ opacity: 0.4, fontStyle: 'italic', fontSize: '0.875rem' }}>Loading…</p>
@@ -729,9 +728,7 @@ export function ScheduleManager({ rangeStart, rangeEnd, children }: { rangeStart
     <div>
       {/* Header first — then any page-provided controls (the shift-signup
           toggle rides in as children), then the view controls row. */}
-      <p style={{ fontSize: '0.95rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: '#C8A848', fontWeight: 600, margin: '0 0 1rem' }}>
-        Scheduled Events <span style={{ opacity: 0.5, fontWeight: 400 }}>— {dated.length + undated.length}</span>
-      </p>
+      <WorkspaceHeader title="Scheduled Events" count={dated.length + undated.length} />
 
       {children}
 

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { to24h } from '@/lib/time-format'
 import { clockLabel } from '@/lib/shift-hours'
+import { WorkspaceHeader } from './WorkspaceHeader'
 import { LoadError } from './LoadError'
 import { LeadUpCalendar } from './LeadUpCalendar'
 import { useConfirm } from '../components/ConfirmDialog'
@@ -364,23 +365,27 @@ export function LeadUpGatheringsManager({ rangeStart, rangeEnd }: { rangeStart?:
     letterSpacing: '0.06em', opacity: 0.75,
   }
 
-  if (loading) return <p style={{ opacity: 0.4, fontStyle: 'italic', fontSize: '0.875rem' }}>Loading…</p>
-  if (loadError) return <LoadError onRetry={() => { setLoading(true); load() }} />
+  if (loading || loadError) return (
+    <div>
+      <WorkspaceHeader title="Lead-Up Gatherings" />
+      {loading
+        ? <p style={{ opacity: 0.4, fontStyle: 'italic', fontSize: '0.875rem' }}>Loading…</p>
+        : <LoadError onRetry={() => { setLoading(true); load() }} />}
+    </div>
+  )
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-        <p style={{ fontSize: '0.68rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, margin: 0 }}>
-          Lead-Up Gatherings — {events.length}
+      <WorkspaceHeader title="Lead-Up Gatherings" count={events.length} />
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', marginBottom: '1rem' }}>
+        <p style={{ fontSize: '0.78rem', opacity: 0.45, lineHeight: 1.6, margin: 0, flex: 1 }}>
+          Planning &amp; brainstorming sessions on the runway to the event. Members RSVP per session — these are separate from the at-camp schedule and never affect shifts or attunement.
         </p>
         <button style={addBtnStyle} onClick={() => { setModal({ mode: 'add' }); setModalError(null) }}>
           + Add gathering
         </button>
       </div>
-
-      <p style={{ fontSize: '0.78rem', opacity: 0.45, lineHeight: 1.6, margin: '0 0 1rem' }}>
-        Planning &amp; brainstorming sessions on the runway to the event. Members RSVP per session — these are separate from the at-camp schedule and never affect shifts or attunement.
-      </p>
 
       {/* Month calendar — the runway at a glance. Click an empty day to add a
           gathering there; click a gathering to edit it. */}
