@@ -89,6 +89,15 @@ notify pattern). Default off.
 - "Still needed" nudges ("🪑 Decor still needs two rugs") and event-start
   posts as stored moments (the strip covers "now" live)
 - Kind filters on `/radio`
-- Shoutouts folding in as a member-voice kind (overlaps `voice` — decide
-  deliberately)
 - Optional push for flagged broadcasts (post-PWA-notifications decision)
+
+## Radio voices vs Shoutouts (decided 2026-07-03: they stay separate)
+
+Same input mechanics, opposite delivery contracts. **Shoutouts are pinned to
+the reader** — they hold a slot on the dashboard widget and keep earning
+impressions ("S.O.S. Has anyone seen my furry vest?" needs eyes until it's
+found). **Radio voices are pinned to the moment** — witnessed by whoever is
+tuned in, then they sink; the expectation is a voice will likely not be seen
+beyond the moment, and that's the point. Post to Shoutouts when you need a
+response; put a moment on Radio when it deserves witnessing. Neither absorbs
+the other.
