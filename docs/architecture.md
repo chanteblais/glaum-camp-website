@@ -115,7 +115,7 @@ Sign-out flow:
 | `/api/admin/groups/[id]` | PATCH/DELETE | Update / delete group |
 | `/api/admin/groups/[id]/members` | GET/POST/DELETE | Group roster / add member / remove member (`?clerk_user_id=`) |
 | `/api/admin/groups/[id]/icon` | POST/DELETE | Upload / clear a group's icon image (`group-badges` bucket, `groups/` prefix; sets `groups.icon_image`). Mirrors the avatar route. |
-| `/api/admin/resources` | GET/POST | Shared resources, admin view: all lists (hidden included) with items, claimed totals, **and claimant names** (via `memberDisplayNames`) / create a list |
+| `/api/admin/resources` | GET/POST | Shared resources, admin view: all lists (hidden included; `steward_name` resolved from the group/department/role FK) with items, claimed totals, **and claimant names** (via `memberDisplayNames`) / create a list (at most one steward id enforced) |
 | `/api/admin/resources/[id]` | PATCH/DELETE | Update / delete a resource list (items + claims cascade) |
 | `/api/admin/resources/items` | POST | Add an item to a list |
 | `/api/admin/resources/items/[id]` | PATCH/DELETE | Update / delete an item (claims cascade) |

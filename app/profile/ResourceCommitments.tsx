@@ -15,7 +15,8 @@ type ResourceList = {
   id: string
   title: string
   description: string | null
-  group_name: string | null
+  // The list's steward — a group, department, or role name (display context only).
+  steward_name: string | null
   items: ResourceItem[]
 }
 
@@ -151,12 +152,12 @@ export function ResourceCommitments() {
             }}>
               {list.title}
             </p>
-            {(list.description || list.group_name) && (
+            {(list.description || list.steward_name) && (
               <p style={{ margin: '0 0 0.85rem', fontSize: '0.78rem', opacity: 0.45, lineHeight: 1.5 }}>
-                {[list.description, list.group_name ? `Stewarded by ${list.group_name}` : null].filter(Boolean).join(' · ')}
+                {[list.description, list.steward_name ? `Stewarded by ${list.steward_name}` : null].filter(Boolean).join(' · ')}
               </p>
             )}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: list.description || list.group_name ? 0 : '0.65rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: list.description || list.steward_name ? 0 : '0.65rem' }}>
               {list.items.map(renderItem)}
             </div>
           </div>

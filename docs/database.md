@@ -1,6 +1,6 @@
 # Database Schema
 
-All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations in `supabase-migrations/` document incremental changes (latest: `051`; all of `025`–`050` **applied in prod** as of 2026-07-02; `051` **not yet applied**). Confirm `025` (column renames), `029` (the `application-files` bucket), `033` (group messaging), `034`/`035` (group icon images + `group-badges` bucket, `badge_image` → `icon_image`), `036`–`038` (public profile fields, members/profiles, member distinctions), `039`–`041` (lead-up gatherings + notify/image), `042`–`044` (group collections + per-collection profile visibility + per-collection self-join), `045`–`047` (shifts redesign + shift times), and `048`/`049` (participation leads + per-event lead opt-in; the gathering halves are dropped by `050`) are applied before relying on those features.
+All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations in `supabase-migrations/` document incremental changes (latest: `052`; all of `025`–`051` **applied in prod** as of 2026-07-02; `052` **not yet applied**). Confirm `025` (column renames), `029` (the `application-files` bucket), `033` (group messaging), `034`/`035` (group icon images + `group-badges` bucket, `badge_image` → `icon_image`), `036`–`038` (public profile fields, members/profiles, member distinctions), `039`–`041` (lead-up gatherings + notify/image), `042`–`044` (group collections + per-collection profile visibility + per-collection self-join), `045`–`047` (shifts redesign + shift times), and `048`/`049` (participation leads + per-event lead opt-in; the gathering halves are dropped by `050`) are applied before relying on those features.
 
 ---
 
@@ -546,6 +546,7 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `049_needs_lead.sql` | **Per-event lead opt-in.** `needs_lead BOOL` (default false) on `schedule_events` **and** `lead_up_events` — whether an event *has* a lead role is the organizer's call at creation; all member lead affordances (048) are gated on it, and the offer moves to signup/RSVP time. Additive + idempotent. *(The `lead_up_events` half is dropped by `050`.)* |
 | `050_scrap_gathering_leads.sql` | **Scrap gathering leads.** Leads become a **shifts-only** concept: drops `lead_up_event_rsvps.role` + `lead_up_events.needs_lead` (the gathering halves of 048/049). **Destructive by design** — discards any recorded gathering-lead offers. Idempotent via `IF EXISTS`. |
 | `051_shared_resources.sql` | **Shared resources.** `resource_lists` + `resources` + `resource_claims` — admin-authored needs ("4 camping stoves"), met by one-click member claims with quantities; totals always derived from claim rows. Additive + idempotent; **must be applied** before the feature works. See [`shared-resources.md`](./shared-resources.md). |
+| `052_resource_list_stewards.sql` | **Resource-list stewards beyond groups.** Adds `department_id` + `role_id` to `resource_lists` (both `ON DELETE SET NULL`) + an at-most-one-steward CHECK (`resource_lists_one_steward`, exclusive arc over group/department/role). Stewardship stays display-only. Additive + idempotent. |
 
 ---
 
@@ -589,14 +590,16 @@ Per-session RSVP to a lead-up gathering. Presence of a row = "I'll be at this pl
 
 ### `resource_lists`
 
-A named collection of shared-resource needs ("Shared Kitchen", "Setup Equipment") — the gear members bring to the event. Community-scoped by design: no polymorphic department/event owners (see [`shared-resources.md`](./shared-resources.md) → Non-goals). Managed in Admin → Manage → Shared Resources.
+A named collection of shared-resource needs ("Shared Kitchen", "Setup Equipment") — the gear members bring to the event. Community-scoped by design: no polymorphic *owners* and no event scoping (see [`shared-resources.md`](./shared-resources.md) → Non-goals). The optional **steward** is a group, department, **or** role — at most one, via the exclusive-arc CHECK `resource_lists_one_steward` (migration `052`) — and is display context only, never a permission gate. Managed in Admin → Manage → Shared Resources.
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | UUID PK | |
 | `title` | TEXT | |
 | `description` | TEXT | optional |
-| `group_id` | UUID FK → `groups.id` (ON DELETE SET NULL) | optional *stewarding* group — display context only, never a permission gate |
+| `group_id` | UUID FK → `groups.id` (ON DELETE SET NULL) | steward, group flavour |
+| `department_id` | UUID FK → `departments.id` (ON DELETE SET NULL) | steward, department flavour (migration `052`) |
+| `role_id` | UUID FK → `roles.id` (ON DELETE SET NULL) | steward, role flavour (migration `052`) |
 | `visible` | BOOL | shown to members on `/signup` → "Bring Something" (hidden = admin work-in-progress) |
 | `sort_order` | INT | default 0; display falls back to `created_at` |
 

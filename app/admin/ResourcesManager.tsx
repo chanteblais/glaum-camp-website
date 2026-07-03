@@ -19,17 +19,38 @@ type ResourceList = {
   title: string
   description: string | null
   group_id: string | null
-  group_name: string | null
+  department_id: string | null
+  role_id: string | null
+  steward_name: string | null
   visible: boolean
   sort_order: number
   items: ResourceItem[]
 }
-type GroupOption = { id: string; name: string }
+// The steward dropdown's option pools (at most one steward per list — migration 052).
+type StewardOptions = {
+  groups: { id: string; name: string }[]
+  departments: { id: string; name: string }[]
+  roles: { id: string; name: string; department_name: string | null }[]
+}
 
-type ListDraft = { title: string; description: string; group_id: string; visible: boolean }
+// Steward encoded as one select value: '' | 'group:<id>' | 'department:<id>' | 'role:<id>'.
+type ListDraft = { title: string; description: string; steward: string; visible: boolean }
 type ItemDraft = { name: string; note: string; quantity_needed: number }
 
-const blankList = (): ListDraft => ({ title: '', description: '', group_id: '', visible: true })
+const stewardValue = (l: { group_id: string | null; department_id: string | null; role_id: string | null }) =>
+  l.group_id ? `group:${l.group_id}` : l.department_id ? `department:${l.department_id}` : l.role_id ? `role:${l.role_id}` : ''
+
+// '' → all three null; 'group:<id>' → { group_id: <id>, department_id: null, role_id: null }; etc.
+const stewardFields = (steward: string) => {
+  const [kind, id] = steward.split(':')
+  return {
+    group_id: kind === 'group' ? id : null,
+    department_id: kind === 'department' ? id : null,
+    role_id: kind === 'role' ? id : null,
+  }
+}
+
+const blankList = (): ListDraft => ({ title: '', description: '', steward: '', visible: true })
 const blankItem = (): ItemDraft => ({ name: '', note: '', quantity_needed: 1 })
 
 const inputStyle: React.CSSProperties = {
@@ -105,10 +126,10 @@ function ModalActions({ onCancel, onSave, saving, disabled, saveLabel }: {
   )
 }
 
-function ListModal({ initial, isCreate, groups, onSave, onClose, saving, error }: {
+function ListModal({ initial, isCreate, stewards, onSave, onClose, saving, error }: {
   initial: ListDraft
   isCreate: boolean
-  groups: GroupOption[]
+  stewards: StewardOptions
   onSave: (form: ListDraft) => void
   onClose: () => void
   saving: boolean
@@ -124,10 +145,24 @@ function ListModal({ initial, isCreate, groups, onSave, onClose, saving, error }
       <Field label="Description (optional)">
         <textarea rows={2} style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }} value={form.description} placeholder="What this gear is for" onChange={e => set('description', e.target.value)} />
       </Field>
-      <Field label="Stewarding group (optional)">
-        <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.group_id} onChange={e => set('group_id', e.target.value)}>
+      <Field label="Steward (optional)">
+        <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.steward} onChange={e => set('steward', e.target.value)}>
           <option value="">— None —</option>
-          {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+          {stewards.groups.length > 0 && (
+            <optgroup label="Groups">
+              {stewards.groups.map(g => <option key={g.id} value={`group:${g.id}`}>{g.name}</option>)}
+            </optgroup>
+          )}
+          {stewards.departments.length > 0 && (
+            <optgroup label="Departments">
+              {stewards.departments.map(d => <option key={d.id} value={`department:${d.id}`}>{d.name}</option>)}
+            </optgroup>
+          )}
+          {stewards.roles.length > 0 && (
+            <optgroup label="Roles">
+              {stewards.roles.map(r => <option key={r.id} value={`role:${r.id}`}>{r.name}{r.department_name ? ` (${r.department_name})` : ''}</option>)}
+            </optgroup>
+          )}
         </select>
       </Field>
       <div style={{ marginBottom: '1.25rem' }}>
@@ -183,7 +218,7 @@ function ProgressPill({ claimed, needed }: { claimed: number; needed: number }) 
 
 export function ResourcesManager() {
   const [lists, setLists] = useState<ResourceList[]>([])
-  const [groups, setGroups] = useState<GroupOption[]>([])
+  const [stewards, setStewards] = useState<StewardOptions>({ groups: [], departments: [], roles: [] })
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [modal, setModal] = useState<
@@ -199,17 +234,28 @@ export function ResourcesManager() {
   const load = async () => {
     setLoadError(false)
     try {
-      const [rRes, gRes] = await Promise.all([
+      const [rRes, gRes, dRes, roRes] = await Promise.all([
         fetch('/api/admin/resources'),
         fetch('/api/admin/groups'),
+        fetch('/api/admin/departments'),
+        fetch('/api/admin/roles'),
       ])
       if (!rRes.ok) throw new Error()
       const rJson = await rRes.json()
       setLists(rJson.lists ?? [])
-      if (gRes.ok) {
-        const gJson = await gRes.json()
-        setGroups((gJson.groups ?? []).map((g: GroupOption) => ({ id: g.id, name: g.name })))
-      }
+      // Steward option pools — each degrades to empty if its fetch fails.
+      const gJson = gRes.ok ? await gRes.json() : {}
+      const dJson = dRes.ok ? await dRes.json() : {}
+      const roJson = roRes.ok ? await roRes.json() : {}
+      const departments = (dJson.departments ?? []).map((d: { id: string; name: string }) => ({ id: d.id, name: d.name }))
+      const deptName = Object.fromEntries(departments.map((d: { id: string; name: string }) => [d.id, d.name]))
+      setStewards({
+        groups: (gJson.groups ?? []).map((g: { id: string; name: string }) => ({ id: g.id, name: g.name })),
+        departments,
+        roles: (roJson.roles ?? []).map((r: { id: string; name: string; department_id: string | null }) => ({
+          id: r.id, name: r.name, department_name: r.department_id ? deptName[r.department_id] ?? null : null,
+        })),
+      })
     } catch {
       setLoadError(true)
     }
@@ -234,7 +280,7 @@ export function ResourcesManager() {
   }
 
   const handleSaveList = (form: ListDraft) => {
-    const body = { title: form.title, description: form.description, group_id: form.group_id || null, visible: form.visible }
+    const body = { title: form.title, description: form.description, ...stewardFields(form.steward), visible: form.visible }
     if (modal?.kind === 'edit-list') save(`/api/admin/resources/${modal.list.id}`, 'PATCH', body)
     else save('/api/admin/resources', 'POST', body)
   }
@@ -312,7 +358,7 @@ export function ResourcesManager() {
                   )}
                 </p>
                 <p style={{ fontSize: '0.7rem', opacity: 0.45, margin: '0.15rem 0 0' }}>
-                  {[list.description, list.group_name ? `Stewarded by ${list.group_name}` : null].filter(Boolean).join(' · ') || '—'}
+                  {[list.description, list.steward_name ? `Stewarded by ${list.steward_name}` : null].filter(Boolean).join(' · ') || '—'}
                 </p>
               </div>
               <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
@@ -358,10 +404,10 @@ export function ResourcesManager() {
       {(modal?.kind === 'add-list' || modal?.kind === 'edit-list') && (
         <ListModal
           initial={modal.kind === 'edit-list'
-            ? { title: modal.list.title, description: modal.list.description ?? '', group_id: modal.list.group_id ?? '', visible: modal.list.visible }
+            ? { title: modal.list.title, description: modal.list.description ?? '', steward: stewardValue(modal.list), visible: modal.list.visible }
             : blankList()}
           isCreate={modal.kind === 'add-list'}
-          groups={groups}
+          stewards={stewards}
           onSave={handleSaveList}
           onClose={() => setModal(null)}
           saving={saving}

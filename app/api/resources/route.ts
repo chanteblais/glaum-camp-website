@@ -11,7 +11,7 @@ export async function GET() {
 
   const { data: lists, error } = await supabaseAdmin
     .from('resource_lists')
-    .select('id, title, description, visible, sort_order, groups(name)')
+    .select('id, title, description, visible, sort_order, groups(name), departments(name), roles(name)')
     .eq('visible', true)
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: true })
@@ -54,19 +54,20 @@ export async function GET() {
     })
   }
 
-  type ListRow = { id: string; title: string; description: string | null; groups: { name: string } | { name: string }[] | null }
+  // Supabase types the embeds as arrays; runtime returns a single row for a to-one FK.
+  type NameEmbed = { name: string } | { name: string }[] | null
+  const embedName = (e: NameEmbed) => (Array.isArray(e) ? e[0]?.name : e?.name) ?? null
+  type ListRow = { id: string; title: string; description: string | null; groups: NameEmbed; departments: NameEmbed; roles: NameEmbed }
   return NextResponse.json({
     lists: ((lists ?? []) as unknown as ListRow[])
-      .map(l => {
-        const g = Array.isArray(l.groups) ? l.groups[0] : l.groups
-        return {
-          id: l.id,
-          title: l.title,
-          description: l.description,
-          group_name: g?.name ?? null,
-          items: itemsByList[l.id] ?? [],
-        }
-      })
+      .map(l => ({
+        id: l.id,
+        title: l.title,
+        description: l.description,
+        // At most one steward FK is set (migration 052) — group, department, or role.
+        steward_name: embedName(l.groups) ?? embedName(l.departments) ?? embedName(l.roles),
+        items: itemsByList[l.id] ?? [],
+      }))
       // An empty list is admin work-in-progress; don't show members a bare heading.
       .filter(l => (l.items as unknown[]).length > 0),
   })

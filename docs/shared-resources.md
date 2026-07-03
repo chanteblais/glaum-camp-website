@@ -6,16 +6,18 @@ coolers, tools, shade structures, decor. Today that happens in spreadsheets and
 first-class concept: admins author **needs**, members meet them with one-click
 **claims**, and the totals take care of themselves.
 
-Built 2026-07-02 · migration `051_shared_resources.sql`.
+Built 2026-07-02 · migrations `051_shared_resources.sql` + `052_resource_list_stewards.sql`.
 
 ## The model
 
 Three tables (see `docs/database.md`):
 
 - **`resource_lists`** — a named collection of needs ("Shared Kitchen",
-  "Setup Equipment"). Community-scoped, with an optional *stewarding group*
-  (`group_id`, display context only — not a permission gate) and a `visible`
-  toggle so a half-authored list stays hidden.
+  "Setup Equipment"). Community-scoped, with an optional **steward** — a group,
+  department, or role ("Shared Kitchen, stewarded by the Department of
+  Nourishment"). Three nullable FKs with an at-most-one CHECK (exclusive arc,
+  migration `052`); display context only — not a permission gate. Plus a
+  `visible` toggle so a half-authored list stays hidden.
 - **`resources`** — one item per row: name, optional note, `quantity_needed`.
 - **`resource_claims`** — one row per member per resource (`UNIQUE`), carrying
   a `quantity`. Bringing three coolers = one row with quantity 3.
@@ -28,8 +30,10 @@ organizer wants, not an error).
 ## Surfaces
 
 - **Admin → Manage → Program → Shared Resources** (`ResourcesManager.tsx`):
-  create/edit/hide/delete lists, add/edit/delete items, and see per-item
-  progress *with claimant names* — the organizer always knows who to chase.
+  create/edit/hide/delete lists (steward picked from one dropdown with
+  Groups / Departments / Roles optgroups), add/edit/delete items, and see
+  per-item progress *with claimant names* — the organizer always knows who
+  to chase.
 - **Member: `/signup` → "Bring Something"** (`ResourceCommitments.tsx`, below
   Your Groups): visible lists with per-item progress and an **"I'll bring one"**
   button; a claimed row grows −/+ steppers and a remove control. Unclaiming is
@@ -51,11 +55,12 @@ organizer wants, not an error).
 
 ## Non-goals (deliberate, revisit post–What If)
 
-- **No polymorphic ownership** (department / event / community owner types).
-  Departments aren't an entity; the hierarchy in early sketches
-  ("Department of Nourishment → Shared Kitchen") is presentational — a list
-  title does the job. If multi-owner ever proves necessary the data migrates
-  cleanly from the single nullable `group_id`.
+- **No polymorphic ownership.** A list's *steward* can be a group, department,
+  or role (migration `052`), but stewardship is a display label — no owner
+  carries permissions, edit rights, or member-visibility rules. The hierarchy
+  in early sketches ("Department of Nourishment → Shared Kitchen") stays
+  presentational. If real per-owner behaviour ever proves necessary, the
+  exclusive-arc FKs migrate cleanly.
 - **No event scoping.** Lists implicitly belong to *the* event — a
   single-community assumption, logged in `docs/generalizability-log.md`.
   Multi-event/multi-tenant scoping is a foundation-phase concern.

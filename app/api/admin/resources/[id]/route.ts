@@ -22,6 +22,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
   if ('description' in body) patch.description = body.description?.trim() || null
   if ('group_id' in body) patch.group_id = body.group_id || null
+  if ('department_id' in body) patch.department_id = body.department_id || null
+  if ('role_id' in body) patch.role_id = body.role_id || null
+  if ([patch.group_id, patch.department_id, patch.role_id].filter(Boolean).length > 1) {
+    return NextResponse.json({ error: 'A list has at most one steward' }, { status: 400 })
+  }
   if ('visible' in body) patch.visible = !!body.visible
   if ('sort_order' in body) patch.sort_order = Number(body.sort_order) || 0
 
