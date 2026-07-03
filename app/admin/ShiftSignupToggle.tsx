@@ -39,7 +39,7 @@ export function ShiftSignupToggle({ initialOpen }: { initialOpen: boolean }) {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem',
       }}>
         <div>
-          <p style={{ margin: '0 0 0.15rem', fontSize: '0.88rem', fontWeight: 600, color: open ? '#C8A848' : '#ff8080' }}>
+          <p style={{ margin: '0 0 0.15rem', fontSize: '0.8rem', fontWeight: 500, color: open ? '#C8A848' : '#ff8080' }}>
             Shift signup {open ? 'open' : 'closed'}
           </p>
           <p style={{ margin: 0, fontSize: '0.75rem', opacity: 0.5 }}>
