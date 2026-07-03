@@ -351,7 +351,7 @@ function EventModal({
         )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem 1.5rem', marginBottom: '1.25rem' }}>
-          <Toggle checked={form.visible} onChange={(v) => set('visible', v)} label="Visible on site" />
+          <Toggle checked={form.visible} onChange={(v) => set('visible', v)} label="Visible" />
           <Toggle checked={form.highlight} onChange={(v) => set('highlight', v)} label="Highlight day" />
           <Toggle checked={form.is_recurring} onChange={(v) => set('is_recurring', v)} label="Recurring" />
           {/* Off = not on the schedule page / home teaser, but members can
