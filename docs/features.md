@@ -294,6 +294,19 @@ The event itself: three always-open workspaces, each held together by a **soft p
 | Lead-Up Gatherings | `LeadUpGatheringsManager` | CRUD for lead-up gatherings (spec: [`lead-up-gatherings.md`](./lead-up-gatherings.md)) topped by a **month calendar** (`LeadUpCalendar`) — the runway at a glance: click an empty day to add a gathering there (date prefilled), click a gathering chip to edit it; ‹ › month nav opens on the next upcoming gathering's month; the configured event range (Configure → Event Dates) is tinted purple with an "Event" marker; past days dimmed; hidden gatherings at low opacity with ○. The editor requires title + date + start time (the same styled `TimeField` as the event modal, end optional with durations). The row list below keeps Notify / visibility / delete per gathering |
 | Shared Resources | `ResourcesManager` | Gear the community needs, members claim what they'll bring — see [Shared Resources](#shared-resources) |
 
+### Configure tab (`/admin/configure`)
+
+The standalone definitional structures, presented as a **collapsed settings menu**: each section is a soft panel (`CollapsibleSection` with the `panel` prop) whose header keeps the title, a plain-English summary, and a live **status chip** (counts computed server-side in `app/admin/configure/page.tsx` — e.g. "3 fields · 9 system", "Jul 22 – Jul 27 · 6 days", "none granted") visible whether open or closed, so the collapsed page doubles as a state-of-the-camp overview. Panels default collapsed; localStorage remembers how you left each one per browser (`glaum-admin-panel:*` keys, separate from the flat variant's `glaum-admin-section:*`). Category headings use the same enlarged `CategoryHeading` as Program. The Application Form entry is a panel-styled link that opens the full-screen builder.
+
+| Category | Sections |
+|---|---|
+| Forms & Fields | Application Form (link) · Profile Fields |
+| Recognition & Tasks | Distinctions · Attunement Tasks |
+| Structure | Event Dates · Departments · Groups · Shift Types |
+| Access & System | Admins · Poll Managers · Debug Tools |
+
+The Admins / Poll Managers grant lists show the first 5 grantable members with an "…and N more — search" note; searching reveals all matches. (This replaced a fixed-height inner scrollbox that used to trap the page's scroll.)
+
 ---
 
 ### Application Builder (`/admin/configure`)
@@ -301,7 +314,7 @@ The event itself: three always-open workspaces, each held together by a **soft p
 **Who:** Admin  
 **What:** Full-page form builder for configuring both the Camp Member application and Volunteer signup.
 
-Reached via the "Configure Applications →" link on the admin dashboard.
+Reached via the **Application Form** link panel at the top of Configure → Forms & Fields.
 
 **The member application is fully modular** — every section and field (built-in or admin-added) can be reordered, edited, resized, hidden, and (non-core) deleted. Config is the source of truth: deletions stick; "Reset to defaults" restores.
 
