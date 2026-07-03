@@ -197,11 +197,14 @@ function Waveform() {
         <path d={smoothPath(THREAD_B_RIGHT)} stroke="url(#thread-fade-in)" strokeWidth="1" />
 
         {/* ghost echoes shadowing the pulse — the wisps that make it alive */}
-        <path d={smoothPath(ghost(11, 0.92))} stroke="url(#radio-fade)" strokeWidth="1.2" opacity="0.28" />
-        <path d={smoothPath(ghost(-9, 0.8))} stroke="url(#radio-fade)" strokeWidth="1" opacity="0.18" />
-        <path d={smoothPath(ghost(22, 0.7))} stroke="url(#radio-fade)" strokeWidth="0.9" opacity="0.12" />
-        <path d={smoothPath(ghost(-18, 0.62))} stroke="url(#radio-fade)" strokeWidth="0.8" opacity="0.1" />
-        <path d={smoothPath(ghost(32, 0.85))} stroke="url(#radio-fade)" strokeWidth="0.8" opacity="0.09" />
+        <path d={smoothPath(ghost(11, 0.92))} stroke="url(#radio-fade)" strokeWidth="1.2" opacity="0.3" />
+        <path d={smoothPath(ghost(-9, 0.8))} stroke="url(#radio-fade)" strokeWidth="1" opacity="0.2" />
+        <path d={smoothPath(ghost(22, 0.7))} stroke="url(#radio-fade)" strokeWidth="0.9" opacity="0.14" />
+        <path d={smoothPath(ghost(-18, 0.62))} stroke="url(#radio-fade)" strokeWidth="0.8" opacity="0.12" />
+        <path d={smoothPath(ghost(32, 0.85))} stroke="url(#radio-fade)" strokeWidth="0.8" opacity="0.11" />
+        <path d={smoothPath(ghost(-30, 0.95))} stroke="url(#radio-fade)" strokeWidth="0.7" opacity="0.09" />
+        <path d={smoothPath(ghost(44, 0.55))} stroke="url(#radio-fade)" strokeWidth="0.7" opacity="0.08" />
+        <path d={smoothPath(ghost(-42, 0.72))} stroke="url(#radio-fade)" strokeWidth="0.6" opacity="0.07" />
 
         {/* the pulse — glow underlay, amber ribbon, bright core. The mock's
             line is proportionally substantial (~2px on a 570px-wide band):
@@ -247,7 +250,7 @@ export function RadioHero() {
         .radio-hero-wave {
           position: absolute;
           left: 46%;
-          right: 11%;
+          right: 2%;
           top: 50%;
           transform: translateY(-50%);
           pointer-events: none;
@@ -260,13 +263,11 @@ export function RadioHero() {
 
       <h1
         style={{
-          fontFamily: 'var(--font-cormorant-garamond), serif',
-          fontWeight: 300,
-          fontSize: 'clamp(2.4rem, 6.5vw, 3.5rem)',
+          fontFamily: 'TokyoDreams, serif',
+          fontSize: 'clamp(2.2rem, 6vw, 3.2rem)',
           color: GOLD,
           margin: 0,
-          letterSpacing: '0.22em',
-          textTransform: 'uppercase',
+          letterSpacing: '0.08em',
           display: 'flex',
           alignItems: 'center',
           gap: '1.1rem',
