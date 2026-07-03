@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabaseResizedUrl } from '@/lib/supabase-image'
+import { useConfirm } from '../../../components/ConfirmDialog'
 
 type GroupMessage = {
   id: string
@@ -115,6 +116,7 @@ export function GroupThreadClient({ currentUserId, groupId, groupName, groupIcon
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const { confirm, confirmDialog } = useConfirm()
 
   // Close the bell menu on an outside click or Escape. (A fixed overlay doesn't
   // work here — the header's backdrop-filter traps `position: fixed` to the header.)
@@ -261,15 +263,21 @@ export function GroupThreadClient({ currentUserId, groupId, groupName, groupIcon
 
   const leaveGroup = async () => {
     if (leaving) return
-    if (!confirm(`Leave ${groupName}? You'll stop seeing this thread.`)) return
+    const ok = await confirm({
+      title: `Leave ${groupName}?`,
+      body: "You'll stop seeing this thread.",
+      confirmLabel: 'Leave group',
+      danger: true,
+    })
+    if (!ok) return
     setLeaving(true)
     try {
       const res = await fetch(`/api/groups/${groupId}/leave`, { method: 'POST' })
       if (res.ok) { window.location.href = '/messages'; return }
       const d = await res.json().catch(() => ({}))
-      alert(d.error ?? 'Could not leave the group.')
+      await confirm({ title: 'Could not leave the group', body: d.error ?? 'Something went wrong — try again in a moment.', notice: true })
     } catch {
-      alert('Something went wrong.')
+      await confirm({ title: 'Could not leave the group', body: 'Something went wrong — try again in a moment.', notice: true })
     }
     setLeaving(false)
   }
@@ -653,6 +661,8 @@ export function GroupThreadClient({ currentUserId, groupId, groupName, groupIcon
           Enter to send · Shift+Enter for new line
         </p>
       </div>
+
+      {confirmDialog}
     </div>
   )
 }

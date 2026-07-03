@@ -2,16 +2,18 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useConfirm } from '../components/ConfirmDialog'
 
 export function AdminActions({ id, email, redirectAfter }: { id: string; email: string; redirectAfter?: string }) {
   const [loading, setLoading] = useState<'approve' | 'reject' | null>(null)
   const router = useRouter()
+  const { confirm, confirmDialog } = useConfirm()
 
   const handleApprove = async () => {
     setLoading('approve')
     const res = await fetch(`/api/admin/${id}/approve`, { method: 'POST' })
     const data = await res.json().catch(() => ({}))
-    if (data?.emailWarning) alert(`⚠️ ${data.emailWarning}`)
+    if (data?.emailWarning) await confirm({ title: 'Approved, with a hiccup', body: data.emailWarning, notice: true })
     if (redirectAfter) router.push(redirectAfter)
     else router.refresh()
     setLoading(null)
@@ -61,6 +63,7 @@ export function AdminActions({ id, email, redirectAfter }: { id: string; email: 
       >
         {loading === 'reject' ? '...' : 'Reject'}
       </button>
+      {confirmDialog}
     </div>
   )
 }

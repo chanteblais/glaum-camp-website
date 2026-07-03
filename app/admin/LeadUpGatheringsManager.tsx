@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { normaliseToken } from '@/lib/time-format'
 import { LoadError } from './LoadError'
+import { useConfirm } from '../components/ConfirmDialog'
 
 type LeadUpEvent = {
   id: string
@@ -260,6 +261,7 @@ export function LeadUpGatheringsManager() {
   const [modalError, setModalError] = useState<string | null>(null)
   const [notifyingId, setNotifyingId] = useState<string | null>(null)
   const [notifyResult, setNotifyResult] = useState<{ id: string; text: string } | null>(null)
+  const { confirm, confirmDialog } = useConfirm()
 
   const load = async () => {
     setLoadError(false)
@@ -315,17 +317,36 @@ export function LeadUpGatheringsManager() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this gathering? Its RSVPs will be removed too.')) return
+    const ev = events.find(e => e.id === id)
+    const ok = await confirm({
+      title: `Delete ${ev ? `“${ev.title}”` : 'this gathering'}?`,
+      body: 'Its RSVPs will be removed too.',
+      confirmLabel: 'Delete gathering',
+      danger: true,
+    })
+    if (!ok) return
     await fetch(`/api/admin/lead-up-events/${id}`, { method: 'DELETE' })
     setEvents(prev => prev.filter(e => e.id !== id))
   }
 
   const handleNotify = async (event: LeadUpEvent) => {
-    if (!event.visible) { alert('Make the gathering visible before notifying members.'); return }
+    if (!event.visible) {
+      await confirm({
+        title: 'This gathering is still hidden',
+        body: 'Make it visible before notifying members.',
+        notice: true,
+      })
+      return
+    }
     const already = !!event.notified_at
-    if (!confirm(already
-      ? `Re-send the alert for “${event.title}” to all members? They'll get another bell notification and email.`
-      : `Alert all members about “${event.title}”? They'll get a bell notification and an email (members who turned off announcement emails won't be emailed).`)) return
+    const ok = await confirm({
+      title: already ? `Re-send the alert for “${event.title}”?` : `Alert all members about “${event.title}”?`,
+      body: already
+        ? "Everyone will get another bell notification and email."
+        : "Everyone will get a bell notification and an email (members who turned off announcement emails won't be emailed).",
+      confirmLabel: already ? 'Re-send alert' : 'Notify members',
+    })
+    if (!ok) return
 
     setNotifyingId(event.id)
     setNotifyResult(null)
@@ -469,6 +490,8 @@ export function LeadUpGatheringsManager() {
           error={modalError}
         />
       )}
+
+      {confirmDialog}
     </div>
   )
 }

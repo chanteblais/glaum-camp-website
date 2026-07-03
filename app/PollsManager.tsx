@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useConfirm } from './components/ConfirmDialog'
 
 type Poll = {
   id: string
@@ -187,6 +188,7 @@ export function PollsManager() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const { confirm, confirmDialog } = useConfirm()
 
   useEffect(() => {
     fetch('/api/admin/polls')
@@ -220,7 +222,14 @@ export function PollsManager() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Delete this poll and all its votes?')) return
+    const poll = polls.find(p => p.id === id)
+    const ok = await confirm({
+      title: `Delete ${poll ? `“${poll.question}”` : 'this poll'}?`,
+      body: 'All its votes will be removed too.',
+      confirmLabel: 'Delete poll',
+      danger: true,
+    })
+    if (!ok) return
     setDeleting(id)
     await fetch(`/api/admin/polls/${id}`, { method: 'DELETE' })
     setPolls(prev => prev.filter(p => p.id !== id))
@@ -324,6 +333,8 @@ export function PollsManager() {
           error={saveError}
         />
       )}
+
+      {confirmDialog}
     </div>
   )
 }

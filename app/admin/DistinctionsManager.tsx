@@ -10,6 +10,7 @@ import {
 } from '@/lib/distinctions'
 import { AssetImagePicker, type GroupIconOption } from './AssetImagePicker'
 import type { DistinctionCatalogEntry, DistinctionValueType } from '@/lib/profile-fields'
+import { useConfirm } from '../components/ConfirmDialog'
 
 const GOLD = '#C8A848'
 const PURPLE = '#D239F8'
@@ -73,6 +74,7 @@ export function DistinctionsManager({
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const { confirm, confirmDialog } = useConfirm()
 
   // Debounced autosave — same feedback pattern as the sibling Configure sections
   // (Attunement Tasks, Event Dates, Profile Fields): edit, then a transient
@@ -350,9 +352,13 @@ export function DistinctionsManager({
                 style={{ background: 'none', border: 'none', cursor: idx === rules.length - 1 ? 'default' : 'pointer', color: GOLD, opacity: idx === rules.length - 1 ? 0.2 : 0.5, fontSize: '0.75rem', padding: '0.1rem' }}
               >▼</button>
               <button
-                onClick={() => {
-                  if (!window.confirm(`Remove "${rule.label}"?`)) return
-                  update(rules.filter((_, i) => i !== idx))
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: `Remove “${rule.label}”?`,
+                    confirmLabel: 'Remove distinction',
+                    danger: true,
+                  })
+                  if (ok) update(rules.filter((_, i) => i !== idx))
                 }}
                 title="Remove"
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ff8a8a', opacity: 0.45, fontSize: '0.8rem', padding: '0.1rem', marginTop: '0.15rem' }}
@@ -382,6 +388,8 @@ export function DistinctionsManager({
           : saved ? <p style={{ fontSize: '0.72rem', color: GOLD, opacity: 0.6, margin: 0 }}>Saved ✓</p>
           : null}
       </div>
+
+      {confirmDialog}
     </div>
   )
 }
