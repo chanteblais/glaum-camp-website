@@ -129,7 +129,6 @@ const STORED_DEFAULT_FIELDS: ProfileField[] = [
   { key: 'eventExperience', label: 'Event Experience', description: 'Which years have you camped with Glåüm?', type: 'multi_select', options: ['2022', '2023', '2024', '2025'], public: true, memberEditable: true, applicationEligible: true, distinctionEligible: true, enabled: true },
   { key: 'skills',          label: 'Skills',           description: 'What can you bring to camp?', type: 'multi_select', options: [], public: true, memberEditable: true, applicationEligible: true, distinctionEligible: true, enabled: true },
   { key: 'languages',       label: 'Languages',        type: 'multi_select', options: [], public: true, memberEditable: true, applicationEligible: true, distinctionEligible: false, enabled: true },
-  { key: 'quote',           label: 'Quote',            description: 'A short line shown under your name.', type: 'text', public: true, memberEditable: true, applicationEligible: true, distinctionEligible: false, enabled: true },
   { key: 'dietaryPreferences', label: 'Dietary Preferences', type: 'text', public: false, memberEditable: true, applicationEligible: true, distinctionEligible: false, enabled: true },
 ]
 
@@ -215,6 +214,33 @@ export function parseProfileFields(raw?: string | null): ProfileField[] {
 }
 
 // ── Helpers shared by later phases ──────────────────────────────────────────────
+
+/**
+ * Coerce an incoming value to the shape its field type expects, dropping
+ * anything invalid (and, for selects, anything not in the allowed options).
+ * Shared by every path that writes member_profiles.values (member self-edit,
+ * application submission) so no writer can bypass the registry's typing.
+ */
+export function coerceProfileValue(field: ProfileField, raw: unknown): unknown {
+  switch (field.type) {
+    case 'multi_select': {
+      const arr = Array.isArray(raw) ? raw.map(String) : []
+      return field.options?.length ? arr.filter(v => field.options!.includes(v)) : arr
+    }
+    case 'single_select': {
+      const s = typeof raw === 'string' ? raw : ''
+      return field.options?.length && !field.options.includes(s) ? '' : s
+    }
+    case 'number': {
+      const n = typeof raw === 'number' ? raw : Number(raw)
+      return Number.isFinite(n) ? n : null
+    }
+    case 'boolean':
+      return raw === true || raw === 'true'
+    default: // text, textarea, date
+      return typeof raw === 'string' ? raw : raw == null ? '' : String(raw)
+  }
+}
 
 /** Stored (non-system), enabled fields — the ones backed by member_profiles. */
 export function storedFields(fields: ProfileField[]): ProfileField[] {

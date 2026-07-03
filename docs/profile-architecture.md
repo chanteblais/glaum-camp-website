@@ -118,7 +118,10 @@ everything reversible until the new store is proven.
   (`lib/form-config.ts`) binds a custom application question to a registry field. `ApplyWizard`
   builds a registry-keyed `profile_values` map on submit; `/api/apply` writes it to
   `member_profiles` (instead of seeding from raw `custom_answers`, which stay on the application
-  row for the "Additional Responses" view). `ApplicationBuilder` gains a **"Saves to"** dropdown on
+  row for the "Additional Responses" view), **coerced + validated against the registry** via the
+  shared `coerceProfileValue` (`lib/profile-fields.ts`) — application-eligible stored fields only,
+  select values filtered to the field's options; the same validation the member self-edit PATCH
+  applies, so no writer bypasses the registry's typing. `ApplicationBuilder` gains a **"Saves to"** dropdown on
   custom fields (registry application-eligible fields), threaded `ApplicationBuilder → StepSection
   → FieldRow` like the existing `groups` prop. **Deferred refinements:** the bound form field's
   type/options don't yet auto-sync from the registry field (admin sets them manually — a text field

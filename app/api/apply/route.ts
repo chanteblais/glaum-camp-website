@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { notifyAdmin } from '@/lib/notify-admin'
 import { upsertMember } from '@/lib/members'
+import { parseProfileFields, storedFields, applicationFields, coerceProfileValue } from '@/lib/profile-fields'
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth()
@@ -167,6 +168,30 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Phase 3: registry-bound fields populate the canonical profile under their
+    // Profile Field key. Validate against the registry exactly like the member
+    // self-edit path (application-eligible fields only, options/type coerced) so
+    // this writer can't slip out-of-vocabulary values into member_profiles. The
+    // raw answers stay on the application row (custom_answers) untouched.
+    let profileValues: Record<string, unknown> | undefined
+    if (data.profile_values && typeof data.profile_values === 'object') {
+      const { data: registryRow } = await supabaseAdmin
+        .from('page_content')
+        .select('value')
+        .eq('key', 'config_profile_fields')
+        .maybeSingle()
+      const eligible = new Map(
+        applicationFields(storedFields(parseProfileFields(registryRow?.value))).map(f => [f.key, f]),
+      )
+      const coerced: Record<string, unknown> = {}
+      for (const [key, raw] of Object.entries(data.profile_values as Record<string, unknown>)) {
+        const field = eligible.get(key)
+        if (!field) continue // unknown / non-application field → snapshot-only
+        coerced[key] = coerceProfileValue(field, raw)
+      }
+      if (Object.keys(coerced).length > 0) profileValues = coerced
+    }
+
     // Phase 1 dual-write: mirror identity to the canonical `members` table and
     // seed the profile from the already-keyed custom answers. Guarded inside
     // upsertMember — a failure here must never break the application submission.
@@ -183,10 +208,7 @@ export async function POST(req: NextRequest) {
         status: 'pending',
         application_id: inserted?.id ?? null,
       },
-      // Phase 3: registry-bound fields populate the canonical profile under their
-      // Profile Field key. Seed member_profiles from these (not raw custom_answers,
-      // which stay on the application row for the "Additional Responses" view).
-      data.profile_values && typeof data.profile_values === 'object' ? data.profile_values : undefined,
+      profileValues,
     )
 
     const displayName = [data.preferred_name || data.first_name, data.last_name].filter(Boolean).join(' ')

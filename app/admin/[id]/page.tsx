@@ -181,8 +181,15 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
       if (f.profileFieldKey && canonicalKeys.has(f.profileFieldKey)) {
         // Lives in Profile Details; mark as handled so the orphan sweep below
         // doesn't resurface the stored answer under "Additional Responses".
-        seen.add(f.key); seen.add(f.key + '__other')
-        continue
+        // Exception: an "Other: …" specification exists only on the application
+        // snapshot (profile values carry just the selected option), so when one
+        // was submitted the application answer still renders — suppressing it
+        // here would hide that text everywhere.
+        const otherText = customAnswers[f.key + '__other']
+        if (!(typeof otherText === 'string' && otherText.trim())) {
+          seen.add(f.key); seen.add(f.key + '__other')
+          continue
+        }
       }
 
       let value: string | string[]
