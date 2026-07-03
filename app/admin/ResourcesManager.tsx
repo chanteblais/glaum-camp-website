@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { LoadError } from './LoadError'
 import { AssetImagePicker } from './AssetImagePicker'
 import { isImageIcon } from '@/lib/icon-src'
+import { useConfirm } from '../components/ConfirmDialog'
 
 type Claimant = { name: string; quantity: number }
 type ResourceItem = {
@@ -262,6 +263,7 @@ export function ResourcesManager() {
   >(null)
   const [saving, setSaving] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
+  const { confirm, confirmDialog } = useConfirm()
 
   const load = async () => {
     setLoadError(false)
@@ -324,13 +326,25 @@ export function ResourcesManager() {
 
   const handleDeleteList = async (list: ResourceList) => {
     const claims = list.items.reduce((s, it) => s + it.claimants.length, 0)
-    if (!confirm(`Delete “${list.title}”? Its ${list.items.length} item${list.items.length === 1 ? '' : 's'}${claims > 0 ? ` and ${claims} member claim${claims === 1 ? '' : 's'}` : ''} will be removed too.`)) return
+    const ok = await confirm({
+      title: `Delete “${list.title}”?`,
+      body: `Its ${list.items.length} item${list.items.length === 1 ? '' : 's'}${claims > 0 ? ` and ${claims} member claim${claims === 1 ? '' : 's'}` : ''} will be removed too.`,
+      confirmLabel: 'Delete list',
+      danger: true,
+    })
+    if (!ok) return
     await fetch(`/api/admin/resources/${list.id}`, { method: 'DELETE' })
     setLists(prev => prev.filter(l => l.id !== list.id))
   }
 
   const handleDeleteItem = async (item: ResourceItem) => {
-    if (!confirm(`Delete “${item.name}”?${item.claimants.length > 0 ? ` ${item.claimants.length} member claim${item.claimants.length === 1 ? '' : 's'} will be removed too.` : ''}`)) return
+    const ok = await confirm({
+      title: `Delete “${item.name}”?`,
+      body: item.claimants.length > 0 ? `${item.claimants.length} member claim${item.claimants.length === 1 ? '' : 's'} will be removed too.` : undefined,
+      confirmLabel: 'Delete item',
+      danger: true,
+    })
+    if (!ok) return
     await fetch(`/api/admin/resources/items/${item.id}`, { method: 'DELETE' })
     setLists(prev => prev.map(l => l.id === item.list_id ? { ...l, items: l.items.filter(i => i.id !== item.id) } : l))
   }
@@ -455,6 +469,8 @@ export function ResourcesManager() {
           error={modalError}
         />
       )}
+
+      {confirmDialog}
 
       {(modal?.kind === 'add-item' || modal?.kind === 'edit-item') && (
         <ItemModal
