@@ -6,6 +6,7 @@ import { Section, Kicker, GoldDivider } from '@/components/Section'
 import { ScheduleSection } from '@/components/ScheduleSection'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getMemberGroups } from '@/lib/groups'
+import { getUnmetResourceNeeds } from '@/lib/resources'
 import { buildAttunementChecklist, memberGroupCounts, requiredItems, commitmentItems } from '@/lib/attunement'
 import { getMemberShiftState, EMPTY_MEMBER_SHIFT_STATE } from '@/lib/shift-attunement'
 
@@ -259,6 +260,10 @@ let canManagePolls = false
   const allAttuned = requiredTasks.every(t => t.done)
   const commitmentsOutstanding = commitmentTasks.filter(t => !t.done).length
 
+  // Unmet shared-resource needs → the "Bring Something" banner. Demand-driven:
+  // renders nothing once the community has everything covered.
+  const unmetNeeds = isApproved ? await getUnmetResourceNeeds() : []
+
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
   const WHAT_IF_DATE = new Date('2026-07-23T12:00:00')
@@ -373,6 +378,39 @@ let canManagePolls = false
                     </span>
                   </p>
                   <span style={{ fontSize: '0.75rem', color: '#C8A848', opacity: 0.45, flexShrink: 0 }}>View checklist →</span>
+                </a>
+              )
+            })()}
+
+            {/* ── BRING SOMETHING BANNER (unmet shared-resource needs) ── */}
+            {unmetNeeds.length > 0 && (() => {
+              const shown = unmetNeeds.slice(0, 3)
+              const more = unmetNeeds.length - shown.length
+              const needsText = shown
+                .map(n => `${n.name.toLowerCase()} (${n.remaining} more)`)
+                .join(', ') + (more > 0 ? ` +${more} more` : '')
+              return (
+                <a
+                  href="/signup#bring"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '1rem',
+                    padding: '0.75rem 1.25rem',
+                    marginBottom: '1.25rem',
+                    borderRadius: '0.75rem',
+                    border: '1px solid rgba(200,168,72,0.25)',
+                    background: 'rgba(200,168,72,0.06)',
+                    textDecoration: 'none',
+                  }}
+                >
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: '#C8A848', opacity: 0.85, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontFamily: 'TokyoDreams, serif', letterSpacing: '0.04em' }}>Bring Something</span>
+                    <span style={{ opacity: 0.5, margin: '0 0.5rem' }}>·</span>
+                    <span style={{ fontStyle: 'italic', opacity: 0.7 }}>still needed: {needsText}</span>
+                  </p>
+                  <span style={{ fontSize: '0.75rem', color: '#C8A848', opacity: 0.45, flexShrink: 0 }}>Claim one →</span>
                 </a>
               )
             })()}

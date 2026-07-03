@@ -45,6 +45,7 @@ Nav links for non-approved signed-in users (pending/rejected) show the public se
 Fixed top sections (always present, not reorderable):
 1. **Hero banner** — welcome greeting, countdown to event, hero tagline (`home_tagline`, editable inline)
 2. **Attunement + Commitments** — side-by-side (`dash-grid`)
+3. **Slim attention banners** (each renders only while actionable): the **Attunement** banner (outstanding required tasks / unfilled commitments → `/profile`) and the **Bring Something** banner (unmet shared-resource needs — "still needed: camping stove (1 more)…", top 3 + `+N more` → `/signup#bring`; `getUnmetResourceNeeds` in `lib/resources.ts`, offers excluded). Demand-driven: both disappear when there's nothing to do
 
 Configurable widgets (order, visibility, and width controlled by admin via the page editor):
 
@@ -446,7 +447,7 @@ Members pick a role via `SignupSection` on `/profile`. The selection is submitte
 
 **Admin approval:** via `PATCH /api/admin/role-requests/[clerkUserId]` with `{ decision: 'approved' | 'rejected' }`. Approval sets `role_approval_status = 'approved'`. Rejection sets `role_id = null` and clears the status. Both send a `user_notifications` row to the member.
 
-The dedicated **Participate** page (`/signup`) hosts `SignupSection` (role + shift), the **Your Groups** group opt-in (`GroupCommitments` — see [Groups](#groups)), and the **Bring Something** shared-resources claims (`ResourceCommitments` — see [Shared Resources](#shared-resources)). The Commitments card's "Manage commitments →" link points here.
+The dedicated **Participate** page (`/signup`) hosts `SignupSection` (role + shift), then the **Bring Something** shared-resources claims (`ResourceCommitments` — see [Shared Resources](#shared-resources); anchored `#bring` for the home-banner deep link, placed above groups because needs are live and time-sensitive while group membership is a set-once choice), then the **Your Groups** group opt-in (`GroupCommitments` — see [Groups](#groups)). The Commitments card's "Manage commitments →" link points here.
 
 **Key file:** `app/api/signup/route.ts`
 
@@ -487,7 +488,9 @@ Every group also has a **message thread** for coordination — see [Group Thread
 Coordinates the physical gear members bring to the event (stoves, coolers, tools). Admins author **needs**; members meet them with one-click **claims**. Full spec + non-goals: [shared-resources.md](shared-resources.md); tables (`resource_lists`/`resources`/`resource_claims`, migration `051`) in [database.md](database.md).
 
 - **Admin — `Admin → Manage → Shared Resources` (`ResourcesManager.tsx`):** create/edit/hide/delete lists (title, description, optional **steward** — a group, department, *or* role, picked from one grouped dropdown; at most one, display context only — migration `052`), add/edit/delete items (name, note, quantity needed), per-item progress pill (gold while short, green `✓ n of m` when met) **with claimant names** under each item — the organizer always knows who to chase. A list's `visible` toggle keeps work-in-progress off the member surface.
-- **Member — `/signup` → "Bring Something" (`ResourceCommitments.tsx`):** visible lists (empty ones omitted) with per-item progress ("3 of 4 committed"); an **"I'll bring one"** button claims, after which the row shows −/+ steppers (quantities, so three coolers is one claim ×3; stepping to 0 unclaims). Over-fulfillment is allowed — a met need's button recedes but stays active. Toggling calls `router.refresh()` so the profile card updates.
+- **Member — `/signup` → "Bring Something" (`ResourceCommitments.tsx`, anchored `#bring`, above Your Groups):** visible lists (empty ones included — they're offer targets) with per-item progress ("3 of 4 committed"); an **"I'll bring one"** button claims, after which the row shows −/+ steppers (quantities, so three coolers is one claim ×3; stepping to 0 unclaims). Over-fulfillment is allowed — a met need's button recedes but stays active. Toggling calls `router.refresh()` so the profile card updates.
+- **Open-ended offers (migration `053`):** each list has a *"Have something that fits? ＋ Offer it"* footer → inline form (name + note) → `POST /api/resources/offers` creates an item with **no target** (`quantity_needed NULL`, `offered_by` = the member) plus the offerer's own ×1 claim. Offer rows show *"Offered by Sam"* (lavender, italic) and others can pile on with normal claims. Stepping your own offer's claim to 0 **retracts the listing** — unless others have claimed, in which case it's communal and stays. Admins see an *offered by* chip and either **edit a target onto it** (turns it into a tracked need, claims intact) or delete noise; leaving "Needed" blank in the item modal likewise authors an admin open callout. No approval queue — an offer is a listing, not a request.
+- **Home dashboard:** the **Bring Something banner** (fixed slim banner under Attunement) surfaces unmet needs while any exist — see Homepage → Member dashboard.
 - **Profile:** each claim renders as a `BRINGING` row on the **Active Commitments** card ("Camping Stove ×2 · Shared Kitchen", via `lib/resources.ts` → `getMemberResourceClaims`) and counts toward the header's Active Commitments stat.
 - A claim **is** the confirmation (no pledge→confirm workflow); totals are always derived from claim rows, never stored.
 

@@ -52,6 +52,21 @@ export default async function SignupPage() {
 
         <SignupSection />
 
+        {/* Shared resources — claim the gear you'll bring. Above groups: needs
+            are live and time-sensitive; group membership is a set-once choice. */}
+        <div id="bring" style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.25), transparent)', margin: '3rem 0 2rem' }} />
+
+        <div style={{ marginBottom: '1.5rem' }}>
+          <h2 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(1.4rem, 3vw, 2rem)', color: '#C8A848', margin: '0 0 0.5rem', letterSpacing: '0.06em' }}>
+            Bring Something
+          </h2>
+          <p style={{ fontSize: '0.9rem', opacity: 0.55, margin: 0, lineHeight: 1.6 }}>
+            The camp runs on what we carry in together. Claim the gear you can bring — you can change your mind anytime.
+          </p>
+        </div>
+
+        <ResourceCommitments />
+
         {/* Self-join groups, grouped by collection (Contributions, Skills, …) */}
         <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.25), transparent)', margin: '3rem 0 2rem' }} />
 
@@ -65,20 +80,6 @@ export default async function SignupPage() {
         </div>
 
         <GroupCommitments />
-
-        {/* Shared resources — claim the gear you'll bring */}
-        <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.25), transparent)', margin: '3rem 0 2rem' }} />
-
-        <div style={{ marginBottom: '1.5rem' }}>
-          <h2 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(1.4rem, 3vw, 2rem)', color: '#C8A848', margin: '0 0 0.5rem', letterSpacing: '0.06em' }}>
-            Bring Something
-          </h2>
-          <p style={{ fontSize: '0.9rem', opacity: 0.55, margin: 0, lineHeight: 1.6 }}>
-            The camp runs on what we carry in together. Claim the gear you can bring — you can change your mind anytime.
-          </p>
-        </div>
-
-        <ResourceCommitments />
 
       </main>
     </>

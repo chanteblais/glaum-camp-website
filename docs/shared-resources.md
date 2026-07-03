@@ -6,7 +6,7 @@ coolers, tools, shade structures, decor. Today that happens in spreadsheets and
 first-class concept: admins author **needs**, members meet them with one-click
 **claims**, and the totals take care of themselves.
 
-Built 2026-07-02 · migrations `051_shared_resources.sql` + `052_resource_list_stewards.sql`.
+Built 2026-07-02 · migrations `051_shared_resources.sql` + `052_resource_list_stewards.sql` + `053_resource_offers.sql`.
 
 ## The model
 
@@ -19,6 +19,10 @@ Three tables (see `docs/database.md`):
   migration `052`); display context only — not a permission gate. Plus a
   `visible` toggle so a half-authored list stays hidden.
 - **`resources`** — one item per row: name, optional note, `quantity_needed`.
+  A **NULL target = open callout** (migration `053`): either a member **offer**
+  (`offered_by` set — gear nobody asked for) or an admin-authored open ask.
+  Admins turn a useful offer into a tracked need by setting a target (claims
+  stay attached), or delete noise. No approval queue — an offer is a listing.
 - **`resource_claims`** — one row per member per resource (`UNIQUE`), carrying
   a `quantity`. Bringing three coolers = one row with quantity 3.
 
@@ -34,10 +38,20 @@ organizer wants, not an error).
   Groups / Departments / Roles optgroups), add/edit/delete items, and see
   per-item progress *with claimant names* — the organizer always knows who
   to chase.
-- **Member: `/signup` → "Bring Something"** (`ResourceCommitments.tsx`, below
-  Your Groups): visible lists with per-item progress and an **"I'll bring one"**
-  button; a claimed row grows −/+ steppers and a remove control. Unclaiming is
-  always allowed — plans change, and the count simply reflects reality.
+- **Member: `/signup` → "Bring Something"** (`ResourceCommitments.tsx`,
+  anchored `#bring`, **above** Your Groups — needs are live and time-sensitive,
+  group membership is set-once): visible lists with per-item progress and an
+  **"I'll bring one"** button; a claimed row grows −/+ steppers and a remove
+  control. Unclaiming is always allowed — plans change, and the count simply
+  reflects reality. Each list ends with *"Have something that fits? ＋ Offer
+  it"* → an inline form that lists unrequested gear (offer = item with no
+  target + the offerer's ×1 claim; retracting the claim removes the listing
+  unless others piled on).
+- **Home dashboard: the Bring Something banner** — a slim attention banner
+  (under the Attunement banner) that surfaces unmet needs ("still needed:
+  camping stove (1 more)…", top 3 + `+N more`) and deep-links to
+  `/signup#bring`. Demand-driven via `getUnmetResourceNeeds` (`lib/resources.ts`,
+  offers excluded): it disappears once everything is covered.
 - **Profile → Active Commitments**: each claim renders as a `BRINGING` row
   ("Camping Stove ×2 · Shared Kitchen") via `lib/resources.ts` →
   `getMemberResourceClaims`, and counts toward the Active Commitments stat.
@@ -50,8 +64,12 @@ organizer wants, not an error).
 - `PATCH/DELETE /api/admin/resources/[id]` — update / delete a list
 - `POST /api/admin/resources/items`, `PATCH/DELETE /api/admin/resources/items/[id]` — items
 - `GET /api/resources` — member view: visible lists + items + totals + own claim
+  + offer attribution
 - `POST /api/resources/claims` — `{ resource_id, quantity }`; quantity 0 removes
-  the claim, otherwise upserts. Quantity clamped to 1–99.
+  the claim, otherwise upserts. Quantity clamped to 1–99. Removing the last
+  claim on your own offer deletes the offer row (retraction).
+- `POST /api/resources/offers` — `{ list_id, name, note }`; creates the
+  open-callout item + the offerer's ×1 claim.
 
 ## Non-goals (deliberate, revisit post–What If)
 
@@ -64,9 +82,10 @@ organizer wants, not an error).
 - **No event scoping.** Lists implicitly belong to *the* event — a
   single-community assumption, logged in `docs/generalizability-log.md`.
   Multi-event/multi-tenant scoping is a foundation-phase concern.
-- **No offer side.** "I have a generator, does anyone need it?"
-  (member-suggested items) is a different flow. Admin authors needs; members
-  fulfill them.
-- **No pledge→confirm ceremony**, no reminders/nudges, no home-dashboard
-  unmet-needs teaser (natural follow-on), no per-item reordering UI
-  (creation order is the display order).
+- **No standalone offer workflow.** Offers exist (migration `053`) but as
+  plain items-without-targets inside existing lists — no approval queue, no
+  offer inbox, no separate offer entity. An offer that fits no list is the
+  organizer's cue to create a catch-all list ("Odds & Ends"), which needs
+  zero code.
+- **No pledge→confirm ceremony**, no reminders/nudges, no per-item reordering
+  UI (creation order is the display order).

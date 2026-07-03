@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   // Only items on a member-visible list can be claimed.
   const { data: resource } = await supabaseAdmin
     .from('resources')
-    .select('id, resource_lists(visible)')
+    .select('id, offered_by, resource_lists(visible)')
     .eq('id', resource_id)
     .maybeSingle()
   const list = Array.isArray(resource?.resource_lists) ? resource?.resource_lists[0] : resource?.resource_lists
@@ -33,6 +33,18 @@ export async function POST(req: NextRequest) {
       .eq('resource_id', resource_id)
       .eq('clerk_user_id', userId)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    // Retracting your own offer removes the listing too — unless others have
+    // piled on, in which case the item has become communal and stays.
+    if (resource.offered_by === userId) {
+      const { count } = await supabaseAdmin
+        .from('resource_claims')
+        .select('id', { count: 'exact', head: true })
+        .eq('resource_id', resource_id)
+      if ((count ?? 0) === 0) {
+        await supabaseAdmin.from('resources').delete().eq('id', resource_id)
+      }
+    }
   } else {
     const { error } = await supabaseAdmin
       .from('resource_claims')

@@ -1,5 +1,39 @@
 import { supabaseAdmin } from './supabase'
 
+// Unmet needs across visible lists, for the home-dashboard "Bring Something"
+// banner: items with a target (offers excluded) whose claims fall short.
+// Demand-driven — the banner renders nothing once everything is covered.
+export type UnmetNeed = { id: string; name: string; remaining: number }
+
+export async function getUnmetResourceNeeds(): Promise<UnmetNeed[]> {
+  const { data: lists, error } = await supabaseAdmin
+    .from('resource_lists')
+    .select('id')
+    .eq('visible', true)
+  // Table missing (pre-migration) → no banner rather than a crash.
+  if (error || !lists || lists.length === 0) return []
+
+  const { data: items } = await supabaseAdmin
+    .from('resources')
+    .select('id, name, quantity_needed, sort_order, created_at')
+    .in('list_id', lists.map(l => l.id))
+    .not('quantity_needed', 'is', null)
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true })
+  if (!items || items.length === 0) return []
+
+  const { data: claims } = await supabaseAdmin
+    .from('resource_claims')
+    .select('resource_id, quantity')
+    .in('resource_id', items.map(i => i.id))
+  const claimed: Record<string, number> = {}
+  for (const c of claims ?? []) claimed[c.resource_id] = (claimed[c.resource_id] ?? 0) + c.quantity
+
+  return items
+    .map(i => ({ id: i.id, name: i.name, remaining: (i.quantity_needed as number) - (claimed[i.id] ?? 0) }))
+    .filter(i => i.remaining > 0)
+}
+
 // A member's resource claims, shaped for the Active Commitments card
 // ("Camping Stove ×2 · Shared Kitchen"). Claims on hidden lists still show —
 // the member made the commitment; hiding a list gates discovery, not honesty.

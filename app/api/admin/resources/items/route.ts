@@ -18,7 +18,10 @@ export async function POST(req: NextRequest) {
   if (!list_id) return NextResponse.json({ error: 'list_id is required' }, { status: 400 })
   if (!name?.trim()) return NextResponse.json({ error: 'name is required' }, { status: 400 })
 
-  const needed = Math.max(1, Math.floor(Number(quantity_needed) || 1))
+  // Empty/null target = an open callout (no set need) — migration 053.
+  const needed = quantity_needed === '' || quantity_needed == null
+    ? null
+    : Math.max(1, Math.floor(Number(quantity_needed) || 1))
   const { data, error } = await supabaseAdmin
     .from('resources')
     .insert({
@@ -32,5 +35,5 @@ export async function POST(req: NextRequest) {
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json({ item: { ...data, claimed: 0, claimants: [] } })
+  return NextResponse.json({ item: { ...data, offered_by_name: null, claimed: 0, claimants: [] } })
 }

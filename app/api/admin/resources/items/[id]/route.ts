@@ -21,7 +21,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     patch.name = body.name.trim()
   }
   if ('note' in body) patch.note = body.note?.trim() || null
-  if ('quantity_needed' in body) patch.quantity_needed = Math.max(1, Math.floor(Number(body.quantity_needed) || 1))
+  // Empty/null target = open callout; setting a number turns a member offer
+  // into a real need (claims stay attached) — migration 053.
+  if ('quantity_needed' in body) {
+    patch.quantity_needed = body.quantity_needed === '' || body.quantity_needed == null
+      ? null
+      : Math.max(1, Math.floor(Number(body.quantity_needed) || 1))
+  }
   if ('sort_order' in body) patch.sort_order = Number(body.sort_order) || 0
 
   const { error } = await supabaseAdmin.from('resources').update(patch).eq('id', params.id)

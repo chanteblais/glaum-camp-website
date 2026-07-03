@@ -1,6 +1,6 @@
 # Database Schema
 
-All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations in `supabase-migrations/` document incremental changes (latest: `052`; all of `025`–`051` **applied in prod** as of 2026-07-02; `052` **not yet applied**). Confirm `025` (column renames), `029` (the `application-files` bucket), `033` (group messaging), `034`/`035` (group icon images + `group-badges` bucket, `badge_image` → `icon_image`), `036`–`038` (public profile fields, members/profiles, member distinctions), `039`–`041` (lead-up gatherings + notify/image), `042`–`044` (group collections + per-collection profile visibility + per-collection self-join), `045`–`047` (shifts redesign + shift times), and `048`/`049` (participation leads + per-event lead opt-in; the gathering halves are dropped by `050`) are applied before relying on those features.
+All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations in `supabase-migrations/` document incremental changes (latest: `053`; all of `025`–`051` **applied in prod** as of 2026-07-02; `052`–`053` **not yet applied**). Confirm `025` (column renames), `029` (the `application-files` bucket), `033` (group messaging), `034`/`035` (group icon images + `group-badges` bucket, `badge_image` → `icon_image`), `036`–`038` (public profile fields, members/profiles, member distinctions), `039`–`041` (lead-up gatherings + notify/image), `042`–`044` (group collections + per-collection profile visibility + per-collection self-join), `045`–`047` (shifts redesign + shift times), and `048`/`049` (participation leads + per-event lead opt-in; the gathering halves are dropped by `050`) are applied before relying on those features.
 
 ---
 
@@ -547,6 +547,7 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `050_scrap_gathering_leads.sql` | **Scrap gathering leads.** Leads become a **shifts-only** concept: drops `lead_up_event_rsvps.role` + `lead_up_events.needs_lead` (the gathering halves of 048/049). **Destructive by design** — discards any recorded gathering-lead offers. Idempotent via `IF EXISTS`. |
 | `051_shared_resources.sql` | **Shared resources.** `resource_lists` + `resources` + `resource_claims` — admin-authored needs ("4 camping stoves"), met by one-click member claims with quantities; totals always derived from claim rows. Additive + idempotent; **must be applied** before the feature works. See [`shared-resources.md`](./shared-resources.md). |
 | `052_resource_list_stewards.sql` | **Resource-list stewards beyond groups.** Adds `department_id` + `role_id` to `resource_lists` (both `ON DELETE SET NULL`) + an at-most-one-steward CHECK (`resource_lists_one_steward`, exclusive arc over group/department/role). Stewardship stays display-only. Additive + idempotent. |
+| `053_resource_offers.sql` | **Open-ended resource offers.** `resources.quantity_needed` becomes **nullable** (NULL = open callout, no set target) + adds `offered_by TEXT` (the member who listed it; NULL = admin-authored). Members offer unlisted gear; admins edit a target on (→ tracked need) or delete. Additive + idempotent. |
 
 ---
 
@@ -607,7 +608,7 @@ A named collection of shared-resource needs ("Shared Kitchen", "Setup Equipment"
 
 ### `resources`
 
-One needed item per row within a list.
+One item per row within a list — either a **need** (has a target) or an **open offer/callout** (no target, migration `053`).
 
 | Column | Type | Notes |
 |---|---|---|
@@ -615,7 +616,8 @@ One needed item per row within a list.
 | `list_id` | UUID FK → `resource_lists.id` (ON DELETE CASCADE) | |
 | `name` | TEXT | e.g. "Camping stove" |
 | `note` | TEXT | optional, e.g. "two-burner, with propane" |
-| `quantity_needed` | INT | ≥ 1 |
+| `quantity_needed` | INT | ≥ 1, **or NULL** = open callout with no set target (migration `053`). Admin setting a number on a member offer turns it into a tracked need |
+| `offered_by` | TEXT | clerk_user_id of the member who offered it; NULL = admin-authored (migration `053`). A member retracting their own offer's claim deletes the row if nobody else has claimed |
 | `sort_order` | INT | default 0; display falls back to `created_at` |
 
 ---

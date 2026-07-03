@@ -26,7 +26,7 @@ export async function GET() {
 
   const { data: items } = await supabaseAdmin
     .from('resources')
-    .select('id, list_id, name, note, quantity_needed, sort_order')
+    .select('id, list_id, name, note, quantity_needed, offered_by, sort_order')
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: true })
 
@@ -34,7 +34,10 @@ export async function GET() {
     .from('resource_claims')
     .select('resource_id, clerk_user_id, quantity')
 
-  const names = await memberDisplayNames((claims ?? []).map(c => c.clerk_user_id))
+  const names = await memberDisplayNames([
+    ...(claims ?? []).map(c => c.clerk_user_id),
+    ...(items ?? []).map(i => i.offered_by).filter(Boolean) as string[],
+  ])
 
   const claimsByResource: Record<string, { name: string; quantity: number }[]> = {}
   for (const c of claims ?? []) {
@@ -49,6 +52,8 @@ export async function GET() {
     const itemClaims = claimsByResource[it.id] ?? []
     ;(itemsByList[it.list_id] ??= []).push({
       ...it,
+      // NULL quantity_needed = open member offer (migration 053).
+      offered_by_name: it.offered_by ? names[it.offered_by] ?? 'Unknown member' : null,
       claimed: itemClaims.reduce((s, c) => s + c.quantity, 0),
       claimants: itemClaims,
     })

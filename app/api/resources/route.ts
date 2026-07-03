@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { memberDisplayNames } from '@/lib/member-names'
 
 // Member view of shared resources: every VISIBLE list with its items, the
 // community-wide claimed total per item, and the caller's own claim quantity.
@@ -23,10 +24,13 @@ export async function GET() {
   const listIds = lists.map(l => l.id)
   const { data: items } = await supabaseAdmin
     .from('resources')
-    .select('id, list_id, name, note, quantity_needed, sort_order')
+    .select('id, list_id, name, note, quantity_needed, offered_by, sort_order')
     .in('list_id', listIds)
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: true })
+
+  // Offer attribution ("offered by Sam") — the one place member names surface here.
+  const offererNames = await memberDisplayNames((items ?? []).map(i => i.offered_by).filter(Boolean) as string[])
 
   const itemIds = (items ?? []).map(i => i.id)
   const claimTotals: Record<string, number> = {}
@@ -48,9 +52,12 @@ export async function GET() {
       id: it.id,
       name: it.name,
       note: it.note,
+      // NULL = open offer (no target) — migration 053.
       needed: it.quantity_needed,
       claimed: claimTotals[it.id] ?? 0,
       mine: mine[it.id] ?? 0,
+      offered_by_name: it.offered_by ? offererNames[it.offered_by] ?? 'a member' : null,
+      offered_by_me: it.offered_by === userId,
     })
   }
 
@@ -67,8 +74,8 @@ export async function GET() {
         // At most one steward FK is set (migration 052) — group, department, or role.
         steward_name: embedName(l.groups) ?? embedName(l.departments) ?? embedName(l.roles),
         items: itemsByList[l.id] ?? [],
-      }))
-      // An empty list is admin work-in-progress; don't show members a bare heading.
-      .filter(l => (l.items as unknown[]).length > 0),
+      })),
+    // Empty visible lists stay: they're valid offer targets (e.g. a catch-all
+    // "Odds & Ends" list) — hiding work-in-progress is what `visible` is for.
   })
 }

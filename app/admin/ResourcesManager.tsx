@@ -9,7 +9,9 @@ type ResourceItem = {
   list_id: string
   name: string
   note: string | null
-  quantity_needed: number
+  // NULL = open callout (member offer, or an admin-authored no-target ask) — migration 053.
+  quantity_needed: number | null
+  offered_by_name: string | null
   sort_order: number
   claimed: number
   claimants: Claimant[]
@@ -35,7 +37,7 @@ type StewardOptions = {
 
 // Steward encoded as one select value: '' | 'group:<id>' | 'department:<id>' | 'role:<id>'.
 type ListDraft = { title: string; description: string; steward: string; visible: boolean }
-type ItemDraft = { name: string; note: string; quantity_needed: number }
+type ItemDraft = { name: string; note: string; quantity_needed: number | '' }
 
 const stewardValue = (l: { group_id: string | null; department_id: string | null; role_id: string | null }) =>
   l.group_id ? `group:${l.group_id}` : l.department_id ? `department:${l.department_id}` : l.role_id ? `role:${l.role_id}` : ''
@@ -191,12 +193,18 @@ function ItemModal({ initial, isCreate, onSave, onClose, saving, error }: {
           <input style={inputStyle} value={form.name} placeholder="e.g. Camping stove" onChange={e => set('name', e.target.value)} />
         </Field>
         <Field label="Needed">
-          <input style={inputStyle} type="number" min={1} max={99} value={form.quantity_needed} onChange={e => set('quantity_needed', Math.max(1, Math.min(99, Math.floor(Number(e.target.value) || 1))))} />
+          <input
+            style={inputStyle} type="number" min={1} max={99} value={form.quantity_needed} placeholder="—"
+            onChange={e => set('quantity_needed', e.target.value === '' ? '' : Math.max(1, Math.min(99, Math.floor(Number(e.target.value) || 1))))}
+          />
         </Field>
       </div>
       <Field label="Note (optional)">
         <input style={inputStyle} value={form.note} placeholder="e.g. two-burner, with propane" onChange={e => set('note', e.target.value)} />
       </Field>
+      <p style={{ fontSize: '0.72rem', opacity: 0.4, margin: '-0.5rem 0 1rem', lineHeight: 1.5 }}>
+        Leave “Needed” blank for an open callout (no set target). Setting a number on a member offer turns it into a tracked need — claims stay attached.
+      </p>
       {error && <p style={{ color: '#ff8a8a', fontSize: '0.82rem', marginBottom: '0.75rem' }}>{error}</p>}
       <ModalActions onCancel={onClose} onSave={() => onSave(form)} saving={saving} disabled={!form.name.trim()} saveLabel="Save item" />
     </Modal>
@@ -205,7 +213,15 @@ function ItemModal({ initial, isCreate, onSave, onClose, saving, error }: {
 
 // Per-item progress pill: gold while short, green once the need is met.
 // Over-fulfillment shows as-is (5 of 4) — information, not an error.
-function ProgressPill({ claimed, needed }: { claimed: number; needed: number }) {
+// No target (open callout / member offer) → a lavender count of what's coming.
+function ProgressPill({ claimed, needed }: { claimed: number; needed: number | null }) {
+  if (needed === null) {
+    return (
+      <span style={{ fontSize: '0.72rem', color: '#D9B8E8', border: '1px solid rgba(210,57,248,0.3)', borderRadius: '9999px', padding: '0.15rem 0.6rem', whiteSpace: 'nowrap', flexShrink: 0 }}>
+        {claimed} offered
+      </span>
+    )
+  }
   const met = claimed >= needed
   const color = met ? '#7dcf8e' : '#C8A848'
   const border = met ? 'rgba(100,200,120,0.35)' : 'rgba(200,168,72,0.3)'
@@ -377,6 +393,11 @@ export function ResourcesManager() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontSize: '0.84rem', color: '#F3EDE6', margin: 0 }}>
                     {item.name}
+                    {item.offered_by_name && (
+                      <span style={{ marginLeft: '0.5rem', fontSize: '0.6rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#D9B8E8', border: '1px solid rgba(210,57,248,0.3)', borderRadius: '9999px', padding: '0.1rem 0.5rem', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                        offered by {item.offered_by_name}
+                      </span>
+                    )}
                     {item.note && <span style={{ opacity: 0.45, fontSize: '0.74rem' }}> — {item.note}</span>}
                   </p>
                   {item.claimants.length > 0 && (
@@ -394,7 +415,7 @@ export function ResourcesManager() {
             ))}
             {list.items.length === 0 && (
               <p style={{ fontSize: '0.74rem', opacity: 0.3, fontStyle: 'italic', margin: 0, padding: '0.5rem 1rem 0.75rem' }}>
-                No items yet — add one to make this list mean something. Empty lists stay hidden from members.
+                No items yet. Visible empty lists still show to members as a place to offer gear.
               </p>
             )}
           </div>
@@ -418,7 +439,7 @@ export function ResourcesManager() {
       {(modal?.kind === 'add-item' || modal?.kind === 'edit-item') && (
         <ItemModal
           initial={modal.kind === 'edit-item'
-            ? { name: modal.item.name, note: modal.item.note ?? '', quantity_needed: modal.item.quantity_needed }
+            ? { name: modal.item.name, note: modal.item.note ?? '', quantity_needed: modal.item.quantity_needed ?? '' }
             : blankItem()}
           isCreate={modal.kind === 'add-item'}
           onSave={handleSaveItem}
