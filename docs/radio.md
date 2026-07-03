@@ -95,8 +95,13 @@ in case member moments come back.
 - **Home dashboard teaser** — the `activity` widget ("On the Air") shows the
   latest 6 posts and links to `/radio` (replaced the old joins/profile-updates
   feed — joins now *are* Radio welcomes).
-- **Admin → Program → Radio** (`RadioManager`) — compose broadcasts, toggle
-  the automatic sources, and curate: **any** post can be removed.
+- **Admin → Community → Communication → Radio** (`RadioManager`, a collapsed
+  section on `/admin` beside Announcements — curating the feed is
+  communication work, not programming; re-homed out of Program 2026-07-03) —
+  compose broadcasts, toggle the automatic sources, and curate: **any** post
+  can be removed. (The tab is still "Members" on this branch; it renames to
+  "Community" on `feat/community-tab`, which also moves Shared Resources
+  there under Logistics.)
 
 ## Data
 

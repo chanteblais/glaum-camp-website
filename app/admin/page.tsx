@@ -10,11 +10,18 @@ import { AdminNav } from './AdminNav'
 import { CategoryHeading } from './CategoryHeading'
 import { MEMBERS_CATEGORIES } from './admin-sections'
 import { AnnouncementsManager } from './AnnouncementsManager'
+import { RadioManager } from './RadioManager'
 import { getGroupNamesByUser } from '@/lib/groups'
 import { getShiftEventByUser } from '@/lib/shift-signups'
 import { getAdminRunway } from '@/lib/admin-attention'
+import { parseRadioSources } from '@/lib/radio'
+import { getAdminRadioEvents } from '@/lib/admin-program-data'
 import { RoleRequestsSection } from './RoleRequestsSection'
 import { RoleSuggestionsSection } from './RoleSuggestionsSection'
+
+// A failed section fetch degrades to undefined — the manager then runs its own
+// mount fetch and shows its usual retry UI instead of the whole page erroring.
+const safe = <T,>(p: Promise<T>): Promise<T | undefined> => p.catch(() => undefined)
 
 export default async function AdminPage() {
   const { userId } = await auth()
@@ -29,6 +36,8 @@ export default async function AdminPage() {
     signupEventMap,
     runway,
     { data: notifications, error: notificationsError },
+    radioEvents,
+    { data: radioConfigRow },
   ] = await Promise.all([
     supabaseAdmin
       .from('volunteers')
@@ -47,6 +56,12 @@ export default async function AdminPage() {
       .select('id, application_id, event_type, message, details, created_at, read_at')
       .order('created_at', { ascending: false })
       .limit(20),
+    safe(getAdminRadioEvents()),
+    supabaseAdmin
+      .from('page_content')
+      .select('value')
+      .eq('key', 'config_radio')
+      .maybeSingle(),
   ])
 
   const volunteers = volunteersRaw ?? []
@@ -223,6 +238,17 @@ export default async function AdminPage() {
           defaultOpen={false}
         >
           <AnnouncementsManager />
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          title="Radio"
+          summary={radioEvents ? `${radioEvents.length} post${radioEvents.length === 1 ? '' : 's'} in the feed` : 'Curate the community feed'}
+          defaultOpen={false}
+        >
+          <RadioManager
+            initialEvents={radioEvents}
+            initialSources={parseRadioSources(radioConfigRow?.value)}
+          />
         </CollapsibleSection>
 
       </div>
