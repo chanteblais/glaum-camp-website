@@ -49,7 +49,7 @@ New table `lead_up_events` — deliberately lighter than `schedule_events`:
 | `location` | TEXT | physical place — optional |
 | `link` | TEXT | virtual link (Zoom/Meet) — brainstorms are often remote; optional |
 | `host` | TEXT | who's running it — optional |
-| `image_url` | TEXT | optional banner image (public `lead-up-images` bucket, migration `041`); shown on the /schedule cards, the home-dashboard teaser (thumbnail), + announcement email |
+| `image_url` | TEXT | optional banner image (public `lead-up-images` bucket, migration `041`); shown on the home-dashboard teaser (thumbnail) + announcement email. **Not** rendered on the `/schedule` "Before We Gather" cards — those are image-free (engraved row: date · gold hairline · details · RSVP) as of the 2026-07-03 redesign |
 | `visible` | BOOL | admin show/hide |
 | `sort_order` | INT | |
 

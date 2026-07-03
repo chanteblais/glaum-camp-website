@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { clockRangeLabel } from '@/lib/shift-hours'
-import { supabaseResizedUrl } from '@/lib/supabase-image'
 
 export type LeadUpEvent = {
   id: string
@@ -87,6 +86,25 @@ export function LeadUpGatherings({ initialEvents }: {
 
   return (
     <div style={{ marginBottom: '3.5rem' }}>
+      {/* Inline <style> must use dangerouslySetInnerHTML (React escapes children →
+          hydration mismatch on the child combinator + media query). */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        .leadup-card { display: flex; align-items: center; gap: 1.1rem;
+          border-radius: 1rem; border: 1px solid rgba(200,168,72,0.28);
+          background: rgba(10,0,20,0.45); padding: 0.9rem 1.2rem; }
+        .leadup-divider { width: 1px; align-self: stretch; flex-shrink: 0;
+          background: linear-gradient(to bottom, transparent, rgba(200,168,72,0.32), transparent); }
+        .leadup-body { flex: 1; min-width: 0; }
+        .leadup-rsvp-col { flex-shrink: 0; display: flex; flex-direction: column;
+          align-items: flex-end; gap: 0.35rem; }
+        @media (max-width: 640px) {
+          .leadup-card { flex-wrap: wrap; align-items: flex-start;
+            gap: 0.7rem 0.9rem; padding: 0.85rem 1rem; }
+          .leadup-divider { display: none; }
+          .leadup-body { flex: 1 1 60%; }
+          .leadup-rsvp-col { flex: 1 1 100%; align-items: flex-start; }
+        }
+      ` }} />
       <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '0.78rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.9, textAlign: 'center', margin: '0 0 0.4rem' }}>
         Before We Gather
       </p>
@@ -99,28 +117,23 @@ export function LeadUpGatherings({ initialEvents }: {
           const { weekday, date } = formatDate(ev.event_date)
           const time = timeLabel(ev)
           return (
-            <div key={ev.id} style={{
-              borderRadius: '1rem', overflow: 'hidden',
-              border: '1px solid rgba(200,168,72,0.2)', background: 'rgba(10,0,20,0.45)',
-            }}>
-              {ev.image_url && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={supabaseResizedUrl(ev.image_url, 800, 340) ?? ''} alt="" style={{ width: '100%', height: '170px', objectFit: 'cover', display: 'block', borderBottom: '1px solid rgba(200,168,72,0.15)' }} />
-              )}
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.1rem', padding: '1.1rem 1.25rem' }}>
+            <div key={ev.id} className="leadup-card">
               {/* Date block */}
               <div style={{
-                flexShrink: 0, width: '64px', textAlign: 'center',
-                padding: '0.5rem 0.4rem', border: '1px solid rgba(200,168,72,0.25)',
+                flexShrink: 0, width: '66px', textAlign: 'center',
+                padding: '0.55rem 0.45rem', border: '1px solid rgba(200,168,72,0.25)',
                 borderRadius: '0.6rem', background: 'rgba(200,168,72,0.07)',
               }}>
-                <p style={{ fontSize: '0.58rem', letterSpacing: '0.1em', color: '#C8A848', opacity: 0.65, margin: '0 0 0.15rem' }}>{weekday}</p>
-                <p style={{ fontSize: '0.78rem', color: '#C8A848', margin: 0, letterSpacing: '0.02em' }}>{date}</p>
+                <p style={{ fontSize: '0.58rem', letterSpacing: '0.12em', color: '#C8A848', opacity: 0.65, margin: '0 0 0.18rem' }}>{weekday}</p>
+                <p style={{ fontSize: '0.86rem', color: '#C8A848', margin: 0, letterSpacing: '0.02em' }}>{date}</p>
               </div>
 
+              {/* Gold hairline (hidden on mobile) */}
+              <div className="leadup-divider" />
+
               {/* Body */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: '1rem', color: '#EDE0C8', margin: '0 0 0.25rem', fontFamily: 'TokyoDreams, serif' }}>{ev.title}</p>
+              <div className="leadup-body">
+                <p style={{ fontSize: '1.05rem', color: '#EDE0C8', margin: '0 0 0.25rem', fontFamily: 'TokyoDreams, serif' }}>{ev.title}</p>
                 {(time || ev.location || ev.host) && (
                   <p style={{ fontSize: '0.75rem', color: '#C8A848', opacity: 0.6, margin: '0 0 0.4rem' }}>
                     {[time, ev.location, ev.host && `with ${ev.host}`].filter(Boolean).join('  ·  ')}
@@ -137,7 +150,7 @@ export function LeadUpGatherings({ initialEvents }: {
               </div>
 
               {/* RSVP */}
-              <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.35rem' }}>
+              <div className="leadup-rsvp-col">
                 <button
                   onClick={() => toggleRsvp(ev)}
                   disabled={pending === ev.id}
@@ -154,10 +167,9 @@ export function LeadUpGatherings({ initialEvents }: {
                 </button>
                 {ev.rsvp_count > 0 && (
                   <span style={{ fontSize: '0.68rem', opacity: 0.4 }}>
-                    {ev.rsvp_count} {ev.rsvp_count === 1 ? 'going' : 'going'}
+                    {ev.rsvp_count} going
                   </span>
                 )}
-              </div>
               </div>
             </div>
           )
