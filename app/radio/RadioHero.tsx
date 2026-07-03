@@ -26,17 +26,25 @@ function WavesMark() {
   )
 }
 
-// The ornamental rule — hairline with a four-point diamond at its heart,
-// fading to nothing at its right end so the frequency band can pick the
-// line up mid-air.
+// The ornamental rule — one CONTINUOUS hairline (no break) with the
+// four-point diamond sitting on it, easing out at its right end where the
+// frequency band takes the line over.
 function DiamondRule() {
   return (
-    <div aria-hidden style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', width: '100%' }}>
-      <span style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(200,168,72,0.55), rgba(200,168,72,0.3))' }} />
-      <svg width="12" height="12" viewBox="0 0 12 12" fill={GOLD} opacity="0.85" aria-hidden style={{ flexShrink: 0 }}>
+    <div aria-hidden style={{ position: 'relative', width: '100%', height: '12px', display: 'flex', alignItems: 'center' }}>
+      <span
+        style={{
+          width: '100%',
+          height: '1px',
+          background: 'linear-gradient(90deg, rgba(200,168,72,0.55), rgba(200,168,72,0.4) 80%, rgba(200,168,72,0) 100%)',
+        }}
+      />
+      <svg
+        width="12" height="12" viewBox="0 0 12 12" fill={GOLD} opacity="0.9" aria-hidden
+        style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}
+      >
         <path d="M6 0 l1.6 4.4 4.4 1.6 -4.4 1.6 L6 12 4.4 7.6 0 6 l4.4 -1.6 Z" />
       </svg>
-      <span style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(200,168,72,0.3), rgba(200,168,72,0))' }} />
     </div>
   )
 }
@@ -148,14 +156,14 @@ function Waveform() {
         {/* the line fades in from the left edge (picking up the rule's
             hand-off) and out to the right */}
         <linearGradient id="radio-fade" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor={LINE} stopOpacity="0" />
-          <stop offset="0.14" stopColor={LINE} stopOpacity="1" />
+          <stop offset="0" stopColor={LINE} stopOpacity="0.35" />
+          <stop offset="0.05" stopColor={LINE} stopOpacity="1" />
           <stop offset="0.92" stopColor={LINE} stopOpacity="1" />
           <stop offset="1" stopColor={LINE} stopOpacity="0" />
         </linearGradient>
         <linearGradient id="radio-fade-core" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor={LINE_CORE} stopOpacity="0" />
-          <stop offset="0.14" stopColor={LINE_CORE} stopOpacity="0.55" />
+          <stop offset="0" stopColor={LINE_CORE} stopOpacity="0.2" />
+          <stop offset="0.05" stopColor={LINE_CORE} stopOpacity="0.55" />
           <stop offset="0.92" stopColor={LINE_CORE} stopOpacity="0.55" />
           <stop offset="1" stopColor={LINE_CORE} stopOpacity="0" />
         </linearGradient>
@@ -188,6 +196,8 @@ function Waveform() {
         <path d={smoothPath(ghost(11, 0.92))} stroke="url(#radio-fade)" strokeWidth="1.2" opacity="0.28" />
         <path d={smoothPath(ghost(-9, 0.8))} stroke="url(#radio-fade)" strokeWidth="1" opacity="0.18" />
         <path d={smoothPath(ghost(22, 0.7))} stroke="url(#radio-fade)" strokeWidth="0.9" opacity="0.12" />
+        <path d={smoothPath(ghost(-18, 0.62))} stroke="url(#radio-fade)" strokeWidth="0.8" opacity="0.1" />
+        <path d={smoothPath(ghost(32, 0.85))} stroke="url(#radio-fade)" strokeWidth="0.8" opacity="0.09" />
 
         {/* the pulse — glow underlay, amber ribbon, bright core. The mock's
             line is proportionally substantial (~2px on a 570px-wide band):
@@ -226,27 +236,28 @@ export function RadioHero() {
           margin: 1rem 0 0.9rem;
         }
         .radio-rule {
-          width: 40%;
+          width: 46%;
           min-width: 15rem;
         }
+        /* the band's left tip starts exactly where the rule ends */
         .radio-hero-wave {
           position: absolute;
-          left: 44%;
-          right: 0;
+          left: 46%;
+          right: 4%;
           top: 50%;
           transform: translateY(-50%);
           pointer-events: none;
         }
         @media (max-width: 700px) {
-          .radio-rule { width: 62%; min-width: 0; }
-          .radio-hero-wave { left: 50%; right: 0; }
+          .radio-rule { width: 55%; min-width: 0; }
+          .radio-hero-wave { left: 55%; right: 0; }
         }
       ` }} />
 
       <h1
         style={{
           fontFamily: 'var(--font-cormorant-garamond), serif',
-          fontWeight: 400,
+          fontWeight: 300,
           fontSize: 'clamp(2.4rem, 6.5vw, 3.5rem)',
           color: GOLD,
           margin: 0,
