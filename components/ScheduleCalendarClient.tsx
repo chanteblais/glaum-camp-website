@@ -68,7 +68,7 @@ function parseMinutes(str: string): number | null {
   const m = parseInt(match[2])
   const ap = match[3].toUpperCase()
   if (ap === 'PM' && h !== 12) h += 12
-  if (ap === 'AM' && h === 12) h = 24 // midnight → treat as end of day
+  if (ap === 'AM' && h === 12) h = 0
   return h * 60 + m
 }
 
@@ -76,7 +76,10 @@ function parseEventTimes(timeStr: string | null): { start: number | null; end: n
   if (!timeStr) return { start: null, end: null }
   const parts = timeStr.split(/\s*[–—-]\s*/)
   const start = parseMinutes(parts[0])
-  const end = parts[1] ? parseMinutes(parts[1]) : null
+  let end = parts[1] ? parseMinutes(parts[1]) : null
+  // Overnight events ("11:00 PM – 2:00 AM") wrap past midnight; without this the
+  // early-morning end time stretches the grid's start back to 1 AM.
+  if (start !== null && end !== null && end <= start) end += 24 * 60
   return { start, end }
 }
 
