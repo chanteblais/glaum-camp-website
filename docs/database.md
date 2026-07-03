@@ -1,6 +1,6 @@
 # Database Schema
 
-All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations in `supabase-migrations/` document incremental changes (latest: `054`; all of `025`–`051` **applied in prod** as of 2026-07-02; `052`–`054` **not yet applied**). Confirm `025` (column renames), `029` (the `application-files` bucket), `033` (group messaging), `034`/`035` (group icon images + `group-badges` bucket, `badge_image` → `icon_image`), `036`–`038` (public profile fields, members/profiles, member distinctions), `039`–`041` (lead-up gatherings + notify/image), `042`–`044` (group collections + per-collection profile visibility + per-collection self-join), `045`–`047` (shifts redesign + shift times), and `048`/`049` (participation leads + per-event lead opt-in; the gathering halves are dropped by `050`) are applied before relying on those features.
+All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations in `supabase-migrations/` document incremental changes (latest: `055`; all of `025`–`055` **applied in prod** as of 2026-07-02). Confirm `025` (column renames), `029` (the `application-files` bucket), `033` (group messaging), `034`/`035` (group icon images + `group-badges` bucket, `badge_image` → `icon_image`), `036`–`038` (public profile fields, members/profiles, member distinctions), `039`–`041` (lead-up gatherings + notify/image), `042`–`044` (group collections + per-collection profile visibility + per-collection self-join), `045`–`047` (shifts redesign + shift times), and `048`/`049` (participation leads + per-event lead opt-in; the gathering halves are dropped by `050`) are applied before relying on those features.
 
 ---
 
@@ -232,7 +232,7 @@ Public camp schedule entries. **Reworked by the shifts redesign** (see [shifts-r
 |---|---|---|
 | `id` | UUID PK | |
 | `day` | TEXT | Weekday label (e.g. `"Thursday"`) — **derived from `event_date`** on save (admin API), never set by hand |
-| `time` | TEXT | Display time string. For shift events it's derived from `start_time`/`end_time` (`formatShiftRange`) |
+| `time` | TEXT | Display time string, **derived** from `start_time`/`end_time` (`formatShiftRange`) on every save — never typed by hand (free-text time entry removed with `054`) |
 | `title` | TEXT | |
 | `subtitle` | TEXT | |
 | `detail_desc` | TEXT | Expanded description |
@@ -245,7 +245,7 @@ Public camp schedule entries. **Reworked by the shifts redesign** (see [shifts-r
 | `participation_type` | TEXT | `'general'` (optional/info) / `'shift'` (signable slots) / `'mandatory'` (everyone attends). Migration `046` |
 | `shift_type_id` | UUID FK → `shift_types.id` | Which kind of shift this slot is (shift events only). `ON DELETE SET NULL`. Migration `046` |
 | `requires_ack` | BOOL | Mandatory events only: whether members must acknowledge ("I'll be there"). Per-event toggle; ack flow not yet built member-side. Migration `045` |
-| `start_time` / `end_time` | TEXT | `"HH:MM"` 24-hour (shift events only). Duration = `shiftDurationHours` (`lib/shift-hours.ts`) — what counts toward hours requirements. Migration `047` |
+| `start_time` / `end_time` | TEXT | `"HH:MM"` 24-hour, **on every event** (was shift-only until `054`; backfilled from the old free-text `time` by `054`). Editor requires a start on all events, an end on shifts. Duration = `shiftDurationHours` (`lib/shift-hours.ts`) — what counts toward hours requirements. Migrations `047` + `054` |
 | `needs_lead` | BOOL | Whether this shift has a lead role (organizer's call at creation; shift events only). Gates all member lead affordances; the offer appears in the signup confirm. Migration `049` |
 | `capacity` | INT | Shift events only: max signups per slot. NULL = unlimited |
 | `event_type` | TEXT | **Legacy** (`'all_hands'`/`'camp_tending'`/`'service'`). No longer set by hand — derived (`'all_hands'` for mandatory) by `lib/event-type-compat.ts` for old readers. Drop in final cleanup |
@@ -548,7 +548,8 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `051_shared_resources.sql` | **Shared resources.** `resource_lists` + `resources` + `resource_claims` — admin-authored needs ("4 camping stoves"), met by one-click member claims with quantities; totals always derived from claim rows. Additive + idempotent; **must be applied** before the feature works. See [`shared-resources.md`](./shared-resources.md). |
 | `052_resource_list_stewards.sql` | **Resource-list stewards beyond groups.** Adds `department_id` + `role_id` to `resource_lists` (both `ON DELETE SET NULL`) + an at-most-one-steward CHECK (`resource_lists_one_steward`, exclusive arc over group/department/role). Stewardship stays display-only. Additive + idempotent. |
 | `053_resource_offers.sql` | **Open-ended resource offers.** `resources.quantity_needed` becomes **nullable** (NULL = open callout, no set target) + adds `offered_by TEXT` (the member who listed it; NULL = admin-authored). Members offer unlisted gear; admins edit a target on (→ tracked need) or delete. Additive + idempotent. |
-| `054_resource_item_icons.sql` | **Resource item icons.** `resources.icon TEXT` — optional image reference (asset-library path or uploaded `group-badges` URL, `resources/` prefix), following the `departments.icon` idiom. Additive + idempotent. |
+| `054_structured_event_times.sql` | **Structured event times everywhere.** Data-only (no schema change): backfills `schedule_events.start_time`/`end_time` from the free-text `time` (fills NULLs only) and converts `lead_up_events.start_time`/`end_time` display strings ("6:00 PM") to `"HH:MM"` in place. Unparseable values are left untouched (code renders them as-is via `clockLabel`). Idempotent. |
+| `055_resource_item_icons.sql` | **Resource item icons.** `resources.icon TEXT` — optional image reference (asset-library path or uploaded `group-badges` URL, `resources/` prefix), following the `departments.icon` idiom. Additive + idempotent. *(Was briefly numbered 054 on the branch; renumbered at merge — 054 was taken by structured event times.)* |
 
 ---
 
@@ -561,9 +562,9 @@ Real-dated planning/brainstorming gatherings on the runway to the event — deli
 | `id` | UUID PK | |
 | `title` | TEXT | |
 | `description` | TEXT | |
-| `event_date` | DATE | real calendar date (not a camp-relative slot label); NULL = TBD |
-| `start_time` | TEXT | display time string |
-| `end_time` | TEXT | optional |
+| `event_date` | DATE | real calendar date (not a camp-relative slot label). NULL = TBD on legacy rows; the editor now **requires** a date (the admin month calendar needs one to place the gathering) |
+| `start_time` | TEXT | `"HH:MM"` 24-hour since `054` (was a display string like `"6:00 PM"`); **required** by the editor. Rendered via `clockLabel` (`lib/shift-hours.ts`), which passes unconverted legacy strings through |
+| `end_time` | TEXT | optional, same `"HH:MM"` format |
 | `location` | TEXT | physical place (optional) |
 | `link` | TEXT | virtual link, e.g. Zoom/Meet (optional) |
 | `host` | TEXT | who's running it (optional) |
@@ -619,7 +620,7 @@ One item per row within a list — either a **need** (has a target) or an **open
 | `note` | TEXT | optional, e.g. "two-burner, with propane" |
 | `quantity_needed` | INT | ≥ 1, **or NULL** = open callout with no set target (migration `053`). Admin setting a number on a member offer turns it into a tracked need |
 | `offered_by` | TEXT | clerk_user_id of the member who offered it; NULL = admin-authored (migration `053`). A member retracting their own offer's claim deletes the row if nobody else has claimed |
-| `icon` | TEXT | optional icon image reference (asset-library path or uploaded `group-badges` URL, `resources/` prefix — migration `054`); shown on member cards, admin rows, and profile BRINGING rows |
+| `icon` | TEXT | optional icon image reference (asset-library path or uploaded `group-badges` URL, `resources/` prefix — migration `055`); shown on member cards, admin rows, and profile BRINGING rows |
 | `sort_order` | INT | default 0; display falls back to `created_at` |
 
 ---

@@ -6,7 +6,7 @@ coolers, tools, shade structures, decor. Today that happens in spreadsheets and
 first-class concept: admins author **needs**, members meet them with one-click
 **claims**, and the totals take care of themselves.
 
-Built 2026-07-02 · migrations `051_shared_resources.sql` + `052_resource_list_stewards.sql` + `053_resource_offers.sql`.
+Built 2026-07-02 · migrations `051_shared_resources.sql` + `052_resource_list_stewards.sql` + `053_resource_offers.sql` + `055_resource_item_icons.sql`.
 
 ## The model
 
@@ -36,7 +36,7 @@ organizer wants, not an error).
 - **Admin → Manage → Program → Shared Resources** (`ResourcesManager.tsx`):
   create/edit/hide/delete lists (steward picked from one dropdown with
   Groups / Departments / Roles optgroups), add/edit/delete items (incl. an
-  optional **icon** via the shared `AssetImagePicker` — migration `054`,
+  optional **icon** via the shared `AssetImagePicker` — migration `055`,
   `resources.icon`, departments idiom), and see per-item progress *with
   claimant names* — the organizer always knows who to chase.
 - **Member: `/participate` → "Bring Something"** (`ResourceCommitments.tsx`,

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { clockRangeLabel } from '@/lib/shift-hours'
 
 type LeadUpEvent = {
   id: string
@@ -29,7 +30,9 @@ function formatDate(d: string | null): { weekday: string; date: string } {
 }
 
 function timeLabel(ev: LeadUpEvent): string {
-  return [ev.start_time, ev.end_time].filter(Boolean).join(' – ')
+  // Times are stored "HH:MM" (24h); clockRangeLabel formats them for display
+  // and passes legacy display strings through untouched.
+  return clockRangeLabel(ev.start_time, ev.end_time)
 }
 
 export function LeadUpGatherings() {
