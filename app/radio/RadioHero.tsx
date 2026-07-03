@@ -181,12 +181,13 @@ function Waveform() {
           <stop offset="0.92" stopColor={LINE} stopOpacity="0.14" />
           <stop offset="1" stopColor={LINE} stopOpacity="0.02" />
         </linearGradient>
-        {/* the silk: visible only in the final act, for the finest strands */}
+        {/* the silk: visible only in the final act, for the finest strands —
+            capped below the main line's fade so no strand outshines it */}
         <linearGradient id="radio-fade-silk" x1="0" y1="0" x2="1" y2="0">
           <stop offset="0.55" stopColor={LINE} stopOpacity="0" />
-          <stop offset="0.72" stopColor={LINE} stopOpacity="0.16" />
-          <stop offset="0.88" stopColor={LINE} stopOpacity="0.2" />
-          <stop offset="1" stopColor={LINE} stopOpacity="0.03" />
+          <stop offset="0.72" stopColor={LINE} stopOpacity="0.12" />
+          <stop offset="0.88" stopColor={LINE} stopOpacity="0.1" />
+          <stop offset="1" stopColor={LINE} stopOpacity="0.01" />
         </linearGradient>
         <linearGradient id="radio-fade-core" x1="0" y1="0" x2="1" y2="0">
           <stop offset="0.08" stopColor={LINE_CORE} stopOpacity="0" />
@@ -195,14 +196,17 @@ function Waveform() {
           <stop offset="0.59" stopColor={LINE_CORE} stopOpacity="0" />
         </linearGradient>
         {/* edge-weighted fade for the outer wisps: present at the quiet
-            ends, ducking through the loud middle */}
+            ends, ducking through the loud middle — and always FAINTER than
+            the main line's own fade at the same point */}
         <linearGradient id="radio-fade-edges" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor={LINE} stopOpacity="0.3" />
-          <stop offset="0.17" stopColor={LINE} stopOpacity="0.25" />
-          <stop offset="0.36" stopColor={LINE} stopOpacity="0.06" />
-          <stop offset="0.52" stopColor={LINE} stopOpacity="0.06" />
-          <stop offset="0.72" stopColor={LINE} stopOpacity="0.25" />
-          <stop offset="1" stopColor={LINE} stopOpacity="0" />
+          <stop offset="0" stopColor={LINE} stopOpacity="0.06" />
+          <stop offset="0.08" stopColor={LINE} stopOpacity="0.2" />
+          <stop offset="0.2" stopColor={LINE} stopOpacity="0.22" />
+          <stop offset="0.38" stopColor={LINE} stopOpacity="0.06" />
+          <stop offset="0.55" stopColor={LINE} stopOpacity="0.07" />
+          <stop offset="0.72" stopColor={LINE} stopOpacity="0.18" />
+          <stop offset="0.9" stopColor={LINE} stopOpacity="0.08" />
+          <stop offset="1" stopColor={LINE} stopOpacity="0.01" />
         </linearGradient>
         {/* the edge threads fade at their inner ends — no thin lines cross
             the loud middle */}
@@ -249,6 +253,11 @@ function Waveform() {
         <path d={smoothPath(ghost(-14, 0.38))} stroke="url(#radio-fade-edges)" strokeWidth="0.7" />
         <path d={smoothPath(ghost(30, 0.62))} stroke="url(#radio-fade-edges)" strokeWidth="0.7" />
         <path d={smoothPath(ghost(-28, 0.45))} stroke="url(#radio-fade-edges)" strokeWidth="0.6" />
+        <path d={smoothPath(ghost(46, 0.34))} stroke="url(#radio-fade-edges)" strokeWidth="0.6" />
+        <path d={smoothPath(ghost(-44, 0.56))} stroke="url(#radio-fade-edges)" strokeWidth="0.55" />
+        <path d={smoothPath(ghost(60, 0.48))} stroke="url(#radio-fade-edges)" strokeWidth="0.5" />
+        <path d={smoothPath(ghost(-58, 0.3))} stroke="url(#radio-fade-edges)" strokeWidth="0.5" />
+        <path d={smoothPath(ghost(9, 0.7))} stroke="url(#radio-fade-edges)" strokeWidth="0.45" />
 
         {/* the silk: finest strands unravelling from the line at its end */}
         <path d={smoothPath(ghost(8, 1.06))} stroke="url(#radio-fade-silk)" strokeWidth="0.5" />
