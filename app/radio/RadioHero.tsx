@@ -127,6 +127,12 @@ const ORBS: [number, number, number, number][] = [
   [931, 277, 2.4, 0.6], [912, 372, 3.8, 0.85], [465, 415, 2.8, 0.65],
 ]
 
+// Ghost echoes of the pulse — attenuated, offset copies of the main trace
+// (the mock's liveliness: faint wisps shadowing the line, standing tall
+// BESIDE the crests rather than cutting through them).
+const ghost = (dx: number, k: number): [number, number][] =>
+  MAIN.map(([x, y]) => [x + dx, Math.round(MID + (y - MID) * k)])
+
 function Waveform() {
   return (
     <svg viewBox="0 0 1000 500" fill="none" aria-hidden style={{ width: '100%', height: 'auto', display: 'block' }}>
@@ -177,6 +183,11 @@ function Waveform() {
         <path d={smoothPath(THREAD_B_LEFT)} stroke="url(#thread-fade-out)" strokeWidth="1" />
         <path d={smoothPath(THREAD_C_RIGHT)} stroke="url(#thread-fade-in)" strokeWidth="0.9" />
         <path d={smoothPath(THREAD_B_RIGHT)} stroke="url(#thread-fade-in)" strokeWidth="1" />
+
+        {/* ghost echoes shadowing the pulse — the wisps that make it alive */}
+        <path d={smoothPath(ghost(11, 0.92))} stroke="url(#radio-fade)" strokeWidth="1.2" opacity="0.28" />
+        <path d={smoothPath(ghost(-9, 0.8))} stroke="url(#radio-fade)" strokeWidth="1" opacity="0.18" />
+        <path d={smoothPath(ghost(22, 0.7))} stroke="url(#radio-fade)" strokeWidth="0.9" opacity="0.12" />
 
         {/* the pulse — glow underlay, amber ribbon, bright core. The mock's
             line is proportionally substantial (~2px on a 570px-wide band):
