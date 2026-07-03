@@ -182,6 +182,7 @@ See [database.md → Storage Buckets](database.md#storage-buckets) for the canon
 ## Key Conventions
 
 - **Shared `<Header />`** — all member-facing pages use the shared `Header` component (`components/Header.tsx` → `components/HeaderClient.tsx`). Pages no longer manage their own header rows.
+- **Icon art & rendering** — every icon image (built-in asset library and uploads alike) lives on the standard normalized frame: artwork trimmed, scaled so its bounding-box *diagonal* is uniform, centered on a transparent 1536×1024 canvas (`lib/icon-image.ts` for uploads; `scripts/normalize-assets.py` / `scripts/strike-icon.py` for repo assets). Render icons only through `components/IconImage.tsx` (square clipping box, frame sized by height, `fill` = optical size) — never a raw `<img objectFit: contain>`, which shows the frame's margins and halves the art. The Cabinet of Distinctions keeps its own 132% medal scale.
 - **Mobile nav breakpoint** — detected in JS via `window.innerWidth < 768`
 - **`overflow-x: hidden`** on `html`/`body` to prevent mobile horizontal scroll
 - **Camp signups join** — always fetch `applications` and `camp_signups` separately and join in JS; Supabase can't resolve the FK via nested select

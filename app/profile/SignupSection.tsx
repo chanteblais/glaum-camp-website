@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { IconImage } from '@/components/IconImage'
 import { SuggestRoleModal } from './SuggestRoleModal'
 import { isImageIcon } from '@/lib/icon-src'
 import { roleSlug } from '@/lib/role-slug'
@@ -181,7 +182,7 @@ function CurrentSignupCards({
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 {dept?.icon && (isImageIcon(dept.icon)
-                  ? <img src={dept.icon} alt="" aria-hidden style={{ width: '72%', height: '72%', objectFit: 'contain', opacity: 0.92 }} />
+                  ? <IconImage src={dept.icon} size="92%" fill={0.8} opacity={0.92} />
                   : <span style={{ fontSize: '1.25rem', lineHeight: 1 }}>{dept?.icon ?? '✦'}</span>)}
               </div>
               <div style={{ minWidth: 0 }}>
@@ -441,7 +442,7 @@ function RoleDetailModal({ role, dept, signup, saving, error, onConfirm, onClose
           {dept && (
             <p style={{ fontSize: '0.65rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.7, margin: '0 0 0.4rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               {dept.icon && (isImageIcon(dept.icon)
-                ? <img src={dept.icon} alt="" aria-hidden style={{ width: '1rem', height: '1rem', objectFit: 'contain' }} />
+                ? <IconImage src={dept.icon} size="1rem" fill={0.92} />
                 : <span style={{ fontSize: '0.9rem' }}>{dept.icon}</span>)}
               {dept.name}
             </p>
@@ -590,7 +591,7 @@ function RolePicker({
                 between groups so departments read as distinct sections. */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', marginBottom: dept.description ? '0.35rem' : '0.85rem' }}>
               {dept.icon && (isImageIcon(dept.icon)
-                ? <img src={dept.icon} alt="" aria-hidden style={{ width: '1.7rem', height: '1.7rem', objectFit: 'contain', flexShrink: 0 }} />
+                ? <IconImage src={dept.icon} size="1.7rem" fill={0.85} />
                 : <span style={{ fontSize: '1.4rem', flexShrink: 0 }}>{dept.icon}</span>)}
               <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.2rem', color: '#C8A848', margin: 0, letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
                 {dept.name}

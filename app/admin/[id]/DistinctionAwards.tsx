@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { IconImage } from '@/components/IconImage'
 
 const GOLD = '#C8A848'
 const CREAM = '#F3EDE6'
@@ -71,7 +72,7 @@ export function DistinctionAwards({ memberId, rules, initialAwards }: {
             <div key={rule.id} style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', padding: '0.5rem 0.7rem', borderRadius: '0.5rem', border: '1px solid rgba(200,168,72,0.12)', background: on ? 'rgba(200,168,72,0.06)' : 'transparent' }}>
               <span style={{ width: 22, textAlign: 'center', flexShrink: 0 }}>
                 {rule.image
-                  ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={rule.image} alt="" style={{ width: 20, height: 20, objectFit: 'contain' }} />
+                  ? /* eslint-disable-next-line @next/next/no-img-element */ <IconImage src={rule.image} size={20} fill={0.9} />
                   : <span style={{ fontSize: '1rem' }}>{rule.glyph || '✦'}</span>}
               </span>
               <span style={{ flex: 1, minWidth: 0, fontSize: '0.85rem', color: CREAM }}>
