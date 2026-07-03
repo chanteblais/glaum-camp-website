@@ -33,10 +33,6 @@ export type FieldConfig = {
   isCustom?: boolean
   type?: FieldType
   options?: string[]
-  // checkbox fields only: options that STAND ALONE — picking one clears every
-  // other selection (e.g. "Newbie" vs. the attended years). Subset of options;
-  // see lib/multi-select.ts. Custom fields pass through mergeMemberConfig as-is.
-  exclusiveOptions?: string[]
   // When set, this field's answer is saved to the canonical member profile under
   // the given Profile Field registry key (member_profiles.values) — not just
   // custom_answers. Lets one profile field be collected by, and reused across,

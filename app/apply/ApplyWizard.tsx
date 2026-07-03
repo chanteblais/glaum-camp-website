@@ -7,7 +7,6 @@ import type { MemberFormConfig, StepConfig, FieldConfig } from '@/lib/form-confi
 import type { ContributionType } from '@/lib/application-options'
 import { DEFAULT_CONTRIBUTION_TYPES } from '@/lib/application-options'
 import { RichText } from '@/lib/markdown-lite'
-import { toggleMultiValue, splitExclusive } from '@/lib/multi-select'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -190,33 +189,23 @@ function RadioGroup({ options, value, onChange }: { options: string[]; value: st
   )
 }
 
-function CheckboxGroup({ options, value, onChange, exclusive = [] }: { options: string[]; value: string[]; onChange: (v: string[]) => void; exclusive?: string[] }) {
-  const toggle = (opt: string) => onChange(toggleMultiValue(value, opt, exclusive))
-  const { regular, standalone } = splitExclusive(options, exclusive)
-  const row = (opt: string) => (
-    <label key={opt} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer', fontSize: '0.9rem', color: CREAM, opacity: value.includes(opt) ? 1 : 0.65, lineHeight: 1.5 }}>
-      <div style={{
-        width: '18px', height: '18px', borderRadius: '3px', flexShrink: 0, marginTop: '2px',
-        border: `1.5px solid ${value.includes(opt) ? GOLD : 'rgba(200,168,72,0.35)'}`,
-        background: value.includes(opt) ? 'rgba(200,168,72,0.12)' : 'transparent',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }} onClick={() => toggle(opt)}>
-        {value.includes(opt) && <span style={{ fontSize: '0.7rem', color: GOLD, fontWeight: 700 }}>✓</span>}
-      </div>
-      <span onClick={() => toggle(opt)}>{opt}</span>
-    </label>
-  )
+function CheckboxGroup({ options, value, onChange }: { options: string[]; value: string[]; onChange: (v: string[]) => void }) {
+  const toggle = (opt: string) => onChange(value.includes(opt) ? value.filter(v => v !== opt) : [...value, opt])
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-      {regular.map(row)}
-      {standalone.length > 0 && (
-        <div aria-hidden style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: '0.1rem 0' }}>
-          <div style={{ flex: '0 0 2.5rem', height: '1px', background: 'rgba(200,168,72,0.25)' }} />
-          <span style={{ fontSize: '0.68rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: GOLD, opacity: 0.55 }}>or</span>
-          <div style={{ flex: 1, height: '1px', background: 'rgba(200,168,72,0.25)' }} />
-        </div>
-      )}
-      {standalone.map(row)}
+      {options.map(opt => (
+        <label key={opt} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer', fontSize: '0.9rem', color: CREAM, opacity: value.includes(opt) ? 1 : 0.65, lineHeight: 1.5 }}>
+          <div style={{
+            width: '18px', height: '18px', borderRadius: '3px', flexShrink: 0, marginTop: '2px',
+            border: `1.5px solid ${value.includes(opt) ? GOLD : 'rgba(200,168,72,0.35)'}`,
+            background: value.includes(opt) ? 'rgba(200,168,72,0.12)' : 'transparent',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }} onClick={() => toggle(opt)}>
+            {value.includes(opt) && <span style={{ fontSize: '0.7rem', color: GOLD, fontWeight: 700 }}>✓</span>}
+          </div>
+          <span onClick={() => toggle(opt)}>{opt}</span>
+        </label>
+      ))}
     </div>
   )
 }
@@ -599,7 +588,7 @@ function FieldControl({ field, form, set, answers, setAnswer, optionSources, gro
       const other = field.options.find(o => o.trim().toLowerCase() === 'other')
       return (
         <>
-          <CheckboxGroup options={field.options} value={vals} onChange={v => setAnswer(field.key, v as string[])} exclusive={field.exclusiveOptions} />
+          <CheckboxGroup options={field.options} value={vals} onChange={v => setAnswer(field.key, v as string[])} />
           {other && vals.includes(other) && (
             <div style={{ marginTop: '0.5rem' }}>
               <Input value={(answers[field.key + '__other'] as string) ?? ''} onChange={v => setAnswer(field.key + '__other', v)} placeholder="Please specify…" />

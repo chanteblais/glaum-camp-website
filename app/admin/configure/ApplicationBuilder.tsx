@@ -161,7 +161,7 @@ function ElementRow({
 function FieldRow({
   field, saving,
   onToggleVisible, onToggleRequired, onLabelChange, onDescChange,
-  onOptionsChange, onFieldPatch, onDelete,
+  onOptionsChange, onDelete,
   onMoveUp, onMoveDown, isFirst, isLast, onToggleWidth, groups = [],
   profileFieldOptions, onBindProfileField,
 }: {
@@ -172,9 +172,6 @@ function FieldRow({
   onLabelChange: (v: string) => void
   onDescChange: (v: string) => void
   onOptionsChange?: (opts: string[]) => void
-  // Atomic patch for custom fields — lets option edits keep exclusiveOptions
-  // (stand-alone "or" answers) in sync with the option list in one update.
-  onFieldPatch?: (change: Partial<FieldConfig>) => void
   onDelete?: () => void
   // Reorder + width controls (provided only for modular sections)
   onMoveUp?: () => void
@@ -190,20 +187,6 @@ function FieldRow({
   const showOptions = (field.isCustom && (field.type === 'radio' || field.type === 'checkbox')) || field.type === 'agreement'
   const isAgreement = field.type === 'agreement'
   const isHalf = (field.width ?? 'full') === 'half'
-
-  // Checkbox option edits go through here so the stand-alone list follows
-  // renames and deletions; other field types keep the plain options path.
-  const canStandAlone = field.type === 'checkbox' && !!onFieldPatch
-  const setOptions = (next: string[], renamed?: { from: string; to: string }) => {
-    if (canStandAlone) {
-      let excl = field.exclusiveOptions ?? []
-      if (renamed) excl = excl.map(o => (o === renamed.from ? renamed.to : o))
-      excl = excl.filter(o => next.includes(o))
-      onFieldPatch!({ options: next, exclusiveOptions: excl.length ? excl : undefined })
-    } else {
-      onOptionsChange?.(next)
-    }
-  }
 
   // Locked core field — always present, not deletable/hideable/reorderable here.
   // Its Required status is editable only when canChangeRequired (e.g. Photo).
@@ -410,7 +393,7 @@ function FieldRow({
               ) : (
                 <input
                   value={opt}
-                  onChange={e => { const next = [...(field.options ?? [])]; next[i] = e.target.value; setOptions(next, { from: opt, to: e.target.value }) }}
+                  onChange={e => { const next = [...(field.options ?? [])]; next[i] = e.target.value; onOptionsChange(next) }}
                   style={{
                     flex: 1, background: 'transparent', border: 'none',
                     borderBottom: '1px solid rgba(200,168,72,0.15)',
@@ -419,38 +402,15 @@ function FieldRow({
                   }}
                 />
               )}
-              {canStandAlone && (() => {
-                const on = (field.exclusiveOptions ?? []).includes(opt)
-                return (
-                  <button
-                    onClick={() => {
-                      const cur = field.exclusiveOptions ?? []
-                      const next = on ? cur.filter(x => x !== opt) : [...cur, opt]
-                      onFieldPatch!({ exclusiveOptions: next.length ? next : undefined })
-                    }}
-                    title={on
-                      ? `“${opt}” stands alone — picking it clears the other selections. Click to make it combinable again.`
-                      : 'Make this a stand-alone answer — picking it clears the other selections (e.g. “Newbie” vs. the years). The form shows it after an “— or —” divider.'}
-                    style={{
-                      background: on ? 'rgba(210,57,248,0.12)' : 'none',
-                      border: `1px solid ${on ? 'rgba(210,57,248,0.5)' : 'rgba(200,168,72,0.2)'}`,
-                      borderRadius: '9999px', cursor: 'pointer', flexShrink: 0,
-                      color: on ? PURPLE : 'rgba(243,237,230,0.4)',
-                      fontSize: '0.6rem', letterSpacing: '0.12em', textTransform: 'uppercase',
-                      padding: '0.1rem 0.45rem',
-                    }}
-                  >or</button>
-                )
-              })()}
               <button
-                onClick={() => setOptions((field.options ?? []).filter((_, j) => j !== i))}
+                onClick={() => onOptionsChange((field.options ?? []).filter((_, j) => j !== i))}
                 title="Remove"
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ff8a8a', opacity: 0.4, fontSize: '0.75rem', padding: 0, marginTop: isAgreement ? '0.35rem' : 0 }}
               >✕</button>
             </div>
           ))}
           <button
-            onClick={() => setOptions([...(field.options ?? []), isAgreement ? 'I agree to…' : 'New option'])}
+            onClick={() => onOptionsChange([...(field.options ?? []), isAgreement ? 'I agree to…' : 'New option'])}
             style={{
               marginTop: '0.2rem', background: 'none', border: '1px dashed rgba(200,168,72,0.2)',
               borderRadius: '0.3rem', color: GOLD, opacity: 0.55,
@@ -658,7 +618,6 @@ function StepSection({
                 onLabelChange={v => onFieldChange(field.key, { label: v })}
                 onDescChange={v => onFieldChange(field.key, { description: v })}
                 onOptionsChange={(field.isCustom || field.type === 'agreement') ? opts => onFieldChange(field.key, { options: opts }) : undefined}
-                onFieldPatch={field.isCustom ? change => onFieldChange(field.key, change) : undefined}
                 onMoveUp={fieldsModular && onMoveField ? () => onMoveField(field.key, -1) : undefined}
                 onMoveDown={fieldsModular && onMoveField ? () => onMoveField(field.key, 1) : undefined}
                 isFirst={pinUp}
