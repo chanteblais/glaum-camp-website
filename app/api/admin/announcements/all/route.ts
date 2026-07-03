@@ -1,13 +1,10 @@
 import { NextResponse } from 'next/server'
-import { auth, clerkClient } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { requireAdmin } from '@/lib/admin-auth'
 
 export async function GET() {
-  const { userId } = await auth()
+  const userId = await requireAdmin()
   if (!userId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  const client = await clerkClient()
-  const user = await client.users.getUser(userId)
-  if (user.publicMetadata?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { data, error } = await supabaseAdmin
     .from('announcements')

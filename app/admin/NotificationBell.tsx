@@ -13,11 +13,11 @@ type Notification = {
 }
 
 export function NotificationBell({
-  initialNotifications = [],
+  initialNotifications,
 }: {
   initialNotifications?: Notification[]
 }) {
-  const [notifications, setNotifications] = useState(initialNotifications)
+  const [notifications, setNotifications] = useState(initialNotifications ?? [])
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -59,12 +59,16 @@ export function NotificationBell({
     return () => document.removeEventListener('mousedown', handleClick)
   }, [open])
 
-  // Fetch on mount (for when rendered outside the admin page)
+  // Fetch on mount only when no server-rendered list was provided (i.e. the
+  // bell is rendered outside the admin pages) — the tabs all pass one, so
+  // refetching what the server just sent would waste a round trip.
   useEffect(() => {
+    if (initialNotifications !== undefined) return
     fetch('/api/admin/notifications')
       .then(r => r.ok ? r.json() : null)
       .then(json => { if (json) setNotifications(json.notifications ?? []) })
       .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Poll for new notifications every 60s

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth, clerkClient } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { normalizeIconImage } from '@/lib/icon-image'
+import { requireAdmin } from '@/lib/admin-auth'
 
 const ALLOWED_TYPES = ['image/png', 'image/webp', 'image/svg+xml', 'image/jpeg', 'image/gif']
 const MAX_BYTES = 5 * 1024 * 1024 // 5 MB
@@ -11,15 +11,6 @@ const MAX_BYTES = 5 * 1024 * 1024 // 5 MB
 // for a not-yet-saved one the client passes a generated key. The resulting URL
 // is written into `resources.icon` when the modal saves (no DB write here).
 const BUCKET = 'group-badges'
-
-async function requireAdmin() {
-  const { userId } = await auth()
-  if (!userId) return null
-  const client = await clerkClient()
-  const user = await client.users.getUser(userId)
-  if (user.publicMetadata?.role !== 'admin') return null
-  return userId
-}
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   if (!(await requireAdmin())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

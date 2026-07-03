@@ -1,6 +1,7 @@
-import { auth, clerkClient } from '@clerk/nextjs/server'
+import { auth } from '@clerk/nextjs/server'
 import { redirect, notFound } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
+import { requireAdmin } from '@/lib/admin-auth'
 import { AdminActions } from '../AdminActions'
 import { RemoveMemberButton } from '../RemoveMemberButton'
 import { MemberSignupCard } from '../MemberSignupCard'
@@ -18,9 +19,7 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
 
-  const client = await clerkClient()
-  const user = await client.users.getUser(userId)
-  if (user.publicMetadata?.role !== 'admin') redirect('/')
+  if (!(await requireAdmin())) redirect('/')
 
   const { data: app } = await supabaseAdmin
     .from('applications')
@@ -30,53 +29,82 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
 
   if (!app) notFound()
 
-  // Fetch signup if member has a clerk_user_id. Shifts are many-to-many
-  // (member_shift_signups) plus the legacy single camp_signups.schedule_event_id.
+  // Everything here depends only on `app`, so it runs as one parallel batch.
+  // Signup + held shifts exist only for members with a clerk_user_id; the three
+  // page_content configs collapse into a single keyed read.
+  const none = { data: null }
+  const [
+    { data: signup },
+    { data: heldRows },
+    memberGroupChips,
+    runway,
+    { data: cfgRows },
+    member,
+  ] = await Promise.all([
+    app.clerk_user_id
+      ? supabaseAdmin
+          .from('camp_signups')
+          .select('role_id, schedule_event_id, role_approval_status')
+          .eq('clerk_user_id', app.clerk_user_id)
+          .maybeSingle()
+      : none,
+    app.clerk_user_id
+      ? supabaseAdmin
+          .from('member_shift_signups')
+          .select('role, schedule_events(id, title, time, day)')
+          .eq('clerk_user_id', app.clerk_user_id)
+      : { data: null as any[] | null },
+    // Cross-reference chips (docs/admin-ux-handoff.md A5): the member's linked
+    // entities at a glance, each deep-linking to where that entity is managed.
+    app.clerk_user_id ? getMemberGroups(app.clerk_user_id) : [],
+    getAdminRunway(),
+    supabaseAdmin
+      .from('page_content')
+      .select('key, value')
+      .in('key', ['config_member_form', 'config_distinctions', 'config_profile_fields']),
+    // The person's canonical member record (manual distinctions + profile values).
+    (app.clerk_user_id || app.email) ? resolveMember(app.clerk_user_id ?? null, app.email) : null,
+  ])
+  const cfgMap: Record<string, string | undefined> = Object.fromEntries((cfgRows ?? []).map(r => [r.key, r.value]))
+
+  // Union many-to-many + legacy single, deduped by event id. Only the
+  // many-to-many rows can carry a lead role (migration 048).
+  const shiftMap = new Map<string, { id: string; title: string; time: string | null; day: string; lead: boolean }>()
+  for (const r of heldRows ?? []) {
+    const ev = r.schedule_events as any
+    if (ev?.id) shiftMap.set(ev.id, { id: ev.id, title: ev.title, time: ev.time ?? null, day: ev.day, lead: (r as any).role === 'lead' })
+  }
+  const legacyEventId = signup?.schedule_event_id && !shiftMap.has(signup.schedule_event_id)
+    ? signup.schedule_event_id
+    : null
+
+  // Second batch: rows that hang off the signup / member rows above.
+  const [roleRes, { data: legacyEv }, memberAwards, memberProfileValues] = await Promise.all([
+    signup?.role_id
+      ? supabaseAdmin.from('roles').select('name, commitment, department_id, departments(name, icon)').eq('id', signup.role_id).single()
+      : none,
+    legacyEventId
+      ? supabaseAdmin.from('schedule_events').select('id, title, time, day').eq('id', legacyEventId).single()
+      : none,
+    member ? getMemberAwards(member.id) : [],
+    member ? getMemberProfileValues(member.id) : ({} as Record<string, unknown>),
+  ])
+  if (legacyEv) shiftMap.set(legacyEv.id, { id: legacyEv.id, title: legacyEv.title, time: legacyEv.time ?? null, day: legacyEv.day, lead: false })
+
   let signupData: { role: any; shifts: { id: string; title: string; time: string | null; day: string; lead: boolean }[] } | null = null
-  if (app.clerk_user_id) {
-    const [{ data: signup }, { data: heldRows }] = await Promise.all([
-      supabaseAdmin
-        .from('camp_signups')
-        .select('role_id, schedule_event_id, role_approval_status')
-        .eq('clerk_user_id', app.clerk_user_id)
-        .maybeSingle(),
-      supabaseAdmin
-        .from('member_shift_signups')
-        .select('role, schedule_events(id, title, time, day)')
-        .eq('clerk_user_id', app.clerk_user_id),
-    ])
+  if (signup || (heldRows ?? []).length > 0) {
+    const roleRow = roleRes.data as any
+    const dept = roleRow?.departments as { name: string; icon: string | null } | null
 
-    if (signup || (heldRows ?? []).length > 0) {
-      const roleRes = signup?.role_id
-        ? await supabaseAdmin.from('roles').select('name, commitment, department_id, departments(name, icon)').eq('id', signup.role_id).single()
-        : { data: null }
-
-      // Union many-to-many + legacy single, deduped by event id. Only the
-      // many-to-many rows can carry a lead role (migration 048).
-      const shiftMap = new Map<string, { id: string; title: string; time: string | null; day: string; lead: boolean }>()
-      for (const r of heldRows ?? []) {
-        const ev = r.schedule_events as any
-        if (ev?.id) shiftMap.set(ev.id, { id: ev.id, title: ev.title, time: ev.time ?? null, day: ev.day, lead: (r as any).role === 'lead' })
-      }
-      if (signup?.schedule_event_id && !shiftMap.has(signup.schedule_event_id)) {
-        const { data: legacyEv } = await supabaseAdmin
-          .from('schedule_events').select('id, title, time, day').eq('id', signup.schedule_event_id).single()
-        if (legacyEv) shiftMap.set(legacyEv.id, { id: legacyEv.id, title: legacyEv.title, time: legacyEv.time ?? null, day: legacyEv.day, lead: false })
-      }
-
-      const roleRow = roleRes.data as any
-      const dept = roleRow?.departments as { name: string; icon: string | null } | null
-
-      signupData = {
-        role: roleRow ? {
-          name: roleRow.name,
-          department: dept?.name ?? null,
-          department_icon: dept?.icon ?? null,
-          commitment: roleRow.commitment ?? null,
-          approval_status: signup?.role_approval_status ?? null,
-        } : null,
-        shifts: Array.from(shiftMap.values()),
-      }
+    signupData = {
+      role: roleRow ? {
+        name: roleRow.name,
+        department: dept?.name ?? null,
+        department_icon: dept?.icon ?? null,
+        commitment: roleRow.commitment ?? null,
+        approval_status: signup?.role_approval_status ?? null,
+      } : null,
+      shifts: Array.from(shiftMap.values()),
     }
   }
 
@@ -84,43 +112,27 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   })
 
-  // Cross-reference chips (docs/admin-ux-handoff.md A5): the member's linked
-  // entities at a glance, each deep-linking to where that entity is managed.
-  const memberGroupChips = app.clerk_user_id ? await getMemberGroups(app.clerk_user_id) : []
-  const runway = await getAdminRunway()
-
   // Render the application strictly from the member-form config so the review
   // mirrors the live form: sections + fields in config order, honouring admin
   // renames, hidden/deleted fields, width, and admin-added custom fields.
   // Built-in fields read from their column; custom fields from `custom_answers`.
   // Legacy columns no longer part of the form simply don't appear.
   const customAnswers: Record<string, string | string[]> = app.custom_answers ?? {}
-  const { data: cfgRow } = await supabaseAdmin
-    .from('page_content').select('value').eq('key', 'config_member_form').maybeSingle()
   let rawCfg: object = {}
-  try { if (cfgRow?.value) rawCfg = JSON.parse(cfgRow.value) } catch { /* defaults */ }
+  try { if (cfgMap['config_member_form']) rawCfg = JSON.parse(cfgMap['config_member_form']!) } catch { /* defaults */ }
   const cfg = mergeMemberConfig(rawCfg)
 
-  // Manual distinctions: resolve this person's canonical member record + their
-  // current hand-granted awards, plus every defined distinction to offer.
-  const member = (app.clerk_user_id || app.email)
-    ? await resolveMember(app.clerk_user_id ?? null, app.email)
-    : null
-  const { data: distCfgRow } = await supabaseAdmin
-    .from('page_content').select('value').eq('key', 'config_distinctions').maybeSingle()
-  const awardRules = parseDistinctions(distCfgRow?.value).map(r => ({
+  // Manual distinctions: the member's current hand-granted awards, plus every
+  // defined distinction to offer.
+  const awardRules = parseDistinctions(cfgMap['config_distinctions']).map(r => ({
     id: r.id, label: r.label, glyph: r.glyph, image: r.image, manualOnly: r.conditions.length === 0,
   }))
-  const memberAwards = member ? await getMemberAwards(member.id) : []
 
   // Profile Details — the member's canonical profile-field values
   // (member_profiles.values), rendered from the Profile Field registry. This is
   // the ADMIN-only surface for fields marked not visible (public=false), which
   // never appear on the member-facing profile.
-  const { data: pfCfgRow } = await supabaseAdmin
-    .from('page_content').select('value').eq('key', 'config_profile_fields').maybeSingle()
-  const profileFieldDefs = storedFields(parseProfileFields(pfCfgRow?.value))
-  const memberProfileValues = member ? await getMemberProfileValues(member.id) : {}
+  const profileFieldDefs = storedFields(parseProfileFields(cfgMap['config_profile_fields']))
   const profileDetailFields: RenderField[] = profileFieldDefs
     .map(f => {
       const raw = memberProfileValues[f.key]

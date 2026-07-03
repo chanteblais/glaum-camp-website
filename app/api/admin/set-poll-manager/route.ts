@@ -1,14 +1,6 @@
 import { NextResponse } from 'next/server'
-import { auth, clerkClient } from '@clerk/nextjs/server'
-
-async function requireAdmin() {
-  const { userId } = await auth()
-  if (!userId) return null
-  const client = await clerkClient()
-  const user = await client.users.getUser(userId)
-  if (user.publicMetadata?.role !== 'admin') return null
-  return userId
-}
+import { clerkClient } from '@clerk/nextjs/server'
+import { requireAdmin } from '@/lib/admin-auth'
 
 // POST { targetUserId, grant: boolean } — admins grant/revoke poll management.
 export async function POST(req: Request) {

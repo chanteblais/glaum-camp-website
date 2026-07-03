@@ -1,16 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth, clerkClient } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { sendLeadUpGatheringEmail } from '@/lib/send-email'
 import { clockLabel } from '@/lib/shift-hours'
-
-async function requireAdmin() {
-  const { userId } = await auth()
-  if (!userId) return null
-  const client = await clerkClient()
-  const user = await client.users.getUser(userId)
-  return user.publicMetadata?.role === 'admin' ? userId : null
-}
+import { requireAdmin } from '@/lib/admin-auth'
 
 // "2026-07-08" + "19:00" → "Tue, Jul 8 · 7:00 PM" (clockLabel tolerates
 // legacy display-string times).

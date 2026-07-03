@@ -1,6 +1,7 @@
-import { auth, clerkClient } from '@clerk/nextjs/server'
+import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
+import { requireAdmin } from '@/lib/admin-auth'
 import { mergeMemberConfig, mergeVolunteerConfig } from '@/lib/form-config'
 import { parseTrackCopy } from '@/lib/site-config'
 import { ApplicationBuilder } from '../ApplicationBuilder'
@@ -9,9 +10,7 @@ export default async function ApplicationFormPage() {
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
 
-  const client = await clerkClient()
-  const user = await client.users.getUser(userId)
-  if (user.publicMetadata?.role !== 'admin') redirect('/')
+  if (!(await requireAdmin())) redirect('/')
 
   const { data: configRows } = await supabaseAdmin
     .from('page_content')

@@ -1,6 +1,7 @@
-import { auth, clerkClient } from '@clerk/nextjs/server'
+import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
+import { requireAdmin } from '@/lib/admin-auth'
 import { AdminNav } from '../AdminNav'
 import { CategoryHeading } from '../CategoryHeading'
 import { NotificationBell } from '../NotificationBell'
@@ -25,26 +26,24 @@ export default async function ProgramPage() {
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
 
-  const client = await clerkClient()
-  const user = await client.users.getUser(userId)
-  if (user.publicMetadata?.role !== 'admin') redirect('/')
+  if (!(await requireAdmin())) redirect('/')
 
-  const { data: configRows } = await supabaseAdmin
-    .from('page_content')
-    .select('key, value')
-    .in('key', ['config_shift_signup_open', 'config_event_start_date', 'config_event_end_date'])
+  const [{ data: configRows }, { data: notifications }, runway] = await Promise.all([
+    supabaseAdmin
+      .from('page_content')
+      .select('key, value')
+      .in('key', ['config_shift_signup_open', 'config_event_start_date', 'config_event_end_date']),
+    supabaseAdmin
+      .from('admin_notifications')
+      .select('id, application_id, event_type, message, details, created_at, read_at')
+      .order('created_at', { ascending: false })
+      .limit(20),
+    getAdminRunway(),
+  ])
   const configMap = Object.fromEntries((configRows ?? []).map(r => [r.key, r.value]))
   const shiftSignupOpen = configMap['config_shift_signup_open'] !== 'false'
   const eventRangeStart = configMap['config_event_start_date'] ?? ''
   const eventRangeEnd = configMap['config_event_end_date'] ?? ''
-
-  const { data: notifications } = await supabaseAdmin
-    .from('admin_notifications')
-    .select('id, application_id, event_type, message, details, created_at, read_at')
-    .order('created_at', { ascending: false })
-    .limit(20)
-
-  const runway = await getAdminRunway()
 
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflowX: 'clip' }}>

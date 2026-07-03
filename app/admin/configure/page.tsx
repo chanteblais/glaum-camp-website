@@ -1,6 +1,7 @@
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
+import { requireAdmin } from '@/lib/admin-auth'
 import { AdminNav } from '../AdminNav'
 import { CategoryHeading } from '../CategoryHeading'
 import { CollapsibleSection } from '../CollapsibleSection'
@@ -26,14 +27,46 @@ export default async function ConfigurePage() {
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
 
-  const client = await clerkClient()
-  const user = await client.users.getUser(userId)
-  if (user.publicMetadata?.role !== 'admin') redirect('/')
+  if (!(await requireAdmin())) redirect('/')
 
-  const { data: configRows } = await supabaseAdmin
-    .from('page_content')
-    .select('key, value')
-    .in('key', ['config_attunement_tasks', 'config_distinctions', 'config_profile_fields', 'config_event_start_date', 'config_event_end_date', 'config_attunement_nudge_days'])
+  const [
+    { data: configRows },
+    { data: groupIconRows },
+    { collections: groupCollections, uncollected },
+    { data: shiftTypeRows },
+    { data: notifications },
+    { data: applications },
+    runway,
+  ] = await Promise.all([
+    supabaseAdmin
+      .from('page_content')
+      .select('key, value')
+      .in('key', ['config_attunement_tasks', 'config_distinctions', 'config_profile_fields', 'config_event_start_date', 'config_event_end_date', 'config_attunement_nudge_days']),
+    // Group icon images — offered as medal art in the distinctions builder.
+    supabaseAdmin
+      .from('groups')
+      .select('name, icon_image')
+      .not('icon_image', 'is', null)
+      .order('sort_order'),
+    // Collections + their group counts — power the Attunement "collection membership"
+    // requirement (which collection, and the cap on how many groups can be required).
+    getGroupCollections(),
+    // Shift types — offered as targets for a shift-hours attunement task.
+    supabaseAdmin
+      .from('shift_types').select('id, name').order('sort_order'),
+    supabaseAdmin
+      .from('admin_notifications')
+      .select('id, application_id, event_type, message, details, created_at, read_at')
+      .order('created_at', { ascending: false })
+      .limit(20),
+    // Approved members + which of them are admins in Clerk (for the Admins manager).
+    supabaseAdmin
+      .from('applications')
+      .select('clerk_user_id, first_name, last_name, preferred_name, email, status')
+      .eq('status', 'approved'),
+    getAdminRunway(),
+  ])
+
   const configMap = Object.fromEntries((configRows ?? []).map(r => [r.key, r.value]))
   const attunementTasks = parseAttunementTasks(configMap['config_attunement_tasks'])
   const distinctions = parseDistinctions(configMap['config_distinctions'])
@@ -41,51 +74,34 @@ export default async function ConfigurePage() {
   // Facts a distinction rule may reference — derived from the registry.
   const distinctionFactCatalog = distinctionCatalog(profileFields)
 
-  // Group icon images — offered as medal art in the distinctions builder.
-  const { data: groupIconRows } = await supabaseAdmin
-    .from('groups')
-    .select('name, icon_image')
-    .not('icon_image', 'is', null)
-    .order('sort_order')
   const groupIconOptions = (groupIconRows ?? [])
     .filter(g => g.icon_image)
     .map(g => ({ name: g.name as string, image: g.icon_image as string }))
 
-  // Collections + their group counts — power the Attunement "collection membership"
-  // requirement (which collection, and the cap on how many groups can be required).
-  const { collections: groupCollections, uncollected } = await getGroupCollections()
   const attunementCollections = groupCollections.map(c => ({ id: c.id, name: c.name, groupCount: c.groups.length }))
   const totalGroupCount = groupCollections.reduce((n, c) => n + c.groups.length, 0) + uncollected.length
 
-  // Shift types — offered as targets for a shift-hours attunement task.
-  const { data: shiftTypeRows } = await supabaseAdmin
-    .from('shift_types').select('id, name').order('sort_order')
   const shiftTypeOptions = (shiftTypeRows ?? []).map(s => ({ id: s.id as string, name: s.name as string }))
 
-  const { data: notifications } = await supabaseAdmin
-    .from('admin_notifications')
-    .select('id, application_id, event_type, message, details, created_at, read_at')
-    .order('created_at', { ascending: false })
-    .limit(20)
-
-  // Approved members + which of them are admins in Clerk (for the Admins manager).
-  const { data: applications } = await supabaseAdmin
-    .from('applications')
-    .select('clerk_user_id, first_name, last_name, preferred_name, email, status')
-    .eq('status', 'approved')
   const approvedWithClerk = (applications ?? []).filter(a => a.clerk_user_id)
-  const clerkUsers = await Promise.all(
-    approvedWithClerk.map(a => client.users.getUser(a.clerk_user_id!).catch(() => null))
-  )
-  const adminMembers = approvedWithClerk.map((a, i) => ({
-    clerk_user_id: a.clerk_user_id!,
-    first_name: a.first_name,
-    last_name: a.last_name,
-    preferred_name: a.preferred_name ?? null,
-    email: a.email,
-    isAdmin: clerkUsers[i]?.publicMetadata?.role === 'admin',
-    canManagePolls: clerkUsers[i]?.publicMetadata?.canManagePolls === true,
-  }))
+  // One batched Clerk read for everyone (vs. one API call per member).
+  const client = await clerkClient()
+  const { data: clerkUsers } = approvedWithClerk.length > 0
+    ? await client.users.getUserList({ userId: approvedWithClerk.map(a => a.clerk_user_id!), limit: 500 })
+    : { data: [] }
+  const clerkById = new Map(clerkUsers.map(u => [u.id, u]))
+  const adminMembers = approvedWithClerk.map(a => {
+    const u = clerkById.get(a.clerk_user_id!)
+    return {
+      clerk_user_id: a.clerk_user_id!,
+      first_name: a.first_name,
+      last_name: a.last_name,
+      preferred_name: a.preferred_name ?? null,
+      email: a.email,
+      isAdmin: u?.publicMetadata?.role === 'admin',
+      canManagePolls: u?.publicMetadata?.canManagePolls === true,
+    }
+  })
 
   // Approved members shaped for the Groups roster (assign members to groups).
   const groupMembers = approvedWithClerk.map(a => ({
@@ -103,7 +119,7 @@ export default async function ConfigurePage() {
 
       <div style={{ maxWidth: '960px', margin: '0 auto', padding: '0 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
 
-        <AdminNav sections={CONFIGURE_CATEGORIES} runway={await getAdminRunway()} />
+        <AdminNav sections={CONFIGURE_CATEGORIES} runway={runway} />
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.5rem' }}>
           <NotificationBell initialNotifications={notifications ?? []} />
