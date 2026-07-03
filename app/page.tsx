@@ -318,12 +318,21 @@ let canManagePolls = false
             .dash-hero-inner { display: flex; width: 100%; padding: 2.25rem 2.5rem; align-items: center; justify-content: space-between; gap: 2rem; }
             .dash-spotlight  { display: grid; grid-template-columns: 5fr 7fr; gap: 1.25rem; align-items: start; }
             .dash-quicklinks { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+            .dash-attune {
+              display: flex; align-items: center; flex-wrap: wrap; gap: 1.25rem;
+              padding: 1rem 1.4rem; border-radius: 0.9rem;
+              border: 1px solid rgba(200,168,72,0.45);
+              background: rgba(200,168,72,0.09);
+              transition: border-color 0.2s ease, background 0.2s ease;
+            }
+            .dash-attune:hover { border-color: rgba(200,168,72,0.75); background: rgba(200,168,72,0.14); }
             @media (max-width: 680px) {
               .dash-quote-card { display: none !important; }
-              [data-width="half"], [data-width="third"] { flex: 0 0 100% !important; }
+              [data-width="half"], [data-width="third"], [data-width="twothirds"] { flex: 0 0 100% !important; }
               .dash-hero-inner { flex-direction: column; align-items: flex-start; padding: 1.5rem 1.25rem; gap: 1rem; }
               .dash-spotlight  { grid-template-columns: 1fr; }
               .dash-quicklinks { grid-template-columns: 1fr; }
+              .dash-attune { padding: 0.9rem 1rem; gap: 0.9rem; }
             }
           ` }} />
 
@@ -387,33 +396,58 @@ let canManagePolls = false
 
             {/* ── ATTUNEMENT BANNER (required tasks outstanding, or commitments to fill) ── */}
             {(!allAttuned || commitmentsOutstanding > 0) && (() => {
-              const outstanding = requiredTasks.filter(t => !t.done).length
+              const outstandingTasks = requiredTasks.filter(t => !t.done)
+              const outstanding = outstandingTasks.length
+              const doneCount = requiredTasks.length - outstanding
+              const named = outstandingTasks.slice(0, 3)
+              const unnamed = outstanding - named.length
               return (
-                <a
-                  href="/profile"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '1rem',
-                    padding: '0.75rem 1.25rem',
-                    marginBottom: '1.25rem',
-                    borderRadius: '0.75rem',
-                    border: '1px solid rgba(200,168,72,0.25)',
-                    background: 'rgba(200,168,72,0.06)',
-                    textDecoration: 'none',
-                  }}
-                >
-                  <p style={{ margin: 0, fontSize: '0.82rem', color: '#C8A848', opacity: 0.85 }}>
-                    <span style={{ fontFamily: 'TokyoDreams, serif', letterSpacing: '0.04em' }}>Attunement</span>
-                    <span style={{ opacity: 0.5, margin: '0 0.5rem' }}>·</span>
-                    <span style={{ fontStyle: 'italic', opacity: 0.7 }}>
+                <a href="/profile" className="dash-attune" style={{ marginBottom: '1.25rem', textDecoration: 'none' }}>
+                  <img
+                    src="/asset-library/icons/eye-in-triangle.webp"
+                    alt=""
+                    aria-hidden
+                    style={{ width: '54px', height: '54px', objectFit: 'contain', flexShrink: 0 }}
+                  />
+                  <div style={{ flex: 1, minWidth: '220px' }}>
+                    <p style={{ margin: '0 0 0.3rem', color: '#C8A848' }}>
+                      <span style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.05rem', letterSpacing: '0.04em' }}>Attunement</span>
+                      {!allAttuned && requiredTasks.length > 0 && (
+                        <span style={{ fontSize: '0.72rem', letterSpacing: '0.14em', opacity: 0.6, marginLeft: '0.75rem' }}>
+                          {doneCount} OF {requiredTasks.length}
+                        </span>
+                      )}
+                    </p>
+                    <p style={{ margin: 0, fontSize: '0.82rem', fontStyle: 'italic', color: '#F3EDE6', opacity: 0.75, lineHeight: 1.5 }}>
                       {!allAttuned
-                        ? `${outstanding} outstanding ${outstanding === 1 ? 'task' : 'tasks'}${commitmentsOutstanding > 0 ? ` · ${commitmentsOutstanding} commitment${commitmentsOutstanding === 1 ? '' : 's'}` : ''}`
-                        : `attuned — ${commitmentsOutstanding} commitment${commitmentsOutstanding === 1 ? '' : 's'} still to fill`}
-                    </span>
-                  </p>
-                  <span style={{ fontSize: '0.75rem', color: '#C8A848', opacity: 0.45, flexShrink: 0 }}>View checklist →</span>
+                        ? <>
+                            {named.map((t, i) => (
+                              <span key={t.id}>
+                                {i > 0 && <span style={{ color: '#C8A848', opacity: 0.6, margin: '0 0.5rem' }}>·</span>}
+                                {t.label}
+                              </span>
+                            ))}
+                            {unnamed > 0 && <span style={{ opacity: 0.6 }}> · +{unnamed} more</span>}
+                            {commitmentsOutstanding > 0 && <span style={{ opacity: 0.6 }}> · {commitmentsOutstanding} commitment{commitmentsOutstanding === 1 ? '' : 's'}</span>}
+                          </>
+                        : <>Attuned — {commitmentsOutstanding} commitment{commitmentsOutstanding === 1 ? '' : 's'} still to fill.</>}
+                    </p>
+                    {!allAttuned && requiredTasks.length > 0 && (
+                      <div style={{ marginTop: '0.55rem', height: '3px', borderRadius: '2px', background: 'rgba(200,168,72,0.18)', overflow: 'hidden' }}>
+                        <div style={{ width: `${Math.round((doneCount / requiredTasks.length) * 100)}%`, height: '100%', background: '#C8A848' }} />
+                      </div>
+                    )}
+                  </div>
+                  <span style={{
+                    flexShrink: 0,
+                    padding: '0.45rem 1.1rem',
+                    border: '1px solid rgba(200,168,72,0.5)',
+                    borderRadius: '9999px',
+                    background: 'rgba(200,168,72,0.08)',
+                    fontSize: '0.7rem', letterSpacing: '0.16em', color: '#C8A848',
+                  }}>
+                    {allAttuned ? 'VIEW COMMITMENTS' : 'COMPLETE THE CHECKLIST'} →
+                  </span>
                 </a>
               )
             })()}
@@ -622,12 +656,13 @@ let canManagePolls = false
                     const w = widths[id]
                     const isHalf = w === 'half'
                     const isThird = w === 'third'
+                    const isTwoThirds = w === 'twothirds'
                     return (
                       <div
                         key={id}
                         data-widget-id={id}
-                        data-width={isHalf ? 'half' : isThird ? 'third' : 'full'}
-                        style={{ flex: isThird ? '0 0 calc(33.333% - 0.833rem)' : isHalf ? '0 0 calc(50% - 0.625rem)' : '0 0 100%', minWidth: 0 }}
+                        data-width={isHalf ? 'half' : isThird ? 'third' : isTwoThirds ? 'twothirds' : 'full'}
+                        style={{ flex: isThird ? '0 0 calc(33.333% - 0.833rem)' : isTwoThirds ? '0 0 calc(66.667% - 0.417rem)' : isHalf ? '0 0 calc(50% - 0.625rem)' : '0 0 100%', minWidth: 0 }}
                       >
                         {widget}
                       </div>

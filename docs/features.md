@@ -45,7 +45,7 @@ Nav links for non-approved signed-in users (pending/rejected) show the public se
 Fixed top sections (always present, not reorderable):
 1. **Hero banner** — welcome greeting, countdown to event, hero tagline (`home_tagline`, editable inline)
 2. **Attunement + Commitments** — side-by-side (`dash-grid`)
-3. **Attunement banner** (renders only while actionable): outstanding required tasks / unfilled commitments → `/profile`
+3. **Attunement banner** (renders only while actionable): card with the eye-in-triangle ornament, named outstanding required tasks (first 3 + "+n more"), a done/total progress bar, and a pill CTA → `/profile`. When required tasks are done but commitments remain, a gentler variant (no bar, "View commitments") shows instead
 
 Configurable widgets (order, visibility, and width controlled by admin via the page editor):
 
@@ -62,7 +62,7 @@ Configurable widgets (order, visibility, and width controlled by admin via the p
 Fixed bottom section (always present):
 - **Role & Shift + Many Hands** — quick-link grid to `/participate` and `/members`
 
-**Widget layout:** widgets wrap in a flex row; each is full-width by default or half-width when configured (two consecutive halves pair side by side). All revert to full width on mobile.
+**Widget layout:** widgets wrap in a flex row; each is full (default), half, third, or two-thirds wide (consecutive widgets pair side by side when their widths fill a row — ½+½ or ⅓+⅔). All revert to full width on mobile.
 
 **Dashboard layout** is stored as `dashboard_layout` JSON in `page_content`:
 ```json
@@ -74,7 +74,8 @@ Admin-only: **"✎ Edit Page"** floating button (bottom-right). Clicking enters 
 - All widgets get a gold dashed outline
 - Hovering a widget reveals a `⠿ Label [½]` handle in its top-right corner
 - **Drag the handle** to reorder widgets — the card physically follows the cursor (`position: fixed`) while a dashed placeholder holds the drop slot
-- **Click `½`** on the handle to toggle that widget between full and half width (updates live on the page before saving)
+- **Click the width button** on the handle to cycle full → half → third → two-thirds (updates live on the page before saving)
+- **Drop a widget beside another** and it takes the complement of its neighbour's width so the pair fills the row (beside a ⅓ → becomes ⅔; beside a ½ or full → both become ½)
 - **Click a gold-underlined text element** (e.g. the hero tagline) to edit it inline (`contenteditable`)
 - **`+ Poll`** — opens a slide-in panel to create a new poll
 - **`Edit Text`** — opens a slide-in panel for copy fields not visible on the dashboard (quote card, About, Participate)
