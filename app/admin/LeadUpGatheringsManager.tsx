@@ -8,7 +8,7 @@ import { LeadUpCalendar } from './LeadUpCalendar'
 import { useConfirm } from '../components/ConfirmDialog'
 import { TimeField } from '../components/TimeField'
 
-type LeadUpEvent = {
+export type LeadUpEvent = {
   id: string
   title: string
   description: string | null
@@ -238,9 +238,16 @@ function GatheringModal({ initial, isCreate, onSave, onClose, saving, error }: {
   )
 }
 
-export function LeadUpGatheringsManager({ rangeStart, rangeEnd }: { rangeStart?: string; rangeEnd?: string }) {
-  const [events, setEvents] = useState<LeadUpEvent[]>([])
-  const [loading, setLoading] = useState(true)
+export function LeadUpGatheringsManager({ rangeStart, rangeEnd, initialEvents }: {
+  rangeStart?: string
+  rangeEnd?: string
+  // Server-rendered pages pass this (docs/architecture.md → Auth → "Server-
+  // rendered section data") so the list paints populated; the mount fetch
+  // below runs only when it's absent. The API route stays the refresh path.
+  initialEvents?: LeadUpEvent[]
+}) {
+  const [events, setEvents] = useState<LeadUpEvent[]>(initialEvents ?? [])
+  const [loading, setLoading] = useState(initialEvents === undefined)
   const [loadError, setLoadError] = useState(false)
   const [modal, setModal] = useState<{ mode: 'add'; date?: string } | { mode: 'edit'; event: LeadUpEvent } | null>(null)
   const [saving, setSaving] = useState(false)
@@ -262,7 +269,7 @@ export function LeadUpGatheringsManager({ rangeStart, rangeEnd }: { rangeStart?:
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { if (initialEvents === undefined) load() }, [])
 
   const handleSave = async (form: Draft, notify = false) => {
     setSaving(true)

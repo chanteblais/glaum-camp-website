@@ -1,19 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { requireAdmin } from '@/lib/admin-auth'
+import { getAdminShiftTypes } from '@/lib/admin-program-data'
 
 // Shift types are requirement-free kinds of shift (Setup, Service, Tea, …).
 // Whether a shift is *required* — and for whom — lives on groups/roles (conditional)
 // or on attunement tasks (universal), never on the type itself.
 
 export async function GET() {
-  const { data, error } = await supabaseAdmin
-    .from('shift_types')
-    .select('id, name, icon, sort_order')
-    .order('sort_order', { ascending: true })
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ shiftTypes: data ?? [] })
+  try {
+    return NextResponse.json({ shiftTypes: await getAdminShiftTypes() })
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 500 })
+  }
 }
 
 export async function POST(req: NextRequest) {

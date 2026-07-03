@@ -3,19 +3,18 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { deriveLegacyColumns } from '@/lib/event-type-compat'
 import { weekdayFromISO } from '@/lib/shift-hours'
 import { requireAdmin } from '@/lib/admin-auth'
+import { getAdminScheduleEvents } from '@/lib/admin-program-data'
 
 export async function GET() {
   if (!(await requireAdmin())) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const { data, error } = await supabaseAdmin
-    .from('schedule_events')
-    .select('*')
-    .order('sort_order', { ascending: true })
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ events: data ?? [] })
+  try {
+    return NextResponse.json({ events: await getAdminScheduleEvents() })
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 500 })
+  }
 }
 
 export async function POST(req: NextRequest) {

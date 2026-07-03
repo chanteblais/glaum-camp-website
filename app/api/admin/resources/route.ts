@@ -1,69 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { memberDisplayNames } from '@/lib/member-names'
 import { requireAdmin } from '@/lib/admin-auth'
+import { getAdminResourceLists } from '@/lib/admin-program-data'
 
 // Full admin view: every list (visible or not) with its items, and per-item
 // claims carrying display names — the organizer always sees who to chase.
+// Assembly lives in lib/admin-program-data.ts (shared with /admin/program's
+// server render); this route is the client's refresh path.
 export async function GET() {
   if (!(await requireAdmin())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { data: lists, error } = await supabaseAdmin
-    .from('resource_lists')
-    .select('id, title, description, group_id, department_id, role_id, visible, sort_order, groups(name), departments(name), roles(name)')
-    .order('sort_order', { ascending: true })
-    .order('created_at', { ascending: true })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  const { data: items } = await supabaseAdmin
-    .from('resources')
-    .select('id, list_id, name, note, quantity_needed, offered_by, icon, sort_order')
-    .order('sort_order', { ascending: true })
-    .order('created_at', { ascending: true })
-
-  const { data: claims } = await supabaseAdmin
-    .from('resource_claims')
-    .select('resource_id, clerk_user_id, quantity')
-
-  const names = await memberDisplayNames([
-    ...(claims ?? []).map(c => c.clerk_user_id),
-    ...(items ?? []).map(i => i.offered_by).filter(Boolean) as string[],
-  ])
-
-  const claimsByResource: Record<string, { name: string; quantity: number }[]> = {}
-  for (const c of claims ?? []) {
-    ;(claimsByResource[c.resource_id] ??= []).push({
-      name: names[c.clerk_user_id] ?? 'Unknown member',
-      quantity: c.quantity,
-    })
+  try {
+    return NextResponse.json({ lists: await getAdminResourceLists() })
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 500 })
   }
-
-  const itemsByList: Record<string, unknown[]> = {}
-  for (const it of items ?? []) {
-    const itemClaims = claimsByResource[it.id] ?? []
-    ;(itemsByList[it.list_id] ??= []).push({
-      ...it,
-      // NULL quantity_needed = open member offer (migration 053).
-      offered_by_name: it.offered_by ? names[it.offered_by] ?? 'Unknown member' : null,
-      claimed: itemClaims.reduce((s, c) => s + c.quantity, 0),
-      claimants: itemClaims,
-    })
-  }
-
-  // Supabase types the embeds as arrays; runtime returns a single row for a to-one FK.
-  type NameEmbed = { name: string } | { name: string }[] | null
-  const embedName = (e: NameEmbed) => (Array.isArray(e) ? e[0]?.name : e?.name) ?? null
-  type ListRow = { id: string; title: string; description: string | null; group_id: string | null; department_id: string | null; role_id: string | null; visible: boolean; sort_order: number; groups: NameEmbed; departments: NameEmbed; roles: NameEmbed }
-  return NextResponse.json({
-    lists: ((lists ?? []) as unknown as ListRow[]).map(l => ({
-      id: l.id, title: l.title, description: l.description,
-      group_id: l.group_id, department_id: l.department_id, role_id: l.role_id,
-      visible: l.visible, sort_order: l.sort_order,
-      // The steward is display context only; at most one FK is set (migration 052).
-      steward_name: embedName(l.groups) ?? embedName(l.departments) ?? embedName(l.roles),
-      items: itemsByList[l.id] ?? [],
-    })),
-  })
 }
 
 export async function POST(req: NextRequest) {

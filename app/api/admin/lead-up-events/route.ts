@@ -1,31 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { requireAdmin } from '@/lib/admin-auth'
+import { getAdminLeadUpEvents } from '@/lib/admin-program-data'
 
 // GET — all lead-up gatherings with their RSVP headcounts (admin view).
+// Assembly lives in lib/admin-program-data.ts (shared with /admin/program's
+// server render); this route is the client's refresh path.
 export async function GET() {
   if (!(await requireAdmin())) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const { data, error } = await supabaseAdmin
-    .from('lead_up_events')
-    .select('*')
-    .order('event_date', { ascending: true, nullsFirst: false })
-    .order('sort_order', { ascending: true })
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  const { data: rsvps } = await supabaseAdmin
-    .from('lead_up_event_rsvps')
-    .select('lead_up_event_id')
-  const counts: Record<string, number> = {}
-  for (const r of rsvps ?? []) {
-    counts[r.lead_up_event_id] = (counts[r.lead_up_event_id] ?? 0) + 1
+  try {
+    return NextResponse.json({ events: await getAdminLeadUpEvents() })
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 500 })
   }
-
-  const events = (data ?? []).map(e => ({ ...e, rsvp_count: counts[e.id] ?? 0 }))
-  return NextResponse.json({ events })
 }
 
 export async function POST(req: NextRequest) {
