@@ -339,7 +339,8 @@ export function RadioHero() {
         }
         @media (max-width: 700px) {
           .radio-rule { width: 55%; min-width: 0; }
-          .radio-hero-wave { left: 51%; right: -1.5rem; }
+          /* mobile: hug the rule line (no downward nudge) and sit further left */
+          .radio-hero-wave { left: 44%; right: -1.5rem; top: calc(50% + 4px); }
         }
       ` }} />
 
