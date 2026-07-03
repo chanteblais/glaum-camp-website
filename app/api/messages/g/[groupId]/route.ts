@@ -26,11 +26,14 @@ export async function GET(_req: Request, { params }: { params: { groupId: string
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  if (!(await isGroupMember(params.groupId, userId))) {
+  // Membership check and conversation lookup are independent — run together.
+  const [isMember, convId] = await Promise.all([
+    isGroupMember(params.groupId, userId),
+    findGroupConversation(params.groupId),
+  ])
+  if (!isMember) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
-
-  const convId = await findGroupConversation(params.groupId)
   if (!convId) return NextResponse.json({ messages: [] })
 
   const { data: msgs, error } = await supabaseAdmin

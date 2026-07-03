@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { LoadError } from './LoadError'
+import { useConfirm } from '../components/ConfirmDialog'
 
 type Announcement = {
   id: string
@@ -140,6 +141,7 @@ export function AnnouncementsManager() {
   const [modal, setModal] = useState<{ mode: 'add' } | { mode: 'edit'; item: Announcement } | null>(null)
   const [saving, setSaving] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
+  const { confirm, confirmDialog } = useConfirm()
 
   const load = async () => {
     setLoadError(false)
@@ -181,7 +183,13 @@ export function AnnouncementsManager() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this announcement?')) return
+    const item = items.find(a => a.id === id)
+    const ok = await confirm({
+      title: `Delete ${item ? `“${item.title}”` : 'this announcement'}?`,
+      confirmLabel: 'Delete announcement',
+      danger: true,
+    })
+    if (!ok) return
     await fetch(`/api/admin/announcements/${id}`, { method: 'DELETE' })
     setItems(prev => prev.filter(a => a.id !== id))
   }
@@ -255,6 +263,8 @@ export function AnnouncementsManager() {
           error={modalError}
         />
       )}
+
+      {confirmDialog}
     </div>
   )
 }

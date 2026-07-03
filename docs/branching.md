@@ -73,6 +73,13 @@ with `--no-ff` after verification (tsc + click-through), delete the branch, and
 - **A push ships all of `main`.** Check `git log --first-parent origin/main..main`
   before pushing; if it carries another session's unpushed merge, that's fine —
   nothing lands on main unverified (rule 1) — but say so in the summary.
+- **Docs ride along — verify before pushing (added 2026-07-02).** Every commit
+  being pushed must have its docs already folded in (the standing docs-before-
+  commit sweep: `docs/database.md` incl. migrations ledger, `docs/features.md`,
+  `docs/architecture.md`, the relevant feature spec, `docs/generalizability-log.md`).
+  Before pushing, glance over the outgoing commits and confirm that's true —
+  including other sessions' merges the push would carry. Stale docs → land the
+  docs fix first (rule-5 tweak or quick branch), then push.
 - **Migrations deploy with their code** (rule 6): apply the migration to prod as
   part of the same merge+push, and note the number in the merge commit. If the
   migration can't be applied right then, hold the push and say why.

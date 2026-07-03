@@ -152,3 +152,29 @@ textarea::placeholder {
     box-shadow: 0 0 40px rgba(210, 57, 248, 0.2), 0 0 80px rgba(210, 57, 248, 0.08);
   }
 }
+
+/* ── Mobile ergonomics ──────────────────────────────────────────────────────
+   iOS Safari auto-zooms the page (and leaves it zoomed) when focusing a form
+   field whose font-size is under 16px. Force 16px on phones — !important so it
+   beats the inline styles used throughout. Checkboxes/radios carry no text. */
+@media (max-width: 767px) {
+  input:not([type='checkbox']):not([type='radio']),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* Disable the double-tap-to-zoom gesture (and its 300ms tap delay) on
+   interactive elements — pinch-zoom stays available. */
+a, button, input, textarea, select, label, summary, [role='button'] {
+  touch-action: manipulation;
+}
+
+/* Collapses a hardcoded two-column inline grid to one column on narrow
+   screens — !important because those grids are inline styles. */
+@media (max-width: 559px) {
+  .mobile-stack {
+    grid-template-columns: 1fr !important;
+  }
+}

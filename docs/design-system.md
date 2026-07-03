@@ -72,6 +72,12 @@ Defined in `globals.css` under `@layer components`:
 | `.gold-divider` | 1px horizontal line, gold gradient, 40% opacity |
 | `.purple-glow` | Box shadow with layered purple glow |
 | `.site-shell` | Full site wrapper — background, dot grid, base text color |
+| `.mobile-stack` | Collapses a hardcoded two-column inline grid (`gridTemplateColumns: '1fr 1fr'`) to one column under 560px (`!important`, since the grids are inline styles). Used by paired form fields (apply wizard, volunteer form, profile settings) and the Your Role / Your Shifts cards. |
+
+### Mobile ergonomics (globals.css, not a class)
+
+- **Form fields are forced to `font-size: 16px` under 768px** (`!important`, overriding inline styles). iOS Safari auto-zooms the page — and leaves it zoomed — when focusing a field styled under 16px; 16px is the threshold that disables that. Don't "fix" a field back down on mobile.
+- **`touch-action: manipulation` on interactive elements** (links, buttons, form controls) disables double-tap-to-zoom and its tap delay; pinch-zoom is unaffected.
 
 ### Layout classes (profile page, defined inline via `<style>`)
 
@@ -101,6 +107,10 @@ Most content cards use a parchment aesthetic:
 - Primary: gold background (`#C8A848` or `glaum-gold`) with dark text
 - Secondary/ghost: transparent with gold or cream border
 - Focus: `outline: 2px solid #D239F8` (purple), offset 2px, `border-radius: 4px`
+
+### Confirm Dialog
+
+`ConfirmDialog` / `useConfirm()` (`components/ConfirmDialog.tsx`) — in-app replacement for native `confirm()`/`alert()`. Ink card on a dimmed overlay: gold uppercase eyebrow ("✦ A moment of pause"), TokyoDreams title, cream body, pill buttons ("Never mind" ghost + confirm; red accent when `danger`). `notice: true` = single "Understood" button (alert replacement, eyebrow "✦ A small snag"). Promise-based: `const { confirm, confirmDialog } = useConfirm()`, `await confirm({ title, body, confirmLabel, danger })`, render `{confirmDialog}` in the tree. Esc / overlay click cancel. Used everywhere — no native `confirm()`/`alert()` calls remain in the app (delete confirmations name the item and use `danger: true`; error alerts use `notice: true`). The one styled sibling is `ShiftConfirmModal` (shift sign-up/cancel), which predates this component.
 
 ### Avatar
 

@@ -8,6 +8,7 @@ import { isImageIcon } from '@/lib/icon-src'
 import { formatTime } from '@/lib/time-format'
 import { shiftDurationHours, formatShiftRange, weekdayFromISO } from '@/lib/shift-hours'
 import { buildScheduleDays, type ScheduleDay } from '@/lib/schedule-days'
+import { useConfirm } from '../components/ConfirmDialog'
 
 type ScheduleEvent = {
   id: string
@@ -504,6 +505,7 @@ export function ScheduleManager({ rangeStart, rangeEnd }: { rangeStart?: string;
   const draggedId = useRef<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const { confirm, confirmDialog } = useConfirm()
 
   const load = async () => {
     setLoadError(false)
@@ -581,7 +583,13 @@ export function ScheduleManager({ rangeStart, rangeEnd }: { rangeStart?: string;
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this event?')) return
+    const ev = events.find(e => e.id === id)
+    const ok = await confirm({
+      title: `Delete ${ev ? `“${ev.title}”` : 'this event'}?`,
+      confirmLabel: 'Delete event',
+      danger: true,
+    })
+    if (!ok) return
     await fetch(`/api/admin/schedule/${id}`, { method: 'DELETE' })
     setEvents((prev) => prev.filter((e) => e.id !== id))
   }
@@ -788,6 +796,8 @@ export function ScheduleManager({ rangeStart, rangeEnd }: { rangeStart?: string;
           shiftTypes={shiftTypes}
         />
       )}
+
+      {confirmDialog}
     </div>
   )
 }

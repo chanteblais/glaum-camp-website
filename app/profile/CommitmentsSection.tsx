@@ -105,7 +105,9 @@ function AccentHeader({ title, compact }: { title: string; compact?: boolean }) 
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.8rem' }}>
       {spark}{line('l')}
-      <p style={{ fontFamily: 'var(--font-cormorant-garamond), serif', fontSize: compact ? '0.92rem' : '1.05rem', fontWeight: 600, letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C8A848', margin: 0, textShadow: '0 0 18px rgba(200,168,72,0.35)', whiteSpace: 'nowrap' }}>
+      {/* No nowrap: the title is the card's widest content — on a phone it must
+          be able to wrap rather than force the card past the viewport. */}
+      <p style={{ fontFamily: 'var(--font-cormorant-garamond), serif', fontSize: compact ? '0.92rem' : '1.05rem', fontWeight: 600, letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C8A848', margin: 0, textShadow: '0 0 18px rgba(200,168,72,0.35)', textAlign: 'center' }}>
         {title}
       </p>
       {line('r')}{spark}

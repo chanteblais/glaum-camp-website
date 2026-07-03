@@ -220,7 +220,7 @@ export function VolunteerForm({ userEmail, userFirstName, userLastName, formConf
 
         <form onSubmit={handleSubmit}>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+          <div className="mobile-stack" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
             <Field label={fl.label('first_name')}>
               <TextInput name="first_name" placeholder="First name" required={fl.required('first_name')} defaultValue={userFirstName} />
             </Field>
@@ -230,7 +230,7 @@ export function VolunteerForm({ userEmail, userFirstName, userLastName, formConf
           </div>
 
           {(fl.visible('preferred_name') || fl.visible('pronouns')) && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+            <div className="mobile-stack" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
               {fl.visible('preferred_name') && (
                 <Field label={fl.label('preferred_name')} optional={!fl.required('preferred_name')}>
                   <TextInput name="preferred_name" placeholder="If different from first name" required={fl.required('preferred_name')} />
@@ -244,7 +244,7 @@ export function VolunteerForm({ userEmail, userFirstName, userLastName, formConf
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+          <div className="mobile-stack" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
             <Field label={fl.label('email')}>
               <TextInput name="email" type="email" defaultValue={userEmail} readOnly required={fl.required('email')} />
             </Field>

@@ -6,6 +6,7 @@ import {
   type AttunementRequirement,
   type AttunementTask,
 } from '@/lib/site-config'
+import { useConfirm } from '../components/ConfirmDialog'
 
 const GOLD = '#C8A848'
 const PURPLE = '#D239F8'
@@ -55,6 +56,7 @@ export function AttunementTasksManager({
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const { confirm, confirmDialog } = useConfirm()
 
   const save = useCallback((next: AttunementTask[]) => {
     if (timer.current) clearTimeout(timer.current)
@@ -289,9 +291,13 @@ export function AttunementTasksManager({
                 style={{ background: 'none', border: 'none', cursor: idx === tasks.length - 1 ? 'default' : 'pointer', color: GOLD, opacity: idx === tasks.length - 1 ? 0.2 : 0.5, fontSize: '0.75rem', padding: '0.1rem' }}
               >▼</button>
               <button
-                onClick={() => {
-                  if (!window.confirm(`Remove "${task.label}"?`)) return
-                  update(tasks.filter((_, i) => i !== idx))
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: `Remove “${task.label}”?`,
+                    confirmLabel: 'Remove task',
+                    danger: true,
+                  })
+                  if (ok) update(tasks.filter((_, i) => i !== idx))
                 }}
                 title="Remove"
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ff8a8a', opacity: 0.45, fontSize: '0.8rem', padding: '0.1rem', marginTop: '0.15rem' }}
@@ -319,6 +325,8 @@ export function AttunementTasksManager({
         {error && <p style={{ fontSize: '0.78rem', color: '#ff8a8a', margin: 0 }}>{error}</p>}
         {!error && saved && <p style={{ fontSize: '0.72rem', color: GOLD, opacity: 0.6, margin: 0 }}>Saved ✓</p>}
       </div>
+
+      {confirmDialog}
     </div>
   )
 }

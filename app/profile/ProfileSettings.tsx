@@ -282,7 +282,7 @@ export function ProfileSettings({ application }: { application: ApplicationData 
 
       {view === 'edit' && (
         <Panel title="Edit profile" onClose={closeAll}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 1rem' }}>
+          <div className="mobile-stack" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 1rem' }}>
             <Field label="Preferred name">
               <input
                 style={inputStyle}
@@ -302,7 +302,7 @@ export function ProfileSettings({ application }: { application: ApplicationData 
           {/* About / Skills are edited in the Profile Details card (they save to
               the canonical member_profiles values), not here. */}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 1rem' }}>
+          <div className="mobile-stack" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 1rem' }}>
             <Field label="Phone">
               <input
                 style={inputStyle}
@@ -340,7 +340,7 @@ export function ProfileSettings({ application }: { application: ApplicationData 
             </select>
           </Field>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 1rem' }}>
+          <div className="mobile-stack" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 1rem' }}>
             <Field label="Arrival">
               <input
                 style={inputStyle}
