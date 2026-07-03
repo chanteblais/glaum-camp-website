@@ -37,10 +37,11 @@ Auth is handled by **Clerk v7**. The Clerk middleware runs on all routes via `mi
 - Admin routes check for `role === 'admin'` in `publicMetadata`
 - `RememberSignedIn` component writes a localStorage flag so `HeaderClient` can show the right nav state without a round-trip
 - `/api/nav-auth` trusts only Clerk-verified sessions (`auth()`); an earlier unverified `__session`-cookie fallback was removed 2026-07-02 — post-sign-in flakiness is covered by `HeaderClient`'s retry loop instead
+- `/api/sign-out` resolves the user for session revocation from `auth()` first, falling back only to `verifyToken` (networkless JWKS check) on the raw `__session` cookie; an earlier unverified base64 parse of the JWT was removed 2026-07-02 (a forged `sub` could revoke any known user's sessions). Cookie-clearing runs regardless, so sign-out still works mid-broken-session
 
 Sign-out flow:
 1. User clicks sign out
-2. `POST /api/sign-out` clears session
+2. `GET /api/sign-out` revokes the user's Clerk sessions (verified identity only) and clears session cookies
 3. `HeaderClient` clears localStorage on nav-auth confirmation
 
 ---
@@ -102,7 +103,7 @@ Sign-out flow:
 | `/api/groups/[id]/join` | POST | Self-join an open group |
 | `/api/groups/[id]/leave` | POST | Leave an open group (admin-assigned groups → 403) |
 | `/api/nav-auth` | GET | Lightweight auth check for nav (returns `isSignedIn`, `isApproved`, name, email, avatarUrl) |
-| `/api/sign-out` | POST | Sign out |
+| `/api/sign-out` | GET | Revoke Clerk sessions (verified identity) + clear session cookies |
 | `/api/badge` | GET | Generate role badge PNG (OG image) |
 
 ### Admin-only
