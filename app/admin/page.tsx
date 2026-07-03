@@ -48,9 +48,11 @@ export default async function AdminPage() {
   const { data: configRows } = await supabaseAdmin
     .from('page_content')
     .select('key, value')
-    .in('key', ['config_shift_signup_open'])
+    .in('key', ['config_shift_signup_open', 'config_event_start_date', 'config_event_end_date'])
   const configMap = Object.fromEntries((configRows ?? []).map(r => [r.key, r.value]))
   const shiftSignupOpen = configMap['config_shift_signup_open'] !== 'false'
+  const eventRangeStart = configMap['config_event_start_date'] ?? ''
+  const eventRangeEnd = configMap['config_event_end_date'] ?? ''
 
   const { data: notifications, error: notificationsError } = await supabaseAdmin
     .from('admin_notifications')
@@ -221,7 +223,7 @@ export default async function AdminPage() {
           summary="Edit public schedule"
         >
           <ShiftSignupToggle initialOpen={shiftSignupOpen} />
-          <ScheduleManager />
+          <ScheduleManager rangeStart={eventRangeStart} rangeEnd={eventRangeEnd} />
         </CollapsibleSection>
 
         <CollapsibleSection
