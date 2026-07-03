@@ -96,23 +96,17 @@ const MAIN: [number, number][] = [
   [589, 149], [595, 49], [600, -5], [605, -29], [611, -32], [616, -23], [621, 11], [626, 111],
   [632, 252], [637, 363], [642, 397], [647, 401], [653, 394], [658, 355], [663, 288], [668, 207],
   [674, 117], [679, 64], [684, 58], [689, 67], [695, 114], [700, 178], [705, 253], [711, 278],
-  [716, 253], [721, 214], [726, 189], [732, 168], [737, 146], [742, 134], [747, 137], [753, 154],
-  [758, 175], [763, 188], [768, 194], [774, 194], [784, 186], [795, 201], [805, 189], [816, 149],
-  [826, 142], [837, 177], [847, 239], [858, 255], [868, 209], [879, 134], [889, 105], [900, 121],
-  // (this crest/valley pair softened from the raw transcription — the y
-  // rescale had sharpened it into needles)
-  [911, 172], [922, 208], [932, 214], [944, 168], [954, 136], [964, 146], [974, 196], [982, 194],
-  [984, 183], [995, 171], [1000, 177],
-  // the long tail, phrased like the left side's opening (deep slow swoop,
-  // then a sudden pick-up) but in its own voice: a moderate wave out of the
-  // decay, one LONG deep swoop below the baseline, a sharp crest surfacing
-  // from it, a quick settle, then a slow bright trail past the margin. The
-  // fade (not the geometry) extinguishes the line.
-  [1030, 196], [1068, 158],
-  [1120, 190], [1185, 226], [1250, 232], [1310, 216], [1352, 184],
-  [1392, 149], [1430, 160],
-  // …and the curve it feeds into settles evenly, barely breathing
-  [1464, 185], [1506, 176], [1552, 181], [1600, 178],
+  // Everything after the pulse obeys a strictly falling envelope — once the
+  // signal starts dropping, no crest or valley ever rises above the one
+  // before it (98 -> 62 -> 50 -> 42 -> 36 -> 30 -> 26 -> 22 -> 19 -> 16 ->
+  // 13 -> 7 -> 5 units) while the wavelengths stretch: the frequency
+  // dropping off. The wide swoop and gentle rally survive, tucked under the
+  // envelope; the fade + silk extinguish the line.
+  [716, 253], [740, 118], [768, 230], [800, 138], [836, 216], [876, 150],
+  [920, 206], [968, 158], [1020, 199], [1080, 164],
+  [1140, 196], [1210, 197], [1270, 193],
+  [1330, 167], [1390, 187],
+  [1450, 177], [1520, 182], [1600, 179],
 ]
 
 // Echo threads — the braid lives at the EDGES ONLY in the mock: two fine
