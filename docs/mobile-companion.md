@@ -23,10 +23,12 @@ Both clients navigate the same surfaces:
 
 - Schedule
 - Radio
-- Many Hands
+- Many Hands — the member registry (today's `/members`): *see the many hands you're building with*
 - Messages
 - Participate
 - Profile
+
+("Many Hands" is Glåüm terminology — hands-pillar naming for the directory. When the nav rename actually lands in the app, log the term in `generalizability-log.md` like the other community-specific vocabulary.)
 
 ### Explicitly rejected (2026-07-03)
 
