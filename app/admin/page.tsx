@@ -7,17 +7,13 @@ import { VolunteersSection } from './VolunteersSection'
 import { NotificationBell } from './NotificationBell'
 import { AdminNav } from './AdminNav'
 import { CategoryHeading } from './CategoryHeading'
-import { MANAGE_CATEGORIES } from './admin-sections'
-import { ScheduleManager } from './ScheduleManager'
-import { LeadUpGatheringsManager } from './LeadUpGatheringsManager'
-import { ResourcesManager } from './ResourcesManager'
+import { MEMBERS_CATEGORIES } from './admin-sections'
 import { AnnouncementsManager } from './AnnouncementsManager'
 import { getGroupNamesByUser } from '@/lib/groups'
 import { getShiftEventByUser } from '@/lib/shift-signups'
 import { getAdminRunway } from '@/lib/admin-attention'
 import { RoleRequestsSection } from './RoleRequestsSection'
 import { RoleSuggestionsSection } from './RoleSuggestionsSection'
-import { ShiftSignupToggle } from './ShiftSignupToggle'
 
 export default async function AdminPage() {
   const { userId } = await auth()
@@ -45,15 +41,6 @@ export default async function AdminPage() {
 
   const signupEventMap = await getShiftEventByUser()
   const runway = await getAdminRunway()
-
-  const { data: configRows } = await supabaseAdmin
-    .from('page_content')
-    .select('key, value')
-    .in('key', ['config_shift_signup_open', 'config_event_start_date', 'config_event_end_date'])
-  const configMap = Object.fromEntries((configRows ?? []).map(r => [r.key, r.value]))
-  const shiftSignupOpen = configMap['config_shift_signup_open'] !== 'false'
-  const eventRangeStart = configMap['config_event_start_date'] ?? ''
-  const eventRangeEnd = configMap['config_event_end_date'] ?? ''
 
   const { data: notifications, error: notificationsError } = await supabaseAdmin
     .from('admin_notifications')
@@ -111,7 +98,7 @@ export default async function AdminPage() {
 
       <div style={{ maxWidth: '960px', margin: '0 auto', padding: '0 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
 
-        <AdminNav sections={MANAGE_CATEGORIES} runway={runway} />
+        <AdminNav sections={MEMBERS_CATEGORIES} runway={runway} />
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.5rem' }}>
           <NotificationBell initialNotifications={notifications ?? []} />
@@ -134,10 +121,13 @@ export default async function AdminPage() {
         {/* ═══════════════ PEOPLE ═══════════════ */}
         <CategoryHeading id="people" />
 
-        {/* Registered members + outside volunteers */}
+        {/* Registered members + outside volunteers. Sections on this page
+            start collapsed — the summaries carry the at-a-glance counts —
+            except Applications, which opens itself while reviews are waiting. */}
         <CollapsibleSection
           title="Registered Hands"
           summary={`${approved.length} members · ${activeVolunteers.length} outside${pendingVolunteers.length > 0 ? ` · ${pendingVolunteers.length} pending` : ''}`}
+          defaultOpen={false}
         >
           <VolunteersSection
             volunteers={activeVolunteers}
@@ -159,6 +149,7 @@ export default async function AdminPage() {
         <CollapsibleSection
           title="Applications"
           summary={`${pending.length} pending${rejected.length > 0 ? ` · ${rejected.length} not approved` : ''}${cancelled.length > 0 ? ` · ${cancelled.length} cancelled` : ''}`}
+          defaultOpen={pending.length > 0}
         >
           {pending.length === 0 && rejected.length === 0 && cancelled.length === 0 ? (
             <p style={{ textAlign: 'center', opacity: 0.4, fontStyle: 'italic' }}>No applications to review.</p>
@@ -205,6 +196,7 @@ export default async function AdminPage() {
         <CollapsibleSection
           title="Role Requests"
           summary="Pending approval"
+          defaultOpen={false}
         >
           <RoleRequestsSection />
         </CollapsibleSection>
@@ -212,33 +204,9 @@ export default async function AdminPage() {
         <CollapsibleSection
           title="Role Suggestions"
           summary="Submitted by members"
+          defaultOpen={false}
         >
           <RoleSuggestionsSection />
-        </CollapsibleSection>
-
-        {/* ═══════════════ PROGRAM ═══════════════ */}
-        <CategoryHeading id="program" />
-
-        <CollapsibleSection
-          title="Schedule"
-          summary="Edit public schedule"
-        >
-          <ShiftSignupToggle initialOpen={shiftSignupOpen} />
-          <ScheduleManager rangeStart={eventRangeStart} rangeEnd={eventRangeEnd} />
-        </CollapsibleSection>
-
-        <CollapsibleSection
-          title="Lead-Up Gatherings"
-          summary="Planning sessions on the runway to the event (members RSVP)"
-        >
-          <LeadUpGatheringsManager rangeStart={eventRangeStart} rangeEnd={eventRangeEnd} />
-        </CollapsibleSection>
-
-        <CollapsibleSection
-          title="Shared Resources"
-          summary="Gear the community needs — members claim what they'll bring"
-        >
-          <ResourcesManager />
         </CollapsibleSection>
 
         {/* ═══════════════ COMMUNICATION ═══════════════ */}
@@ -247,6 +215,7 @@ export default async function AdminPage() {
         <CollapsibleSection
           title="Announcements"
           summary="Post updates visible to all members"
+          defaultOpen={false}
         >
           <AnnouncementsManager />
         </CollapsibleSection>

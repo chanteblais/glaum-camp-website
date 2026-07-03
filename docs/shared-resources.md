@@ -33,7 +33,7 @@ organizer wants, not an error).
 
 ## Surfaces
 
-- **Admin → Manage → Program → Shared Resources** (`ResourcesManager.tsx`):
+- **Admin → Program → Shared Resources** (`/admin/program`) (`ResourcesManager.tsx`):
   create/edit/hide/delete lists (steward picked from one dropdown with
   Groups / Departments / Roles optgroups), add/edit/delete items (incl. an
   optional **icon** via the shared `AssetImagePicker` — migration `055`,

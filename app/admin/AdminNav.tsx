@@ -10,7 +10,8 @@ const CREAM = '#F3EDE6'
 
 const TABS = [
   { label: 'Overview', href: '/admin/overview' },
-  { label: 'Manage', href: '/admin' },
+  { label: 'Members', href: '/admin' },
+  { label: 'Program', href: '/admin/program' },
   { label: 'Configure', href: '/admin/configure' },
 ]
 
@@ -24,17 +25,18 @@ export type RunwayProps = {
  * /admin/configure and /admin/[id]) so the nav never disappears and you can
  * always jump between areas or back to camp without backtracking.
  *
- * Pass `sections` (on the Manage or Configure page) to surface a second row of
+ * Pass `sections` (on the Members, Program, or Configure page) to surface a second row of
  * jump-links down to each category on that page. Pass `runway` to show the
  * days-to-camp strip with the next dated milestones (docs/admin-ux-handoff.md A2).
  */
 export function AdminNav({ sections, runway }: { sections?: AdminCategory[]; runway?: RunwayProps }) {
   const path = usePathname()
 
-  // /admin/[id] (application detail) belongs under Manage.
+  // /admin/[id] (application detail) belongs under Members.
   const activeHref =
     path === '/admin/overview' ? '/admin/overview'
     : path.startsWith('/admin/configure') ? '/admin/configure'
+    : path.startsWith('/admin/program') ? '/admin/program'
     : '/admin'
 
   return (
