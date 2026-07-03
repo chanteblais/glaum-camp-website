@@ -294,6 +294,19 @@ The event itself: three always-open workspaces, each held together by a **soft p
 | Lead-Up Gatherings | `LeadUpGatheringsManager` | CRUD for lead-up gatherings (spec: [`lead-up-gatherings.md`](./lead-up-gatherings.md)) topped by a **month calendar** (`LeadUpCalendar`) — the runway at a glance: click an empty day to add a gathering there (date prefilled), click a gathering chip to edit it; ‹ › month nav opens on the next upcoming gathering's month; the configured event range (Configure → Event Dates) is tinted purple with an "Event" marker; past days dimmed; hidden gatherings at low opacity with ○. The editor requires title + date + start time (the same styled `TimeField` as the event modal, end optional with durations). The row list below keeps Notify / visibility / delete per gathering |
 | Shared Resources | `ResourcesManager` | Gear the community needs, members claim what they'll bring — see [Shared Resources](#shared-resources) |
 
+### Configure tab (`/admin/configure`)
+
+The standalone definitional structures, presented as a **collapsed settings menu**: each section is a soft panel (`CollapsibleSection` with the `panel` prop) whose header keeps the title, a plain-English summary, and a live **status chip** (counts computed server-side in `app/admin/configure/page.tsx` — e.g. "3 fields · 9 system", "Jul 22 – Jul 27 · 6 days", "none granted") visible whether open or closed, so the collapsed page doubles as a state-of-the-camp overview. Panels default collapsed; localStorage remembers how you left each one per browser (`glaum-admin-panel:*` keys, separate from the flat variant's `glaum-admin-section:*`). Category headings use the same enlarged `CategoryHeading` as Program. The Application Form entry is a panel-styled link that opens the full-screen builder.
+
+| Category | Sections |
+|---|---|
+| Forms & Fields | Application Form (link) · Profile Fields |
+| Recognition & Tasks | Distinctions · Attunement Tasks |
+| Structure | Event Dates · Departments · Groups · Shift Types |
+| Access & System | Admins · Poll Managers · Debug Tools |
+
+The Admins / Poll Managers grant lists show the first 5 grantable members with an "…and N more — search" note; searching reveals all matches. (This replaced a fixed-height inner scrollbox that used to trap the page's scroll.)
+
 ---
 
 ### Application Builder (`/admin/configure`)
@@ -301,7 +314,7 @@ The event itself: three always-open workspaces, each held together by a **soft p
 **Who:** Admin  
 **What:** Full-page form builder for configuring both the Camp Member application and Volunteer signup.
 
-Reached via the "Configure Applications →" link on the admin dashboard.
+Reached via the **Application Form** link panel at the top of Configure → Forms & Fields.
 
 **The member application is fully modular** — every section and field (built-in or admin-added) can be reordered, edited, resized, hidden, and (non-core) deleted. Config is the source of truth: deletions stick; "Reset to defaults" restores.
 
@@ -334,12 +347,12 @@ Reached via the "Configure Applications →" link on the admin dashboard.
 - **Per field:** enable/disable, label, `key` (internal identity), description, type (Text / Long text / Number / Yes-No / Single-select / Multi-select / Date, with options for the selects), reorder, delete. Plus capability toggles:
   - **Visible** (the `public` flag) — **on** = shown on the member’s profile (and the editable Profile Details card); **off** = the field is **admin-only**, appearing solely in the member’s application detail (`/admin/[id]` → Profile Details). Never public.
   - **Editable** — members can edit their own value (on `/profile`).
-  - **In apps** — the field can be attached to an application question (see below).
-  - **In rules** — the field can be referenced by distinction rules.
+  - **On application** (`applicationEligible`) — the field can be attached to an application question (see below).
+  - **For medals** (`distinctionEligible`) — the field can be referenced by distinction rules.
   - **Catch-up** / **Required** — prompt existing members who haven’t filled the field in yet (Phase 4.5).
-- **Ties into the Application Builder:** a custom application question can be bound to a profile field (`FieldConfig.profileFieldKey`), so its answer saves to `member_profiles.values` and is reused everywhere. The builder’s field-binding dropdown lists every **In apps** profile field (`applicationFields`).
-- **Key stability (data safety):** a field’s `key` is the identity its saved answers are stored under. Renaming a field’s **label never changes its key** for any field that already existed when the manager loaded — only brand-new (this-session) fields auto-derive their key from the label. Editing the `key` box directly still re-keys it, which **disconnects existing member answers** (the old values remain in `member_profiles.values` under the old key — recoverable by setting the key back).
-- **System fields** (groups, tenure, designation, …) are shown read-only at the bottom — derived at eval time, never stored, usable in distinction rules.
+- **Ties into the Application Builder:** a custom application question can be bound to a profile field (`FieldConfig.profileFieldKey`), so its answer saves to `member_profiles.values` and is reused everywhere. The builder’s field-binding dropdown lists every **On application** profile field (`applicationFields`).
+- **Key stability (data safety):** a field’s `key` is the identity its saved answers are stored under, and it is **fully internal — the manager never shows or edits it**. Brand-new (this-session) fields auto-derive a unique key from the label as it’s typed; any field that already existed keeps its key forever, so renaming a label can never disconnect the member answers saved under it.
+- **Derived facts** (groups, tenure, designation, …) are shown read-only at the bottom as the “Tracked automatically” strip with plain-English hover hints — computed at eval time, never stored, usable in distinction rules (`system: true` in the registry).
 
 **Key files:** `app/admin/ProfileFieldsManager.tsx`, `lib/profile-fields.ts`
 
@@ -528,7 +541,7 @@ Coordinates the physical gear members bring to the event (stoves, coolers, tools
 
 Earned, ceremonial honours shown as engraved medals in the profile's **Cabinet of Distinctions**. The architectural rule is **store facts, not badges** — distinctions are *derived* on every render from member facts + admin rules, never persisted.
 
-- **Facts** (`lib/member-facts.ts`) — `buildMemberFacts({ application, roleInfo, memberGroups, roleApproved })` returns a typed `MemberFacts` object. This pass is **derive-only**: only facts sourceable today are computed — `joined_year`/`years_since_joined` (from `applications.submitted_at`), `designation`/`department` (role join), `group_count`/`groups`, `camped_before`, `has_photo`, `is_approved`. `MEMBER_FACT_CATALOG` describes each fact (key, label, type) so the admin builder can render the right operator/value inputs.
+- **Facts** (`lib/member-facts.ts`) — `buildMemberFacts({ application, roleInfo, memberGroups, roleApproved, profileValues })` returns a typed `MemberFacts` object. This pass is **derive-only**: only facts sourceable today are computed — `joined_year`/`years_since_joined` (**earliest evidence of membership**: the member-reported `gatheringsAttended` years from `member_profiles.values` ∪ the `applications.submitted_at` year, whichever is earliest — application year alone would date everyone to the site's launch year; hardcoded field key logged in the generalizability log), `designation`/`department` (role join), `group_count`/`groups`, `camped_before`, `has_photo`, `is_approved`. `joined_year` backs the "Member since" stat on `/profile` **and** `/members/[id]`. `MEMBER_FACT_CATALOG` describes each fact (key, label, type) so the admin builder can render the right operator/value inputs.
 - **Rules** (`lib/distinctions.ts`) — admin-configurable, stored as one JSON string in `page_content.config_distinctions` (mirrors the Attunement Tasks pattern). `parseDistinctions` parses/validates (falling back to `DEFAULT_DISTINCTIONS`); `evaluateDistinctions(facts, rules)` returns the earned medals (enabled rules whose conditions **all** pass). A `DistinctionRule` has a label, optional description (hover tooltip), medal `image` (+ `glyph` emoji fallback), an optional short static **`engraving`** caption (≤`DISTINCTION_ENGRAVING_MAX` = 32 chars, shown under the medal), an optional dynamic `yearFact`, and AND'd `conditions` (`{ fact, op, value }`, ops in `DISTINCTION_OPS`). A condition on an absent/null fact never passes, so rules referencing not-yet-derivable facts (e.g. `camps_attended` for "Glåüm Elder") stay dormant until that fact exists.
 - **Admin** — `Admin → Distinctions` (`DistinctionsManager.tsx`, cloned from `AttunementTasksManager`, rendered in `app/admin/configure/page.tsx`): add/edit/reorder/enable rules with debounced autosave to `config_distinctions`. Medal art is chosen via the shared **`AssetImagePicker`** (Distinctions tab first) — a built-in library image, a reused group icon, or an upload; the old emoji-glyph and pasted-URL inputs were removed (glyph remains a render-time fallback only). Each rule also has the optional **engraving** caption field and the year source; conditions use the fact catalog.
 - **Defaults** — Founding Member (`joined_year ≤ 2026`), Five Year Attunement (`years_since_joined ≥ 5`), Many Hands (`group_count ≥ 3`), and a dormant Glåüm Elder. So the cabinet populates out of the box.

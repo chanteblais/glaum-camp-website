@@ -67,10 +67,11 @@ Lives exactly like `config_distinctions` / `config_attunement_tasks`. Each entry
 - The **`public`** flag is surfaced in `ProfileFieldsManager` as the **"Visible"** toggle: on =
   shown on the member-facing profile; **off = admin-only**, surfaced only in the member's
   application detail (`/admin/[id]` → Profile Details). It is never public-facing when off.
-- The **`key`** is the stable identity that `member_profiles.values` are stored under, so
-  `ProfileFieldsManager` **does not re-key a field when its label is renamed** (only brand-new,
-  this-session fields auto-derive the key from the label). Editing the key box directly re-keys and
-  disconnects existing answers (old values remain under the old key — recoverable).
+- The **`key`** is the stable identity that `member_profiles.values` are stored under. It is
+  **fully internal — never shown or editable in `ProfileFieldsManager`**: brand-new (this-session)
+  fields auto-derive a unique key from the label as it's typed; any field that already existed keeps
+  its key forever, so renaming a label can never disconnect saved answers. (Re-keying is only
+  possible by editing the JSON directly; old values would remain under the old key — recoverable.)
 
 ### The critical abstraction: one merged namespace
 

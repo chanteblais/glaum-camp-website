@@ -40,6 +40,20 @@ function keyFromLabel(label: string): string {
   return words[0] + words.slice(1).map(w => w[0].toUpperCase() + w.slice(1)).join('')
 }
 
+// Plain-English hover hints for the derived facts strip — the labels alone can
+// read like leftovers to a non-programmer.
+const SYSTEM_FIELD_HINTS: Record<string, string> = {
+  joined_year:        'Their earliest Gatherings-Attended year — or the year they applied',
+  years_since_joined: 'How many years since their earliest year',
+  group_count:        'How many groups they belong to',
+  groups:             'Which groups they belong to',
+  designation:        'Their role title',
+  department:         'Their department',
+  camped_before:      'Whether they’ve camped before',
+  has_photo:          'Whether they’ve uploaded a profile photo',
+  is_approved:        'Whether their application is approved',
+}
+
 // Small pill toggle reused for the four capability flags + enable.
 function Toggle({ on, onClick, title }: { on: boolean; onClick: () => void; title: string }) {
   return (
@@ -68,12 +82,12 @@ function FlagRow({ field, onChange }: {
   onChange: (change: Partial<ProfileField>) => void
 }) {
   const flags: { key: keyof ProfileField; label: string; title: string }[] = [
-    { key: 'public',              label: 'Visible',      title: 'Shown on the member’s profile. Off = visible to admins only (in the member’s application detail)' },
-    { key: 'memberEditable',      label: 'Editable',     title: 'Members can edit their own value' },
-    { key: 'applicationEligible', label: 'In apps',      title: 'Can be used as an application question' },
-    { key: 'distinctionEligible', label: 'In rules',     title: 'Can be referenced by distinction rules' },
-    { key: 'askExisting',         label: 'Catch-up',     title: 'Prompt existing members who haven’t filled this in yet' },
-    { key: 'required',            label: 'Required',     title: 'Catch-up prompt can’t be dismissed (use together with Catch-up)' },
+    { key: 'public',              label: 'Visible',        title: 'Shown on the member’s profile. Off = visible to admins only (in the member’s application detail)' },
+    { key: 'memberEditable',      label: 'Editable',       title: 'Members can edit their own value' },
+    { key: 'applicationEligible', label: 'On application', title: 'Can be asked as a question on the application form' },
+    { key: 'distinctionEligible', label: 'For medals',     title: 'Distinction rules can use this field to award medals' },
+    { key: 'askExisting',         label: 'Catch-up',       title: 'Prompt existing members who haven’t filled this in yet' },
+    { key: 'required',            label: 'Required',       title: 'Catch-up prompt can’t be dismissed (use together with Catch-up)' },
   ]
   return (
     <div style={{ display: 'flex', gap: '1.1rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -179,9 +193,9 @@ export function ProfileFieldsManager({ initialFields }: { initialFields: Profile
         profile, so the same field works everywhere.
         <br />
         <span style={{ opacity: 0.7 }}>
-          Use the toggles on each field to choose where it shows up. The <strong>system fields</strong>{' '}
-          at the bottom are filled in automatically (like how many groups someone belongs to) and can
-          be used in distinction rules.
+          Use the toggles on each field to choose where it shows up. At the bottom, the{' '}
+          <strong>tracked-automatically</strong> facts (like how many groups someone belongs to) are
+          filled in by the site itself — nothing to manage, but medal rules can use them.
         </span>
       </p>
 
@@ -193,9 +207,6 @@ export function ProfileFieldsManager({ initialFields }: { initialFields: Profile
         )}
 
         {stored.map((field, idx) => {
-          const keyConflict = stored.some((o, i) => i !== idx && o.key === field.key) ||
-            locked.some(l => l.key === field.key) ||
-            system.some(s => s.key === field.key)
           return (
             <div
               key={idx}
@@ -209,37 +220,27 @@ export function ProfileFieldsManager({ initialFields }: { initialFields: Profile
               <Toggle on={field.enabled} onClick={() => patch(idx, { enabled: !field.enabled })} title={field.enabled ? 'Active' : 'Disabled'} />
 
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.7rem', minWidth: 0 }}>
-                {/* Label + key */}
-                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                  <input
-                    value={field.label}
-                    onChange={e => {
-                      // Auto-track key from label only for NEW fields (added this
-                      // session) whose key still matches the auto-suggestion. Fields
-                      // loaded from the server keep their key so renaming the label
-                      // never orphans saved member answers keyed by it.
-                      const prevAuto = keyFromLabel(field.label)
-                      const change: Partial<ProfileField> = { label: e.target.value }
-                      const isNew = !persistedKeys.current.has(field.key)
-                      if (isNew && (field.key === prevAuto || field.key === '')) {
-                        change.key = keyFromLabel(e.target.value)
-                      }
-                      patch(idx, change)
-                    }}
-                    placeholder="Display name (e.g. Event Experience)"
-                    style={{ ...inputStyle, flex: 1, minWidth: '10rem' }}
-                  />
-                  <span style={{ display: 'inline-flex', flexDirection: 'column', gap: '0.15rem' }}>
-                    <span style={tinyLabel}>Key</span>
-                    <input
-                      value={field.key}
-                      onChange={e => patch(idx, { key: e.target.value.replace(/\s+/g, '') })}
-                      placeholder="eventExperience"
-                      style={{ ...selectStyle, width: '9rem', color: keyConflict ? '#ff8a8a' : '#C9B68F', fontFamily: 'monospace' }}
-                      title={keyConflict ? 'Key must be unique' : 'Internal key — the stable identity for saved answers. Changing it disconnects existing member responses.'}
-                    />
-                  </span>
-                </div>
+                {/* Label. The internal key never surfaces here: new fields derive a
+                    unique key from the label as it's typed; fields that already
+                    existed keep their key forever, so renaming a label can never
+                    disconnect the member answers saved under it. */}
+                <input
+                  value={field.label}
+                  onChange={e => {
+                    const change: Partial<ProfileField> = { label: e.target.value }
+                    if (!persistedKeys.current.has(field.key)) {
+                      const base = keyFromLabel(e.target.value) || 'field'
+                      const others = new Set(fields.filter(f => f !== field).map(f => f.key))
+                      let key = base
+                      let n = 1
+                      while (others.has(key)) key = `${base}${++n}`
+                      change.key = key
+                    }
+                    patch(idx, change)
+                  }}
+                  placeholder="Display name (e.g. Event Experience)"
+                  style={{ ...inputStyle, width: '100%' }}
+                />
 
                 <input
                   value={field.description ?? ''}
@@ -318,12 +319,12 @@ export function ProfileFieldsManager({ initialFields }: { initialFields: Profile
 
       {/* Built-in core fields — always present, member-filled, not configurable */}
       <div style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(200,168,72,0.12)', paddingTop: '1rem' }}>
-        <p style={{ ...tinyLabel, opacity: 0.45, marginBottom: '0.6rem' }}>Built-in fields (always shown · members fill these · not configurable)</p>
+        <p style={{ ...tinyLabel, opacity: 0.45, marginBottom: '0.6rem' }}>Always on every profile — members fill these in</p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
           {(locked.length ? locked : LOCKED_PROFILE_FIELDS).map(f => (
             <span
               key={f.key}
-              title={`${f.type} · built-in, always shown`}
+              title={f.description ?? 'Built-in, always shown'}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
                 padding: '0.25rem 0.7rem', borderRadius: '9999px',
@@ -333,20 +334,19 @@ export function ProfileFieldsManager({ initialFields }: { initialFields: Profile
             >
               <span aria-hidden style={{ opacity: 0.6 }}>🔒</span>
               {f.label}
-              <span style={{ fontFamily: 'monospace', fontSize: '0.62rem', opacity: 0.45 }}>{f.key}</span>
             </span>
           ))}
         </div>
       </div>
 
-      {/* System fields — read-only reference */}
+      {/* Derived facts — read-only reference for the medal rule builder */}
       <div style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(200,168,72,0.12)', paddingTop: '1rem' }}>
-        <p style={{ ...tinyLabel, opacity: 0.45, marginBottom: '0.6rem' }}>System fields (derived · read-only)</p>
+        <p style={{ ...tinyLabel, opacity: 0.45, marginBottom: '0.6rem' }}>Tracked automatically — the site fills these in; medal rules can use them</p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
           {(system.length ? system : SYSTEM_PROFILE_FIELDS).map(f => (
             <span
               key={f.key}
-              title={`${f.type}${f.distinctionEligible ? ' · usable in rules' : ''}`}
+              title={SYSTEM_FIELD_HINTS[f.key] ?? f.label}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
                 padding: '0.25rem 0.7rem', borderRadius: '9999px',
@@ -355,7 +355,6 @@ export function ProfileFieldsManager({ initialFields }: { initialFields: Profile
               }}
             >
               {f.label}
-              <span style={{ fontFamily: 'monospace', fontSize: '0.62rem', opacity: 0.45 }}>{f.key}</span>
             </span>
           ))}
         </div>

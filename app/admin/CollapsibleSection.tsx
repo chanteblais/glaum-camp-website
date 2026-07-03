@@ -5,19 +5,29 @@ import { useState, useEffect } from 'react'
 export function CollapsibleSection({
   title,
   summary,
-  defaultOpen = true,
+  status,
+  panel = false,
+  defaultOpen,
   children,
 }: {
   title: string
   summary?: string
+  /** Short live-state note on the right of the header, e.g. "6 fields · 9 system". */
+  status?: string
+  /** Soft-panel look (Configure): card backdrop, summary always visible, collapsed by default. */
+  panel?: boolean
   defaultOpen?: boolean
   children: React.ReactNode
 }) {
-  const [open, setOpen] = useState(defaultOpen)
+  // Panels open collapsed so the page reads as a scannable settings menu;
+  // the flat variant keeps its historical open-by-default behavior.
+  const [open, setOpen] = useState(defaultOpen ?? !panel)
 
   // The console remembers how you left each section (keyed by title, per
   // browser). Hydrate after mount so the server render stays deterministic.
-  const storageKey = `glaum-admin-section:${title}`
+  // Panels use their own key space so the collapsed-menu default gets a
+  // fresh start on browsers that had the old always-open state saved.
+  const storageKey = `${panel ? 'glaum-admin-panel' : 'glaum-admin-section'}:${title}`
   useEffect(() => {
     try {
       const saved = localStorage.getItem(storageKey)
@@ -30,6 +40,60 @@ export function CollapsibleSection({
       try { localStorage.setItem(storageKey, o ? '0' : '1') } catch { /* ignore */ }
       return !o
     })
+  }
+
+  if (panel) {
+    return (
+      <div style={{
+        marginBottom: '1.1rem',
+        borderRadius: '0.9rem',
+        border: '1px solid rgba(200,168,72,0.14)',
+        background: 'rgba(243,237,230,0.03)',
+      }}>
+        <button
+          onClick={toggle}
+          aria-expanded={open}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '0.5rem 1rem',
+            background: 'none',
+            border: 'none',
+            padding: '1.1rem 1.3rem',
+            cursor: 'pointer',
+            color: 'inherit',
+            textAlign: 'left',
+          }}
+        >
+          <span style={{ flex: '1 1 16rem', minWidth: 0 }}>
+            <span style={{ display: 'block', fontSize: '0.78rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: '#C8A848' }}>
+              {title}
+            </span>
+            {summary && (
+              <span style={{ display: 'block', marginTop: '0.4rem', fontSize: '0.8rem', lineHeight: 1.5, color: '#F3EDE6', opacity: 0.5 }}>
+                {summary}
+              </span>
+            )}
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', whiteSpace: 'nowrap', paddingTop: '0.05rem' }}>
+            {status && (
+              <span style={{ fontSize: '0.75rem', fontStyle: 'italic', color: '#C8A848', opacity: 0.6 }}>{status}</span>
+            )}
+            <span style={{ fontSize: '0.65rem', color: '#C8A848', opacity: 0.45 }}>
+              {open ? '▲' : '▼'}
+            </span>
+          </span>
+        </button>
+        {open && (
+          <div style={{ padding: '1.2rem 1.3rem 1.4rem', borderTop: '1px solid rgba(200,168,72,0.1)' }}>
+            {children}
+          </div>
+        )}
+      </div>
+    )
   }
 
   return (

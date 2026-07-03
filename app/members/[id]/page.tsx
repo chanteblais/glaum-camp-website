@@ -110,12 +110,14 @@ export default async function MemberPage({ params }: { params: { id: string } })
 
   // Earned medals — derived from facts against the admin's distinction rules
   // (store-the-facts, derive-the-badge). Never persisted; recomputed per render.
-  const memberFacts = buildMemberFacts({ application: member, roleInfo, memberGroups, roleApproved })
+  // profileValues feeds the facts too: joined_year derives from the member's
+  // reported Gatherings-Attended years (falling back to application year).
+  const memberFacts = buildMemberFacts({ application: member, roleInfo, memberGroups, roleApproved, profileValues })
   const factContext = { ...profileValues, ...memberFacts }
   const earnedDistinctions = evaluateDistinctions(factContext, parseDistinctions(cfgMap['config_distinctions']), awardedIds)
 
   const displayName = member.preferred_name || member.first_name || 'Member'
-  const memberSince = member.submitted_at ? new Date(member.submitted_at as string).getFullYear() : null
+  const memberSince = memberFacts.joined_year
   const deptName = roleApproved ? roleInfo?.departments?.name ?? null : null
   const deptIcon = roleInfo?.departments?.icon ?? null
   const deptDesc = roleApproved ? roleInfo?.departments?.description ?? null : null

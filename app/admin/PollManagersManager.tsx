@@ -47,11 +47,15 @@ export function PollManagersManager({ members }: { members: Member[] }) {
     const name = `${m.preferred_name ?? m.first_name} ${m.last_name}`.toLowerCase()
     return name.includes(q) || m.email.toLowerCase().includes(q)
   })
+  // Untouched, the list shows a taste of who's grantable; search opens it up.
+  // (A capped list beats an inner scrollbox, which trapped the page scroll.)
+  const shown = search ? grantable : grantable.slice(0, 5)
+  const remaining = grantable.length - shown.length
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <p style={{ fontSize: '0.8rem', opacity: 0.5, margin: 0, lineHeight: 1.5 }}>
-        Approved members granted this can create and edit polls from their dashboard. Admins can always manage polls.
+        Admins can always manage polls, so they don&apos;t need the grant.
       </p>
 
       {error && (
@@ -94,15 +98,20 @@ export function PollManagersManager({ members }: { members: Member[] }) {
             outline: 'none',
           }}
         />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '320px', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           {grantable.length === 0 && (
             <p style={{ fontSize: '0.8rem', opacity: 0.4, fontStyle: 'italic', padding: '0.5rem 0' }}>
               {search ? 'No members match.' : 'No other members to grant.'}
             </p>
           )}
-          {grantable.map(m => (
+          {shown.map(m => (
             <Row key={m.clerk_user_id} member={m} loading={loading === m.clerk_user_id} onToggle={toggle} />
           ))}
+          {remaining > 0 && (
+            <p style={{ fontSize: '0.78rem', opacity: 0.4, fontStyle: 'italic', padding: '0.25rem 0 0', margin: 0 }}>
+              …and {remaining} more — search to find someone specific.
+            </p>
+          )}
         </div>
       </div>
     </div>
