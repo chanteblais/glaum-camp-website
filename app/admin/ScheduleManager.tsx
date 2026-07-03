@@ -37,6 +37,11 @@ type ScheduleEvent = {
 // Shift types offered when an event is a Shift (Configure → Shift Types registry).
 type ShiftTypeOption = { id: string; name: string }
 
+// One holder of a shift, from GET /api/admin/schedule/rosters (member_shift_signups
+// ∪ legacy camp_signups). legacy_only holds have no member_shift_signups row,
+// so the lead toggle can't touch them.
+type RosterEntry = { clerk_user_id: string; name: string; role: 'member' | 'lead'; legacy_only: boolean }
+
 // Weekday fallback order — only used to sort legacy UNDATED rows among themselves.
 const DAY_ORDER: Record<string, number> = {
   Wednesday: 0, Thursday: 1, Friday: 2, Saturday: 3, Sunday: 4, Monday: 5, Tuesday: 6,
@@ -307,6 +312,7 @@ function EventRow({
   shiftTypeName,
   showDay,
   drag,
+  roster,
   onEdit,
   onDelete,
   onToggleVisible,
@@ -315,6 +321,7 @@ function EventRow({
   shiftTypeName?: string
   showDay?: boolean
   drag?: DragHandlers
+  roster?: React.ReactNode
   onEdit: () => void
   onDelete: () => void
   onToggleVisible: () => void
@@ -327,7 +334,6 @@ function EventRow({
       onDrop={drag?.onDrop}
       onDragEnd={drag?.onDragEnd}
       style={{
-        display: 'flex', alignItems: 'center', gap: '0.75rem',
         padding: '0.6rem 1rem', borderRadius: '0.65rem',
         border: drag?.isDragOver
           ? '1px solid rgba(200,168,72,0.5)'
@@ -340,6 +346,7 @@ function EventRow({
         transition: 'border-color 0.15s, background 0.15s',
       }}
     >
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
       {/* Drag handle (recurring only) */}
       {drag && (
         <div style={{ color: '#C8A848', opacity: 0.25, flexShrink: 0, fontSize: '1rem', lineHeight: 1, userSelect: 'none' }}>
@@ -393,6 +400,62 @@ function EventRow({
         </button>
       </div>
     </div>
+    {roster}
+    </div>
+  )
+}
+
+// Compact roster under a shift row: count vs capacity, then one chip per holder
+// (✦ = lead). Chips toggle lead/member with the same set_shift_role PATCH the
+// member page uses — so the digest's "full but no lead" flag is fixable right
+// here. Legacy-only holds can't carry a role, so their chip is inert.
+function ShiftRoster({ event, entries, busyKey, error, onToggleLead }: {
+  event: ScheduleEvent
+  entries: RosterEntry[]
+  busyKey: string | null
+  error: string | null
+  onToggleLead: (entry: RosterEntry) => void
+}) {
+  const n = entries.length
+  const hasLead = entries.some(e => e.role === 'lead')
+  const full = event.capacity != null && n >= event.capacity
+  return (
+    <div style={{ marginTop: '0.5rem', paddingLeft: '6.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+      <span style={{ fontSize: '0.68rem', color: full ? '#C8A848' : '#F3EDE6', opacity: full ? 0.85 : 0.4, whiteSpace: 'nowrap' }}>
+        {n}{event.capacity != null ? ` / ${event.capacity}` : ''} signed up
+      </span>
+      {event.needs_lead && n > 0 && !hasLead && (
+        <span style={{ fontSize: '0.62rem', color: '#C8A848', border: '1px solid rgba(200,168,72,0.4)', borderRadius: '9999px', padding: '0.08rem 0.5rem', whiteSpace: 'nowrap' }}>
+          ✦ no lead yet
+        </span>
+      )}
+      {entries.map(e => {
+        const busy = busyKey === `${event.id}|${e.clerk_user_id}`
+        const lead = e.role === 'lead'
+        return (
+          <button
+            key={e.clerk_user_id}
+            onClick={() => onToggleLead(e)}
+            disabled={busy || e.legacy_only}
+            title={e.legacy_only
+              ? 'Legacy signup — manage from their member page'
+              : lead ? 'Demote to member' : 'Make shift lead ✦'}
+            style={{
+              background: 'none', borderRadius: '9999px', padding: '0.12rem 0.55rem',
+              fontSize: '0.68rem', whiteSpace: 'nowrap',
+              border: `1px solid ${lead ? 'rgba(200,168,72,0.45)' : 'rgba(255,255,255,0.12)'}`,
+              color: lead ? '#C8A848' : '#F3EDE6',
+              cursor: e.legacy_only ? 'default' : 'pointer',
+              opacity: busy ? 0.35 : e.legacy_only ? 0.45 : lead ? 0.95 : 0.65,
+            }}
+          >
+            {lead && <span style={{ marginRight: '0.3rem' }}>✦</span>}
+            {e.name}
+          </button>
+        )
+      })}
+      {error && <span style={{ fontSize: '0.68rem', color: '#ff8a8a' }}>{error}</span>}
+    </div>
   )
 }
 
@@ -430,6 +493,9 @@ function GroupHeader({ label, sub, count, onAdd, addLabel, color = '#C8A848' }: 
 export function ScheduleManager({ rangeStart, rangeEnd }: { rangeStart?: string; rangeEnd?: string }) {
   const [events, setEvents] = useState<ScheduleEvent[]>([])
   const [shiftTypes, setShiftTypes] = useState<ShiftTypeOption[]>([])
+  const [rosters, setRosters] = useState<Record<string, RosterEntry[]>>({})
+  const [rosterBusy, setRosterBusy] = useState<string | null>(null)
+  const [rosterError, setRosterError] = useState<{ eventId: string; message: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [modal, setModal] = useState<{ mode: 'add'; recurring: boolean; date?: string } | { mode: 'edit'; event: ScheduleEvent } | null>(null)
@@ -460,6 +526,13 @@ export function ScheduleManager({ rangeStart, rangeEnd }: { rangeStart?: string;
       .then(r => r.json())
       .then(d => setShiftTypes((d.shiftTypes ?? []).map((t: ShiftTypeOption) => ({ id: t.id, name: t.name }))))
       .catch(() => setShiftTypes([]))
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/admin/schedule/rosters')
+      .then(r => r.json())
+      .then(d => setRosters(d.rosters ?? {}))
+      .catch(() => setRosters({}))
   }, [])
 
   const dated = events.filter((e) => !e.is_recurring && e.event_date)
@@ -559,9 +632,41 @@ export function ScheduleManager({ rangeStart, rangeEnd }: { rangeStart?: string;
   const openAdd = (date?: string) => { setModal({ mode: 'add', recurring: false, date }); setModalError(null) }
   const openEdit = (ev: ScheduleEvent) => { setModal({ mode: 'edit', event: ev }); setModalError(null) }
 
+  // Promote/demote a lead right on the roster — same endpoint as the member
+  // page's "Make lead" (PATCH /api/admin/signups/[userId], set_shift_role).
+  const handleToggleLead = async (eventId: string, entry: RosterEntry) => {
+    setRosterBusy(`${eventId}|${entry.clerk_user_id}`)
+    setRosterError(null)
+    const role = entry.role === 'lead' ? 'member' : 'lead'
+    try {
+      const res = await fetch(`/api/admin/signups/${entry.clerk_user_id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ set_shift_role: { schedule_event_id: eventId, role } }),
+      })
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error) }
+      setRosters(prev => ({
+        ...prev,
+        [eventId]: (prev[eventId] ?? []).map(e => e.clerk_user_id === entry.clerk_user_id ? { ...e, role } : e),
+      }))
+    } catch (e: unknown) {
+      setRosterError({ eventId, message: e instanceof Error ? e.message : 'Something went wrong' })
+    } finally {
+      setRosterBusy(null)
+    }
+  }
+
   const rowProps = (ev: ScheduleEvent) => ({
     event: ev,
     shiftTypeName: shiftTypes.find((t) => t.id === ev.shift_type_id)?.name,
+    roster: ev.participation_type === 'shift' ? (
+      <ShiftRoster
+        event={ev}
+        entries={rosters[ev.id] ?? []}
+        busyKey={rosterBusy}
+        error={rosterError?.eventId === ev.id ? rosterError.message : null}
+        onToggleLead={(entry) => handleToggleLead(ev.id, entry)}
+      />
+    ) : undefined,
     onEdit: () => openEdit(ev),
     onDelete: () => handleDelete(ev.id),
     onToggleVisible: () => handleToggleVisible(ev),

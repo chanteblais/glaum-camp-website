@@ -118,6 +118,7 @@ Sign-out flow:
 | `/api/admin/schedule` | GET/POST | List / create schedule events |
 | `/api/admin/schedule/[id]` | PATCH/DELETE | Update / delete event |
 | `/api/admin/schedule/icon` | POST | Upload custom event icon |
+| `/api/admin/schedule/rosters` | GET | Per-event shift rosters for the schedule editor (`member_shift_signups` ∪ legacy `camp_signups`, deduped; names + lead role + `legacy_only` flag) |
 | `/api/admin/shifts` | GET/POST | **Dead** — legacy of the removed original `shifts` table; nothing calls it (removed in the shifts-redesign cleanup) |
 | `/api/admin/shift-types` | GET/POST | List / create shift types (the configurable registry; `/[id]` PATCH/DELETE to edit) |
 | `/api/admin/signups/[userId]` | GET/PATCH | View / manage member signups |
