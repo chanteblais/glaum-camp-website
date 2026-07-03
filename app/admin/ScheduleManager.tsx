@@ -508,7 +508,7 @@ function GroupHeader({ label, sub, count, onAdd, addLabel, color = '#C8A848' }: 
   )
 }
 
-export function ScheduleManager({ rangeStart, rangeEnd }: { rangeStart?: string; rangeEnd?: string }) {
+export function ScheduleManager({ rangeStart, rangeEnd, children }: { rangeStart?: string; rangeEnd?: string; children?: React.ReactNode }) {
   const [events, setEvents] = useState<ScheduleEvent[]>([])
   const [shiftTypes, setShiftTypes] = useState<ShiftTypeOption[]>([])
   const [rosters, setRosters] = useState<Record<string, RosterEntry[]>>({})
@@ -713,42 +713,53 @@ export function ScheduleManager({ rangeStart, rangeEnd }: { rangeStart?: string;
     whiteSpace: 'nowrap', opacity: 0.75,
   })
 
-  if (loading) return <p style={{ opacity: 0.4, fontStyle: 'italic', fontSize: '0.875rem' }}>Loading…</p>
-  if (loadError) return <LoadError onRetry={() => { setLoading(true); load() }} />
+  if (loading || loadError) return (
+    <div>
+      <p style={{ fontSize: '0.95rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: '#C8A848', fontWeight: 600, margin: '0 0 1rem' }}>
+        Scheduled Events
+      </p>
+      {children}
+      {loading
+        ? <p style={{ opacity: 0.4, fontStyle: 'italic', fontSize: '0.875rem' }}>Loading…</p>
+        : <LoadError onRetry={() => { setLoading(true); load() }} />}
+    </div>
+  )
 
   return (
     <div>
-      {/* Header: total count + view toggle + global add (per-day adds prefill their date) */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem', gap: '0.75rem', flexWrap: 'wrap' }}>
-        <p style={{ fontSize: '0.68rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, margin: 0 }}>
-          Scheduled Events — {dated.length + undated.length}
-        </p>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          {/* List ⇄ Week: the list is the working roster; the week grid shows
-              time as space (overlaps, gaps, lopsided days). */}
-          <div style={{ display: 'flex', border: '1px solid rgba(200,168,72,0.25)', borderRadius: '9999px', overflow: 'hidden' }}>
-            {(['list', 'week'] as const).map(v => (
-              <button
-                key={v}
-                onClick={() => setView(v)}
-                style={{
-                  padding: '0.45rem 0.9rem', border: 'none', cursor: 'pointer',
-                  fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'capitalize',
-                  background: view === v ? 'rgba(200,168,72,0.15)' : 'transparent',
-                  color: '#C8A848', opacity: view === v ? 1 : 0.5,
-                }}
-              >
-                {v}
-              </button>
-            ))}
-          </div>
-          <button
-            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.25)', background: 'transparent', color: '#C8A848', cursor: 'pointer', fontSize: '0.78rem', letterSpacing: '0.06em', opacity: 0.75 }}
-            onClick={() => openAdd()}
-          >
-            + Add event
-          </button>
+      {/* Header first — then any page-provided controls (the shift-signup
+          toggle rides in as children), then the view controls row. */}
+      <p style={{ fontSize: '0.95rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: '#C8A848', fontWeight: 600, margin: '0 0 1rem' }}>
+        Scheduled Events <span style={{ opacity: 0.5, fontWeight: 400 }}>— {dated.length + undated.length}</span>
+      </p>
+
+      {children}
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '0.85rem', gap: '0.5rem', flexWrap: 'wrap' }}>
+        {/* List ⇄ Week: the list is the working roster; the week grid shows
+            time as space (overlaps, gaps, lopsided days). */}
+        <div style={{ display: 'flex', border: '1px solid rgba(200,168,72,0.25)', borderRadius: '9999px', overflow: 'hidden' }}>
+          {(['list', 'week'] as const).map(v => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              style={{
+                padding: '0.45rem 0.9rem', border: 'none', cursor: 'pointer',
+                fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'capitalize',
+                background: view === v ? 'rgba(200,168,72,0.15)' : 'transparent',
+                color: '#C8A848', opacity: view === v ? 1 : 0.5,
+              }}
+            >
+              {v}
+            </button>
+          ))}
         </div>
+        <button
+          style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.25)', background: 'transparent', color: '#C8A848', cursor: 'pointer', fontSize: '0.78rem', letterSpacing: '0.06em', opacity: 0.75 }}
+          onClick={() => openAdd()}
+        >
+          + Add event
+        </button>
       </div>
 
       {/* Week view — day columns × hour axis; click empty slot to add there */}

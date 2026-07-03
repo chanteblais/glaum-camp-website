@@ -62,8 +62,9 @@ export default async function ProgramPage() {
         <CategoryHeading id="schedule" />
 
         <div style={{ marginBottom: '3.5rem' }}>
-          <ShiftSignupToggle initialOpen={shiftSignupOpen} />
-          <ScheduleManager rangeStart={eventRangeStart} rangeEnd={eventRangeEnd} />
+          <ScheduleManager rangeStart={eventRangeStart} rangeEnd={eventRangeEnd}>
+            <ShiftSignupToggle initialOpen={shiftSignupOpen} />
+          </ScheduleManager>
         </div>
 
         {/* ═══════════════ LEAD-UP GATHERINGS ═══════════════ */}
