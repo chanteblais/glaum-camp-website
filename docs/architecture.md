@@ -36,6 +36,7 @@ Auth is handled by **Clerk v7**. The Clerk middleware runs on all routes via `mi
 - `lib/profile-auth.ts` provides a shared helper to verify auth in server components and API routes
 - Admin routes check for `role === 'admin'` in `publicMetadata`
 - `RememberSignedIn` component writes a localStorage flag so `HeaderClient` can show the right nav state without a round-trip
+- `/api/nav-auth` trusts only Clerk-verified sessions (`auth()`); an earlier unverified `__session`-cookie fallback was removed 2026-07-02 — post-sign-in flakiness is covered by `HeaderClient`'s retry loop instead
 
 Sign-out flow:
 1. User clicks sign out
