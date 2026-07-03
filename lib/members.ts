@@ -7,6 +7,8 @@
 // a benign value rather than throwing — a failure must never break the primary
 // application/profile flow. See docs/profile-architecture.md.
 
+import { cache } from 'react'
+import { currentUser } from '@clerk/nextjs/server'
 import { supabaseAdmin } from './supabase'
 
 export type MemberRecord = {
@@ -28,8 +30,12 @@ const MEMBER_COLUMNS =
 
 export type MemberIdentity = Partial<Omit<MemberRecord, 'id' | 'clerk_user_id'>>
 
-/** Find a member by clerk_user_id (preferred), falling back to email. */
-export async function resolveMember(
+/**
+ * Find a member by clerk_user_id (preferred), falling back to email.
+ * Request-cached (React cache): the Header and the page it sits on share one
+ * lookup per render instead of querying twice.
+ */
+export const resolveMember = cache(async function resolveMember(
   clerkUserId: string | null,
   email?: string | null,
 ): Promise<MemberRecord | null> {
@@ -50,6 +56,47 @@ export async function resolveMember(
     console.error('[members] resolveMember failed', e)
   }
   return null
+})
+
+/**
+ * Resolve the signed-in user's member row without a Clerk Backend-API
+ * round-trip on the common path. Every production row has clerk_user_id set,
+ * so the indexed lookup almost always hits; `currentUser()` (a ~200–500ms
+ * network call to Clerk) runs only as the email fallback for rows that were
+ * never linked. Found-by-email rows get clerk_user_id backfilled so the next
+ * request takes the fast path.
+ */
+export async function resolveMemberForUser(clerkUserId: string): Promise<MemberRecord | null> {
+  const direct = await resolveMember(clerkUserId)
+  if (direct) return direct
+
+  const user = await currentUser()
+  const email = user?.emailAddresses[0]?.emailAddress
+  if (!email) return null
+
+  const byEmail = await resolveMember(null, email)
+  if (byEmail && !byEmail.clerk_user_id) {
+    const { error } = await supabaseAdmin
+      .from('members')
+      .update({ clerk_user_id: clerkUserId })
+      .eq('id', byEmail.id)
+      .is('clerk_user_id', null)
+    if (error) console.error('[members] clerk_user_id backfill', error)
+  }
+  return byEmail
+}
+
+/** resolveMemberForUser gated on approved status — the standard API-route auth check. */
+export async function getApprovedMember(clerkUserId: string): Promise<MemberRecord | null> {
+  const member = await resolveMemberForUser(clerkUserId)
+  return member?.status === 'approved' ? member : null
+}
+
+/** Human-readable name for notifications: preferred, else "First Last", else the fallback. */
+export function memberDisplayName(member: MemberRecord, fallback: string): string {
+  if (member.preferred_name) return member.preferred_name
+  if (member.first_name && member.last_name) return `${member.first_name} ${member.last_name}`
+  return member.first_name ?? fallback
 }
 
 /** The member's stored profile values (empty object when none). */

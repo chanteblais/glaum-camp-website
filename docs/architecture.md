@@ -36,10 +36,16 @@ Auth is handled by **Clerk v7**. The Clerk middleware runs on all routes via `mi
 - `lib/profile-auth.ts` provides a shared helper to verify auth in server components and API routes
 - Admin routes check for `role === 'admin'` in `publicMetadata`
 - `RememberSignedIn` component writes a localStorage flag so `HeaderClient` can show the right nav state without a round-trip
+- `/api/nav-auth` trusts only Clerk-verified sessions (`auth()`); an earlier unverified `__session`-cookie fallback was removed 2026-07-02 — post-sign-in flakiness is covered by `HeaderClient`'s retry loop instead
+- `/api/sign-out` resolves the user for session revocation from `auth()` first, falling back only to `verifyToken` (networkless JWKS check) on the raw `__session` cookie; an earlier unverified base64 parse of the JWT was removed 2026-07-02 (a forged `sub` could revoke any known user's sessions). Cookie-clearing runs regardless, so sign-out still works mid-broken-session
+- **Nav auth state is server-rendered:** `components/Header.tsx` (server) resolves `auth()` + the member row per request and passes `initialAuth` to `HeaderClient`, so the first paint shows the correct nav — no signed-out flash, and no `/api/nav-auth` fetch on mount (that route survives as the no-prop fallback). `resolveMember` is wrapped in React `cache()`, so the Header shares the lookup with any page that already resolved the member.
+- **Member lookup (perf):** `lib/members.ts` → `resolveMemberForUser` / `getApprovedMember` is the standard "who is this signed-in user" check for pages and API routes. It queries `members` by `clerk_user_id` first (every production row has it) and only falls back to Clerk's `currentUser()` + email match when no row is found — `currentUser()` is a ~200–500ms Backend-API round-trip, so it must never sit on the hot path. Found-by-email rows get `clerk_user_id` backfilled. When a route genuinely needs `currentUser()` (e.g. `publicMetadata` on the homepage), run it inside `Promise.all` alongside the first DB query, never before it.
+- **Query batching:** server components and API-route GETs batch independent Supabase queries with `Promise.all` (see `app/page.tsx`, `app/profile/page.tsx`, `/api/signup`, `/api/shift-signups`). Latency is dominated by round-trip count, not row volume — a new query should join an existing batch, not be awaited on its own line.
+- **Server-rendered section data:** when a page's client components need API data on mount, extract the GET's assembly into a lib function and have the page fetch it server-side, passing it as an `initial*` prop (the component skips its mount fetch when the prop is present); the API route keeps serving the client's refresh path. Precedents: `lib/inbox.ts` (`/messages`), `lib/participate-data.ts` + `lib/resources.ts` `getMemberResourceView` (`/participate` — `SignupSection`, `GroupCommitments`, `ResourceCommitments`).
 
 Sign-out flow:
 1. User clicks sign out
-2. `POST /api/sign-out` clears session
+2. `GET /api/sign-out` revokes the user's Clerk sessions (verified identity only) and clears session cookies
 3. `HeaderClient` clears localStorage on nav-auth confirmation
 
 ---
@@ -50,8 +56,9 @@ Sign-out flow:
 /                        Public homepage (schedule, about) / Member dashboard (if approved)
 /apply                   Application form (4 states, see Features doc)
 /volunteer               Outside volunteer signup
-/profile                 Logged-in member profile + role/shift picker
-/participate             Participate page: role + shift pickers, Bring Something (resources), Your Groups (renamed from /signup 2026-07-02; /signup now redirects here)
+/profile                 Logged-in member profile (designation, commitments, distinctions)
+/participate             Participate page: role + shift pickers, Bring Something (resources), Your Groups (renamed from /signup 2026-07-02; /signup permanently redirects here via next.config.js)
+/roles                   Registry of Roles — full departments + roles documentation, claimable in place
 /members                 Member directory (approved members only)
 /members/[id]            Individual member view
 /messages                Member messaging inbox (DMs + group threads, filterable)
@@ -101,7 +108,7 @@ Sign-out flow:
 | `/api/groups/[id]/join` | POST | Self-join an open group |
 | `/api/groups/[id]/leave` | POST | Leave an open group (admin-assigned groups → 403) |
 | `/api/nav-auth` | GET | Lightweight auth check for nav (returns `isSignedIn`, `isApproved`, name, email, avatarUrl) |
-| `/api/sign-out` | POST | Sign out |
+| `/api/sign-out` | GET | Revoke Clerk sessions (verified identity) + clear session cookies |
 | `/api/badge` | GET | Generate role badge PNG (OG image) |
 
 ### Admin-only
@@ -144,6 +151,14 @@ Sign-out flow:
 | `/api/admin/announcements/all` | GET | List all announcements including hidden (admin only) |
 | `/api/admin/announcements/[id]` | PATCH/DELETE | Update / delete announcement |
 | `/api/admin/page-content` | GET/PATCH | Read / upsert any `page_content` row — used for homepage copy (`home_*`) and form configs (`config_member_form`, `config_volunteer_form`) |
+
+### Cron (Vercel Cron)
+
+Scheduled jobs are declared in `vercel.json` (`crons`) and hit API routes under `/api/cron/*`. Vercel authenticates each invocation with `Authorization: Bearer ${CRON_SECRET}` — the `CRON_SECRET` env var must be set in Vercel (and `.env.local` for local testing); the routes fail closed without it. Cron schedules use **UTC**. Crons only run on the production deployment and activate on the next deploy after `vercel.json` changes.
+
+| Route | Schedule | Purpose |
+|---|---|---|
+| `/api/cron/attunement-nudges` | daily 16:00 UTC (9am PT) | Email approved members their outstanding attunement checklist (same `buildAttunementChecklist` as home/profile). Per-member cadence from `config_attunement_nudge_days` (Off/1/2/3/7 days, default 2; **Reminder emails** select in the Attunement Tasks manager) — the cron fires daily, each member is emailed only once their cadence cooldown lapses (`attunement_nudges` ledger). Also skips: attuned members, opt-outs (`notification_preferences.email_attunement_nudges`), no-email rows. Sends are spaced 600ms apart (Resend rate limit); `maxDuration = 60`. A logged-in **admin** can also GET the route in a browser: **dry-run by default** (JSON report of who'd get what), `?send=1` to really send. |
 
 ---
 

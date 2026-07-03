@@ -155,10 +155,10 @@ export function UserNotificationBell() {
                   switch (n.event_type) {
                     case 'application_approved': return { href: '/profile', label: 'Go to profile →' }
                     case 'application_rejected':  return { href: '/apply', label: 'Back to apply →' }
-                    case 'role_suggestion_approved': return { href: '/profile#role-signup', label: 'Select your role →' }
+                    case 'role_suggestion_approved': return { href: '/participate#role-signup', label: 'Select your role →' }
                     case 'role_suggestion_rejected': return { href: '/profile', label: 'Go to profile →' }
                     case 'role_request_approved':   return { href: '/profile', label: 'Go to profile →' }
-                    case 'role_request_rejected':   return { href: '/profile#role-signup', label: 'Choose another role →' }
+                    case 'role_request_rejected':   return { href: '/participate#role-signup', label: 'Choose another role →' }
                     case 'volunteer_approved':       return { href: '/profile', label: 'Go to profile →' }
                     case 'lead_up_gathering':        return { href: '/schedule', label: 'View gathering →' }
                     case 'new_message': {

@@ -57,6 +57,21 @@ Rules:
    paths only — the tree may contain another session's (or Chante's) in-flight
    files.
 4. Sessions that only *read* need no branch and no worktree.
+5. **Commit work-in-progress to the feature branch; never leave the shared
+   checkout dirty between turns.** (Learned 2026-07-02: review-round edits sat
+   uncommitted for hours and got swept by a stash.) A dev server serves the
+   working tree either way, so the review loop doesn't change — but committed
+   work survives stashes, branch switches, and resets. Sign-off then triggers
+   the merge, not the first commit.
+6. **Never `git stash` in the shared checkout.** The tree may hold several
+   parties' in-flight work, and stash sweeps it all invisibly. If someone
+   else's dirty files block you, stop and surface it (or take a worktree).
+7. **Release `main` the moment you're done with it.** A branch can only be
+   checked out in one worktree at a time, so a worktree parked on `main`
+   blocks every other session's merge. After merge + push, immediately
+   `git switch --detach` (or remove the worktree). Humans wanting a local
+   view of main: keep that worktree **detached** (`git fetch && git checkout
+   --detach origin/main` to refresh) — never park the branch itself.
 
 ## Claude sessions
 

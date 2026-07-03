@@ -7,7 +7,6 @@ import { NotificationPreferences } from './NotificationPreferences'
 import { ProfileSettings } from './ProfileSettings'
 import { VolunteerSettings } from './VolunteerSettings'
 import { AvatarUpload } from '@/components/AvatarUpload'
-import { SignupSection } from './SignupSection'
 import { CommitmentsSection } from './CommitmentsSection'
 import { TaskStatus } from './TaskStatus'
 import { PersonalSchedule } from './PersonalSchedule'
@@ -24,6 +23,7 @@ import { getMemberAwards } from '@/lib/distinction-awards'
 import { CabinetOfDistinctions } from './CabinetOfDistinctions'
 import { ProfileDetails } from './ProfileDetails'
 import { isImageIcon } from '@/lib/icon-src'
+import { roleSlug } from '@/lib/role-slug'
 
 // ── Identity stat list (mirrors the mockup's right-column at-a-glance facts) ──
 function StatIcon({ name }: { name: 'calendar' | 'star' | 'shield' | 'hand' }) {
@@ -51,42 +51,86 @@ export default async function ProfilePage() {
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
 
-  const user = await currentUser()
+  // currentUser() is a Clerk Backend-API round-trip; both DB lookups key on
+  // clerk_user_id, so all three overlap. Email matching survives as a rare
+  // fallback for applications never linked to a Clerk account.
+  const [user, appByIdRes, volunteerRes] = await Promise.all([
+    currentUser(),
+    supabaseAdmin
+      .from('applications')
+      .select('*')
+      .eq('clerk_user_id', userId)
+      .order('submitted_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabaseAdmin
+      .from('volunteers')
+      .select('*')
+      .eq('clerk_user_id', userId)
+      .maybeSingle(),
+  ])
   const email = user?.emailAddresses[0]?.emailAddress
 
   // Check for camp application (cancelled treated as no application)
-  const { data: applicationRaw } = await supabaseAdmin
-    .from('applications')
-    .select('*')
-    .or(`clerk_user_id.eq.${userId},email.eq.${email}`)
-    .order('submitted_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  let applicationRaw = appByIdRes.data
+  if (!applicationRaw && email) {
+    const { data } = await supabaseAdmin
+      .from('applications')
+      .select('*')
+      .eq('email', email)
+      .order('submitted_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    applicationRaw = data
+  }
   const application = applicationRaw?.status === 'cancelled' ? null : applicationRaw
 
-  // Check for active volunteer signup (cancelled records are treated as no record)
-  const { data: volunteerRaw } = await supabaseAdmin
-    .from('volunteers')
-    .select('*')
-    .eq('clerk_user_id', userId)
-    .maybeSingle()
+  // Active volunteer signup (cancelled records are treated as no record)
+  const volunteerRaw = volunteerRes.data
   const volunteer = (volunteerRaw?.status === 'active' || volunteerRaw?.status === 'pending') ? volunteerRaw : null
 
-  // Fetch signup status for approved members and active (not pending) volunteers
+  // Everything below keys on the resolved identity and nothing else, so it all
+  // shares one parallel round-trip: signup status (approved members and active,
+  // not pending, volunteers), groups, resource claims, config, shift state, and
+  // the canonical member row.
   const isActiveMember = application?.status === 'approved' || volunteer?.status === 'active'
-  const [{ data: campSignup }, { data: heldShiftRows }] = isActiveMember
-    ? await Promise.all([
-        supabaseAdmin
-          .from('camp_signups')
-          .select('role_id, schedule_event_id, role_approval_status, roles(name, description, purpose, department_id, departments(name, icon)), schedule_events(id, title, day, time, icon_type, event_date)')
-          .eq('clerk_user_id', userId)
-          .maybeSingle(),
-        supabaseAdmin
-          .from('member_shift_signups')
-          .select('schedule_events(id, title, day, time, icon_type, event_date)')
-          .eq('clerk_user_id', userId),
-      ])
-    : [{ data: null }, { data: null }]
+  const memberClerkId = application?.clerk_user_id ?? userId
+  const [
+    [{ data: campSignup }, { data: heldShiftRows }],
+    memberGroups,
+    resourceClaims,
+    { data: attuneConfigRows },
+    shiftState,
+    profileMember,
+  ] = await Promise.all([
+    isActiveMember
+      ? Promise.all([
+          supabaseAdmin
+            .from('camp_signups')
+            .select('role_id, schedule_event_id, role_approval_status, roles(name, description, purpose, department_id, departments(name, icon)), schedule_events(id, title, day, time, icon_type, event_date)')
+            .eq('clerk_user_id', userId)
+            .maybeSingle(),
+          supabaseAdmin
+            .from('member_shift_signups')
+            .select('schedule_events(id, title, day, time, icon_type, event_date)')
+            .eq('clerk_user_id', userId),
+        ])
+      : ([{ data: null }, { data: null }] as const),
+    // Groups the member belongs to (replaces the old setup_preference "contributions").
+    getMemberGroups(memberClerkId),
+    // Shared-resource claims ("I'll bring one") — BRINGING rows on the commitments card.
+    getMemberResourceClaims(memberClerkId),
+    // Attunement config (Admin → Manage → Attunement Tasks) + distinction rules.
+    supabaseAdmin
+      .from('page_content')
+      .select('key, value')
+      .in('key', ['config_attunement_tasks', 'config_shift_signup_open', 'config_distinctions']),
+    // Shift-hours state: held hours per shift type + obligations derived from the
+    // member's groups/roles. Same helper as the home dashboard — keep in sync.
+    getMemberShiftState(memberClerkId),
+    // Canonical member row (Phase 1 member_profiles) for stored profile values.
+    resolveMember(memberClerkId, email),
+  ])
 
   // Extract role + department info
   const roleInfo = campSignup?.roles as { name?: string; description?: string | null; purpose?: string | null; departments?: { name?: string; icon?: string } | null } | null
@@ -110,12 +154,8 @@ export default async function ProfilePage() {
     event_date: ev.event_date ?? null,
   }))
 
-  // Groups the member belongs to (replaces the old setup_preference "contributions").
   // `contributions` = group names; `groupMeta` carries each group's icon/description
   // for the commitments card (keyed by name, the shape CommitmentsSection expects).
-  const memberGroups = await getMemberGroups(application?.clerk_user_id ?? userId)
-  // Shared-resource claims ("I'll bring one") — BRINGING rows on the commitments card.
-  const resourceClaims = await getMemberResourceClaims(application?.clerk_user_id ?? userId)
   // Full list drives attunement + distinction facts; the profile card shows only
   // groups whose collection is marked visible (show_on_profile).
   const contributions = memberGroups.map(g => g.name)
@@ -125,14 +165,7 @@ export default async function ProfilePage() {
 
   // Attunement checklist — admin-configured tasks, each auto-completed from its
   // requirement type (Admin → Manage → Attunement Tasks).
-  const { data: attuneConfigRows } = await supabaseAdmin
-    .from('page_content')
-    .select('key, value')
-    .in('key', ['config_attunement_tasks', 'config_shift_signup_open', 'config_distinctions'])
   const attuneConfig = Object.fromEntries((attuneConfigRows ?? []).map(r => [r.key, r.value]))
-  // Shift-hours state: held hours per shift type + obligations derived from the
-  // member's groups/roles. Same helper as the home dashboard — keep in sync.
-  const shiftState = await getMemberShiftState(application?.clerk_user_id ?? userId)
   // Shared with the home dashboard banner via buildAttunementChecklist — keep both in sync.
   const attunementState = {
     hasPhoto: !!application?.avatar_url,
@@ -155,9 +188,10 @@ export default async function ProfilePage() {
   // member_profiles) ∪ derived system facts. System facts win on any key overlap
   // (they're authoritative and non-spoofable). Guarded — empty when no member row
   // exists yet, so this falls back to system-facts-only behavior.
-  const profileMember = await resolveMember(application?.clerk_user_id ?? userId, email)
-  const profileValues = profileMember ? await getMemberProfileValues(profileMember.id) : {}
-  const awardedIds = profileMember ? new Set(await getMemberAwards(profileMember.id)) : undefined
+  const [profileValues, awardIds] = profileMember
+    ? await Promise.all([getMemberProfileValues(profileMember.id), getMemberAwards(profileMember.id)])
+    : [{} as Record<string, unknown>, null]
+  const awardedIds = awardIds ? new Set(awardIds) : undefined
   const factContext = { ...profileValues, ...memberFacts }
   const earnedDistinctions = evaluateDistinctions(factContext, parseDistinctions(attuneConfig['config_distinctions']), awardedIds)
 
@@ -278,8 +312,13 @@ export default async function ProfilePage() {
       <p style={{ fontSize: '0.64rem', letterSpacing: '0.34em', textTransform: 'uppercase', color: '#D239F8', marginBottom: '0.35rem', opacity: 0.85 }}>
         Designation
       </p>
+      {/* The title itself is the doorway to the full charge in the Registry. */}
       <h2 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(1.7rem, 3vw, 2.2rem)', color: '#C8A848', margin: '0 auto', maxWidth: '13rem', lineHeight: 1.05, textShadow: '0 0 30px rgba(210,57,248,0.35)' }}>
-        {memberFacts.designation}
+        {roleInfo?.name ? (
+          <a href={`/roles#${roleSlug(roleInfo.name)}`} className="designation-link">
+            {memberFacts.designation}
+          </a>
+        ) : memberFacts.designation}
       </h2>
       {/* Stylized divider under the designation — ── ✦ ── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', width: '68%', margin: '0.6rem auto 0.6rem' }}>
@@ -295,10 +334,14 @@ export default async function ProfilePage() {
       {memberFacts.department && (() => {
         // Break "Department of X" onto two lines: "Department of" / "X".
         const m = memberFacts.department.match(/^(department of)\s+(.+)$/i)
+        const deptLabel = m ? <>{m[1]}<br />{m[2]}</> : memberFacts.department
+        const deptName = roleInfo?.departments?.name
         return (
           <div>
             <p style={{ fontSize: '0.72rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.72, lineHeight: 1.45 }}>
-              {m ? <>{m[1]}<br />{m[2]}</> : memberFacts.department}
+              {deptName
+                ? <a href={`/roles#${roleSlug(deptName)}`} className="designation-link">{deptLabel}</a>
+                : deptLabel}
             </p>
             {/* Decorative closing flourish — small and delicate */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', width: '12%', margin: '1.3rem auto 0' }}>
@@ -327,6 +370,10 @@ export default async function ProfilePage() {
         .profile-main-grid > *, .profile-info-grid > * { min-width: 0; }
         /* Header: designation (left) · portrait (center, focal point) · identity (right). */
         .profile-header-grid    { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 2.25rem; }
+        /* Designation title + department double as doorways into the Registry —
+           quiet by default, a gentle underline on hover. */
+        .designation-link       { color: inherit; text-decoration: none; }
+        .designation-link:hover { text-decoration: underline; text-decoration-color: rgba(200,168,72,0.45); text-underline-offset: 5px; text-decoration-thickness: 1px; }
         .profile-header-desig   { text-align: center; min-width: 0; }
         .profile-header-id      { text-align: center; min-width: 0; }
         /* Let the portrait feel slightly oversized — it can bleed past its grid cell. */
@@ -606,7 +653,7 @@ export default async function ProfilePage() {
               )}
             </div>
 
-            <TaskStatus track="volunteer" volunteerStatus={volunteer.status} campSignup={campSignup} signupIntent={volunteer.signup_intent} />
+            <TaskStatus track="volunteer" volunteerStatus={volunteer.status} />
             <NotificationPreferences />
           </>
         )}

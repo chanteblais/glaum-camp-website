@@ -1,79 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth, currentUser } from '@clerk/nextjs/server'
+import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
-
-async function requireApprovedCamper(userId: string) {
-  const user = await currentUser()
-  const email = user?.emailAddresses[0]?.emailAddress
-
-  const { data: application } = await supabaseAdmin
-    .from('members')
-    .select('id, status')
-    .or(`clerk_user_id.eq.${userId},email.eq.${email}`)
-    .eq('status', 'approved')
-    .maybeSingle()
-
-  return application ?? null
-}
+import { getApprovedMember, memberDisplayName } from '@/lib/members'
+import { getRoleSignupData } from '@/lib/participate-data'
 
 export async function GET() {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const application = await requireApprovedCamper(userId)
-  if (!application) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-
-  const [deptRes, rolesRes, signupRes, roleCounts, eventSignupCounts, scheduleRes, shiftFlagRes] = await Promise.all([
-    supabaseAdmin.from('departments').select('id, name, description, icon, sort_order').order('sort_order'),
-    supabaseAdmin.from('roles').select('id, name, description, capacity, sort_order, department_id, purpose, responsibilities_before, responsibilities_during, ideal_for, commitment, commitment_period, requires_approval').order('sort_order'),
-    supabaseAdmin.from('camp_signups').select('role_id, schedule_event_id, role_approval_status').eq('clerk_user_id', userId).maybeSingle(),
-    supabaseAdmin.from('camp_signups').select('role_id').not('role_id', 'is', null),
-    supabaseAdmin.from('camp_signups').select('schedule_event_id').not('schedule_event_id', 'is', null),
-    supabaseAdmin.from('schedule_events').select('id, day, time, title, subtitle, icon_type, highlight, is_recurring, capacity').eq('visible', true).order('sort_order'),
-    supabaseAdmin.from('page_content').select('value').eq('key', 'config_shift_signup_open').maybeSingle(),
+  // The approval gate runs alongside the data batch — it only gates the
+  // response, not what we fetch, so there's no need to serialize on it.
+  // Data assembly lives in lib/participate-data.ts, shared with the
+  // server-rendered /participate page (this route is the client's refresh path).
+  const [application, data] = await Promise.all([
+    getApprovedMember(userId),
+    getRoleSignupData(userId),
   ])
 
-  const shiftSignupOpen = shiftFlagRes.data?.value !== 'false'
+  if (!application) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const roleSignupCounts: Record<string, number> = {}
-  for (const row of roleCounts.data ?? []) {
-    if (row.role_id) roleSignupCounts[row.role_id] = (roleSignupCounts[row.role_id] ?? 0) + 1
-  }
-
-  const evSignupCounts: Record<string, number> = {}
-  for (const row of eventSignupCounts.data ?? []) {
-    if (row.schedule_event_id) evSignupCounts[row.schedule_event_id] = (evSignupCounts[row.schedule_event_id] ?? 0) + 1
-  }
-
-  const rolesWithCounts = (rolesRes.data ?? []).map(r => ({
-    ...r,
-    signed_up: roleSignupCounts[r.id] ?? 0,
-  }))
-
-  const departments = (deptRes.data ?? []).map(d => ({
-    ...d,
-    roles: rolesWithCounts.filter(r => r.department_id === d.id),
-  }))
-
-  // Only include capacity on events so the client knows which are signable
-  const scheduleEvents = (scheduleRes.data ?? []).map(e => ({
-    ...e,
-    signed_up: e.capacity != null ? (evSignupCounts[e.id] ?? 0) : null,
-  }))
-
-  return NextResponse.json({
-    signup: signupRes.data ?? null,
-    departments,
-    scheduleEvents,
-    shiftSignupOpen,
-  })
+  return NextResponse.json(data)
 }
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const application = await requireApprovedCamper(userId)
+  const application = await getApprovedMember(userId)
   if (!application) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await req.json()
@@ -162,10 +115,7 @@ export async function POST(req: NextRequest) {
 
   // Notify admin if role requires approval
   if (requiresApproval && isRoleChange && next_role_id) {
-    const user = await currentUser()
-    const name = user?.firstName && user?.lastName
-      ? `${user.firstName} ${user.lastName}`
-      : user?.firstName ?? userId
+    const name = memberDisplayName(application, userId)
 
     const { error: notifError } = await supabaseAdmin.from('admin_notifications').insert({
       application_id: application.id,
@@ -178,10 +128,7 @@ export async function POST(req: NextRequest) {
 
   // Notify admin on role or shift change (non-approval roles)
   if (!requiresApproval && next_role_id && (isRoleChange || isEventChange)) {
-    const user = await currentUser()
-    const name = user?.firstName && user?.lastName
-      ? `${user.firstName} ${user.lastName}`
-      : user?.firstName ?? userId
+    const name = memberDisplayName(application, userId)
 
     if (isRoleChange) {
       const [oldRole, newRole] = await Promise.all([

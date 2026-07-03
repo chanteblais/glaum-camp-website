@@ -9,6 +9,7 @@ import { getMemberGroups } from '@/lib/groups'
 import { getUnmetResourceNeeds } from '@/lib/resources'
 import { buildAttunementChecklist, memberGroupCounts, requiredItems, commitmentItems } from '@/lib/attunement'
 import { getMemberShiftState, EMPTY_MEMBER_SHIFT_STATE } from '@/lib/shift-attunement'
+import { daysUntilEvent } from '@/lib/camp-event'
 import { clockLabel } from '@/lib/shift-hours'
 
 import { HomePageEditor } from './HomePageEditor'
@@ -51,25 +52,46 @@ export default async function Home() {
 let isAdmin = false
 let canManagePolls = false
 
+  // Kicked off before any member work — page content is user-independent and
+  // is awaited in the parallel batch further down. (Supabase builders never
+  // reject; errors come back on the result object.)
+  const pageContentQuery = supabaseAdmin.from('page_content').select('key, value')
+
   if (userId) {
-    const user = await currentUser()
+    // currentUser() is a Clerk Backend-API round-trip; the application lookup
+    // keys on clerk_user_id (every production row has it), so the two can
+    // overlap instead of queueing. Email matching survives as a rare fallback.
+    const [user, appByIdRes] = await Promise.all([
+      currentUser(),
+      supabaseAdmin
+        .from('applications')
+        .select('*')
+        .eq('clerk_user_id', userId)
+        .order('submitted_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ])
     const email = user?.emailAddresses[0]?.emailAddress
     userFirstName = user?.firstName ?? null
     isAdmin = user?.publicMetadata?.role === 'admin'
     canManagePolls = user?.publicMetadata?.canManagePolls === true
 
-    const { data: appRaw } = await supabaseAdmin
-      .from('applications')
-      .select('*')
-      .or(`clerk_user_id.eq.${userId},email.eq.${email}`)
-      .order('submitted_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    let appRaw = appByIdRes.data
+    if (!appRaw && email) {
+      const { data } = await supabaseAdmin
+        .from('applications')
+        .select('*')
+        .eq('email', email)
+        .order('submitted_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      appRaw = data
+    }
 
     application = appRaw?.status === 'cancelled' ? null : appRaw ?? null
 
     if (application?.status === 'approved') {
-      const [signupResult, eventsResult, leadUpResult, spotlightResult, announcementsResult, pollsResult, pollVotesResult, shoutoutsResult, nextEventResult] = await Promise.all([
+      const [signupResult, eventsResult, leadUpResult, spotlightResult, announcementsResult, pollsResult, pollVotesResult, shoutoutsResult, nextEventResult, recentApprovedResult] = await Promise.all([
         supabaseAdmin
           .from('camp_signups')
           .select('role_id, schedule_event_id, role_approval_status, roles(name, description, purpose, department_id, departments(name, icon)), schedule_events(title, day, time, icon_type)')
@@ -133,6 +155,14 @@ let canManagePolls = false
           .order('event_date', { ascending: true })
           .limit(1)
           .maybeSingle(),
+        // Recent activity feed
+        supabaseAdmin
+          .from('applications')
+          .select('preferred_name, first_name, reviewed_at, profile_updated_at, avatar_url')
+          .eq('status', 'approved')
+          .not('reviewed_at', 'is', null)
+          .order('reviewed_at', { ascending: false })
+          .limit(10),
       ])
 
       campSignup = signupResult.data ?? null
@@ -142,26 +172,42 @@ let canManagePolls = false
       spotlightPool = spotlightResult.data ?? []
       announcements = (announcementsResult.data ?? []) as Announcement[]
 
-      // Enrich shoutouts with each author's current avatar (no FK — join in JS).
+      // Second stage — three JS joins that depend on the first batch but not
+      // on each other, so they share one round-trip.
       const shoutoutRows = (shoutoutsResult.data ?? []) as Omit<Shoutout, 'avatar_url'>[]
+      const rawPolls = (pollsResult.data ?? []) as { id: string; question: string; options: string[]; allow_multiple: boolean; expires_at: string | null }[]
+      const pool = spotlightPool as SpotlightMember[]
+      const authorIds = Array.from(new Set(shoutoutRows.map(s => s.clerk_user_id)))
+      const pollIds = rawPolls.map(p => p.id)
+      const clerkIds = pool.map(m => m.clerk_user_id).filter(Boolean) as string[]
+
+      const empty = Promise.resolve({ data: null })
+      const [authorRowsRes, allVotesRes, signupRowsRes] = await Promise.all([
+        // Enrich shoutouts with each author's current avatar (no FK — join in JS).
+        authorIds.length > 0
+          ? supabaseAdmin.from('applications').select('clerk_user_id, avatar_url').in('clerk_user_id', authorIds)
+          : empty,
+        pollIds.length > 0
+          ? supabaseAdmin.from('poll_votes').select('poll_id, option_index').in('poll_id', pollIds)
+          : empty,
+        // Role info for all spotlight pool members
+        clerkIds.length > 0
+          ? supabaseAdmin.from('camp_signups').select('clerk_user_id, roles(name, departments(name))').in('clerk_user_id', clerkIds)
+          : empty,
+      ])
+
       if (shoutoutRows.length > 0) {
-        const authorIds = Array.from(new Set(shoutoutRows.map(s => s.clerk_user_id)))
-        const { data: authorRows } = await supabaseAdmin
-          .from('applications')
-          .select('clerk_user_id, avatar_url')
-          .in('clerk_user_id', authorIds)
-        const avatarMap = Object.fromEntries((authorRows ?? []).map(a => [a.clerk_user_id, a.avatar_url]))
+        const authorRows = (authorRowsRes.data ?? []) as { clerk_user_id: string; avatar_url: string | null }[]
+        const avatarMap = Object.fromEntries(authorRows.map(a => [a.clerk_user_id, a.avatar_url]))
         shoutouts = shoutoutRows.map(s => ({ ...s, avatar_url: avatarMap[s.clerk_user_id] ?? null }))
       }
 
-      const rawPolls = (pollsResult.data ?? []) as { id: string; question: string; options: string[]; allow_multiple: boolean; expires_at: string | null }[]
       const userVoteRows = (pollVotesResult.data ?? []) as { poll_id: string; option_index: number }[]
       if (rawPolls.length > 0) {
-        const pollIds = rawPolls.map(p => p.id)
-        const { data: allVotes } = await supabaseAdmin.from('poll_votes').select('poll_id, option_index').in('poll_id', pollIds)
+        const allVotes = (allVotesRes.data ?? []) as { poll_id: string; option_index: number }[]
         polls = rawPolls.map(p => {
           const counts = Array(p.options.length).fill(0)
-          for (const v of allVotes ?? []) {
+          for (const v of allVotes) {
             if (v.poll_id === p.id && v.option_index < counts.length) counts[v.option_index]++
           }
           const initialUserVotes = userVoteRows.filter(v => v.poll_id === p.id).map(v => v.option_index)
@@ -170,16 +216,8 @@ let canManagePolls = false
       }
 
       // Recent activity feed
-      const { data: recentApproved } = await supabaseAdmin
-        .from('applications')
-        .select('preferred_name, first_name, reviewed_at, profile_updated_at, avatar_url')
-        .eq('status', 'approved')
-        .not('reviewed_at', 'is', null)
-        .order('reviewed_at', { ascending: false })
-        .limit(10)
-
       const activityFeed: ActivityItem[] = []
-      for (const row of recentApproved ?? []) {
+      for (const row of recentApprovedResult.data ?? []) {
         const name = row.preferred_name || row.first_name || 'A member'
         activityFeed.push({ label: 'joined the camp', name, ts: row.reviewed_at, avatar_url: row.avatar_url ?? null })
         if (row.profile_updated_at && row.profile_updated_at > row.reviewed_at) {
@@ -189,16 +227,10 @@ let canManagePolls = false
       activityFeed.sort((a, b) => b.ts.localeCompare(a.ts))
       recentActivity = activityFeed.slice(0, 6)
 
-      // Batch-fetch role info for all spotlight pool members
-      const pool = spotlightPool as SpotlightMember[]
       if (pool.length > 0) {
-        const clerkIds = pool.map(m => m.clerk_user_id).filter(Boolean) as string[]
-        const { data: signupRows } = await supabaseAdmin
-          .from('camp_signups')
-          .select('clerk_user_id, roles(name, departments(name))')
-          .in('clerk_user_id', clerkIds)
+        const signupRows = (signupRowsRes.data ?? []) as { clerk_user_id: string; roles: unknown }[]
         const roleMap = Object.fromEntries(
-          (signupRows ?? []).map(r => {
+          signupRows.map(r => {
             const rolesRaw = r.roles as { name: string; departments: { name: string }[] | null } | { name: string; departments: { name: string }[] | null }[] | null
             const role = (Array.isArray(rolesRaw) ? rolesRaw[0] : rolesRaw) as { name: string; departments: { name: string }[] | null } | null
             return [r.clerk_user_id, { role_name: role?.name ?? null, dept_name: role?.departments?.[0]?.name ?? null }]
@@ -209,8 +241,20 @@ let canManagePolls = false
     }
   }
 
-  // ── Page content (editable by admin) ─────────────────────────
-  const pageContentResult = await supabaseAdmin.from('page_content').select('key, value')
+  // ── Page content + member-derived state (one parallel round-trip) ──
+  // isApproved is needed before the batch to keep getUnmetResourceNeeds
+  // approved-only (its banner only renders for approved members anyway).
+  const isApprovedForBatch = application?.status === 'approved'
+  const shiftClerkId = (application?.clerk_user_id as string | null) ?? userId
+  const [pageContentResult, memberGroups, shiftState, unmetNeeds] = await Promise.all([
+    pageContentQuery,
+    // Groups the member belongs to (replaces the old setup_preference "contributions").
+    getMemberGroups(application?.clerk_user_id as string | null),
+    shiftClerkId ? getMemberShiftState(shiftClerkId) : Promise.resolve(EMPTY_MEMBER_SHIFT_STATE),
+    // Unmet shared-resource needs → the "Bring Something" banner. Demand-driven:
+    // renders nothing once the community has everything covered.
+    isApprovedForBatch ? getUnmetResourceNeeds() : Promise.resolve([]),
+  ])
   const contentRows = pageContentResult.data
   const pageContent: Record<string, string> = Object.fromEntries((contentRows ?? []).map(r => [r.key, r.value]))
   const c = (key: string, fallback: string) => pageContent[key] ?? fallback
@@ -234,16 +278,12 @@ let canManagePolls = false
   const badgeDeptName = roleInfo?.departments?.name ?? null
   const badgeRoleName = roleInfo?.name ?? null
 
-  // Groups the member belongs to (replaces the old setup_preference "contributions").
-  const memberGroups = await getMemberGroups(application?.clerk_user_id as string | null)
   const { groupCountsByCollection, totalGroupCount } = memberGroupCounts(memberGroups)
 
   const displayName = (application?.preferred_name as string | null) ?? (application?.first_name as string | null) ?? userFirstName ?? 'Welcome'
 
   // Attunement checklist — shared with the profile page via buildAttunementChecklist
   // so the home banner's outstanding count always matches the profile checklist.
-  const shiftClerkId = (application?.clerk_user_id as string | null) ?? userId
-  const shiftState = shiftClerkId ? await getMemberShiftState(shiftClerkId) : EMPTY_MEMBER_SHIFT_STATE
   const attunementTasks = buildAttunementChecklist(pageContent['config_attunement_tasks'], {
     hasPhoto: !!application?.avatar_url,
     groupCountsByCollection,
@@ -261,14 +301,9 @@ let canManagePolls = false
   const allAttuned = requiredTasks.every(t => t.done)
   const commitmentsOutstanding = commitmentTasks.filter(t => !t.done).length
 
-  // Unmet shared-resource needs → the "Bring Something" banner. Demand-driven:
-  // renders nothing once the community has everything covered.
-  const unmetNeeds = isApproved ? await getUnmetResourceNeeds() : []
-
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
-  const WHAT_IF_DATE = new Date('2026-07-23T12:00:00')
-  const daysUntil = Math.max(0, Math.ceil((WHAT_IF_DATE.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+  const daysUntil = daysUntilEvent(pageContent['config_event_start_date'])
 
   // ── APPROVED MEMBER DASHBOARD ─────────────────────────────────
   if (isApproved) {

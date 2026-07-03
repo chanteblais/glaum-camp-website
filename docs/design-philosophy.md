@@ -143,6 +143,20 @@ image-gen → potrace pipeline and its prompt language live in `design/icon-lab/
      chisel strokes.
    - **The hand crops at the palm base.** No wrist, no forearm at icon scale.
    - Delivered as transparent-background assets in `public/asset-library/icons/`.
+   - The whole method is a tool: `scripts/strike-icon.py` (subject + optional geometry
+     anchor → regal strike → keyed transparent, cropped, webp). Exploration history and
+     galleries are archived under `design/icon-lab/regal/` on the design-exploration branch.
+
+10. **THE BADGE REGISTER (2026-07-03).** Badges (distinction medals) are a separate
+    category from icons, doing different things. An icon is a solid sculpted subject,
+    no disc, read at a glance from across the room. A badge is a *place*: warm
+    dimensional embossed gold on a deep aubergine disc face, composition-rich (wreath,
+    star, a scene held between hands), rewarding the close look a medal invites. The
+    standard is the Glåüm Elder medal (`asset-library/distinctions/elder-tree.webp`) —
+    re-strike experiments that simplified for small sizes lost either the warmth
+    (flattened into graphic) or the disc (all-metal coin); *"the original is still the
+    winner."* Its warmth outranks small-size crispness at badge scale. Anchor badge
+    work to it the way icon work anchors to the hand.
 
 ## 8. Status
 

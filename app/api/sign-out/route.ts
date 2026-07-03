@@ -1,37 +1,45 @@
-import { clerkClient } from '@clerk/nextjs/server'
+import { auth, clerkClient, verifyToken } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 
 export async function GET(req: Request) {
-  // Parse session + user ID directly from the __session JWT (no auth() needed)
   const cookieHeader = req.headers.get('cookie') || ''
 
-  const sessionCookie = cookieHeader
-    .split(';')
-    .map(c => c.trim())
-    .find(c => c.startsWith('__session='))
-    ?.split('=')
-    .slice(1)
-    .join('=')
-
-  if (sessionCookie) {
-    try {
-      const payload = JSON.parse(
-        Buffer.from(sessionCookie.split('.')[1], 'base64url').toString()
-      )
-      const sessionId = payload.sid
-      const userId = payload.sub
-      const client = await clerkClient()
-
-      // Revoke all active sessions for this user
-      if (userId) {
-        const sessions = await client.sessions.getSessionList({ userId })
-        await Promise.all(
-          sessions.data.map(s => client.sessions.revokeSession(s.id))
-        )
+  try {
+    // Prefer the Clerk-verified session. Fall back to the raw __session cookie
+    // only via verifyToken (networkless signature check against Clerk's JWKS
+    // using CLERK_SECRET_KEY) so a forged cookie can never drive revocation —
+    // sign-out still works mid-broken-session because the token stays valid
+    // even when auth() can't resolve it.
+    let userId: string | null = null
+    const authed = await auth()
+    if (authed.userId) {
+      userId = authed.userId
+    } else {
+      const sessionCookie = cookieHeader
+        .split(';')
+        .map(c => c.trim())
+        .find(c => c.startsWith('__session='))
+        ?.split('=')
+        .slice(1)
+        .join('=')
+      if (sessionCookie) {
+        const payload = await verifyToken(sessionCookie, {
+          secretKey: process.env.CLERK_SECRET_KEY,
+        })
+        userId = typeof payload.sub === 'string' ? payload.sub : null
       }
-    } catch (e: any) {
-      // Session revocation failed silently — cookies still cleared below
     }
+
+    // Revoke all active sessions for this user
+    if (userId) {
+      const client = await clerkClient()
+      const sessions = await client.sessions.getSessionList({ userId })
+      await Promise.all(
+        sessions.data.map(s => client.sessions.revokeSession(s.id))
+      )
+    }
+  } catch (e: any) {
+    // Session revocation failed silently — cookies still cleared below
   }
 
   // Delete session cookies only — NOT __clerk_db_jwt* (the dev browser token).

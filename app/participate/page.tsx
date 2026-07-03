@@ -1,7 +1,9 @@
-import { auth, currentUser } from '@clerk/nextjs/server'
+import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
-import { supabaseAdmin } from '@/lib/supabase'
-import { SignupSection } from '@/app/profile/SignupSection'
+import { getApprovedMember } from '@/lib/members'
+import { getRoleSignupData, getShiftSignupData, getSelfJoinGroups } from '@/lib/participate-data'
+import { getMemberResourceView } from '@/lib/resources'
+import { SignupSection, type SignupInitialData } from '@/app/profile/SignupSection'
 import { GroupCommitments } from '@/app/profile/GroupCommitments'
 import { ResourceCommitments } from '@/app/profile/ResourceCommitments'
 import { Header } from '@/components/Header'
@@ -12,18 +14,22 @@ export default async function SignupPage() {
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
 
-  const user = await currentUser()
-  const email = user?.emailAddresses[0]?.emailAddress ?? ''
+  // Everything the page's sections need, in one parallel round-trip — the
+  // same assembly the /api/signup, /api/shift-signups, /api/groups/membership
+  // and /api/resources routes serve, so the sections render with their data
+  // in place instead of fetching it after hydration.
+  const [member, roleData, shiftData, selfJoinGroups, resourceLists] = await Promise.all([
+    getApprovedMember(userId),
+    getRoleSignupData(userId),
+    getShiftSignupData(userId),
+    getSelfJoinGroups(userId),
+    getMemberResourceView(userId),
+  ])
+  if (!member) redirect('/profile')
 
-  const { data: application } = await supabaseAdmin
-    .from('members')
-    .select('id, status')
-    .or(`clerk_user_id.eq.${userId},email.eq.${email}`)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  if (!application || application.status !== 'approved') redirect('/profile')
+  // The lib types the payloads loosely (they're built for JSON serialization);
+  // the shapes are exactly what the client components' own types describe.
+  const signupInitialData = { role: roleData, shifts: shiftData } as unknown as SignupInitialData
 
   return (
     <>
@@ -50,7 +56,7 @@ export default async function SignupPage() {
 
         <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.25), transparent)', marginBottom: '2rem' }} />
 
-        <SignupSection />
+        <SignupSection initialData={signupInitialData} />
 
         {/* Shared resources — claim the gear you'll bring. Above groups: needs
             are live and time-sensitive; group membership is a set-once choice. */}
@@ -65,7 +71,7 @@ export default async function SignupPage() {
           </p>
         </div>
 
-        <ResourceCommitments />
+        <ResourceCommitments initialLists={resourceLists} />
 
         {/* Self-join groups, grouped by collection (Contributions, Skills, …) */}
         <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.25), transparent)', margin: '3rem 0 2rem' }} />
@@ -79,7 +85,7 @@ export default async function SignupPage() {
           </p>
         </div>
 
-        <GroupCommitments />
+        <GroupCommitments initialGroups={selfJoinGroups} />
 
       </main>
     </>

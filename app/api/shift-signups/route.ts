@@ -1,136 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth, currentUser } from '@clerk/nextjs/server'
+import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { shiftDurationHours } from '@/lib/shift-hours'
-import { getMemberShiftState } from '@/lib/shift-attunement'
-import { parseAttunementTasks } from '@/lib/site-config'
-import { memberDisplayNames } from '@/lib/member-names'
+import { getApprovedMember, memberDisplayName } from '@/lib/members'
+import { getShiftSignupData, fetchAllHolds, countHoldsFor } from '@/lib/participate-data'
 
 // Member-facing multi-shift signup (shifts redesign). A member holds any number
 // of shift events via member_shift_signups; this replaces the single
 // camp_signups.schedule_event_id (still read for back-compat, never written here;
 // cancelling a legacy-held shift clears both so hours never double-count).
 
-async function requireApprovedCamper(userId: string) {
-  const user = await currentUser()
-  const email = user?.emailAddresses[0]?.emailAddress
-
-  const { data: application } = await supabaseAdmin
-    .from('members')
-    .select('id, status')
-    .or(`clerk_user_id.eq.${userId},email.eq.${email}`)
-    .eq('status', 'approved')
-    .maybeSingle()
-
-  return application ?? null
-}
-
-// Unique (member, event) holds across the new table + the legacy single column.
-// Leads (migration 048) only exist on the new table; legacy holds are members.
-async function fetchAllHolds() {
-  const [{ data: many }, { data: legacy }] = await Promise.all([
-    supabaseAdmin.from('member_shift_signups').select('clerk_user_id, schedule_event_id, role'),
-    supabaseAdmin.from('camp_signups').select('clerk_user_id, schedule_event_id').not('schedule_event_id', 'is', null),
-  ])
-  const pairs = new Set<string>()
-  const leadsByEvent = new Map<string, string[]>()
-  for (const r of many ?? []) {
-    if (!r.schedule_event_id) continue
-    pairs.add(`${r.clerk_user_id}|${r.schedule_event_id}`)
-    if (r.role === 'lead') {
-      leadsByEvent.set(r.schedule_event_id, [...(leadsByEvent.get(r.schedule_event_id) ?? []), r.clerk_user_id])
-    }
-  }
-  for (const r of legacy ?? []) {
-    if (r.schedule_event_id) pairs.add(`${r.clerk_user_id}|${r.schedule_event_id}`)
-  }
-  return { pairs, leadsByEvent }
-}
-
-const countFor = (pairs: Set<string>, eventId: string) => {
-  let n = 0
-  pairs.forEach(p => { if (p.endsWith(`|${eventId}`)) n++ })
-  return n
-}
-
 export async function GET() {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const application = await requireApprovedCamper(userId)
-  if (!application) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-
-  const [eventsRes, holds, shiftState, flagRes, typesRes] = await Promise.all([
-    supabaseAdmin
-      .from('schedule_events')
-      .select('id, title, subtitle, day, time, event_date, start_time, end_time, capacity, shift_type_id, needs_lead, shift_types(name, icon)')
-      .eq('participation_type', 'shift')
-      .eq('visible', true)
-      .order('event_date', { ascending: true, nullsFirst: false })
-      .order('start_time', { ascending: true, nullsFirst: false }),
-    fetchAllHolds(),
-    getMemberShiftState(userId),
-    supabaseAdmin.from('page_content').select('key, value').in('key', ['config_shift_signup_open', 'config_attunement_tasks']),
-    supabaseAdmin.from('shift_types').select('id, name, icon').order('sort_order'),
+  // The approval gate runs alongside the data batch — it only gates the
+  // response, not what we fetch, so there's no need to serialize on it.
+  // Data assembly lives in lib/participate-data.ts, shared with the
+  // server-rendered /participate page (this route is the client's refresh path).
+  const [application, data] = await Promise.all([
+    getApprovedMember(userId),
+    getShiftSignupData(userId),
   ])
 
-  // Registry order drives each type's palette slot (lib/shift-colors.ts).
-  const shiftTypes = (typesRes.data ?? []).map((t, i) => ({ id: t.id, name: t.name, icon: t.icon, color_index: i }))
+  if (!application) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const config = Object.fromEntries((flagRes.data ?? []).map(r => [r.key, r.value]))
-  const shiftSignupOpen = config['config_shift_signup_open'] !== 'false'
-
-  const leadNames = await memberDisplayNames(Array.from(holds.leadsByEvent.values()).flat())
-
-  const shifts = (eventsRes.data ?? []).map(e => {
-    const st = e.shift_types as unknown as { name?: string; icon?: string | null } | null
-    const leadIds = holds.leadsByEvent.get(e.id) ?? []
-    const held = holds.pairs.has(`${userId}|${e.id}`)
-    return {
-      id: e.id,
-      title: e.title,
-      subtitle: e.subtitle,
-      day: e.day,
-      time: e.time,
-      event_date: e.event_date,
-      duration_hours: shiftDurationHours(e.start_time, e.end_time),
-      capacity: e.capacity,
-      signed_up: countFor(holds.pairs, e.id),
-      shift_type_id: e.shift_type_id,
-      shift_type_name: st?.name ?? 'Shift',
-      shift_type_icon: st?.icon ?? null,
-      held,
-      held_role: held ? (leadIds.includes(userId) ? 'lead' : 'member') : null,
-      lead_names: leadIds.map(id => leadNames[id]).filter(Boolean),
-      needs_lead: e.needs_lead ?? false,
-    }
-  })
-
-  // Owed requirements = derived (groups/roles) merged with universal typed shift
-  // attunement tasks — max hours per shift type, mirroring attunement's rule.
-  const owedByType = new Map<string, number>()
-  for (const r of shiftState.derivedShiftRequirements) {
-    owedByType.set(r.shiftTypeId, Math.max(owedByType.get(r.shiftTypeId) ?? 0, r.requiredHours))
-  }
-  for (const t of parseAttunementTasks(config['config_attunement_tasks'])) {
-    if (t.enabled && t.requirement === 'shift' && t.shiftTypeId) {
-      owedByType.set(t.shiftTypeId, Math.max(owedByType.get(t.shiftTypeId) ?? 0, t.requiredHours ?? 1))
-    }
-  }
-  const owed = Array.from(owedByType.entries()).map(([shiftTypeId, requiredHours]) => ({
-    shiftTypeId,
-    requiredHours,
-    heldHours: shiftState.hoursByShiftType[shiftTypeId] ?? 0,
-  }))
-
-  return NextResponse.json({ shifts, owed, shiftTypes, shiftSignupOpen })
+  return NextResponse.json(data)
 }
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const application = await requireApprovedCamper(userId)
+  const application = await getApprovedMember(userId)
   if (!application) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { schedule_event_id, role: rawRole } = await req.json()
@@ -170,7 +71,7 @@ export async function POST(req: NextRequest) {
 
   if (event.capacity != null && !existing) {
     const holds = await fetchAllHolds()
-    if (!holds.pairs.has(`${userId}|${event.id}`) && countFor(holds.pairs, event.id) >= event.capacity) {
+    if (!holds.pairs.has(`${userId}|${event.id}`) && countHoldsFor(holds.pairs, event.id) >= event.capacity) {
       return NextResponse.json({ error: `"${event.title}" is full` }, { status: 409 })
     }
   }
@@ -186,8 +87,7 @@ export async function POST(req: NextRequest) {
 
   // Admin notification (same shape as the legacy shift_change event). A role
   // change on an existing signup reads as such, not as a fresh signup.
-  const user = await currentUser()
-  const name = user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.firstName ?? userId
+  const name = memberDisplayName(application, userId)
   const message = existing && role && role !== existing.role
     ? role === 'lead'
       ? `${name} offered to lead "${event.title}"`
@@ -209,7 +109,7 @@ export async function DELETE(req: NextRequest) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const application = await requireApprovedCamper(userId)
+  const application = await getApprovedMember(userId)
   if (!application) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const schedule_event_id = req.nextUrl.searchParams.get('schedule_event_id')

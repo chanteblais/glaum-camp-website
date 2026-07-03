@@ -19,17 +19,22 @@ type OptInGroup = {
 
 const GOLD = '#C8A848'
 
-export function GroupCommitments() {
+// Server-rendered pages pass the same shape /api/groups/membership returns
+// (lib/participate-data.ts → getSelfJoinGroups), so the section renders with
+// its data already in place and skips the fetch-after-hydration round-trip.
+export function GroupCommitments({ initialGroups }: { initialGroups?: OptInGroup[] }) {
   const router = useRouter()
-  const [groups, setGroups] = useState<OptInGroup[] | null>(null)
+  const [groups, setGroups] = useState<OptInGroup[] | null>(initialGroups ?? null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (initialGroups) return
     fetch('/api/groups/membership')
       .then(r => r.json())
       .then(d => setGroups(d.groups ?? []))
       .catch(() => setGroups([]))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function toggle(g: OptInGroup) {

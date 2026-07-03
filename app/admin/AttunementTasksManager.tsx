@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from 'react'
 import {
   ATTUNEMENT_REQUIREMENTS,
+  ATTUNEMENT_NUDGE_OPTIONS,
   type AttunementRequirement,
   type AttunementTask,
 } from '@/lib/site-config'
@@ -20,11 +21,13 @@ export function AttunementTasksManager({
   collections,
   totalGroupCount,
   shiftTypes,
+  initialNudgeDays,
 }: {
   initialTasks: AttunementTask[]
   collections: CollectionOption[]
   totalGroupCount: number
   shiftTypes: ShiftTypeOption[]
+  initialNudgeDays: number
 }) {
   // Max groups a 'collection' task may require = groups present in that collection
   // (or the total across all collections when no specific collection is chosen).
@@ -88,6 +91,32 @@ export function AttunementTasksManager({
     save(next)
   }
 
+  // Reminder-email cadence (config_attunement_nudge_days; 0 = off) — saved
+  // immediately, a select change is already a deliberate action.
+  const [nudgeDays, setNudgeDays] = useState(initialNudgeDays)
+  async function changeNudgeDays(value: number) {
+    setNudgeDays(value)
+    try {
+      const res = await fetch('/api/admin/page-content', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config_attunement_nudge_days: String(value) }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        setError(d.error ?? 'Failed to save')
+        setSaved(false)
+      } else {
+        setError(null)
+        setSaved(true)
+        setTimeout(() => setSaved(false), 1800)
+      }
+    } catch {
+      setError('Network error')
+      setSaved(false)
+    }
+  }
+
   // The requirement <select> encodes a collection choice as `col:<id>` (empty id
   // = any collection) and a shift choice as `shift:<id>` (empty id = any shift).
   // Static requirements keep their plain value.
@@ -135,6 +164,36 @@ export function AttunementTasksManager({
         member&rsquo;s profile. Every item auto-completes when the member meets its requirement — pick the
         requirement from the dropdown. Disabled items are hidden from members.
       </p>
+
+      {/* Reminder-email cadence */}
+      <div
+        style={{
+          display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap',
+          border: '1px solid rgba(200,168,72,0.15)', borderRadius: '0.75rem',
+          background: 'rgba(200,168,72,0.02)', padding: '0.75rem 1rem', marginBottom: '1.25rem',
+        }}
+      >
+        <div style={{ flex: 1, minWidth: '220px' }}>
+          <span style={{ display: 'block', fontSize: '0.85rem', color: CREAM }}>Reminder emails</span>
+          <span style={{ display: 'block', fontSize: '0.72rem', opacity: 0.5, lineHeight: 1.5 }}>
+            Members with outstanding tasks get an email at this cadence (mornings). Members can opt out;
+            fully attuned members never get one.
+          </span>
+        </div>
+        <select
+          value={nudgeDays}
+          onChange={e => changeNudgeDays(parseInt(e.target.value, 10))}
+          style={{
+            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(200,168,72,0.2)',
+            borderRadius: '0.3rem', color: CREAM, fontSize: '0.75rem',
+            padding: '0.2rem 0.4rem', outline: 'none', fontFamily: 'inherit', cursor: 'pointer',
+          }}
+        >
+          {ATTUNEMENT_NUDGE_OPTIONS.map(o => (
+            <option key={o.value} value={o.value} style={{ background: '#1A0A24' }}>{o.label}</option>
+          ))}
+        </select>
+      </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1.25rem' }}>
         {tasks.length === 0 && (

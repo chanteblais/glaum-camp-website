@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
-import { auth, currentUser, clerkClient } from '@clerk/nextjs/server'
+import { auth, clerkClient } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getNotificationPreferences } from '@/lib/notification-prefs'
-import { getOrCreateDirectConversation } from '@/lib/conversations'
+import { getOrCreateDirectConversation, findDirectConversation } from '@/lib/conversations'
 import { getInboxConversations } from '@/lib/inbox'
 import { sendNewMessageEmail } from '@/lib/send-email'
 
@@ -38,30 +38,36 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Cannot message yourself' }, { status: 400 })
   }
 
-  // Verify recipient is an approved member
-  const { data: recipient } = await supabaseAdmin
-    .from('members')
-    .select('clerk_user_id, first_name, preferred_name')
-    .eq('clerk_user_id', recipientId)
-    .eq('status', 'approved')
-    .maybeSingle()
+  // Recipient check, sender-name snapshot, and conversation lookup are all
+  // independent — one round-trip instead of four (this path previously also
+  // paid a Clerk Backend-API call just for a name fallback).
+  const [{ data: recipient }, { data: senderApp }, existingConvId] = await Promise.all([
+    // Verify recipient is an approved member (email feeds the notification below).
+    supabaseAdmin
+      .from('members')
+      .select('clerk_user_id, first_name, preferred_name, email')
+      .eq('clerk_user_id', recipientId)
+      .eq('status', 'approved')
+      .maybeSingle(),
+    // Snapshot the sender's display name onto the message so the conversation
+    // stays readable even if the sender's application is later deleted.
+    supabaseAdmin
+      .from('members')
+      .select('preferred_name, first_name')
+      .eq('clerk_user_id', userId)
+      .maybeSingle(),
+    // Read-only lookup here; creation (below) waits for the recipient check so
+    // a bad recipient id never leaves a dangling conversation.
+    findDirectConversation(userId, recipientId),
+  ])
 
   if (!recipient) return NextResponse.json({ error: 'Recipient not found' }, { status: 404 })
 
-  // Snapshot the sender's display name onto the message so the conversation stays
-  // readable even if the sender's application is later deleted. Prefer the
-  // application name (what's shown elsewhere), falling back to Clerk's first name.
-  const { data: senderApp } = await supabaseAdmin
-    .from('members')
-    .select('preferred_name, first_name')
-    .eq('clerk_user_id', userId)
-    .maybeSingle()
-  const user = await currentUser()
-  const senderName = senderApp?.preferred_name || senderApp?.first_name || user?.firstName || 'A member'
+  const senderName = senderApp?.preferred_name || senderApp?.first_name || 'A member'
 
   // Attach to the direct conversation (resolve-or-create), so the message lives in
   // the conversations model. recipient_clerk_id is still set for DMs (legacy reads).
-  const conversationId = await getOrCreateDirectConversation(userId, recipientId)
+  const conversationId = existingConvId ?? await getOrCreateDirectConversation(userId, recipientId)
 
   const { data: message, error } = await supabaseAdmin
     .from('messages')
@@ -71,23 +77,24 @@ export async function POST(req: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // In-app notification (always)
-  await supabaseAdmin.from('user_notifications').insert({
-    clerk_user_id: recipientId,
-    event_type: 'new_message',
-    message: `${senderName} sent you a message`,
-    details: { senderId: userId, messageId: message.id },
-  })
-
-  // Email notification (best-effort, non-blocking semantics — awaited but guarded)
-  await maybeSendMessageEmail({
-    messageId: message.id,
-    senderId: userId,
-    senderName,
-    recipientId,
-    recipientName: recipient.preferred_name || recipient.first_name || 'there',
-    messageBody: body.trim(),
-  })
+  // In-app notification and the (guarded, best-effort) email are independent.
+  await Promise.all([
+    supabaseAdmin.from('user_notifications').insert({
+      clerk_user_id: recipientId,
+      event_type: 'new_message',
+      message: `${senderName} sent you a message`,
+      details: { senderId: userId, messageId: message.id },
+    }),
+    maybeSendMessageEmail({
+      messageId: message.id,
+      senderId: userId,
+      senderName,
+      recipientId,
+      recipientName: recipient.preferred_name || recipient.first_name || 'there',
+      recipientEmail: recipient.email ?? null,
+      messageBody: body.trim(),
+    }),
+  ])
 
   return NextResponse.json({ message })
 }
@@ -98,31 +105,37 @@ async function maybeSendMessageEmail(opts: {
   senderName: string
   recipientId: string
   recipientName: string
+  recipientEmail: string | null
   messageBody: string
 }) {
   try {
-    // Respect the recipient's preference.
-    const prefs = await getNotificationPreferences(opts.recipientId)
-    if (!prefs.email_new_message) return
-
-    // Throttle: skip if we already emailed this recipient about a message from
-    // this sender within the throttle window.
+    // The preference and throttle checks are independent — one round-trip.
     const since = new Date(Date.now() - EMAIL_THROTTLE_MS).toISOString()
-    const { data: recent } = await supabaseAdmin
-      .from('messages')
-      .select('id')
-      .eq('sender_clerk_id', opts.senderId)
-      .eq('recipient_clerk_id', opts.recipientId)
-      .not('notified_at', 'is', null)
-      .gte('notified_at', since)
-      .limit(1)
-
+    const [prefs, { data: recent }] = await Promise.all([
+      // Respect the recipient's preference.
+      getNotificationPreferences(opts.recipientId),
+      // Throttle: skip if we already emailed this recipient about a message
+      // from this sender within the throttle window.
+      supabaseAdmin
+        .from('messages')
+        .select('id')
+        .eq('sender_clerk_id', opts.senderId)
+        .eq('recipient_clerk_id', opts.recipientId)
+        .not('notified_at', 'is', null)
+        .gte('notified_at', since)
+        .limit(1),
+    ])
+    if (!prefs.email_new_message) return
     if (recent && recent.length > 0) return
 
-    // Resolve the recipient's email address from Clerk.
-    const client = await clerkClient()
-    const recipientUser = await client.users.getUser(opts.recipientId)
-    const email = recipientUser.emailAddresses[0]?.emailAddress
+    // The member row's email (fetched with the recipient check) is canonical —
+    // members sign in with it. Clerk remains the fallback for rows without one.
+    let email = opts.recipientEmail
+    if (!email) {
+      const client = await clerkClient()
+      const recipientUser = await client.users.getUser(opts.recipientId)
+      email = recipientUser.emailAddresses[0]?.emailAddress ?? null
+    }
     if (!email) return
 
     const result = await sendNewMessageEmail({

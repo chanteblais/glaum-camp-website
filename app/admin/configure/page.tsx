@@ -16,7 +16,7 @@ import { AdminsManager } from '../AdminsManager'
 import { PollManagersManager } from '../PollManagersManager'
 import { DebugSection } from '../DebugSection'
 import { CONFIGURE_CATEGORIES } from '../admin-sections'
-import { parseAttunementTasks } from '@/lib/site-config'
+import { parseAttunementTasks, parseAttunementNudgeDays } from '@/lib/site-config'
 import { getGroupCollections } from '@/lib/group-collections'
 import { parseDistinctions } from '@/lib/distinctions'
 import { parseProfileFields, distinctionCatalog } from '@/lib/profile-fields'
@@ -33,7 +33,7 @@ export default async function ConfigurePage() {
   const { data: configRows } = await supabaseAdmin
     .from('page_content')
     .select('key, value')
-    .in('key', ['config_attunement_tasks', 'config_distinctions', 'config_profile_fields', 'config_event_start_date', 'config_event_end_date'])
+    .in('key', ['config_attunement_tasks', 'config_distinctions', 'config_profile_fields', 'config_event_start_date', 'config_event_end_date', 'config_attunement_nudge_days'])
   const configMap = Object.fromEntries((configRows ?? []).map(r => [r.key, r.value]))
   const attunementTasks = parseAttunementTasks(configMap['config_attunement_tasks'])
   const distinctions = parseDistinctions(configMap['config_distinctions'])
@@ -162,7 +162,7 @@ export default async function ConfigurePage() {
           title="Attunement Tasks"
           summary="Profile checklist items members complete"
         >
-          <AttunementTasksManager initialTasks={attunementTasks} collections={attunementCollections} totalGroupCount={totalGroupCount} shiftTypes={shiftTypeOptions} />
+          <AttunementTasksManager initialTasks={attunementTasks} collections={attunementCollections} totalGroupCount={totalGroupCount} shiftTypes={shiftTypeOptions} initialNudgeDays={parseAttunementNudgeDays(configMap['config_attunement_nudge_days'])} />
         </CollapsibleSection>
 
         {/* ═══════════════ STRUCTURE ═══════════════ */}
