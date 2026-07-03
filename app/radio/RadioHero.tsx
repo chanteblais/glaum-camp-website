@@ -62,28 +62,30 @@ const MID = 180
 
 // The main pulse: quiet braid → growing swells → jagged mid-cluster → the
 // heartbeat spike → decay → quiet braid.
-// Transcribed from assets/radio_mockup.png: the actual extrema were extracted
-// per-column from the gold pixels (baseline y=313 in the source), then scaled
-// into this viewBox. The crests are ROUND — extrema sit ~35 viewBox units
-// apart, so the Catmull-Rom smoother produces her generous U-shaped swings,
-// not needles.
+// The mockup's trace, VERBATIM: densely sampled per-column from
+// assets/radio_mockup.png (gold-pixel run tracking, median-filtered,
+// baseline y=313 → 180 here). Extrema-only sampling made pointy crests —
+// the mock's roundness lives between the extrema, so the curve itself is
+// the data. A few mote-grab glitches were hand-mended against the local
+// curve; regenerate with the extraction script in the session notes if the
+// mock ever changes.
 const MAIN: [number, number][] = [
-  // quiet braid in
-  [0, 180], [40, 176], [80, 183], [120, 177], [160, 182],
-  // first swells
-  [198, 145], [239, 215], [268, 172], [298, 196],
-  // taller pair
-  [335, 128], [370, 232],
-  // the little m-wiggle
-  [400, 171], [417, 187], [435, 168], [456, 184],
-  // building
-  [479, 155], [500, 196],
-  // the cluster: crest · deep valley · GIANT crest · deepest valley · tall crest · valley
-  [537, 113], [570, 285], [610, 37], [645, 330], [684, 97], [712, 253],
-  // decay: small m, then still-substantial swells
-  [745, 150], [768, 201], [784, 171], [798, 189],
-  [821, 147], [854, 230], [891, 128], [926, 207], [956, 138], [982, 198],
-  [1000, 180],
+  [0, 180], [5, 174], [16, 171], [25, 170], [33, 167], [42, 167], [68, 167], [79, 170],
+  [89, 175], [100, 184], [111, 196], [121, 202], [132, 207], [142, 208], [153, 205], [163, 196],
+  [174, 177], [184, 156], [195, 146], [205, 151], [216, 170], [226, 189], [237, 193], [247, 187],
+  [258, 175], [268, 176], [279, 191], [289, 206], [300, 204], [311, 182], [321, 149], [332, 130],
+  [342, 139], [353, 179], [363, 221], [374, 228], [384, 205], [395, 186], [405, 186], [416, 199],
+  [426, 202], [437, 192], [447, 181], [458, 178], [468, 163], [479, 156], [489, 171], [500, 204],
+  [505, 208], [511, 205], [516, 196], [521, 171], [526, 143], [532, 121], [537, 115], [542, 120],
+  [547, 141], [553, 185], [558, 238], [563, 269], [568, 281], [574, 281], [579, 266], [584, 230],
+  [589, 160], [595, 94], [600, 59], [605, 43], [611, 41], [616, 47], [621, 69], [626, 135],
+  [632, 227], [637, 300], [642, 322], [647, 325], [653, 320], [658, 295], [663, 251], [668, 198],
+  [674, 139], [679, 104], [684, 100], [689, 106], [695, 137], [700, 179], [705, 228], [711, 244],
+  [716, 228], [721, 202], [726, 186], [732, 172], [737, 158], [742, 150], [747, 152], [753, 163],
+  [758, 177], [763, 185], [768, 189], [774, 189], [784, 184], [795, 194], [805, 186], [816, 160],
+  [826, 155], [837, 178], [847, 219], [858, 229], [868, 199], [879, 150], [889, 131], [900, 141],
+  [911, 175], [921, 200], [930, 206], [940, 172], [947, 145], [953, 139], [963, 199], [974, 193],
+  [984, 182], [995, 174], [1000, 178],
 ]
 
 // Echo threads — the braid lives at the EDGES in the mock: two fine strands
