@@ -230,7 +230,7 @@ export default async function AdminPage() {
           title="Lead-Up Gatherings"
           summary="Planning sessions on the runway to the event (members RSVP)"
         >
-          <LeadUpGatheringsManager />
+          <LeadUpGatheringsManager rangeStart={eventRangeStart} rangeEnd={eventRangeEnd} />
         </CollapsibleSection>
 
         {/* ═══════════════ COMMUNICATION ═══════════════ */}

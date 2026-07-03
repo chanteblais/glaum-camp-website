@@ -5,9 +5,10 @@ import { EventIcon } from '@/components/EventIcon'
 import { AssetImagePicker } from './AssetImagePicker'
 import { LoadError } from './LoadError'
 import { isImageIcon } from '@/lib/icon-src'
-import { formatTime } from '@/lib/time-format'
-import { shiftDurationHours, formatShiftRange, weekdayFromISO } from '@/lib/shift-hours'
+import { rangeTo24h } from '@/lib/time-format'
+import { shiftDurationHours, formatShiftRange, parseHHMM, weekdayFromISO } from '@/lib/shift-hours'
 import { buildScheduleDays, type ScheduleDay } from '@/lib/schedule-days'
+import { ScheduleWeekView } from './ScheduleWeekView'
 import { useConfirm } from '../components/ConfirmDialog'
 
 type ScheduleEvent = {
@@ -67,9 +68,14 @@ function parseStartMinutes(time: string): number {
 }
 
 // Time orders rows within a day; title breaks ties so the order is stable.
+// Structured start_time wins; the free-text parse only covers legacy rows
+// that haven't been re-saved (or backfilled by migration 054) yet.
+function startMinutes(e: ScheduleEvent): number {
+  return parseHHMM(e.start_time) ?? parseStartMinutes(e.time)
+}
 function sortByTime(evs: ScheduleEvent[]): ScheduleEvent[] {
   return [...evs].sort((a, b) =>
-    parseStartMinutes(a.time) - parseStartMinutes(b.time) || a.title.localeCompare(b.title)
+    startMinutes(a) - startMinutes(b) || a.title.localeCompare(b.title)
   )
 }
 
@@ -137,7 +143,17 @@ function EventModal({
   // out of sync (picking the wrong Wednesday used to be an easy mistake).
   const derivedDay = weekdayFromISO(form.event_date)
   // Non-recurring events need a real date so the schedule can place them.
-  const canSave = !!form.title && (form.is_recurring || !!form.event_date)
+  // Every event needs a start time (no free-text times); shifts also need an
+  // end so their hours can be counted.
+  const canSave = !!form.title
+    && (form.is_recurring || !!form.event_date)
+    && !!form.start_time
+    && (form.participation_type !== 'shift' || !!form.end_time)
+  const missing = !form.title ? 'a title'
+    : (!form.is_recurring && !form.event_date) ? 'a date'
+    : !form.start_time ? 'a start time'
+    : (form.participation_type === 'shift' && !form.end_time) ? 'an end time (shift hours need it)'
+    : null
 
   return (
     <>
@@ -177,12 +193,19 @@ function EventModal({
           </Field>
         )}
 
-        {/* Shift events set their time via Start/End (below); other events use free text. */}
-        {form.participation_type !== 'shift' && (
-          <Field label="Time">
-            <input style={inputStyle} value={form.time} placeholder="e.g. 7:00 PM – 10:00 PM" onChange={(e) => set('time', e.target.value)} />
+        {/* Every event carries structured times — the display string derives
+            from them on save. End is optional except for shifts (hours math). */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '0 1rem', alignItems: 'end' }}>
+          <Field label="Start">
+            <input type="time" style={inputStyle} value={form.start_time ?? ''} onChange={e => set('start_time', e.target.value || null)} />
           </Field>
-        )}
+          <Field label={form.participation_type === 'shift' ? 'End' : 'End (optional)'}>
+            <input type="time" style={inputStyle} value={form.end_time ?? ''} onChange={e => set('end_time', e.target.value || null)} />
+          </Field>
+          <div style={{ marginBottom: '1rem', paddingBottom: '0.6rem', fontSize: '0.82rem', color: '#C8A848', opacity: 0.75, whiteSpace: 'nowrap' }}>
+            {shiftDurationHours(form.start_time, form.end_time) > 0 ? `${shiftDurationHours(form.start_time, form.end_time)}h` : '—'}
+          </div>
+        </div>
 
         {!form.is_recurring && (
           <Field label="Subtitle — shown in the At a Glance table">
@@ -244,17 +267,6 @@ function EventModal({
                 </span>
               </label>
             </Field>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '0 1rem', alignItems: 'end' }}>
-              <Field label="Start">
-                <input type="time" style={inputStyle} value={form.start_time ?? ''} onChange={e => set('start_time', e.target.value || null)} />
-              </Field>
-              <Field label="End">
-                <input type="time" style={inputStyle} value={form.end_time ?? ''} onChange={e => set('end_time', e.target.value || null)} />
-              </Field>
-              <div style={{ marginBottom: '1rem', paddingBottom: '0.6rem', fontSize: '0.82rem', color: '#C8A848', opacity: 0.75, whiteSpace: 'nowrap' }}>
-                {shiftDurationHours(form.start_time, form.end_time) > 0 ? `${shiftDurationHours(form.start_time, form.end_time)}h` : '—'}
-              </div>
-            </div>
             <Field label="Capacity per slot (optional — blank = unlimited)">
               <input
                 style={{ ...inputStyle, width: '120px' }}
@@ -282,7 +294,12 @@ function EventModal({
 
         {error && <p style={{ color: '#ff8a8a', fontSize: '0.82rem', marginBottom: '0.75rem' }}>{error}</p>}
 
-        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+          {missing && (
+            <span style={{ fontSize: '0.72rem', color: '#C8A848', opacity: 0.55, fontStyle: 'italic', marginRight: 'auto' }}>
+              Needs {missing}
+            </span>
+          )}
           <button onClick={onClose} style={{ padding: '0.6rem 1.2rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.2)', background: 'transparent', color: '#F3EDE6', cursor: 'pointer', fontSize: '0.82rem', opacity: 0.7 }}>
             Cancel
           </button>
@@ -499,7 +516,8 @@ export function ScheduleManager({ rangeStart, rangeEnd }: { rangeStart?: string;
   const [rosterError, setRosterError] = useState<{ eventId: string; message: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
-  const [modal, setModal] = useState<{ mode: 'add'; recurring: boolean; date?: string } | { mode: 'edit'; event: ScheduleEvent } | null>(null)
+  const [modal, setModal] = useState<{ mode: 'add'; recurring: boolean; date?: string; time?: string } | { mode: 'edit'; event: ScheduleEvent } | null>(null)
+  const [view, setView] = useState<'list' | 'week'>('list')
   const [saving, setSaving] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
   const draggedId = useRef<string | null>(null)
@@ -554,12 +572,10 @@ export function ScheduleManager({ rangeStart, rangeEnd }: { rangeStart?: string;
   const handleSave = async (form: Omit<ScheduleEvent, 'id' | 'sort_order'>) => {
     setSaving(true)
     setModalError(null)
-    // Shift events derive their display `time` from start/end; others keep free
-    // text. Fall back to the existing text if start/end aren't set yet, so an
-    // untimed legacy shift doesn't lose its display line.
-    const time = form.participation_type === 'shift'
-      ? (formatShiftRange(form.start_time, form.end_time) || form.time)
-      : formatTime(form.time)
+    // The display `time` derives from structured start/end for every event —
+    // the modal requires a start, so the fallback to the old text only guards
+    // against an empty result ever wiping a legacy display line.
+    const time = formatShiftRange(form.start_time, form.end_time) || form.time
     const normalised = { ...form, time }
     try {
       let res: Response
@@ -637,8 +653,18 @@ export function ScheduleManager({ rangeStart, rangeEnd }: { rangeStart?: string;
     onDragEnd: () => { draggedId.current = null; setDragOverId(null) },
   })
 
-  const openAdd = (date?: string) => { setModal({ mode: 'add', recurring: false, date }); setModalError(null) }
-  const openEdit = (ev: ScheduleEvent) => { setModal({ mode: 'edit', event: ev }); setModalError(null) }
+  const openAdd = (date?: string, time?: string) => { setModal({ mode: 'add', recurring: false, date, time }); setModalError(null) }
+  // Legacy rows (pre-054, or unparseable by the backfill) may have only the
+  // free-text `time` — prefill Start/End from it so editing doesn't demand
+  // retyping a time the row already knows.
+  const openEdit = (ev: ScheduleEvent) => {
+    const legacy = ev.start_time ? { start: ev.start_time, end: ev.end_time } : (() => {
+      const r = rangeTo24h(ev.time)
+      return { start: r.start, end: ev.end_time ?? r.end }
+    })()
+    setModal({ mode: 'edit', event: { ...ev, start_time: legacy.start, end_time: legacy.end } })
+    setModalError(null)
+  }
 
   // Promote/demote a lead right on the roster — same endpoint as the member
   // page's "Make lead" (PATCH /api/admin/signups/[userId], set_shift_role).
@@ -692,21 +718,55 @@ export function ScheduleManager({ rangeStart, rangeEnd }: { rangeStart?: string;
 
   return (
     <div>
-      {/* Header: total count + global add (per-day adds prefill their date) */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
+      {/* Header: total count + view toggle + global add (per-day adds prefill their date) */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem', gap: '0.75rem', flexWrap: 'wrap' }}>
         <p style={{ fontSize: '0.68rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, margin: 0 }}>
           Scheduled Events — {dated.length + undated.length}
         </p>
-        <button
-          style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.25)', background: 'transparent', color: '#C8A848', cursor: 'pointer', fontSize: '0.78rem', letterSpacing: '0.06em', opacity: 0.75 }}
-          onClick={() => openAdd()}
-        >
-          + Add event
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          {/* List ⇄ Week: the list is the working roster; the week grid shows
+              time as space (overlaps, gaps, lopsided days). */}
+          <div style={{ display: 'flex', border: '1px solid rgba(200,168,72,0.25)', borderRadius: '9999px', overflow: 'hidden' }}>
+            {(['list', 'week'] as const).map(v => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                style={{
+                  padding: '0.45rem 0.9rem', border: 'none', cursor: 'pointer',
+                  fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'capitalize',
+                  background: view === v ? 'rgba(200,168,72,0.15)' : 'transparent',
+                  color: '#C8A848', opacity: view === v ? 1 : 0.5,
+                }}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+          <button
+            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.25)', background: 'transparent', color: '#C8A848', cursor: 'pointer', fontSize: '0.78rem', letterSpacing: '0.06em', opacity: 0.75 }}
+            onClick={() => openAdd()}
+          >
+            + Add event
+          </button>
+        </div>
       </div>
 
+      {/* Week view — day columns × hour axis; click empty slot to add there */}
+      {view === 'week' && (
+        <div style={{ marginBottom: '1.5rem' }}>
+          <ScheduleWeekView
+            events={events}
+            days={days}
+            shiftTypes={shiftTypes}
+            rosters={rosters}
+            onEdit={id => { const ev = events.find(e => e.id === id); if (ev) openEdit(ev) }}
+            onAddAt={(iso, time) => openAdd(iso, time)}
+          />
+        </div>
+      )}
+
       {/* Day rail — one chip per day, click to jump */}
-      {(days.length > 1 || undated.length > 0 || recurring.length > 0) && (
+      {view === 'list' && (days.length > 1 || undated.length > 0 || recurring.length > 0) && (
         <div style={{ display: 'flex', gap: '0.4rem', overflowX: 'auto', paddingBottom: '0.4rem', marginBottom: '1.25rem' }}>
           {days.map((d) => {
             const n = eventsOn(d.iso).length
@@ -731,7 +791,7 @@ export function ScheduleManager({ rangeStart, rangeEnd }: { rangeStart?: string;
           No events yet. Set the event dates in Configure → Event Dates to lay out the days, or add a dated event.
         </p>
       )}
-      {days.map((d) => {
+      {view === 'list' && days.map((d) => {
         const dayEvents = eventsOn(d.iso)
         return (
           <div key={d.iso} ref={(el) => { sectionRefs.current[d.iso] = el }} style={{ marginBottom: '1.5rem', scrollMarginTop: '5.5rem' }}>
@@ -788,7 +848,7 @@ export function ScheduleManager({ rangeStart, rangeEnd }: { rangeStart?: string;
         <EventModal
           initial={modal.mode === 'edit'
             ? modal.event
-            : { ...blank(), is_recurring: modal.recurring, event_date: modal.date ?? null }}
+            : { ...blank(), is_recurring: modal.recurring, event_date: modal.date ?? null, start_time: modal.time ?? null }}
           onSave={handleSave}
           onClose={() => setModal(null)}
           saving={saving}

@@ -26,11 +26,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   for (const key of allowed) {
     if (key in body) updates[key] = body[key]
   }
-  // Non-shift events never carry shift times.
-  if ('participation_type' in body && body.participation_type !== 'shift') {
-    updates.start_time = null
-    updates.end_time = null
-  }
   // `day` derives from the real date whenever one is set (wrong-weekday-proof).
   if ('event_date' in body) {
     const derived = weekdayFromISO(body.event_date)
