@@ -130,6 +130,8 @@ The form config is read fresh from `page_content` on every load — no caching. 
 
 Collects name, contact info, pronouns, photo, signup intent, days available, and notes. All fields are configurable via the Application Builder. If `config.open === false`, shows a "Volunteer Signup Closed" screen instead.
 
+Volunteers are **admin-coordinated, not self-serve**: the signup intents (shift / role / other) and shift interests are signals surfaced in Admin → Volunteers, and organizers reach out directly. `/participate` and the signup APIs stay gated on an approved members row, so an active volunteer's profile checklist (`TaskStatus.tsx`, `track='volunteer'`) shows a pending "we'll reach out" state rather than role/shift pickers. Someone who should hold a role (e.g. a pre-event contributor) is admitted as a regular member instead — see the volunteers→members fold planned in [generalizability-log.md](generalizability-log.md).
+
 **Admin preview:** `?admin_preview=1` bypasses redirect checks for admins.
 
 ---

@@ -9,18 +9,11 @@ type Task = {
 }
 
 type Props = {
-  track: 'pending' | 'approved' | 'volunteer'
+  track: 'pending' | 'volunteer'
   volunteerStatus?: string | null
-  contributions?: string[]
-  campSignup?: {
-    role_id: string | null
-    schedule_event_id: string | null
-    role_approval_status: string | null
-  } | null
-  signupIntent?: string[] | null
 }
 
-export function TaskStatus({ track, volunteerStatus, contributions, campSignup, signupIntent }: Props) {
+export function TaskStatus({ track, volunteerStatus }: Props) {
   const tasks: Task[] = []
 
   if (track === 'pending') {
@@ -34,46 +27,10 @@ export function TaskStatus({ track, volunteerStatus, contributions, campSignup, 
     })
   }
 
-  if (track === 'approved') {
-    const hasRole = !!campSignup?.role_id
-    const hasShift = !!campSignup?.schedule_event_id
-    const rolePending = campSignup?.role_approval_status === 'pending'
-    const hasContributions = (contributions?.length ?? 0) > 0
-
-    tasks.push({ id: 'approved', label: 'Application approved', done: true })
-    tasks.push({
-      id: 'contributions',
-      label: 'Choose your contributions',
-      done: hasContributions,
-      href: undefined, // edited via profile settings gear
-      note: hasContributions ? undefined : 'Let us know if you can help with setup, teardown, or decor. Open the settings gear to update.',
-    })
-    tasks.push({
-      id: 'role',
-      label: rolePending ? 'Role request pending approval' : 'Choose a camp role',
-      done: hasRole && !rolePending,
-      pending: rolePending,
-      href: rolePending ? undefined : '#role-signup',
-      cta: 'Select a role →',
-      note: rolePending ? "You'll be notified once your role request is reviewed." : undefined,
-    })
-    tasks.push({
-      id: 'shift',
-      label: 'Sign up for a shift',
-      done: hasShift,
-      href: '#role-signup',
-      cta: 'Pick a shift →',
-    })
-  }
-
   if (track === 'volunteer') {
-    const hasRole = !!campSignup?.role_id
-    const hasShift = !!campSignup?.schedule_event_id
-    const isPending = volunteerStatus === 'pending'
-
     tasks.push({ id: 'signed-up', label: 'Volunteer signup complete', done: true })
 
-    if (isPending) {
+    if (volunteerStatus === 'pending') {
       tasks.push({
         id: 'approval',
         label: 'Awaiting admin approval',
@@ -82,44 +39,19 @@ export function TaskStatus({ track, volunteerStatus, contributions, campSignup, 
         note: "You'll receive a notification once your signup has been reviewed.",
       })
     } else {
-      const intents = signupIntent ?? []
-      const wantsRole = intents.includes('role')
-      const wantsShift = intents.includes('shift')
-      const wantsOther = intents.includes('other')
-      const hasAnyIntent = intents.length > 0
-
-      if (wantsRole || (!hasAnyIntent)) {
-        tasks.push({
-          id: 'role',
-          label: 'Choose a volunteer role',
-          done: hasRole,
-          href: '#role-signup',
-          cta: 'Select a role →',
-        })
-      }
-      if (wantsShift || (!hasAnyIntent)) {
-        tasks.push({
-          id: 'shift',
-          label: 'Sign up for a shift',
-          done: hasShift,
-          href: '#role-signup',
-          cta: 'Pick a shift →',
-        })
-      }
-      if (wantsOther && !wantsRole && !wantsShift) {
-        tasks.push({
-          id: 'outreach',
-          label: "We'll reach out with ways to contribute",
-          done: false,
-          pending: true,
-          note: "Keep an eye on your email — we'll be in touch as the event gets closer.",
-        })
-      }
+      // Roles & shifts are member self-serve only (/participate is gated on an
+      // approved members row) — volunteers are coordinated by organizers, who
+      // see each signup's intents and shift interests in Admin → Volunteers.
+      tasks.push({
+        id: 'outreach',
+        label: "We'll reach out with ways to contribute",
+        done: false,
+        pending: true,
+        note: "Keep an eye on your email — we'll be in touch as the event gets closer.",
+      })
     }
   }
 
-  const allDone = tasks.every(t => t.done || t.pending === false)
-  const actionablePending = tasks.filter(t => !t.done && !t.pending)
   const isAllCaughtUp = tasks.every(t => t.done) && track !== 'pending'
 
   return (

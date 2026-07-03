@@ -606,7 +606,7 @@ export default async function ProfilePage() {
               )}
             </div>
 
-            <TaskStatus track="volunteer" volunteerStatus={volunteer.status} campSignup={campSignup} signupIntent={volunteer.signup_intent} />
+            <TaskStatus track="volunteer" volunteerStatus={volunteer.status} />
             <NotificationPreferences />
           </>
         )}
