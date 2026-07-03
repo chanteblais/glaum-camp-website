@@ -133,7 +133,7 @@ function CurrentSignupCards({
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '2.5rem' }}>
+    <div className="mobile-stack" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '2.5rem' }}>
 
       {/* Role card — plain, since the badge now lives in the profile header */}
       <div style={{ border: '1px solid rgba(200,168,72,0.15)', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.02)', overflow: 'hidden' }}>

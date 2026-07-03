@@ -6,8 +6,8 @@ import type { MemberOption } from './page'
 
 type Conversation = {
   kind: 'direct' | 'group'
-  otherUserId?: string        // direct
-  groupId?: string            // group
+  otherUserId?: string | null // direct
+  groupId?: string | null     // group
   displayName: string
   avatarUrl: string | null    // direct
   icon?: string | null        // group
@@ -298,9 +298,11 @@ function FindGroupModal({ onClose, onJoined }: { onClose: () => void; onJoined: 
 
 type Filter = 'all' | 'direct' | 'group'
 
-export function MessagesInboxClient({ currentUserId, members }: { currentUserId: string; members: MemberOption[] }) {
-  const [conversations, setConversations] = useState<Conversation[]>([])
-  const [loading, setLoading] = useState(true)
+export function MessagesInboxClient({ currentUserId, members, initialConversations }: { currentUserId: string; members: MemberOption[]; initialConversations?: Conversation[] }) {
+  // Server-rendered initial inbox (when provided) — paints immediately; the
+  // mount fetch below just keeps it fresh.
+  const [conversations, setConversations] = useState<Conversation[]>(initialConversations ?? [])
+  const [loading, setLoading] = useState(initialConversations == null)
   const [showNewMessage, setShowNewMessage] = useState(false)
   const [showFindGroup, setShowFindGroup] = useState(false)
   const [filter, setFilter] = useState<Filter>('all')
