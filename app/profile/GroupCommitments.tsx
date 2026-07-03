@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { IconImage } from '@/components/IconImage'
 import { useRouter } from 'next/navigation'
 
 type OptInGroup = {
@@ -104,7 +105,7 @@ export function GroupCommitments({ initialGroups }: { initialGroups?: OptInGroup
         {/* Icon */}
         <div style={{ width: 48, height: 48, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {g.icon_image
-            ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={g.icon_image} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            ? /* eslint-disable-next-line @next/next/no-img-element */ <IconImage src={g.icon_image} size="100%" fill={0.85} />
             : <span style={{ fontSize: '1.5rem' }}>{g.icon || '✦'}</span>}
         </div>
 

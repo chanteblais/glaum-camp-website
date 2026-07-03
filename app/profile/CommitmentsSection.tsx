@@ -1,4 +1,5 @@
 import { EventIcon } from '@/components/EventIcon'
+import { IconImage } from '@/components/IconImage'
 import { isImageIcon } from '@/lib/icon-src'
 import type { ContributionType } from '@/lib/application-options'
 import { DEFAULT_CONTRIBUTION_TYPES } from '@/lib/application-options'
@@ -154,7 +155,7 @@ export function CommitmentsSection({ contributions, role, dept, shifts, bringing
               circleContent={
                 dept?.icon
                   ? isImageIcon(dept.icon)
-                    ? <img src={dept.icon} alt="" aria-hidden style={{ width: '62%', height: '62%', objectFit: 'contain', opacity: 0.85 }} />
+                    ? <IconImage src={dept.icon} size="86%" fill={0.82} opacity={0.85} />
                     : <span style={{ fontSize: compact ? '1.1rem' : '1.4rem', lineHeight: 1 }}>{dept.icon}</span>
                   : <img src="/handicon.png" alt="" aria-hidden style={{ width: '62%', height: '62%', objectFit: 'contain', opacity: 0.85 }} />
               }
@@ -188,7 +189,7 @@ export function CommitmentsSection({ contributions, role, dept, shifts, bringing
                     // by overflow:hidden. 74% fills the circle while leaving a clear gap so
                     // even corner-heavy art (a tasseled cushion, a wide tent base) — which
                     // pokes toward the round edge at its corners — stays comfortably inside.
-                    ? <img src={meta.icon} alt="" aria-hidden style={{ height: '74%', width: 'auto', maxWidth: 'none', display: 'block' }} />
+                    ? <IconImage src={meta.icon} size="100%" fill={0.75} />
                     : <span style={{ fontSize: compact ? '1.1rem' : '1.4rem', lineHeight: 1 }}>{meta.icon}</span>
                 }
                 title={c}
@@ -234,7 +235,7 @@ export function CommitmentsSection({ contributions, role, dept, shifts, bringing
                   // Same sizing rule as the group icon rows above: normalized icon
                   // frames size by height and let the margins clip on the round mask.
                   // eslint-disable-next-line @next/next/no-img-element
-                  ? <img src={b.icon} alt="" aria-hidden style={{ height: '74%', width: 'auto', maxWidth: 'none', display: 'block' }} />
+                  ? <IconImage src={b.icon} size="100%" fill={0.75} />
                   : <span style={{ fontSize: compact ? '1.1rem' : '1.4rem', lineHeight: 1, color: '#8fc4cf', opacity: 0.85 }}>✦</span>
               }
               title={b.quantity > 1 ? `${b.resourceName} ×${b.quantity}` : b.resourceName}

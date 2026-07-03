@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { IconImage } from '@/components/IconImage'
 import { AssetImagePicker, type GroupIconOption } from './AssetImagePicker'
 import { isImageIcon } from '@/lib/icon-src'
 import { LoadError } from './LoadError'
@@ -413,7 +414,7 @@ function DeptRow({
         <span style={{ color: '#C8A848', opacity: 0.25, fontSize: '1rem', userSelect: 'none', flexShrink: 0 }}>⠿</span>
         {dept.icon && (
           isImageIcon(dept.icon)
-            ? <img src={dept.icon} alt="" aria-hidden style={{ width: '1.4rem', height: '1.4rem', objectFit: 'contain', flexShrink: 0 }} />
+            ? <IconImage src={dept.icon} size="1.4rem" fill={0.9} />
             : <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>{dept.icon}</span>
         )}
         <div style={{ flex: 1, minWidth: 0 }}>

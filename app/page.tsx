@@ -1,4 +1,5 @@
 import { auth, currentUser } from '@clerk/nextjs/server'
+import { IconImage } from '@/components/IconImage'
 import Image from 'next/image'
 import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
@@ -406,12 +407,7 @@ let canManagePolls = false
               const unnamed = outstanding - named.length
               return (
                 <a href="/profile" className="dash-attune" style={{ marginBottom: '1.25rem', textDecoration: 'none' }}>
-                  <img
-                    src="/asset-library/icons/eye-in-triangle.webp"
-                    alt=""
-                    aria-hidden
-                    style={{ width: '54px', height: '54px', objectFit: 'contain', flexShrink: 0 }}
-                  />
+                  <IconImage src="/asset-library/icons/eye-in-triangle.webp" size={54} fill={0.85} />
                   <div style={{ flex: 1, minWidth: '220px' }}>
                     <p style={{ margin: '0 0 0.3rem', color: '#C8A848' }}>
                       <span style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.05rem', letterSpacing: '0.04em' }}>Attunement</span>
