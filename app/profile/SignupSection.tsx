@@ -352,9 +352,11 @@ function CommitmentPill({ commitment, period }: { commitment: string | null; per
 
 // ── Role Card (compact, scannable) ─────────────────────────────────────────────
 //
-// The picker shows every role at once — department headers + compact cards in a
-// grid, no accordions. Clicking a card opens the full charge in a modal where
-// the confirm lives. Deep reading happens on /roles (the Registry).
+// Expanded, the picker shows every role at once — department headers + compact
+// cards in a grid, no accordions within. Clicking a card opens the full charge
+// in a modal where the confirm lives. Deep reading happens on /roles (the
+// Registry). The picker as a whole starts collapsed once a role is held (the
+// full registry is long and buried the rest of /participate).
 
 function RoleCard({ role, isCurrent, isPending, onOpen }: {
   role: Role
@@ -547,6 +549,16 @@ function RolePicker({
   onConfirm: () => Promise<boolean>
 }) {
   const [openRoleId, setOpenRoleId] = useState<string | null>(null)
+  // Starts collapsed once a role is held — expanded, the registry runs long and
+  // buried the rest of /participate (shifts, resources, groups). A member who
+  // hasn't chosen yet lands with it open: picking is their next step.
+  const [expanded, setExpanded] = useState(signup?.role_id == null)
+
+  // Opting out (in the plaque above) promises "choose a new one below" — make
+  // that true by unfolding when the held role goes away.
+  useEffect(() => {
+    if (!signup?.role_id) setExpanded(true)
+  }, [signup?.role_id])
 
   const withRoles = departments.filter(d => d.roles.length > 0)
   if (withRoles.length === 0) return null
@@ -565,18 +577,72 @@ function RolePicker({
     setOpenRoleId(null)
   }
 
+  // Once a claim lands, fold the registry back down — the plaque above now
+  // carries the role, and the rest of the page comes back into view.
+  async function handleConfirm() {
+    const ok = await onConfirm()
+    if (ok) setExpanded(false)
+    return ok
+  }
+
   return (
     <div>
-      <p style={{ fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.85, marginBottom: '0.4rem', textAlign: 'center' }}>
-        Choose a Role
-      </p>
-      <p style={{ fontSize: '0.78rem', opacity: 0.55, textAlign: 'center', margin: '0 0 1.5rem', lineHeight: 1.6 }}>
-        Tap a role to read its full charge and claim it. Or browse the{' '}
-        <a href="/roles" style={{ color: '#C8A848', textDecoration: 'underline', textUnderlineOffset: '3px' }}>
-          Registry of Roles
-        </a>{' '}
-        for the complete record.
-      </p>
+      {/* Collapsed — not a hidden door but a sealed one: every department's
+          emblem on display (the same brass rings as the plaques) so the folded
+          registry still shows what it holds, with the browse pill beneath. */}
+      {!expanded && (
+        <button
+          onClick={() => setExpanded(true)}
+          aria-expanded={false}
+          style={{ display: 'block', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '0.5rem 0', textAlign: 'center' }}
+        >
+          {/* Seal sizes step down on narrow screens so a full row of
+              departments still wraps cleanly at phone width. */}
+          <style>{`
+            .role-seal-strip { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem 1.1rem; margin-bottom: 1.4rem; }
+            .role-seal { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; width: 90px; }
+            .role-seal-ring { width: 56px; height: 56px; border-radius: 50%; border: 1.5px solid #C8A848; background: radial-gradient(circle at 42% 38%, rgba(200,168,72,0.18), rgba(8,0,18,0.85)); display: flex; align-items: center; justify-content: center; }
+            .role-seal-ring .role-seal-emoji { font-size: 1.5rem; line-height: 1; }
+            @media (min-width: 560px) {
+              .role-seal { width: 108px; }
+              .role-seal-ring { width: 68px; height: 68px; }
+              .role-seal-ring .role-seal-emoji { font-size: 1.85rem; }
+            }
+          `}</style>
+          <div className="role-seal-strip">
+            {withRoles.map(dept => (
+              <span key={dept.id} className="role-seal">
+                <span className="role-seal-ring">
+                  {dept.icon && isImageIcon(dept.icon)
+                    ? <img src={dept.icon} alt="" aria-hidden style={{ width: '72%', height: '72%', objectFit: 'contain', opacity: 0.92 }} />
+                    : <span className="role-seal-emoji">{dept.icon ?? '✦'}</span>}
+                </span>
+                <span style={{ fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.6, lineHeight: 1.3 }}>
+                  {dept.name}
+                </span>
+              </span>
+            ))}
+          </div>
+          <span style={{
+            display: 'inline-block', padding: '0.5rem 1.3rem', borderRadius: '9999px',
+            border: '1px solid rgba(200,168,72,0.5)', background: 'rgba(200,168,72,0.1)',
+            color: '#FFFACD', fontSize: '0.8rem', letterSpacing: '0.05em',
+          }}>
+            Browse all {allRoles.length} roles ▾
+          </span>
+        </button>
+      )}
+
+      {expanded && (<>
+      <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
+        <button
+          onClick={() => setExpanded(false)}
+          aria-expanded={true}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.72rem', color: '#C8A848', opacity: 0.55, letterSpacing: '0.06em', textDecoration: 'underline', textUnderlineOffset: '3px' }}
+        >
+          Fold the registry away ▴
+        </button>
+      </div>
 
       <style>{`
         .role-grid { display: grid; grid-template-columns: 1fr; gap: 0.55rem; }
@@ -617,6 +683,7 @@ function RolePicker({
           </div>
         ))}
       </div>
+      </>)}
 
       {openRole && (
         <RoleDetailModal
@@ -625,7 +692,7 @@ function RolePicker({
           signup={signup}
           saving={saving}
           error={error}
-          onConfirm={onConfirm}
+          onConfirm={handleConfirm}
           onClose={handleClose}
         />
       )}
@@ -884,7 +951,6 @@ function ShiftsPicker({
     return a.localeCompare(b)
   })
 
-  const owedOutstanding = owed.filter(o => o.heldHours < o.requiredHours).length
   const confirmSignUp = (id: string) => {
     const s = shifts.find(x => x.id === id)
     if (s) setPending({ slot: s, action: 'signup' })
@@ -896,17 +962,6 @@ function ShiftsPicker({
 
   return (
     <div>
-      <p style={{ fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#D239F8', opacity: 0.85, marginBottom: '0.5rem', textAlign: 'center' }}>
-        Shifts
-      </p>
-      <p style={{ fontSize: '0.78rem', opacity: 0.55, textAlign: 'center', margin: '0 0 1rem', lineHeight: 1.6 }}>
-        {owedOutstanding > 0
-          ? 'Sign up for shifts until each requirement below is met. You can hold several — tap a shift to sign up.'
-          : owed.length > 0
-            ? 'Your shift requirements are met — you can still pick up extra shifts.'
-            : 'Tap a shift to sign up for it.'}
-      </p>
-
       <OwedChips owed={owed} shiftTypes={shiftTypes} />
 
       {error && <p style={{ color: '#ff8a8a', fontSize: '0.78rem', textAlign: 'center', margin: '0 0 1rem' }}>{error}</p>}
@@ -1167,11 +1222,25 @@ export function SignupSection({ showPickers = true, initialData }: { showPickers
       {showSuggest && <SuggestRoleModal onClose={() => setShowSuggest(false)} />}
       <CurrentSignupCards signup={signup} departments={departments} heldShifts={heldShifts} shiftTypes={shiftTypes} onOptOut={handleOptOut} onCancelShift={handleCancelShift} onSetLead={handleSetLeadShift} />
 
-      {showPickers && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+      {showPickers && (<>
+        {/* Choose a Role — a full page section, headed like Shifts / Bring
+            Something below, so the folded registry can't be scrolled past. */}
+        {hasRoles && (
+          <>
+            <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.25), transparent)', margin: '3rem 0 2rem' }} />
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h2 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(1.4rem, 3vw, 2rem)', color: '#C8A848', margin: '0 0 0.5rem', letterSpacing: '0.06em' }}>
+                Choose a Role
+              </h2>
+              <p style={{ fontSize: '0.9rem', opacity: 0.55, margin: 0, lineHeight: 1.6 }}>
+                Tap a role to read its full charge and claim it. Or browse the{' '}
+                <a href="/roles" style={{ color: '#C8A848', textDecoration: 'underline', textUnderlineOffset: '3px' }}>
+                  Registry of Roles
+                </a>{' '}
+                for the complete record.
+              </p>
+            </div>
 
-          {/* Role picker — every role visible; confirm lives in the detail modal */}
-          {hasRoles && (
             <div style={{ padding: '1.5rem', border: '1px solid rgba(200,168,72,0.15)', borderRadius: '1rem', background: 'rgba(255,255,255,0.01)' }}>
               <RolePicker
                 departments={departments}
@@ -1183,45 +1252,56 @@ export function SignupSection({ showPickers = true, initialData }: { showPickers
                 onConfirm={handleSave}
               />
             </div>
-          )}
 
-          {/* Suggest a role */}
-          <div style={{ textAlign: 'center', padding: '0.5rem 0' }}>
-            <button
-              onClick={() => setShowSuggest(true)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.78rem', color: '#C8A848', opacity: 0.5, letterSpacing: '0.04em', textDecoration: 'underline', textUnderlineOffset: '3px' }}
-            >
-              Don't see a role that fits? Suggest one →
-            </button>
-          </div>
-
-          {/* Shift picker — hidden while shift signup is closed */}
-          {shifts.length > 0 && shiftSignupOpen && (
-            <div className="shift-panel-breakout" style={{ padding: '1.5rem', border: '1px solid rgba(210,57,248,0.15)', borderRadius: '1rem', background: 'rgba(210,57,248,0.02)' }}>
-              <ShiftsPicker
-                shifts={shifts}
-                owed={owed}
-                shiftTypes={shiftTypes}
-                signingId={signingId}
-                error={shiftError}
-                onSignUp={handleSignUpShift}
-                onCancel={handleCancelShift}
-              />
+            {/* Suggest a role */}
+            <div style={{ textAlign: 'center', padding: '0.5rem 0', marginTop: '1.25rem' }}>
+              <button
+                onClick={() => setShowSuggest(true)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.78rem', color: '#C8A848', opacity: 0.5, letterSpacing: '0.04em', textDecoration: 'underline', textUnderlineOffset: '3px' }}
+              >
+                Don't see a role that fits? Suggest one →
+              </button>
             </div>
-          )}
+          </>
+        )}
 
-          {shifts.length > 0 && !shiftSignupOpen && (
-            <div style={{ padding: '1.5rem', border: '1px solid rgba(210,57,248,0.15)', borderRadius: '1rem', background: 'rgba(210,57,248,0.02)', textAlign: 'center' }}>
-              <p style={{ fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#D239F8', opacity: 0.85, marginBottom: '0.5rem' }}>
+        {/* Shifts — a full page section, headed exactly like Bring Something /
+            Your Groups on /participate (gold divider + TokyoDreams h2); the
+            purple shift accent stays on the calendar panel itself. */}
+        {shifts.length > 0 && (
+          <>
+            <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.25), transparent)', margin: '3rem 0 2rem' }} />
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h2 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(1.4rem, 3vw, 2rem)', color: '#C8A848', margin: '0 0 0.5rem', letterSpacing: '0.06em' }}>
                 Shifts
-              </p>
-              <p style={{ fontSize: '0.85rem', opacity: 0.6, margin: 0, lineHeight: 1.6 }}>
-                Shift times aren't confirmed yet. Shift signup will open here once the schedule is set — check back soon.
+              </h2>
+              <p style={{ fontSize: '0.9rem', opacity: 0.55, margin: 0, lineHeight: 1.6 }}>
+                {!shiftSignupOpen
+                  ? 'Shift times aren’t confirmed yet. Shift signup will open here once the schedule is set — check back soon.'
+                  : owed.some(o => o.heldHours < o.requiredHours)
+                    ? 'Sign up for shifts until each requirement below is met. You can hold several — tap a shift to sign up.'
+                    : owed.length > 0
+                      ? 'Your shift requirements are met — you can still pick up extra shifts.'
+                      : 'Tap a shift to sign up for it.'}
               </p>
             </div>
-          )}
-        </div>
-      )}
+
+            {shiftSignupOpen && (
+              <div className="shift-panel-breakout" style={{ padding: '1.5rem', border: '1px solid rgba(210,57,248,0.15)', borderRadius: '1rem', background: 'rgba(210,57,248,0.02)' }}>
+                <ShiftsPicker
+                  shifts={shifts}
+                  owed={owed}
+                  shiftTypes={shiftTypes}
+                  signingId={signingId}
+                  error={shiftError}
+                  onSignUp={handleSignUpShift}
+                  onCancel={handleCancelShift}
+                />
+              </div>
+            )}
+          </>
+        )}
+      </>)}
     </div>
   )
 }
