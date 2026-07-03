@@ -32,7 +32,10 @@ const MAX_SIDE = 980
 const ALPHA_FLOOR = 16
 const WHITE_CEIL = 245
 const TRANSPARENT = { r: 0, g: 0, b: 0, alpha: 0 }
-const OUTPUT_WIDTH = 800 // downscale target — ~6x retina at medal/icon render size
+// Downscale target — 2x retina at the largest in-app render (~150px). 800px
+// originals weighed 100-180KB each and shipped ~10x more pixels than any
+// render site uses; the full-res masters live on the design-exploration branch.
+const OUTPUT_WIDTH = 320
 
 async function contentBox(png) {
   const { data, info } = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true })

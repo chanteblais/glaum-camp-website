@@ -516,7 +516,7 @@ let canManagePolls = false
                         </div>
                         {ev.image_url && (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={ev.image_url} alt="" style={{ width: '88px', height: '88px', objectFit: 'cover', borderRadius: '0.6rem', flexShrink: 0, border: '1px solid rgba(200,168,72,0.25)' }} />
+                          <img src={supabaseResizedUrl(ev.image_url, 176) ?? ''} alt="" style={{ width: '88px', height: '88px', objectFit: 'cover', borderRadius: '0.6rem', flexShrink: 0, border: '1px solid rgba(200,168,72,0.25)' }} />
                         )}
                         <span style={{ color: '#C8A848', opacity: 0.25, fontSize: '0.8rem', flexShrink: 0 }}>›</span>
                       </div>
