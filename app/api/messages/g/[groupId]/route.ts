@@ -9,6 +9,7 @@ import {
 } from '@/lib/conversations'
 import { getNotificationPreferences } from '@/lib/notification-prefs'
 import { sendGroupMentionEmail, sendGroupActivityEmail } from '@/lib/send-email'
+import { dispatchMemberNotification } from '@/lib/notify'
 
 export const dynamic = 'force-dynamic'
 
@@ -230,16 +231,21 @@ async function notifyMentions(opts: {
       details: { groupId, messageId },
     })
 
-    if (throttled) return
-
-    // Email — gated by the recipient's message-email preference.
-    try {
-      if (!prefs.email_new_message) return
-      if (!a.email) return
-      await sendGroupMentionEmail({ to: a.email, recipientName, senderName, groupName, groupId, preview: body })
-    } catch (err) {
-      console.error('[group message] mention email failed:', err)
-    }
+    // Push per mention + email under the mention throttle, both through the
+    // seam (which gates the two channels on the message preference).
+    await dispatchMemberNotification(recipientId, {
+      kind: 'new_message',
+      prefs,
+      push: {
+        title: groupName,
+        body: `${senderName} mentioned you: ${body.slice(0, 120)}`,
+        link: `/messages/g/${groupId}`,
+      },
+      email:
+        throttled || !a.email
+          ? undefined
+          : () => sendGroupMentionEmail({ to: a.email!, recipientName, senderName, groupName, groupId, preview: body }),
+    })
   }))
 
   return mentioned.map(a => a.clerk_user_id)
@@ -297,13 +303,24 @@ async function notifyOptedIn(opts: {
   // row; no per-recipient Clerk round-trips).
   await Promise.all(recipientIds.map(async recipientId => {
     try {
-      const prefs = await getNotificationPreferences(recipientId)
-      if (!prefs.email_new_message) return
       const m = memberById.get(recipientId)
-      if (!m?.email) return
-      await sendGroupActivityEmail({ to: m.email, recipientName: m.preferred_name || m.first_name || 'there', senderName, groupName, groupId, preview: body })
+      const recipientName = m?.preferred_name || m?.first_name || 'there'
+      // Both channels ride the per-conversation burst throttle above — a busy
+      // thread buzzes once, not per message (these are opt-in thread updates,
+      // not personal mentions).
+      await dispatchMemberNotification(recipientId, {
+        kind: 'new_message',
+        push: {
+          title: groupName,
+          body: `${senderName}: ${body.slice(0, 120)}`,
+          link: `/messages/g/${groupId}`,
+        },
+        email: m?.email
+          ? () => sendGroupActivityEmail({ to: m.email!, recipientName, senderName, groupName, groupId, preview: body })
+          : undefined,
+      })
     } catch (err) {
-      console.error('[group message] opt-in email failed:', err)
+      console.error('[group message] opt-in notification failed:', err)
     }
   }))
 }

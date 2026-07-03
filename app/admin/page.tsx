@@ -8,14 +8,15 @@ import { VolunteersSection } from './VolunteersSection'
 import { NotificationBell } from './NotificationBell'
 import { AdminNav } from './AdminNav'
 import { CategoryHeading } from './CategoryHeading'
-import { MEMBERS_CATEGORIES } from './admin-sections'
+import { COMMUNITY_CATEGORIES } from './admin-sections'
 import { AnnouncementsManager } from './AnnouncementsManager'
 import { RadioManager } from './RadioManager'
+import { ResourcesManager } from './ResourcesManager'
 import { getGroupNamesByUser } from '@/lib/groups'
 import { getShiftEventByUser } from '@/lib/shift-signups'
 import { getAdminRunway } from '@/lib/admin-attention'
 import { parseRadioSources } from '@/lib/radio'
-import { getAdminRadioEvents } from '@/lib/admin-program-data'
+import { getAdminRadioEvents, getAdminResourceLists, getStewardOptions } from '@/lib/admin-program-data'
 import { RoleRequestsSection } from './RoleRequestsSection'
 import { RoleSuggestionsSection } from './RoleSuggestionsSection'
 
@@ -38,6 +39,8 @@ export default async function AdminPage() {
     { data: notifications, error: notificationsError },
     radioEvents,
     { data: radioConfigRow },
+    resourceLists,
+    stewardOptions,
   ] = await Promise.all([
     supabaseAdmin
       .from('volunteers')
@@ -62,6 +65,8 @@ export default async function AdminPage() {
       .select('value')
       .eq('key', 'config_radio')
       .maybeSingle(),
+    safe(getAdminResourceLists()),
+    safe(getStewardOptions()),
   ])
 
   const volunteers = volunteersRaw ?? []
@@ -118,17 +123,17 @@ export default async function AdminPage() {
 
       <div style={{ maxWidth: '960px', margin: '0 auto', padding: '0 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
 
-        <AdminNav sections={MEMBERS_CATEGORIES} runway={runway} />
+        <AdminNav sections={COMMUNITY_CATEGORIES} runway={runway} />
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.5rem' }}>
           <NotificationBell initialNotifications={notifications ?? []} />
         </div>
 
         <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(1.8rem, 5vw, 2.5rem)', color: '#C8A848', marginBottom: '0.5rem', textAlign: 'center' }}>
-          ManyHands Registry
+          Community
         </h1>
         <p style={{ textAlign: 'center', opacity: 0.5, fontSize: '0.85rem', marginBottom: '2.5rem' }}>
-          {pending.length} pending · {approved.length} approved · {rejected.length} rejected · {cancelled.length} cancelled
+          The people of camp, what they hear, and what they&apos;re bringing
         </p>
 
         {dbError && (
@@ -249,6 +254,19 @@ export default async function AdminPage() {
             initialEvents={radioEvents}
             initialSources={parseRadioSources(radioConfigRow?.value)}
           />
+        </CollapsibleSection>
+
+        {/* ═══════════════ LOGISTICS ═══════════════ */}
+        <CategoryHeading id="logistics" />
+
+        <CollapsibleSection
+          title="Shared Resources"
+          summary={resourceLists
+            ? `${resourceLists.length} list${resourceLists.length === 1 ? '' : 's'} · ${resourceLists.reduce((n, l) => n + l.items.length, 0)} items`
+            : 'Bring Something — needs & claims'}
+          defaultOpen={false}
+        >
+          <ResourcesManager initialLists={resourceLists} initialStewards={stewardOptions} />
         </CollapsibleSection>
 
       </div>

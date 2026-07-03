@@ -8,6 +8,7 @@ import { supabaseResizedUrl } from '@/lib/supabase-image'
 import { UserNotificationBell } from './UserNotificationBell'
 import { NotificationBell } from '@/app/admin/NotificationBell'
 import { MessagesNavLink } from './MessagesNavLink'
+import { MobileTabBar, type TabBarLink } from './MobileTabBar'
 
 const AUTH_MEMORY_KEY = 'glaum-auth-signed-in'
 const AUTH_NAME_KEY = 'glaum-auth-first-name'
@@ -27,13 +28,16 @@ const publicNavLinks = [
   { href: '/apply', label: 'Apply' },
 ]
 
-const memberNavLinks = [
-  { href: '/schedule', label: 'Schedule' },
-  { href: '/radio', label: 'Radio' },
-  { href: '/members', label: 'Many Hands' },
-  { href: '/messages', label: 'Messages', badge: true },
-  { href: '/participate', label: 'Participate' },
-  { href: '/profile', label: 'My Profile' },
+// One list drives both renderings of the member nav: labels across the top on
+// desktop, icon tabs along the bottom on phones (same surfaces, same order —
+// docs/mobile-companion.md, "one product, one IA").
+const memberNavLinks: TabBarLink[] = [
+  { href: '/schedule', label: 'Schedule', icon: '/asset-library/icons/gathering.webp' },
+  { href: '/radio', label: 'Radio', icon: '/asset-library/icons/vintage-radio.webp' },
+  { href: '/members', label: 'Many Hands', icon: '/asset-library/icons/raised-hand.webp' },
+  { href: '/messages', label: 'Messages', badge: true, icon: '/asset-library/icons/envelope.webp' },
+  { href: '/participate', label: 'Participate', icon: '/asset-library/icons/signpost.webp' },
+  { href: '/profile', label: 'My Profile', tabLabel: 'Profile', icon: '/asset-library/icons/hand-mirror.webp' },
 ]
 
 // `initialAuth` comes from the server Header (auth() + member row at render
@@ -71,6 +75,11 @@ export function HeaderClient({ initialAuth }: { initialAuth?: NavAuthState }) {
   const initials = userFirstName?.[0] ?? '✦'
   const isAdmin = user?.publicMetadata?.role === 'admin'
   const activeNavLinks = signedIn && isApproved ? memberNavLinks : publicNavLinks
+  // On phones, approved members get the bottom tab bar instead of page links
+  // in the hamburger — the menu shrinks to overflow (name, About, Admin, sign
+  // out). Public visitors keep the full hamburger, and /admin keeps the plain
+  // header: admin is a web/desktop workspace (docs/mobile-companion.md).
+  const tabBarActive = isMobile && signedIn && isApproved && !pathname.startsWith('/admin')
 
   useEffect(() => {
     setMounted(true)
@@ -359,6 +368,7 @@ export function HeaderClient({ initialAuth }: { initialAuth?: NavAuthState }) {
   }
 
   return (
+    <>
     <header
       role="banner"
       style={{
@@ -514,7 +524,7 @@ export function HeaderClient({ initialAuth }: { initialAuth?: NavAuthState }) {
             </div>
           )}
 
-          {activeNavLinks.map((link) => {
+          {!tabBarActive && activeNavLinks.map((link) => {
             const active = isActiveLink(link.href)
             // Lit gold + a left accent bar marks the current page in the mobile menu.
             const itemStyle: React.CSSProperties = active
@@ -567,5 +577,7 @@ export function HeaderClient({ initialAuth }: { initialAuth?: NavAuthState }) {
         </nav>
       )}
     </header>
+    {tabBarActive && <MobileTabBar links={memberNavLinks} />}
+    </>
   )
 }

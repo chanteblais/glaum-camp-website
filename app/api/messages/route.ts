@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getNotificationPreferences } from '@/lib/notification-prefs'
+import { dispatchMemberNotification } from '@/lib/notify'
 import { getOrCreateDirectConversation, findDirectConversation } from '@/lib/conversations'
 import { getInboxConversations } from '@/lib/inbox'
 import { sendNewMessageEmail } from '@/lib/send-email'
@@ -84,7 +85,8 @@ export async function POST(req: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // In-app notification and the (guarded, best-effort) email are independent.
+  // In-app notification and the (guarded, best-effort) push+email dispatch
+  // are independent.
   await Promise.all([
     supabaseAdmin.from('user_notifications').insert({
       clerk_user_id: recipientId,
@@ -92,7 +94,7 @@ export async function POST(req: Request) {
       message: `${senderName} sent you a message`,
       details: { senderId: userId, messageId: message.id },
     }),
-    maybeSendMessageEmail({
+    notifyRecipient({
       messageId: message.id,
       senderId: userId,
       senderName,
@@ -106,7 +108,10 @@ export async function POST(req: Request) {
   return NextResponse.json({ message })
 }
 
-async function maybeSendMessageEmail(opts: {
+// Push + email for a new DM, through the notification seam (lib/notify.ts).
+// Push goes per-message; email keeps the 30-minute per-sender throttle (the
+// native rhythm: the device buzzes each time, the inbox gets one nudge).
+async function notifyRecipient(opts: {
   messageId: string
   senderId: string
   senderName: string
@@ -119,10 +124,10 @@ async function maybeSendMessageEmail(opts: {
     // The preference and throttle checks are independent — one round-trip.
     const since = new Date(Date.now() - EMAIL_THROTTLE_MS).toISOString()
     const [prefs, { data: recent }] = await Promise.all([
-      // Respect the recipient's preference.
+      // Respect the recipient's preference (the seam gates both channels on it).
       getNotificationPreferences(opts.recipientId),
-      // Throttle: skip if we already emailed this recipient about a message
-      // from this sender within the throttle window.
+      // Throttle: skip the email if we already emailed this recipient about a
+      // message from this sender within the throttle window.
       supabaseAdmin
         .from('messages')
         .select('id')
@@ -132,41 +137,61 @@ async function maybeSendMessageEmail(opts: {
         .gte('notified_at', since)
         .limit(1),
     ])
-    if (!prefs.email_new_message) return
-    if (recent && recent.length > 0) return
+    const emailThrottled = Boolean(recent && recent.length > 0)
 
-    // The member row's email (fetched with the recipient check) is canonical —
-    // members sign in with it. Clerk remains the fallback for rows without one.
-    let email = opts.recipientEmail
-    if (!email) {
-      const client = await clerkClient()
-      const recipientUser = await client.users.getUser(opts.recipientId)
-      email = recipientUser.emailAddresses[0]?.emailAddress ?? null
-    }
-    if (!email) return
-
-    const result = await sendNewMessageEmail({
-      to: email,
-      recipientName: opts.recipientName,
-      senderName: opts.senderName,
-      preview: opts.messageBody,
-      senderId: opts.senderId,
+    await dispatchMemberNotification(opts.recipientId, {
+      kind: 'new_message',
+      prefs,
+      push: {
+        title: opts.senderName,
+        body: opts.messageBody.slice(0, 140),
+        link: `/messages?to=${encodeURIComponent(opts.senderId)}`,
+      },
+      email: emailThrottled ? undefined : () => sendThrottledMessageEmail(opts),
     })
-
-    // Only stamp notified_at when Resend actually accepted the send. Marking it
-    // on failure would both hide the error and trip the throttle, silently
-    // suppressing retries for the next 30 minutes.
-    if (!result.ok) {
-      console.error('[messages] new-message email rejected by Resend:', result.error)
-      return
-    }
-
-    // Mark this exact message as having triggered an email for throttling.
-    await supabaseAdmin
-      .from('messages')
-      .update({ notified_at: new Date().toISOString() })
-      .eq('id', opts.messageId)
   } catch (err) {
-    console.error('[messages] email notification failed:', err)
+    console.error('[messages] notification failed:', err)
   }
+}
+
+async function sendThrottledMessageEmail(opts: {
+  messageId: string
+  senderId: string
+  senderName: string
+  recipientId: string
+  recipientName: string
+  recipientEmail: string | null
+  messageBody: string
+}) {
+  // The member row's email (fetched with the recipient check) is canonical —
+  // members sign in with it. Clerk remains the fallback for rows without one.
+  let email = opts.recipientEmail
+  if (!email) {
+    const client = await clerkClient()
+    const recipientUser = await client.users.getUser(opts.recipientId)
+    email = recipientUser.emailAddresses[0]?.emailAddress ?? null
+  }
+  if (!email) return
+
+  const result = await sendNewMessageEmail({
+    to: email,
+    recipientName: opts.recipientName,
+    senderName: opts.senderName,
+    preview: opts.messageBody,
+    senderId: opts.senderId,
+  })
+
+  // Only stamp notified_at when Resend actually accepted the send. Marking it
+  // on failure would both hide the error and trip the throttle, silently
+  // suppressing retries for the next 30 minutes.
+  if (!result.ok) {
+    console.error('[messages] new-message email rejected by Resend:', result.error)
+    return
+  }
+
+  // Mark this exact message as having triggered an email for throttling.
+  await supabaseAdmin
+    .from('messages')
+    .update({ notified_at: new Date().toISOString() })
+    .eq('id', opts.messageId)
 }

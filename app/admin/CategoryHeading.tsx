@@ -1,6 +1,6 @@
 import { catLabel } from './admin-sections'
 
-// Anchored heading that opens each group of sections on the Members, Program,
+// Anchored heading that opens each group of sections on the Community, Program,
 // and Configure pages. The `id` doubles as the scroll anchor used by AdminNav's
 // jump-links. `large` is the Program page's variant — there each heading names
 // a whole workspace panel, so it carries more weight.
