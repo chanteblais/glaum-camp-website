@@ -18,7 +18,7 @@ export default async function SignupPage() {
   // same assembly the /api/signup, /api/shift-signups, /api/groups/membership
   // and /api/resources routes serve, so the sections render with their data
   // in place instead of fetching it after hydration.
-  const [member, roleData, shiftData, selfJoinGroups, resourceLists] = await Promise.all([
+  const [member, roleData, shiftData, selfJoinGroups, resourceView] = await Promise.all([
     getApprovedMember(userId),
     getRoleSignupData(userId),
     getShiftSignupData(userId),
@@ -71,7 +71,7 @@ export default async function SignupPage() {
           </p>
         </div>
 
-        <ResourceCommitments initialLists={resourceLists} />
+        <ResourceCommitments initialLists={resourceView.lists} initialPulse={resourceView.pulse} />
 
         {/* Self-join groups, grouped by collection (Contributions, Skills, …) */}
         <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.25), transparent)', margin: '3rem 0 2rem' }} />

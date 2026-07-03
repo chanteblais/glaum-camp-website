@@ -7,7 +7,7 @@ import { Section, Kicker, GoldDivider } from '@/components/Section'
 import { ScheduleSection } from '@/components/ScheduleSection'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getMemberGroups } from '@/lib/groups'
-import { getUnmetResourceNeeds } from '@/lib/resources'
+import { getResourceWidgetState } from '@/lib/resources'
 import { buildAttunementChecklist, memberGroupCounts, requiredItems, commitmentItems } from '@/lib/attunement'
 import { getMemberShiftState, EMPTY_MEMBER_SHIFT_STATE } from '@/lib/shift-attunement'
 import { daysUntilEvent } from '@/lib/camp-event'
@@ -246,18 +246,18 @@ let canManagePolls = false
   }
 
   // ── Page content + member-derived state (one parallel round-trip) ──
-  // isApproved is needed before the batch to keep getUnmetResourceNeeds
-  // approved-only (its banner only renders for approved members anyway).
+  // isApproved is needed before the batch to keep getResourceWidgetState
+  // approved-only (its widget only renders for approved members anyway).
   const isApprovedForBatch = application?.status === 'approved'
   const shiftClerkId = (application?.clerk_user_id as string | null) ?? userId
-  const [pageContentResult, memberGroups, shiftState, unmetNeeds] = await Promise.all([
+  const [pageContentResult, memberGroups, shiftState, resourceWidget] = await Promise.all([
     pageContentQuery,
     // Groups the member belongs to (replaces the old setup_preference "contributions").
     getMemberGroups(application?.clerk_user_id as string | null),
     shiftClerkId ? getMemberShiftState(shiftClerkId) : Promise.resolve(EMPTY_MEMBER_SHIFT_STATE),
-    // Unmet shared-resource needs → the "Bring Something" banner. Demand-driven:
-    // renders nothing once the community has everything covered.
-    isApprovedForBatch ? getUnmetResourceNeeds() : Promise.resolve([]),
+    // "Bring Something" widget state: the list needing the most attention +
+    // the member's own commitments. null = no targeted items yet (hidden).
+    isApprovedForBatch ? getResourceWidgetState(shiftClerkId) : Promise.resolve(null),
   ])
   const contentRows = pageContentResult.data
   const pageContent: Record<string, string> = Object.fromEntries((contentRows ?? []).map(r => [r.key, r.value]))
@@ -551,41 +551,56 @@ let canManagePolls = false
                   </div>
                 ) : null,
 
-                // Unmet shared-resource needs, one row per list with gaps —
-                // the LIST is the headline ("Shared Kitchen"), the item count
-                // the description. Whole card clicks through to
-                // /participate#bring. Demand-driven like announcements:
-                // hidden once everything is covered.
-                resources: unmetNeeds.length > 0 ? (() => {
-                  const byList: { title: string; items: typeof unmetNeeds }[] = []
-                  for (const n of unmetNeeds) {
-                    let g = byList.find(x => x.title === n.listTitle)
-                    if (!g) { g = { title: n.listTitle, items: [] }; byList.push(g) }
-                    g.items.push(n)
-                  }
-                  const shown = byList.slice(0, 3)
+                // "Bring Something" answers "what does the community still
+                // need from me?" at a glance: ONE list (the one needing the
+                // most attention — not a directory of all lists), its
+                // readiness, urgency-adaptive copy, and a personal line (my
+                // commitments, or a nudge). Whole card clicks through to
+                // /participate#bring. Hidden only while no list has targeted
+                // items; everything-covered renders as a celebration state.
+                resources: resourceWidget ? (() => {
+                  const w = resourceWidget
+                  const remainingUnits = w.needs.reduce((s, n) => s + n.remaining, 0)
+                  const urgent = !w.allCovered && (remainingUnits >= 5 || w.percentReady < 50)
+                  const needsLine = w.allCovered
+                    ? `${w.unitsCovered} of ${w.unitsTotal} resources covered — the community is ready.`
+                    : w.needs.length === 1
+                      ? (w.needs[0].remaining === 1 ? `1 ${w.needs[0].name} still needed.` : `Still need ${w.needs[0].remaining} × ${w.needs[0].name}.`)
+                      : `${remainingUnits} items still needed — ${w.needs.slice(0, 3).map(n => n.name).join(', ')}${w.needs.length > 3 ? ', …' : ''}`
+                  const bringing = w.myClaims.slice(0, 3).map(cl => (cl.quantity > 1 ? `${cl.resourceName} ×${cl.quantity}` : cl.resourceName)).join(', ')
+                  const moreClaims = w.myClaims.length - 3
                   return (
                     <a href="/participate#bring" style={{ border: '1px solid rgba(200,168,72,0.25)', borderRadius: '1rem', background: 'rgba(10,0,20,0.5)', overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box', textDecoration: 'none' }}>
-                      <div style={{ padding: '1rem 1.5rem 0.75rem', borderBottom: '1px solid rgba(200,168,72,0.12)' }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '1rem', padding: '1rem 1.5rem 0.75rem', borderBottom: '1px solid rgba(200,168,72,0.12)' }}>
                         <p style={{ fontSize: '0.62rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, margin: 0 }}>Bring Something</p>
+                        <p style={{ fontSize: '0.66rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.8, margin: 0, flexShrink: 0 }}>{w.percentReady}% Ready</p>
                       </div>
-                      <div style={{ flex: 1 }}>
-                        {shown.map((g, i) => (
-                          <div key={g.title || i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', padding: '1rem 1.5rem', borderBottom: i < shown.length - 1 ? '1px solid rgba(200,168,72,0.08)' : 'none' }}>
-                            <div style={{ minWidth: 0 }}>
-                              <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.05rem', color: '#C8A848', margin: '0 0 0.25rem' }}>
-                                {g.title || 'Shared Resources'}
-                              </p>
-                              <p style={{ fontSize: '0.78rem', opacity: 0.45, margin: 0, color: '#F3EDE6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {g.items.length} item{g.items.length === 1 ? '' : 's'} still needed — {g.items.slice(0, 3).map(n => n.name).join(', ')}{g.items.length > 3 ? ', …' : ''}
-                              </p>
-                            </div>
-                            <span style={{ fontSize: '1rem', color: '#C8A848', opacity: 0.4, flexShrink: 0 }}>→</span>
-                          </div>
-                        ))}
-                        {byList.length > 3 && (
-                          <p style={{ margin: 0, padding: '0 1.5rem 0.9rem', fontSize: '0.72rem', opacity: 0.4, fontStyle: 'italic' }}>
-                            +{byList.length - 3} more list{byList.length - 3 === 1 ? '' : 's'} with needs
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '0.95rem 1.5rem 1.1rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+                          <p style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.05rem', color: '#C8A848', margin: 0, minWidth: 0 }}>
+                            {w.allCovered ? '✨ Everything Covered' : (w.listTitle || 'Shared Resources')}
+                          </p>
+                          {urgent && (
+                            <span style={{ fontSize: '0.58rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: '#D239F8', border: '1px solid rgba(210,57,248,0.35)', borderRadius: '999px', padding: '0.2rem 0.6rem', flexShrink: 0 }}>Needs attention</span>
+                          )}
+                        </div>
+                        {/* A whisper of momentum, not project management: one hairline bar. */}
+                        <div style={{ height: '3px', borderRadius: '999px', background: 'rgba(200,168,72,0.15)', margin: '0.6rem 0 0.65rem', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${w.percentReady}%`, borderRadius: '999px', background: w.allCovered ? '#C8A848' : 'linear-gradient(90deg, rgba(200,168,72,0.55), #C8A848)' }} />
+                        </div>
+                        <p style={{ fontSize: '0.78rem', color: '#F3EDE6', opacity: 0.6, margin: 0 }}>{needsLine}</p>
+                        <p style={{ fontSize: '0.75rem', margin: 'auto 0 0', paddingTop: '0.7rem', borderTop: '1px solid rgba(200,168,72,0.08)' }}>
+                          {w.myClaims.length > 0 ? (
+                            <span style={{ color: '#C8A848', opacity: 0.85 }}>You&apos;re bringing {bringing}{moreClaims > 0 ? ` +${moreClaims} more` : ''} — thank you ✦</span>
+                          ) : w.allCovered ? (
+                            <span style={{ color: '#F3EDE6', opacity: 0.45 }}>Nothing needed from you right now — the community has it covered.</span>
+                          ) : (
+                            <span style={{ color: '#F3EDE6', opacity: 0.45 }}>You haven&apos;t committed anything yet — see what&apos;s needed →</span>
+                          )}
+                        </p>
+                        {w.otherListsShort > 0 && (
+                          <p style={{ margin: '0.55rem 0 0', fontSize: '0.7rem', opacity: 0.4, fontStyle: 'italic', color: '#F3EDE6' }}>
+                            +{w.otherListsShort} more list{w.otherListsShort === 1 ? '' : 's'} could use a hand
                           </p>
                         )}
                       </div>
