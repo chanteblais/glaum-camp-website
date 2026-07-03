@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getApprovedMember } from '@/lib/members'
 
 // Set the caller's claim on a resource. quantity >= 1 upserts the single
 // per-member claim row; quantity 0 removes it (unclaiming is always allowed —
@@ -8,6 +9,11 @@ import { supabaseAdmin } from '@/lib/supabase'
 export async function POST(req: NextRequest) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // Approved members only — same gate as the /participate page this backs.
+  if (!(await getApprovedMember(userId))) {
+    return NextResponse.json({ error: 'Only approved members can claim resources' }, { status: 403 })
+  }
 
   const { resource_id, quantity } = await req.json()
   if (!resource_id || typeof quantity !== 'number' || !Number.isFinite(quantity)) {

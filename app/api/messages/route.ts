@@ -51,9 +51,10 @@ export async function POST(req: Request) {
       .maybeSingle(),
     // Snapshot the sender's display name onto the message so the conversation
     // stays readable even if the sender's application is later deleted.
+    // status rides along for the sender-side membership gate below.
     supabaseAdmin
       .from('members')
-      .select('preferred_name, first_name')
+      .select('preferred_name, first_name, status')
       .eq('clerk_user_id', userId)
       .maybeSingle(),
     // Read-only lookup here; creation (below) waits for the recipient check so
@@ -62,6 +63,12 @@ export async function POST(req: Request) {
   ])
 
   if (!recipient) return NextResponse.json({ error: 'Recipient not found' }, { status: 404 })
+
+  // Sender must be an approved member too — messaging is a members-only space
+  // (the recipient side was already enforced above).
+  if (senderApp?.status !== 'approved') {
+    return NextResponse.json({ error: 'Only approved members can send messages' }, { status: 403 })
+  }
 
   const senderName = senderApp?.preferred_name || senderApp?.first_name || 'A member'
 

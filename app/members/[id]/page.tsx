@@ -163,8 +163,9 @@ export default async function MemberPage({ params }: { params: { id: string } })
         .pub-msg-btn:hover { background: rgba(210,57,248,0.22) !important; border-color: rgba(210,57,248,0.78) !important; box-shadow: 0 0 14px rgba(175,75,255,0.3) !important; }
         .pub-roles { display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; justify-items: center; gap: 1.4rem; }
         @media (max-width: 720px) {
-          .pub-hero { grid-template-columns: 1fr; justify-items: center; text-align: center; gap: 1.4rem; }
+          .pub-hero { grid-template-columns: 1fr; justify-items: center; text-align: center; gap: 1.4rem; margin-left: 0 !important; }
           .pub-hero-id { text-align: center; }
+          .pub-about { margin-left: 0 !important; }
         }
         @media (max-width: 820px) {
           .pub-roles { grid-template-columns: 1fr; gap: 1.1rem; }
@@ -215,9 +216,9 @@ export default async function MemberPage({ params }: { params: { id: string } })
             )}
             <div style={{ marginTop: '1rem', display: 'flex', flexWrap: 'wrap', gap: '0.7rem' }}>
               <ApprovedCamperPill />
-              <a className="pub-msg-btn" href={`/messages/${member.clerk_user_id}`} aria-label={`Send a message to ${displayName}`} style={{ display: 'inline-block', padding: '0.42rem 1.3rem', borderRadius: '9999px', background: 'rgba(210,57,248,0.13)', border: '1px solid rgba(210,57,248,0.5)', boxShadow: '0 0 10px rgba(175,75,255,0.14)', color: '#EEB4F6', fontSize: '0.72rem', letterSpacing: '0.08em', textDecoration: 'none', fontFamily: 'TokyoDreams, serif', transition: 'background 0.15s, border-color 0.15s, box-shadow 0.15s' }}>
+              {member.clerk_user_id && <a className="pub-msg-btn" href={`/messages/${member.clerk_user_id}`} aria-label={`Send a message to ${displayName}`} style={{ display: 'inline-block', padding: '0.42rem 1.3rem', borderRadius: '9999px', background: 'rgba(210,57,248,0.13)', border: '1px solid rgba(210,57,248,0.5)', boxShadow: '0 0 10px rgba(175,75,255,0.14)', color: '#EEB4F6', fontSize: '0.72rem', letterSpacing: '0.08em', textDecoration: 'none', fontFamily: 'TokyoDreams, serif', transition: 'background 0.15s, border-color 0.15s, box-shadow 0.15s' }}>
                 <span aria-hidden="true">✉ </span>Message
-              </a>
+              </a>}
             </div>
           </div>
         </header>
@@ -225,7 +226,7 @@ export default async function MemberPage({ params }: { params: { id: string } })
         {/* ── About (plain text under the hero) · Roles · Contributions ──────── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.95rem', marginBottom: '0.85rem' }}>
           {bio && (
-            <section style={{ alignSelf: 'flex-start', maxWidth: '26rem', width: '100%', marginLeft: '3.25rem' }}>
+            <section className="pub-about" style={{ alignSelf: 'flex-start', maxWidth: '26rem', width: '100%', marginLeft: '3.25rem' }}>
               <ColHeading title="About" align="left" />
               <p style={{ fontSize: '0.92rem', lineHeight: 1.85, color: ROSE, whiteSpace: 'pre-line', textAlign: 'left', margin: 0 }}>{bio}</p>
             </section>
