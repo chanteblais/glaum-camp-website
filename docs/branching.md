@@ -57,8 +57,22 @@ will change files, it creates its own branch — `type/slug` when the scope is
 clear, `session/YYYY-MM-DD-<topic>` when it isn't yet (rename or split later if
 the work firms up). Unrelated tasks in one session get separate branches. Merge
 with `--no-ff` after verification (tsc + click-through), delete the branch, and
-**never push** — pushing (= deploying) is always Chante's call. Rule-5 tiny
-tweaks (log updates, one-line doc fixes) may still go straight to `main`.
+**push `main`** — Chante's approval to merge covers the deploy too (changed
+2026-07-02; it used to be a separate call). Guardrails on the push:
+
+- **Approval first.** Merge + push happen when Chante has signed off on the
+  change ("looks good", "merge it"). Never push work she hasn't seen.
+- **A push ships all of `main`.** Check `git log --first-parent origin/main..main`
+  before pushing; if it carries another session's unpushed merge, that's fine —
+  nothing lands on main unverified (rule 1) — but say so in the summary.
+- **Migrations deploy with their code** (rule 6): apply the migration to prod as
+  part of the same merge+push, and note the number in the merge commit. If the
+  migration can't be applied right then, hold the push and say why.
+- **When in doubt, don't.** Anything half-verified or prod acting strange —
+  leave the push to Chante.
+
+Rule-5 tiny tweaks (log updates, one-line doc fixes) may still go straight to
+`main`.
 
 ## Day-to-day cheat sheet
 
@@ -69,6 +83,6 @@ git add -A && git commit -m "Fix thing"
 git checkout main
 git merge --no-ff fix/thing -m "Fix thing (fix/thing)"
 git branch -d fix/thing
-# ship when ready:
+# ship (on approval — approval to merge = approval to deploy):
 git push
 ```
