@@ -101,14 +101,12 @@ const MAIN: [number, number][] = [
   [826, 142], [837, 177], [847, 239], [858, 255], [868, 209], [879, 134], [889, 105], [900, 121],
   [911, 172], [921, 211], [930, 220], [940, 168], [947, 127], [953, 117], [963, 209], [974, 200],
   [984, 183], [995, 171], [1000, 177],
-  // the long tail: real visible waves (±30ish units — anything less renders
-  // as a flat line at this scale), long wavelengths, slowly decaying, with a
-  // gentle final slope so the terminus never jags. Units beyond ~1300 render
-  // PAST the content margin (the box overflows right by 4rem).
-  [1022, 214], [1050, 148], [1080, 212], [1112, 150], [1146, 208], [1182, 154],
-  [1220, 204], [1260, 158], [1302, 200], [1346, 162], [1392, 196], [1440, 167],
-  // end mid-curve — the fade (not the geometry) is what extinguishes the line
-  [1476, 198], [1510, 163],
+  // the long tail: the FREQUENCY DROPS — each wave longer than the last,
+  // amplitude easing down slowly. Smooth, slow, never busy. Units beyond
+  // ~1300 render past the content margin (the box overflows right by 4rem);
+  // the fade (not the geometry) extinguishes the line.
+  [1026, 208], [1060, 150], [1102, 204], [1152, 156], [1212, 199],
+  [1284, 161], [1368, 193], [1462, 166], [1510, 176],
 ]
 
 // Echo threads — the braid lives at the EDGES ONLY in the mock: two fine
@@ -121,16 +119,14 @@ const THREAD_B_LEFT: [number, number][] = [
 ]
 const THREAD_B_RIGHT: [number, number][] = [
   [755, 178], [790, 185], [825, 174], [860, 186], [895, 175], [930, 184], [965, 176], [1000, 181],
-  [1040, 170], [1085, 192], [1130, 168], [1180, 190], [1235, 170], [1300, 188],
-  [1370, 171], [1440, 187], [1510, 173],
+  [1050, 170], [1110, 190], [1182, 168], [1266, 189], [1362, 170], [1460, 186], [1510, 178],
 ]
 const THREAD_C_LEFT: [number, number][] = [
   [0, 176], [30, 185], [60, 175], [90, 184], [120, 176], [150, 183], [200, 180], [250, 177], [300, 182],
 ]
 const THREAD_C_RIGHT: [number, number][] = [
   [770, 183], [810, 176], [850, 184], [890, 177], [930, 183], [970, 178], [1000, 176],
-  [1045, 188], [1095, 168], [1150, 189], [1205, 169], [1255, 187], [1300, 170],
-  [1365, 186], [1435, 172], [1510, 184],
+  [1052, 187], [1118, 169], [1196, 188], [1286, 170], [1388, 186], [1490, 173], [1510, 176],
 ]
 
 // The mote field, positions measured off the mockup (r and brightness vary;
@@ -150,9 +146,13 @@ const ORBS: [number, number, number, number][] = [
 
 // Ghost echoes of the pulse — attenuated, offset copies of the main trace
 // (the mock's liveliness: faint wisps shadowing the line, standing tall
-// BESIDE the crests rather than cutting through them).
+// BESIDE the crests rather than cutting through them). Points pushed past
+// the canvas edge are dropped, NOT clipped — a viewBox clip cuts the wave
+// mid-stroke as a hard vertical jag; ending the path early lets its own
+// fade extinguish it.
 const ghost = (dx: number, k: number): [number, number][] =>
-  MAIN.map(([x, y]) => [x + dx, Math.round(MID + (y - MID) * k)])
+  MAIN.map(([x, y]) => [x + dx, Math.round(MID + (y - MID) * k)] as [number, number])
+    .filter(([x]) => x >= 0 && x <= 1495)
 
 function Waveform() {
   return (
