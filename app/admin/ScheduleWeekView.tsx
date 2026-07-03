@@ -53,6 +53,10 @@ function hue(e: WeekViewEvent, shiftIndex: Record<string, number>) {
   if (e.participation_type === 'shift' && e.shift_type_id != null && shiftIndex[e.shift_type_id] != null) {
     return shiftHue(shiftIndex[e.shift_type_id])
   }
+  // Daily recurring wears the manager's recurring purple (same as the "Daily
+  // Recurring" section header + rail chip) — they're usually 'general', which
+  // would otherwise dissolve into the neutral gold chrome.
+  if (e.is_recurring) return { rgb: '210,57,248', accent: '#D239F8' }
   return { rgb: '200,168,72', accent: GOLD } // general → house gold
 }
 
@@ -152,9 +156,9 @@ export function ScheduleWeekView({ events, days, shiftTypes, rosters, onEdit, on
           left: `calc(${lane * width}% + 2px)`,
           width: `calc(${width}% - 4px)`,
           borderRadius: '0.35rem',
-          border: `1px ${ghost || !ev.visible ? 'dashed' : 'solid'} rgba(${h.rgb},${ghost ? 0.3 : 0.5})`,
-          background: `rgba(${h.rgb},${ghost ? 0.04 : 0.1})`,
-          opacity: ev.visible ? (ghost ? 0.55 : 1) : 0.4,
+          border: `1px ${ghost || !ev.visible ? 'dashed' : 'solid'} rgba(${h.rgb},${ghost ? 0.45 : 0.5})`,
+          background: `rgba(${h.rgb},${ghost ? 0.08 : 0.1})`,
+          opacity: ev.visible ? (ghost ? 0.8 : 1) : 0.4,
           overflow: 'hidden',
           cursor: 'pointer',
           padding: '0.2rem 0.3rem',
