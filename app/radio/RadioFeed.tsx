@@ -35,7 +35,8 @@ function RadioRow({ e, last }: { e: RadioEventRow; last: boolean }) {
   // voices RIGHT-aligned in a deep purple — a voice calling in from the
   // other side of the airwaves.
   const isSpeech = e.kind === 'broadcast' || isVoice
-  const VOICE_PURPLE = 'rgba(178,82,222,0.95)'
+  const VOICE_PURPLE = 'rgba(158,68,202,0.95)'      // the words: deep and dark
+  const VOICE_SIGNATURE = 'rgba(206,132,244,0.85)'  // the signature: lighter, distinct
   const hasEntity = e.message.includes('**')
 
   const body = (
@@ -67,7 +68,7 @@ function RadioRow({ e, last }: { e: RadioEventRow; last: boolean }) {
         </p>
       )}
       {isVoice && e.actor_name && (
-        <p style={{ margin: '0.3rem 0 0', fontSize: '0.72rem', color: VOICE_PURPLE, opacity: 0.8 }}>
+        <p style={{ margin: '0.3rem 0 0', fontSize: '0.72rem', color: VOICE_SIGNATURE }}>
           — {e.actor_name}
         </p>
       )}

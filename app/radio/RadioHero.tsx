@@ -101,9 +101,12 @@ const MAIN: [number, number][] = [
   [826, 142], [837, 177], [847, 239], [858, 255], [868, 209], [879, 134], [889, 105], [900, 121],
   [911, 172], [921, 211], [930, 220], [940, 168], [947, 127], [953, 117], [963, 209], [974, 200],
   [984, 183], [995, 171], [1000, 177],
-  // the long tail: languid diminishing weave, dissolving — never flatlining
+  // the long tail: languid diminishing weave, dissolving — never flatlining.
+  // Units beyond 1300 render PAST the content margin (the box overflows
+  // right by 4rem; everything ≤1300 stays inside the previous width).
   [1018, 187], [1038, 171], [1060, 186], [1084, 173], [1110, 185], [1138, 174],
   [1168, 184], [1200, 175], [1234, 183], [1268, 177], [1300, 181],
+  [1336, 176], [1374, 183], [1414, 178], [1456, 182], [1510, 179],
 ]
 
 // Echo threads — the braid lives at the EDGES ONLY in the mock: two fine
@@ -117,6 +120,7 @@ const THREAD_B_LEFT: [number, number][] = [
 const THREAD_B_RIGHT: [number, number][] = [
   [755, 178], [790, 185], [825, 174], [860, 186], [895, 175], [930, 184], [965, 176], [1000, 181],
   [1040, 177], [1085, 183], [1130, 178], [1180, 182], [1235, 177], [1300, 180],
+  [1370, 182], [1440, 178], [1510, 180],
 ]
 const THREAD_C_LEFT: [number, number][] = [
   [0, 176], [30, 185], [60, 175], [90, 184], [120, 176], [150, 183], [200, 180], [250, 177], [300, 182],
@@ -124,6 +128,7 @@ const THREAD_C_LEFT: [number, number][] = [
 const THREAD_C_RIGHT: [number, number][] = [
   [770, 183], [810, 176], [850, 184], [890, 177], [930, 183], [970, 178], [1000, 176],
   [1045, 182], [1095, 177], [1150, 181], [1205, 176], [1255, 182], [1300, 178],
+  [1365, 181], [1435, 177], [1510, 181],
 ]
 
 // The mote field, positions measured off the mockup (r and brightness vary;
@@ -149,9 +154,9 @@ const ghost = (dx: number, k: number): [number, number][] =>
 
 function Waveform() {
   return (
-    // 1300 wide: the extra 300 units are the rightward tail — same rendered
-    // footprint, so everything draws smaller and trails further right.
-    <svg viewBox="0 0 1300 500" fill="none" aria-hidden style={{ width: '100%', height: 'auto', display: 'block' }}>
+    // 1510 wide; units 0-1300 map inside the content margin (previous
+    // footprint), 1300-1510 ride past it on the box's right overflow.
+    <svg viewBox="0 0 1510 500" fill="none" aria-hidden style={{ width: '100%', height: 'auto', display: 'block' }}>
       <defs>
         <filter id="radio-blur" x="-30%" y="-30%" width="160%" height="160%">
           <feGaussianBlur stdDeviation="5" />
@@ -167,27 +172,27 @@ function Waveform() {
             left and dissolves down the long tail on the right */}
         <linearGradient id="radio-fade" x1="0" y1="0" x2="1" y2="0">
           <stop offset="0" stopColor={LINE} stopOpacity="0.12" />
-          <stop offset="0.055" stopColor={LINE} stopOpacity="0.4" />
-          <stop offset="0.14" stopColor={LINE} stopOpacity="1" />
-          <stop offset="0.56" stopColor={LINE} stopOpacity="1" />
-          <stop offset="0.72" stopColor={LINE} stopOpacity="0.32" />
-          <stop offset="0.88" stopColor={LINE} stopOpacity="0.12" />
+          <stop offset="0.05" stopColor={LINE} stopOpacity="0.4" />
+          <stop offset="0.12" stopColor={LINE} stopOpacity="1" />
+          <stop offset="0.48" stopColor={LINE} stopOpacity="1" />
+          <stop offset="0.62" stopColor={LINE} stopOpacity="0.3" />
+          <stop offset="0.8" stopColor={LINE} stopOpacity="0.11" />
           <stop offset="1" stopColor={LINE} stopOpacity="0" />
         </linearGradient>
         <linearGradient id="radio-fade-core" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0.09" stopColor={LINE_CORE} stopOpacity="0" />
-          <stop offset="0.22" stopColor={LINE_CORE} stopOpacity="0.55" />
-          <stop offset="0.52" stopColor={LINE_CORE} stopOpacity="0.55" />
-          <stop offset="0.68" stopColor={LINE_CORE} stopOpacity="0" />
+          <stop offset="0.08" stopColor={LINE_CORE} stopOpacity="0" />
+          <stop offset="0.19" stopColor={LINE_CORE} stopOpacity="0.55" />
+          <stop offset="0.45" stopColor={LINE_CORE} stopOpacity="0.55" />
+          <stop offset="0.59" stopColor={LINE_CORE} stopOpacity="0" />
         </linearGradient>
         {/* edge-weighted fade for the outer wisps: present at the quiet
             ends, ducking through the loud middle */}
         <linearGradient id="radio-fade-edges" x1="0" y1="0" x2="1" y2="0">
           <stop offset="0" stopColor={LINE} stopOpacity="0.3" />
-          <stop offset="0.2" stopColor={LINE} stopOpacity="0.25" />
-          <stop offset="0.42" stopColor={LINE} stopOpacity="0.06" />
-          <stop offset="0.6" stopColor={LINE} stopOpacity="0.06" />
-          <stop offset="0.8" stopColor={LINE} stopOpacity="0.25" />
+          <stop offset="0.17" stopColor={LINE} stopOpacity="0.25" />
+          <stop offset="0.36" stopColor={LINE} stopOpacity="0.06" />
+          <stop offset="0.52" stopColor={LINE} stopOpacity="0.06" />
+          <stop offset="0.72" stopColor={LINE} stopOpacity="0.25" />
           <stop offset="1" stopColor={LINE} stopOpacity="0" />
         </linearGradient>
         {/* the edge threads fade at their inner ends — no thin lines cross
@@ -275,17 +280,19 @@ export function RadioHero() {
           min-width: 15rem;
         }
         /* the band's left tip starts exactly where the rule ends */
+        /* right: -4rem lets the tail units (1300+) ride past the content
+           margin; everything else stays inside the previous width */
         .radio-hero-wave {
           position: absolute;
           left: 46%;
-          right: 2%;
+          right: -4rem;
           top: calc(50% + 14px);
           transform: translateY(-50%);
           pointer-events: none;
         }
         @media (max-width: 700px) {
           .radio-rule { width: 55%; min-width: 0; }
-          .radio-hero-wave { left: 55%; right: 0; }
+          .radio-hero-wave { left: 55%; right: -1.5rem; }
         }
       ` }} />
 
