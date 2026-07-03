@@ -1,12 +1,17 @@
 import { supabaseAdmin } from './supabase'
 import { shiftDurationHours } from './shift-hours'
 
-// Community-wide shift-hours rollup for the admin Overview. Aggregates the same
-// facts the member-side math uses (shift events' real durations ×
-// member_shift_signups ∪ the legacy camp_signups single column, deduped) so the
-// admin totals always agree with what members' checklists count. Each event
-// counts its duration once, recurring or not — same convention as
-// lib/shift-attunement.ts.
+// Community-wide shift-hours rollup for the admin Overview, built from shift
+// events' real durations × member_shift_signups ∪ the legacy camp_signups
+// single column (deduped).
+//
+// A recurring shift counts once per occurrence — its listed recurrence_days,
+// or every day of the configured event range (same rules as the schedule
+// calendar), so "8 shifts" here matches what the calendar shows. A signup on a
+// recurring shift is a commitment to the whole series (one signable card in
+// the member picker), so it fills every occurrence. Note: member attunement
+// (lib/shift-attunement.ts) still credits a recurring shift's hours ONCE —
+// a known divergence, flagged rather than silently matched.
 //
 // Deliberately no "% complete" here: an uncapped shift has no defined "full",
 // so the display sticks to facts — scheduled hours, filled people-hours, and
@@ -33,19 +38,47 @@ export type ShiftHoursOverview = {
   types: ShiftTypeHours[]
 }
 
+// Days in the configured event range, with buildScheduleDays' guards (valid,
+// start ≤ end, ≤ 60 days). Fallback 1 so an "every day" recurring shift never
+// vanishes when no range is configured.
+function rangeDayCount(rangeStart?: string | null, rangeEnd?: string | null): number {
+  const parse = (iso?: string | null) => {
+    if (!iso) return null
+    const d = new Date(`${iso}T12:00:00`)
+    return isNaN(d.getTime()) ? null : d
+  }
+  const start = parse(rangeStart)
+  const end = parse(rangeEnd)
+  if (!start || !end) return 1
+  const days = Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)) + 1
+  return days >= 1 && days <= 61 ? days : 1
+}
+
 export async function getShiftHoursOverview(): Promise<ShiftHoursOverview> {
-  const [{ data: shiftTypes }, { data: events }, { data: signups }, { data: legacy }] = await Promise.all([
+  const [{ data: shiftTypes }, { data: events }, { data: signups }, { data: legacy }, { data: rangeRows }] = await Promise.all([
     supabaseAdmin.from('shift_types').select('id, name, sort_order').order('sort_order'),
     supabaseAdmin
       .from('schedule_events')
-      .select('id, shift_type_id, start_time, end_time')
+      .select('id, shift_type_id, start_time, end_time, is_recurring, recurrence_days')
       .eq('participation_type', 'shift'),
     supabaseAdmin.from('member_shift_signups').select('clerk_user_id, schedule_event_id'),
     supabaseAdmin
       .from('camp_signups')
       .select('clerk_user_id, schedule_event_id')
       .not('schedule_event_id', 'is', null),
+    supabaseAdmin
+      .from('page_content')
+      .select('key, value')
+      .in('key', ['config_event_start_date', 'config_event_end_date']),
   ])
+
+  const range = Object.fromEntries((rangeRows ?? []).map(r => [r.key, r.value as string]))
+  const everyDayCount = rangeDayCount(range['config_event_start_date'], range['config_event_end_date'])
+  const occurrencesOf = (ev: { is_recurring?: boolean | null; recurrence_days?: string[] | null }) => {
+    if (!ev.is_recurring) return 1
+    if (Array.isArray(ev.recurrence_days) && ev.recurrence_days.length > 0) return ev.recurrence_days.length
+    return everyDayCount
+  }
 
   const eventById = new Map((events ?? []).map(e => [e.id as string, e]))
 
@@ -77,11 +110,12 @@ export async function getShiftHoursOverview(): Promise<ShiftHoursOverview> {
     }
     const h = shiftDurationHours(ev.start_time, ev.end_time)
     const n = signupsByEvent.get(ev.id as string) ?? 0
-    b.slotCount++
-    b.scheduledHours += h
+    const occ = occurrencesOf(ev)
+    b.slotCount += occ
+    b.scheduledHours += h * occ
     b.signupCount += n
-    b.filledHours += h * n
-    if (n === 0) b.emptySlots++
+    b.filledHours += h * n * occ // a series signup works every occurrence
+    if (n === 0) b.emptySlots += occ
   }
 
   // Registry order (= palette order), untyped bucket last; skip types with no
