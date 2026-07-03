@@ -283,16 +283,24 @@ export default async function OverviewPage() {
             <p style={{ fontSize: '0.85rem', opacity: 0.35, fontStyle: 'italic' }}>No shifts on the schedule yet.</p>
           ) : (
             <>
+              {/* Supply vs demand: promised = hours members owe by requirement;
+                  to fill = spot-hours the schedule opens (capped shifts only —
+                  an uncapped shift has no defined demand). */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-                <div style={card()}>
-                  <p style={statLabel}>Total Shift Hours</p>
-                  <p style={statValue}>{fmtH(shiftHours.totalScheduledHours)}</p>
-                  <p style={statSub}>{shiftHours.slotCount} shift{shiftHours.slotCount === 1 ? '' : 's'} across {shiftHours.types.length} type{shiftHours.types.length === 1 ? '' : 's'}</p>
-                </div>
                 <div style={card()}>
                   <p style={statLabel}>Hours Promised</p>
                   <p style={statValue}>{fmtH(shiftHours.totalPromisedHours)}</p>
-                  <p style={statSub}>owed by attunement + group/role requirements across {shiftHours.approvedMemberCount} members</p>
+                  <p style={statSub}>owed by requirements across {shiftHours.approvedMemberCount} members</p>
+                </div>
+                <div style={card()}>
+                  <p style={statLabel}>Hours to Fill</p>
+                  <p style={statValue}>{fmtH(shiftHours.totalToFillHours)}</p>
+                  <p style={statSub}>
+                    {shiftHours.cappedSlots > 0
+                      ? `spots × length on the ${shiftHours.cappedSlots} shift${shiftHours.cappedSlots === 1 ? '' : 's'} with set spots`
+                      : 'no shifts have set spots yet'}
+                    {shiftHours.slotCount > shiftHours.cappedSlots ? ` · ${shiftHours.slotCount - shiftHours.cappedSlots} uncapped` : ''}
+                  </p>
                 </div>
                 <div style={card()}>
                   <p style={statLabel}>Hours Filled</p>
@@ -312,26 +320,31 @@ export default async function OverviewPage() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
                 {shiftHours.types.map(t => {
                   const hue = t.paletteIndex >= 0 ? shiftHue(t.paletteIndex) : { rgb: '200,168,72', accent: '#C8A848' }
+                  const uncapped = t.slotCount - t.cappedSlots
                   return (
                     <div key={t.id ?? 'untyped'} style={{ ...card(), borderColor: `rgba(${hue.rgb},0.25)`, background: `rgba(${hue.rgb},0.04)` }}>
                       <p style={{ ...statLabel, color: hue.accent, opacity: 0.85 }}>{t.name}</p>
                       <p style={{ ...statValue, fontSize: '1.6rem', color: hue.accent }}>
-                        {fmtH(t.scheduledHours)}
-                        <span style={{ fontSize: '0.85rem', opacity: 0.55 }}> · {t.slotCount} shift{t.slotCount === 1 ? '' : 's'}</span>
+                        {fmtH(t.promisedHours)}
+                        <span style={{ fontSize: '0.85rem', opacity: 0.55 }}> promised{t.promisedMembers > 0 ? ` · ${t.promisedMembers} member${t.promisedMembers === 1 ? '' : 's'}` : ''}</span>
                       </p>
-                      <p style={{ ...statSub, margin: '0.45rem 0 0', opacity: t.promisedHours > 0 ? 0.6 : 0.35 }}>
-                        {t.promisedHours > 0
-                          ? `${fmtH(t.promisedHours)} promised by ${t.promisedMembers} member${t.promisedMembers === 1 ? '' : 's'}`
-                          : 'no hours promised by requirements'}
+                      <p style={{ ...statSub, margin: '0.45rem 0 0' }}>
+                        {t.slotCount === 0
+                          ? 'nothing scheduled yet'
+                          : t.cappedSlots > 0
+                            ? `${fmtH(t.toFillHours)} to fill across ${t.cappedSlots} shift${t.cappedSlots === 1 ? '' : 's'}${uncapped > 0 ? ` · ${uncapped} uncapped` : ''}`
+                            : `${t.slotCount} shift${t.slotCount === 1 ? '' : 's'} · no set spots`}
                       </p>
                       <p style={{ ...statSub, margin: '0.15rem 0 0' }}>
                         {fmtH(t.filledHours)} filled · {t.signupCount} signup{t.signupCount === 1 ? '' : 's'}
                       </p>
-                      <p style={{ ...statSub, margin: '0.15rem 0 0', color: t.emptySlots > 0 ? '#ffb432' : undefined, opacity: t.emptySlots > 0 ? 0.75 : 0.45 }}>
-                        {t.emptySlots > 0
-                          ? `${t.emptySlots} of ${t.slotCount} shift${t.slotCount === 1 ? '' : 's'} empty`
-                          : 'every shift has someone'}
-                      </p>
+                      {t.slotCount > 0 && (
+                        <p style={{ ...statSub, margin: '0.15rem 0 0', color: t.emptySlots > 0 ? '#ffb432' : undefined, opacity: t.emptySlots > 0 ? 0.75 : 0.45 }}>
+                          {t.emptySlots > 0
+                            ? `${t.emptySlots} of ${t.slotCount} shift${t.slotCount === 1 ? '' : 's'} empty`
+                            : 'every shift has someone'}
+                        </p>
+                      )}
                     </div>
                   )
                 })}

@@ -15,37 +15,42 @@ import { parseAttunementTasks } from './site-config'
 // date, so which occurrence a member works is unrecorded; empty-shift counts
 // for a recurring series are therefore occurrences − signups.
 //
-// PROMISED hours are the demand side: what members collectively owe by
-// requirement — the universal attunement 'shift' tasks (every approved member)
-// merged with group/role requirements (required_shift_type_id +
-// required_shift_hours), max per type per member, mirroring attunement's rule
-// (being in two things that both want teardown means the bigger ask, not both).
-//
-// Deliberately no "% complete" here: an uncapped shift has no defined "full",
-// so the display sticks to facts — scheduled hours, promised hours, filled
-// people-hours, and which shifts still have nobody.
+// The section is framed as the organizer's supply-vs-demand ledger:
+//   PROMISED (supply) — what members collectively owe by requirement: the
+//     universal attunement 'shift' tasks (every approved member) merged with
+//     group/role requirements (required_shift_type_id + required_shift_hours),
+//     max per type per member, mirroring attunement's rule (being in two
+//     things that both want teardown means the bigger ask, not both).
+//   TO FILL (demand) — spot-hours the schedule opens: occurrences × duration
+//     × capacity, counted ONLY for shifts with a set capacity (an uncapped
+//     shift has no defined demand, so it's reported as a count, never hours).
+//   FILLED (booked) and EMPTY SHIFTS (gaps) — as above.
+// No duration-only "scheduled hours" total: a 3h shift with 5 spots is 15h of
+// work, so summing bare durations reads as neither supply nor demand.
 
 export type ShiftTypeHours = {
   id: string | null // null = events whose shift type was deleted
   name: string
   paletteIndex: number // slot in SHIFT_HUES (registry sort position); -1 = untyped
   slotCount: number
+  cappedSlots: number // shifts (occurrences) with a set capacity
   emptySlots: number // shifts of this type with zero signups
   signupCount: number
   filledHours: number // Σ over signups of the slot's duration (people-hours)
-  scheduledHours: number // Σ of slot durations — "total hours of shifts"
+  toFillHours: number // Σ over capped shifts of occurrences × duration × capacity
   promisedHours: number // Σ over approved members of the hours they owe of this type
   promisedMembers: number // approved members owing ≥1h of this type
 }
 
 export type ShiftHoursOverview = {
-  totalScheduledHours: number
-  totalFilledHours: number
   totalPromisedHours: number
+  totalToFillHours: number
+  totalFilledHours: number
   totalSignups: number
   memberCount: number // distinct members holding ≥1 shift
   approvedMemberCount: number // approved members the promised math ranges over
   slotCount: number
+  cappedSlots: number
   emptySlots: number
   types: ShiftTypeHours[]
 }
@@ -82,7 +87,7 @@ export async function getShiftHoursOverview(): Promise<ShiftHoursOverview> {
     supabaseAdmin.from('shift_types').select('id, name, sort_order').order('sort_order'),
     supabaseAdmin
       .from('schedule_events')
-      .select('id, shift_type_id, start_time, end_time, is_recurring, recurrence_days')
+      .select('id, shift_type_id, start_time, end_time, capacity, is_recurring, recurrence_days')
       .eq('participation_type', 'shift'),
     supabaseAdmin.from('member_shift_signups').select('clerk_user_id, schedule_event_id'),
     supabaseAdmin
@@ -135,7 +140,7 @@ export async function getShiftHoursOverview(): Promise<ShiftHoursOverview> {
   const bucketFor = (typeId: string | null): Bucket => {
     let b = buckets.get(typeId)
     if (!b) {
-      b = { slotCount: 0, emptySlots: 0, signupCount: 0, filledHours: 0, scheduledHours: 0, promisedHours: 0, promisedMembers: 0 }
+      b = { slotCount: 0, cappedSlots: 0, emptySlots: 0, signupCount: 0, filledHours: 0, toFillHours: 0, promisedHours: 0, promisedMembers: 0 }
       buckets.set(typeId, b)
     }
     return b
@@ -147,10 +152,13 @@ export async function getShiftHoursOverview(): Promise<ShiftHoursOverview> {
     const n = signupsByEvent.get(ev.id as string) ?? 0
     const occ = occurrencesOf(ev)
     b.slotCount += occ
-    b.scheduledHours += h * occ
     b.signupCount += n
     b.filledHours += h * n // one signup = one occurrence's hours
     b.emptySlots += Math.max(0, occ - n)
+    if (ev.capacity != null && ev.capacity > 0) {
+      b.cappedSlots += occ
+      b.toFillHours += h * occ * ev.capacity // capacity is per occurrence
+    }
   }
 
   // ── Promised hours ─────────────────────────────────────────────────────────
@@ -206,7 +214,7 @@ export async function getShiftHoursOverview(): Promise<ShiftHoursOverview> {
     types.push({
       id, name, paletteIndex, ...b,
       filledHours: round(b.filledHours),
-      scheduledHours: round(b.scheduledHours),
+      toFillHours: round(b.toFillHours),
       promisedHours: round(b.promisedHours),
     })
   ;(shiftTypes ?? []).forEach((t, i) => {
@@ -217,13 +225,14 @@ export async function getShiftHoursOverview(): Promise<ShiftHoursOverview> {
   if (untyped) push(null, 'Untyped', -1, untyped)
 
   return {
-    totalScheduledHours: round(types.reduce((a, t) => a + t.scheduledHours, 0)),
-    totalFilledHours: round(types.reduce((a, t) => a + t.filledHours, 0)),
     totalPromisedHours: round(types.reduce((a, t) => a + t.promisedHours, 0)),
+    totalToFillHours: round(types.reduce((a, t) => a + t.toFillHours, 0)),
+    totalFilledHours: round(types.reduce((a, t) => a + t.filledHours, 0)),
     totalSignups: types.reduce((a, t) => a + t.signupCount, 0),
     memberCount: members.size,
     approvedMemberCount: (approvedRows ?? []).length,
     slotCount: types.reduce((a, t) => a + t.slotCount, 0),
+    cappedSlots: types.reduce((a, t) => a + t.cappedSlots, 0),
     emptySlots: types.reduce((a, t) => a + t.emptySlots, 0),
     types,
   }
