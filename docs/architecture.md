@@ -93,7 +93,7 @@ Sign-out flow:
 | `/api/resources/offers` | POST | Suggest a resource: `{ list_id, name, note, bring }` → creates an open-callout item (`quantity_needed NULL`, `offered_by` = caller, migration `053`), plus the suggester's ×1 claim unless `bring: false`. Visible lists only. **Approved members only.** |
 | `/api/profile/application` | PATCH | Update profile fields |
 | `/api/profile/avatar` | POST | Upload avatar to Supabase Storage |
-| `/api/profile/cancel` | POST | Cancel own application |
+| `/api/profile/cancel` | POST | Cancel own application (reason required; mirrors `cancelled` onto `members.status` and releases the member's role + shift slots — `camp_signups` and `member_shift_signups` — same cleanup as the admin remove flow) |
 | `/api/role-suggestions` | POST | Submit a dept/role suggestion |
 | `/api/shoutouts` | GET/POST | List visible shoutouts / post one (approved members) |
 | `/api/shoutouts/[id]` | DELETE | Delete a shoutout (author or admin only) |

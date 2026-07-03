@@ -54,7 +54,7 @@ Configurable widgets (order, visibility, and width controlled by admin via the p
 | `announcements` | Announcements | Visible, non-expired admin announcements; pinned first. Hidden if empty |
 | `resources` | Bring Something | "What does the community still need from me?" — surfaces the ONE list needing the most attention: **% Ready** + hairline progress bar, urgency-adaptive copy ("1 Camping stove still needed." → purple "Needs attention" chip when far short), a **personal line** ("You're bringing Camping Stove ×2 — thank you ✦" / "You haven't committed anything yet"), "+N more lists could use a hand". Everything-covered = celebration state, not hidden. The **whole card** links to `/participate#bring` (`getResourceWidgetState` in `lib/resources.ts`, suggestions excluded). Hidden only while no list has targeted items |
 | `shoutouts` | Shoutouts | Member-posted shoutouts (newest first). Approved members post via a "✦ Share a shoutout" button at the bottom that opens an inline composer; authors and admins can delete (✕). See **Shoutouts** under Supporting Features |
-| `polls` | Polls | Active, non-expired admin polls. Members vote inline; results visible to everyone (voted or not) |
+| `polls` | Polls | Active, non-expired admin polls. Members vote inline (approved members only; option indexes validated server-side); results visible to everyone (voted or not) |
 | `events` | Upcoming Gatherings | Pre-camp + at-camp `schedule_events` in the next 14 days. "View full schedule →" links to `/schedule` |
 | `spotlight` | Meet a Member | Left: rotating member spotlight (cycles every minute). Right: Upcoming Gatherings list |
 | `activity` | Recent Activity | Mixed feed of member joins + profile updates, up to 6 items |
