@@ -1,17 +1,23 @@
 import { auth } from '@clerk/nextjs/server'
-import { resolveMember } from '@/lib/members'
+import { resolveMemberForUser } from '@/lib/members'
 import { HeaderClient, type NavAuthState } from './HeaderClient'
 
 // Server side of the nav: resolves the signed-in member's state during the
 // page render so the client header shows the right nav on first paint — no
-// flash of the signed-out nav while /api/nav-auth round-trips. resolveMember
-// is request-cached, so pages that already looked the member up share the query.
+// flash of the signed-out nav while /api/nav-auth round-trips.
+// resolveMemberForUser (not the clerk-id-only resolveMember): the SAME
+// resolver the pages' own gates use, so the nav can never disagree with the
+// page about membership (a member resolved via the email fallback used to get
+// the public nav on a members-only page). The fallback — currentUser(), which
+// Clerk request-caches — only runs on a clerk-id miss; approved members with
+// linked rows stay on the indexed fast path, and resolveMember's own
+// request-cache still shares the lookup with the page.
 export async function Header() {
   let initialAuth: NavAuthState = { isSignedIn: false }
   try {
     const { userId } = await auth()
     if (userId) {
-      const member = await resolveMember(userId)
+      const member = await resolveMemberForUser(userId)
       initialAuth = {
         isSignedIn: true,
         isApproved: member?.status === 'approved',

@@ -27,7 +27,10 @@ export function TrackPicker({ hideMember = false, hideVolunteer = false, copy = 
           </p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: hideMember || hideVolunteer ? '1fr' : '1fr 1fr', gap: '1.25rem', maxWidth: hideMember || hideVolunteer ? '400px' : undefined, margin: hideMember || hideVolunteer ? '0 auto' : undefined }}>
+        <style dangerouslySetInnerHTML={{ __html: `
+          @media (max-width: 640px) { .track-picker-grid { grid-template-columns: 1fr !important; } }
+        ` }} />
+        <div className="track-picker-grid" style={{ display: 'grid', gridTemplateColumns: hideMember || hideVolunteer ? '1fr' : '1fr 1fr', gap: '1.25rem', maxWidth: hideMember || hideVolunteer ? '400px' : undefined, margin: hideMember || hideVolunteer ? '0 auto' : undefined }}>
           {/* Member */}
           {!hideMember && <a href="/apply?track=member" style={{ textDecoration: 'none' }}>
             <div style={{

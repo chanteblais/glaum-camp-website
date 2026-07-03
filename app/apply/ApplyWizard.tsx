@@ -95,25 +95,6 @@ const inputStyle: React.CSSProperties = {
   transition: 'border-color 0.2s',
 }
 
-// ── Field lookup helper ───────────────────────────────────────────────────────
-
-type FlHelper = {
-  visible: (fieldKey: string) => boolean
-  required: (fieldKey: string) => boolean
-  label:    (fieldKey: string) => string
-  desc:     (fieldKey: string) => string | undefined
-}
-
-function makeFlHelper(formConfig: MemberFormConfig, stepKey: string): FlHelper {
-  const step = formConfig.steps.find(s => s.key === stepKey)
-  return {
-    visible: (fieldKey: string) => step?.fields.find(f => f.key === fieldKey)?.visible ?? true,
-    required: (fieldKey: string) => step?.fields.find(f => f.key === fieldKey)?.required ?? false,
-    label:    (fieldKey: string) => step?.fields.find(f => f.key === fieldKey)?.label ?? fieldKey,
-    desc:     (fieldKey: string) => step?.fields.find(f => f.key === fieldKey)?.description,
-  }
-}
-
 // ── Small components ──────────────────────────────────────────────────────────
 
 function Label({ children, optional }: { children: React.ReactNode; optional?: boolean }) {
@@ -788,7 +769,9 @@ export function ApplyWizard({ userEmail, formConfig, agreementItems, attendanceO
       if (raw) {
         const saved = JSON.parse(raw)
         setFormState(prev => ({ ...prev, ...saved, email: userEmail }))
-        setStep(saved.__step ?? 0)
+        // Clamp the restored step — the admin may have removed/hidden sections
+        // since this draft was saved, and an out-of-range step crashes the render.
+        setStep(Math.min(Math.max(0, saved.__step ?? 0), lastStep))
       }
     } catch { /* ignore */ }
 
@@ -813,59 +796,37 @@ export function ApplyWizard({ userEmail, formConfig, agreementItems, attendanceO
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  // Every visible+required field on the current step must have an answer —
+  // built-in fields check their FormData slot (via the descriptor's formKey),
+  // custom fields check custom_answers. Special cases: agreement checklists
+  // need every clause checked; group selection reads group_choices (and can't
+  // block when the field offers no groups); the photo block checks avatar_url.
   function canContinue() {
-    const currentStepKey = steps[step]?.key
-    const flBasic = makeFlHelper(formConfig, 'basic')
-
-    if (currentStepKey === 'basic') {
-      // A field only blocks if it's both visible and required (admins can now
-      // hide Phone-adjacent fields like Emergency Contact / Photo).
-      const needPhone = flBasic.visible('phone') && flBasic.required('phone')
-      const needEmergency = flBasic.visible('emergency_contact') && flBasic.required('emergency_contact')
-      const needCamped = flBasic.visible('camped_before') && flBasic.required('camped_before')
-      const needAvatar = flBasic.visible('avatar_url') && flBasic.required('avatar_url')
-      return !!(
-        form.first_name.trim() &&
-        form.last_name.trim() &&
-        form.email.trim() &&
-        (!needPhone || form.phone.trim()) &&
-        (!needEmergency || form.emergency_contact.trim()) &&
-        (!needCamped || form.camped_before) &&
-        (!needAvatar || form.avatar_url)
-      )
-    }
-    // These built-in gates only apply when the field is still visible + required
-    // (admins can now hide or make any of them optional).
-    if (currentStepKey === 'registry') {
-      const fl = makeFlHelper(formConfig, 'registry')
-      return !(fl.visible('community_acceptance') && fl.required('community_acceptance')) || !!form.community_acceptance
-    }
-    if (currentStepKey === 'plans') {
-      const fl = makeFlHelper(formConfig, 'plans')
-      return !(fl.visible('attendance') && fl.required('attendance')) || !!form.attendance
-    }
-    if (currentStepKey === 'agreement') {
-      const fl = makeFlHelper(formConfig, 'agreement')
-      if (!(fl.visible('acknowledgements') && fl.required('acknowledgements'))) return true
-      const ackField = formConfig.steps.find(s => s.key === 'agreement')?.fields.find(f => f.key === 'acknowledgements')
-      const clauses = ackField?.options?.length ? ackField.options : resolvedAgreementItems
-      return form.acknowledgements.length === clauses.length
-    }
-    // Custom steps: check required fields have answers
     const currentStep = steps[step]
-    if (currentStep?.isCustom) {
-      return currentStep.fields
-        .filter(f => f.visible && f.required)
-        .every(f => {
-          // Group selection is stored in group_choices, not custom_answers.
-          if (f.type === 'group_select') return form.group_choices.length > 0
+    if (!currentStep) return true
+    return currentStep.fields
+      .filter(f => f.visible && f.required && !f.element && f.key !== 'setup_preference')
+      .every(f => {
+        if (f.type === 'group_select') {
+          const shown = f.options === undefined || f.options === null
+            ? selectableGroups
+            : selectableGroups.filter(g => f.options!.includes(g.id))
+          return shown.length === 0 || form.group_choices.length > 0
+        }
+        const d = FIELD_DESCRIPTORS[f.key]
+        if (!d) {
           const val = form.custom_answers[f.key]
-          // Agreement fields require every clause to be checked.
           if (f.type === 'agreement') return Array.isArray(val) && val.length === (f.options?.length ?? 0)
           return Array.isArray(val) ? val.length > 0 : !!(val as string)?.trim()
-        })
-    }
-    return true
+        }
+        if (d.widget === 'photo') return !!form.avatar_url
+        if (d.widget === 'agreement') {
+          const clauses = f.options?.length ? f.options : (optionSources[f.key] ?? [])
+          return form.acknowledgements.length === clauses.length
+        }
+        const val = form[(d.formKey ?? f.key) as keyof FormData]
+        return Array.isArray(val) ? val.length > 0 : !!(typeof val === 'string' ? val.trim() : val)
+      })
   }
 
   async function handleSubmit() {
@@ -1095,12 +1056,12 @@ export function ApplyWizard({ userEmail, formConfig, agreementItems, attendanceO
         ) : (
           <button
             onClick={handleSubmit}
-            disabled={submitting}
+            disabled={submitting || !canContinue()}
             style={{
               padding: '0.75rem 2.5rem', borderRadius: '9999px',
-              border: 'none', background: submitting ? 'rgba(200,168,72,0.2)' : 'linear-gradient(135deg, #C8A848, #A8882A)',
-              color: submitting ? 'rgba(200,168,72,0.5)' : '#1A0A00',
-              cursor: submitting ? 'not-allowed' : 'pointer', fontSize: '0.85rem',
+              border: 'none', background: (submitting || !canContinue()) ? 'rgba(200,168,72,0.2)' : 'linear-gradient(135deg, #C8A848, #A8882A)',
+              color: (submitting || !canContinue()) ? 'rgba(200,168,72,0.5)' : '#1A0A00',
+              cursor: (submitting || !canContinue()) ? 'not-allowed' : 'pointer', fontSize: '0.85rem',
               letterSpacing: '0.1em', fontWeight: 600,
             }}
           >

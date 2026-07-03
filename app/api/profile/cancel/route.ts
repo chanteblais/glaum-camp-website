@@ -61,6 +61,14 @@ export async function POST(req: NextRequest) {
   // Dual-write: mirror the cancellation onto the canonical member record.
   await setMemberStatus(userId, application.id as string, 'cancelled')
 
+  // Release their role + shift slots (same cleanup as the admin remove flow) —
+  // a cancelled member must not keep occupying shift capacity or rosters.
+  const memberClerkId = (application.clerk_user_id as string | null) ?? userId
+  await Promise.all([
+    supabaseAdmin.from('camp_signups').delete().eq('clerk_user_id', memberClerkId),
+    supabaseAdmin.from('member_shift_signups').delete().eq('clerk_user_id', memberClerkId),
+  ])
+
   const displayName =
     (application.preferred_name as string) ||
     (application.first_name as string) ||

@@ -223,6 +223,14 @@ export function ScheduleCalendarClient({ events, days }: { events: ScheduleEvent
   const TOTAL_HEIGHT = (END_HOUR - START_HOUR) * PX_PER_HOUR
   const HOUR_LABELS = buildHourLabels(START_HOUR, END_HOUR)
 
+  if (events.length === 0) {
+    return (
+      <p style={{ textAlign: 'center', fontSize: '0.9rem', opacity: 0.5, fontStyle: 'italic', margin: '2.5rem 0', lineHeight: 1.7 }}>
+        The schedule is still taking shape — events will appear here as they're confirmed.
+      </p>
+    )
+  }
+
   return (
     <div>
       {/* Time-based calendar grid */}

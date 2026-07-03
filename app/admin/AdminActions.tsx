@@ -13,6 +13,11 @@ export function AdminActions({ id, email, redirectAfter }: { id: string; email: 
     setLoading('approve')
     const res = await fetch(`/api/admin/${id}/approve`, { method: 'POST' })
     const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      await confirm({ title: 'Approval failed', body: data?.error ?? 'Something went wrong — the application is still pending.', notice: true })
+      setLoading(null)
+      return
+    }
     if (data?.emailWarning) await confirm({ title: 'Approved, with a hiccup', body: data.emailWarning, notice: true })
     if (redirectAfter) router.push(redirectAfter)
     else router.refresh()
@@ -21,7 +26,13 @@ export function AdminActions({ id, email, redirectAfter }: { id: string; email: 
 
   const handleReject = async () => {
     setLoading('reject')
-    await fetch(`/api/admin/${id}/reject`, { method: 'POST' })
+    const res = await fetch(`/api/admin/${id}/reject`, { method: 'POST' })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      await confirm({ title: 'Rejection failed', body: data?.error ?? 'Something went wrong — the application is still pending.', notice: true })
+      setLoading(null)
+      return
+    }
     if (redirectAfter) router.push(redirectAfter)
     else router.refresh()
     setLoading(null)

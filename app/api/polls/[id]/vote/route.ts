@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getApprovedMember } from '@/lib/members'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  // Polls live on the member dashboard — approved members only.
+  if (!(await getApprovedMember(userId))) {
+    return NextResponse.json({ error: 'Only approved members can vote' }, { status: 403 })
+  }
 
   const body = await req.json()
   const optionIndexes: number[] = Array.isArray(body.option_indexes) ? body.option_indexes : [body.option_index]
@@ -24,6 +30,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!poll.allow_multiple && optionIndexes.length > 1) {
     return NextResponse.json({ error: 'Multiple choices not allowed' }, { status: 400 })
   }
+  // Every index must name a real option — an out-of-range index would inflate
+  // the counts array returned to every client (counts[999] = 1000 entries).
+  const optionCount = (poll.options as unknown[]).length
+  if (optionIndexes.length === 0 ||
+      !optionIndexes.every(i => Number.isInteger(i) && i >= 0 && i < optionCount)) {
+    return NextResponse.json({ error: 'Invalid option selection' }, { status: 400 })
+  }
 
   // Remove existing votes for this user+poll, then insert new ones
   await supabaseAdmin.from('poll_votes').delete().eq('poll_id', params.id).eq('clerk_user_id', userId)
@@ -38,8 +51,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     .select('option_index')
     .eq('poll_id', params.id)
 
-  const counts = Array((poll.options as unknown[]).length).fill(0)
-  for (const v of votes ?? []) counts[v.option_index] = (counts[v.option_index] || 0) + 1
+  const counts = Array(optionCount).fill(0)
+  for (const v of votes ?? []) {
+    if (Number.isInteger(v.option_index) && v.option_index >= 0 && v.option_index < optionCount) {
+      counts[v.option_index] += 1
+    }
+  }
 
   return NextResponse.json({ counts, userVotes: optionIndexes })
 }

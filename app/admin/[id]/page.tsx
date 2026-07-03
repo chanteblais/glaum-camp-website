@@ -223,6 +223,9 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
 
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1 }}>
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media (max-width: 560px) { .app-detail-grid { grid-template-columns: 1fr !important; } }
+      ` }} />
       <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '0 1.5rem 6rem' }}>
 
         <AdminNav runway={runway} />
@@ -480,7 +483,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Grid({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '0.5rem' }}>
+    <div className="app-detail-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '0.5rem' }}>
       {children}
     </div>
   )
