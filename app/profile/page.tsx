@@ -109,12 +109,12 @@ export default async function ProfilePage() {
           supabaseAdmin
             .from('camp_signups')
             .select('role_id, schedule_event_id, role_approval_status, roles(name, description, purpose, department_id, departments(name, icon)), schedule_events(id, title, day, time, icon_type, event_date)')
-            .eq('clerk_user_id', userId)
+            .eq('clerk_user_id', memberClerkId)
             .maybeSingle(),
           supabaseAdmin
             .from('member_shift_signups')
             .select('schedule_events(id, title, day, time, icon_type, event_date)')
-            .eq('clerk_user_id', userId),
+            .eq('clerk_user_id', memberClerkId),
         ])
       : ([{ data: null }, { data: null }] as const),
     // Groups the member belongs to (replaces the old setup_preference "contributions").
