@@ -615,7 +615,7 @@ function RolePicker({
               <span key={dept.id} className="role-seal">
                 <span className="role-seal-ring">
                   {dept.icon && isImageIcon(dept.icon)
-                    ? <img src={dept.icon} alt="" aria-hidden style={{ width: '72%', height: '72%', objectFit: 'contain', opacity: 0.92 }} />
+                    ? <IconImage src={dept.icon} size="92%" fill={0.8} opacity={0.92} />
                     : <span className="role-seal-emoji">{dept.icon ?? '✦'}</span>}
                 </span>
                 <span style={{ fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.6, lineHeight: 1.3 }}>
