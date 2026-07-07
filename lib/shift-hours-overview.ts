@@ -1,19 +1,18 @@
 import { supabaseAdmin } from './supabase'
 import { shiftDurationHours } from './shift-hours'
 import { parseAttunementTasks } from './site-config'
+import { eventRangeDays, shiftOccurrenceCount, shiftOccurrenceDates } from './shift-occurrences'
 
 // Community-wide shift-hours rollup for the admin Overview, built from shift
 // events' real durations × member_shift_signups ∪ the legacy camp_signups
 // single column (deduped).
 //
-// A recurring shift EVENT counts once per occurrence — its listed
-// recurrence_days, or every day of the configured event range (same rules as
-// the schedule calendar), so "8 shifts" here matches what the calendar shows.
-// But shift ATTENDANCE is per-night: one signup = one occurrence's hours (a
-// nightly miso shift doesn't obligate every night) — same count-once credit
-// as member attunement (lib/shift-attunement.ts). The signup row carries no
-// date, so which occurrence a member works is unrecorded; empty-shift counts
-// for a recurring series are therefore occurrences − signups.
+// A recurring shift EVENT is treated as one regular shift PER occurrence — its
+// listed recurrence_days, or every day of the configured event range (same
+// rules as the schedule calendar, lib/shift-occurrences.ts), so "8 shifts" here
+// matches what the calendar shows. Each signup carries occurrence_date, so
+// coverage is EXACT: an occurrence is covered iff someone holds that night, and
+// empty shifts = occurrences with nobody on them (no estimation).
 //
 // The section is framed as the organizer's supply-vs-demand ledger:
 //   PROMISED (supply) — what members collectively owe by requirement: the
@@ -55,22 +54,6 @@ export type ShiftHoursOverview = {
   types: ShiftTypeHours[]
 }
 
-// Days in the configured event range, with buildScheduleDays' guards (valid,
-// start ≤ end, ≤ 60 days). Fallback 1 so an "every day" recurring shift never
-// vanishes when no range is configured.
-function rangeDayCount(rangeStart?: string | null, rangeEnd?: string | null): number {
-  const parse = (iso?: string | null) => {
-    if (!iso) return null
-    const d = new Date(`${iso}T12:00:00`)
-    return isNaN(d.getTime()) ? null : d
-  }
-  const start = parse(rangeStart)
-  const end = parse(rangeEnd)
-  if (!start || !end) return 1
-  const days = Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)) + 1
-  return days >= 1 && days <= 61 ? days : 1
-}
-
 export async function getShiftHoursOverview(): Promise<ShiftHoursOverview> {
   const [
     { data: shiftTypes },
@@ -87,9 +70,9 @@ export async function getShiftHoursOverview(): Promise<ShiftHoursOverview> {
     supabaseAdmin.from('shift_types').select('id, name, sort_order').order('sort_order'),
     supabaseAdmin
       .from('schedule_events')
-      .select('id, shift_type_id, start_time, end_time, capacity, is_recurring, recurrence_days')
+      .select('id, shift_type_id, start_time, end_time, capacity, event_date, is_recurring, recurrence_days')
       .eq('participation_type', 'shift'),
-    supabaseAdmin.from('member_shift_signups').select('clerk_user_id, schedule_event_id'),
+    supabaseAdmin.from('member_shift_signups').select('clerk_user_id, schedule_event_id, occurrence_date'),
     supabaseAdmin
       .from('camp_signups')
       .select('clerk_user_id, schedule_event_id')
@@ -109,31 +92,28 @@ export async function getShiftHoursOverview(): Promise<ShiftHoursOverview> {
   ])
 
   const config = Object.fromEntries((configRows ?? []).map(r => [r.key, r.value as string]))
-  const everyDayCount = rangeDayCount(config['config_event_start_date'], config['config_event_end_date'])
-  const occurrencesOf = (ev: { is_recurring?: boolean | null; recurrence_days?: string[] | null }) => {
-    if (!ev.is_recurring) return 1
-    if (Array.isArray(ev.recurrence_days) && ev.recurrence_days.length > 0) return ev.recurrence_days.length
-    return everyDayCount
-  }
+  const rangeDays = eventRangeDays(config['config_event_start_date'], config['config_event_end_date'])
 
   const eventById = new Map((events ?? []).map(e => [e.id as string, e]))
 
-  // Union the two signup sources, deduped per member+event (045 backfilled the
-  // legacy column into the many-to-many table, so overlap is expected).
-  const pairs = new Set<string>()
-  for (const s of [...(signups ?? []), ...(legacy ?? [])]) {
-    if (s.schedule_event_id && eventById.has(s.schedule_event_id)) {
-      pairs.add(`${s.clerk_user_id} ${s.schedule_event_id}`)
-    }
+  // Occurrence identity: an occurrence is one (event, night). A signup names its
+  // night via occurrence_date (NULL = the single occurrence of a non-recurring
+  // shift); occKey collapses that to a stable string. Union the two signup
+  // sources deduped per (member, occurrence) — 045 backfilled the legacy column
+  // into the many-to-many table, so overlap is expected.
+  const occKey = (eventId: string, date: string | null) => `${eventId}::${date ?? ''}`
+  const holdersByOcc = new Map<string, Set<string>>()
+  for (const s of [...(signups ?? []).map(r => ({ ...r, occurrence_date: r.occurrence_date as string | null })),
+                   ...(legacy ?? []).map(r => ({ ...r, occurrence_date: null as string | null }))]) {
+    if (!s.schedule_event_id || !eventById.has(s.schedule_event_id)) continue
+    const key = occKey(s.schedule_event_id, s.occurrence_date)
+    const set = holdersByOcc.get(key) ?? new Set<string>()
+    set.add(s.clerk_user_id)
+    holdersByOcc.set(key, set)
   }
 
   const members = new Set<string>()
-  const signupsByEvent = new Map<string, number>()
-  for (const pair of Array.from(pairs)) {
-    const [userId, eventId] = pair.split(' ')
-    members.add(userId)
-    signupsByEvent.set(eventId, (signupsByEvent.get(eventId) ?? 0) + 1)
-  }
+  for (const set of Array.from(holdersByOcc.values())) for (const u of Array.from(set)) members.add(u)
 
   type Bucket = Omit<ShiftTypeHours, 'id' | 'name' | 'paletteIndex'>
   const buckets = new Map<string | null, Bucket>()
@@ -146,18 +126,31 @@ export async function getShiftHoursOverview(): Promise<ShiftHoursOverview> {
     return b
   }
 
+  // Each occurrence is a regular shift: iterate the concrete nights and count
+  // its holders exactly (coverage, empties, filled hours — no estimation).
   for (const ev of events ?? []) {
     const b = bucketFor(ev.shift_type_id ?? null)
     const h = shiftDurationHours(ev.start_time, ev.end_time)
-    const n = signupsByEvent.get(ev.id as string) ?? 0
-    const occ = occurrencesOf(ev)
-    b.slotCount += occ
-    b.signupCount += n
-    b.filledHours += h * n // one signup = one occurrence's hours
-    b.emptySlots += Math.max(0, occ - n)
-    if (ev.capacity != null && ev.capacity > 0) {
-      b.cappedSlots += occ
-      b.toFillHours += h * occ * ev.capacity // capacity is per occurrence
+    const dates = shiftOccurrenceDates(ev, rangeDays)
+    // "Every day" recurring with no configured range → count as 1 abstract slot.
+    const occDates: (string | null)[] = ev.is_recurring
+      ? (dates.length > 0 ? dates : [])
+      : [ev.event_date ? ev.event_date : null]
+    const occCount = ev.is_recurring ? shiftOccurrenceCount(ev, rangeDays) : 1
+    // Iterate real nights when we have them; otherwise fall back to occCount
+    // abstract slots (an unconfigured "every day" shift) with no holders.
+    const iterable: (string | null)[] = occDates.length > 0 ? occDates : new Array(occCount).fill(null)
+    for (const date of iterable) {
+      // Non-recurring signups key on NULL; recurring on the night.
+      const holders = holdersByOcc.get(occKey(ev.id as string, ev.is_recurring ? date : null))?.size ?? 0
+      b.slotCount += 1
+      b.signupCount += holders
+      b.filledHours += h * holders
+      if (holders === 0) b.emptySlots += 1
+      if (ev.capacity != null && ev.capacity > 0) {
+        b.cappedSlots += 1
+        b.toFillHours += h * ev.capacity // capacity is per occurrence
+      }
     }
   }
 

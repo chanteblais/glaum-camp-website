@@ -4,6 +4,12 @@
 
 > ⚠️ **Reading order:** the sections below are chronological design history. The first model ("event-type registry" with binding+hours on the type, migration 045) was **corrected the same day** — see "Model corrected" mid-doc. The final model: fixed `participation_type` on events, a requirement-free `shift_types` registry, requirements authored on groups/roles/attunement tasks.
 
+## Per-night occurrences (2026-07-03, migration `064`)
+
+Recurrence (`is_recurring` + `recurrence_days`) is **purely an admin authoring convenience** — "so the organizer doesn't create the same shift six times." **Each night of a recurring shift is treated in all ways as a regular shift:** its own signup, capacity, roster, hours, and lead. A signup names its night via `member_shift_signups.occurrence_date` (NULL = the single occurrence of a non-recurring shift). There is no "series signup" concept — a member who works two Salon nights holds two rows and earns two nights' hours.
+
+`lib/shift-occurrences.ts` is the single source of an event's concrete nights (`recurrence_days`, or every day of the configured event range for an "every day" shift), reused by the member picker (`lib/participate-data.ts`), the write path (`/api/shift-signups` validation, per-night capacity), attunement hours (`lib/shift-attunement.ts`), the admin roster (`lib/admin-program-data.ts` + `ScheduleManager` per-night breakout), the Overview ledger (`lib/shift-hours-overview.ts`, exact coverage), the personal schedule, and the attention digest. This closed the pre-064 gap where a recurring shift was one dateless signable unit (capacity per-series, roster/coverage blind to which night).
+
 Supersedes the old "a shift is a `schedule_events` row with a capacity" model.
 
 **One-liner:** Separate the *program* (what's happening) from *shifts* (where you're needed) and *mandatory events* (everyone attends), model shift kinds as configurable **categories** instead of hardcoded Setup/Teardown/Decor/Volunteer, and let attunement **reflect** shift requirements rather than re-declare them.

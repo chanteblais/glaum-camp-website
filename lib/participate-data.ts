@@ -3,6 +3,7 @@ import { shiftDurationHours } from './shift-hours'
 import { getMemberShiftState } from './shift-attunement'
 import { parseAttunementTasks } from './site-config'
 import { memberDisplayNames } from './member-names'
+import { eventRangeDays, shiftOccurrenceDates } from './shift-occurrences'
 
 // Data assembly for the Participate page, shared by the API routes and the
 // server-rendered page (mirrors lib/inbox.ts for messages). The page calls
@@ -68,31 +69,44 @@ export async function getRoleSignupData(userId: string): Promise<RoleSignupData>
 
 // ── Shifts (/api/shift-signups GET) ───────────────────────────────────────────
 
-// Unique (member, event) holds across the new table + the legacy single column.
-// Leads (migration 048) only exist on the new table; legacy holds are members.
+// A hold is keyed per (member, event, occurrence) — each night of a recurring
+// shift is its own regular shift. occKey collapses the occurrence to a string
+// (empty = a non-recurring shift's single occurrence / a legacy single hold).
+export const holdOccKey = (userId: string, eventId: string, occDate: string | null) =>
+  `${userId}|${eventId}|${occDate ?? ''}`
+
+// Unique (member, event, occurrence) holds across the new table + the legacy
+// single column. Leads (migration 048) only exist on the new table; legacy
+// holds are members (and always the null occurrence).
 export async function fetchAllHolds() {
   const [{ data: many }, { data: legacy }] = await Promise.all([
-    supabaseAdmin.from('member_shift_signups').select('clerk_user_id, schedule_event_id, role'),
+    supabaseAdmin.from('member_shift_signups').select('clerk_user_id, schedule_event_id, occurrence_date, role'),
     supabaseAdmin.from('camp_signups').select('clerk_user_id, schedule_event_id').not('schedule_event_id', 'is', null),
   ])
   const pairs = new Set<string>()
-  const leadsByEvent = new Map<string, string[]>()
+  // leads keyed by (event, occurrence) so a lead is scoped to the night held.
+  const leadsByOcc = new Map<string, string[]>()
   for (const r of many ?? []) {
     if (!r.schedule_event_id) continue
-    pairs.add(`${r.clerk_user_id}|${r.schedule_event_id}`)
+    const date = (r.occurrence_date as string | null) ?? null
+    pairs.add(holdOccKey(r.clerk_user_id, r.schedule_event_id, date))
     if (r.role === 'lead') {
-      leadsByEvent.set(r.schedule_event_id, [...(leadsByEvent.get(r.schedule_event_id) ?? []), r.clerk_user_id])
+      const k = `${r.schedule_event_id}|${date ?? ''}`
+      leadsByOcc.set(k, [...(leadsByOcc.get(k) ?? []), r.clerk_user_id])
     }
   }
   for (const r of legacy ?? []) {
-    if (r.schedule_event_id) pairs.add(`${r.clerk_user_id}|${r.schedule_event_id}`)
+    if (r.schedule_event_id) pairs.add(holdOccKey(r.clerk_user_id, r.schedule_event_id, null))
   }
-  return { pairs, leadsByEvent }
+  return { pairs, leadsByOcc }
 }
 
-export const countHoldsFor = (pairs: Set<string>, eventId: string) => {
+// Holds on one specific occurrence (event + night). occDate null = the single
+// occurrence of a non-recurring shift.
+export const countHoldsFor = (pairs: Set<string>, eventId: string, occDate: string | null) => {
+  const suffix = `|${eventId}|${occDate ?? ''}`
   let n = 0
-  pairs.forEach(p => { if (p.endsWith(`|${eventId}`)) n++ })
+  pairs.forEach(p => { if (p.endsWith(suffix)) n++ })
   return n
 }
 
@@ -107,14 +121,14 @@ export async function getShiftSignupData(userId: string): Promise<ShiftSignupDat
   const [eventsRes, holds, shiftState, flagRes, typesRes] = await Promise.all([
     supabaseAdmin
       .from('schedule_events')
-      .select('id, title, subtitle, day, time, event_date, start_time, end_time, capacity, shift_type_id, needs_lead, shift_types(name, icon)')
+      .select('id, title, subtitle, day, time, event_date, start_time, end_time, capacity, shift_type_id, needs_lead, is_recurring, recurrence_days, shift_types(name, icon)')
       .eq('participation_type', 'shift')
       .eq('visible', true)
       .order('event_date', { ascending: true, nullsFirst: false })
       .order('start_time', { ascending: true, nullsFirst: false }),
     fetchAllHolds(),
     getMemberShiftState(userId),
-    supabaseAdmin.from('page_content').select('key, value').in('key', ['config_shift_signup_open', 'config_attunement_tasks']),
+    supabaseAdmin.from('page_content').select('key, value').in('key', ['config_shift_signup_open', 'config_attunement_tasks', 'config_event_start_date', 'config_event_end_date']),
     supabaseAdmin.from('shift_types').select('id, name, icon').order('sort_order'),
   ])
 
@@ -123,31 +137,48 @@ export async function getShiftSignupData(userId: string): Promise<ShiftSignupDat
 
   const config = Object.fromEntries((flagRes.data ?? []).map(r => [r.key, r.value]))
   const shiftSignupOpen = config['config_shift_signup_open'] !== 'false'
+  const rangeDays = eventRangeDays(config['config_event_start_date'], config['config_event_end_date'])
 
-  const leadNames = await memberDisplayNames(Array.from(holds.leadsByEvent.values()).flat())
+  const leadNames = await memberDisplayNames(Array.from(holds.leadsByOcc.values()).flat())
 
-  const shifts = (eventsRes.data ?? []).map(e => {
+  // Each occurrence is a regular shift: a non-recurring event yields one slot
+  // (occurrence_date null); a recurring event yields one slot per night, each
+  // with its own holds/capacity/lead. A slot's composite id is eventId::date.
+  const shifts = (eventsRes.data ?? []).flatMap(e => {
     const st = e.shift_types as unknown as { name?: string; icon?: string | null } | null
-    const leadIds = holds.leadsByEvent.get(e.id) ?? []
-    const held = holds.pairs.has(`${userId}|${e.id}`)
-    return {
-      id: e.id,
-      title: e.title,
-      subtitle: e.subtitle,
-      day: e.day,
-      time: e.time,
-      event_date: e.event_date,
-      duration_hours: shiftDurationHours(e.start_time, e.end_time),
-      capacity: e.capacity,
-      signed_up: countHoldsFor(holds.pairs, e.id),
-      shift_type_id: e.shift_type_id,
-      shift_type_name: st?.name ?? 'Shift',
-      shift_type_icon: st?.icon ?? null,
-      held,
-      held_role: held ? (leadIds.includes(userId) ? 'lead' : 'member') : null,
-      lead_names: leadIds.map(id => leadNames[id]).filter(Boolean),
-      needs_lead: e.needs_lead ?? false,
-    }
+    const duration = shiftDurationHours(e.start_time, e.end_time)
+    // Recurring → one slot per night (occurrence_date = the night). Non-recurring
+    // → one slot with occurrence_date NULL (that's how its hold is keyed + what
+    // the API validates); its calendar column comes from event_date below.
+    const dates: (string | null)[] = e.is_recurring
+      ? shiftOccurrenceDates(e, rangeDays)
+      : [null]
+    return dates.map(occDate => {
+      const leadKey = `${e.id}|${occDate ?? ''}`
+      const leadIds = holds.leadsByOcc.get(leadKey) ?? []
+      const held = holds.pairs.has(holdOccKey(userId, e.id, occDate))
+      return {
+        id: occDate ? `${e.id}::${occDate}` : e.id,
+        schedule_event_id: e.id,
+        occurrence_date: occDate,
+        title: e.title,
+        subtitle: e.subtitle,
+        day: e.day,
+        time: e.time,
+        // The night this slot represents drives its calendar column.
+        event_date: e.is_recurring ? occDate : (e.event_date ?? null),
+        duration_hours: duration,
+        capacity: e.capacity,
+        signed_up: countHoldsFor(holds.pairs, e.id, occDate),
+        shift_type_id: e.shift_type_id,
+        shift_type_name: st?.name ?? 'Shift',
+        shift_type_icon: st?.icon ?? null,
+        held,
+        held_role: held ? (leadIds.includes(userId) ? 'lead' : 'member') : null,
+        lead_names: leadIds.map(id => leadNames[id]).filter(Boolean),
+        needs_lead: e.needs_lead ?? false,
+      }
+    })
   })
 
   // Owed requirements = derived (groups/roles) merged with universal typed shift
