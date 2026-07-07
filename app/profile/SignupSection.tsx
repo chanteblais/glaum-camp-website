@@ -44,6 +44,7 @@ type ShiftSlot = {
   subtitle: string | null
   day: string
   time: string
+  start_time: string | null
   event_date: string | null
   duration_hours: number
   capacity: number | null
@@ -54,6 +55,9 @@ type ShiftSlot = {
   held: boolean
   held_role: 'member' | 'lead' | null
   lead_names: string[]
+  // Everyone signed up for this night — leads first, then alphabetical; `isSelf`
+  // flags the current member. Drives the roster on the card + confirm modal.
+  roster: { name: string; isLead: boolean; isSelf: boolean }[]
   // Whether the organizer opted this shift into having a lead role (049) —
   // gates every lead affordance for it.
   needs_lead: boolean
@@ -761,6 +765,61 @@ function OwedChips({ owed, shiftTypes }: { owed: OwedReq[]; shiftTypes: ShiftTyp
   )
 }
 
+// First initial for a roster disc ("Ada Lovelace" → "A"). Falls back to ✦ so a
+// nameless-but-present holder still shows as a body on the shift.
+function initialOf(name: string): string {
+  return name.trim().charAt(0).toUpperCase() || '✦'
+}
+
+// "Ada Lovelace (lead), Ben Rich, Cleo Mint (you)" — the hover tooltip that
+// spells out the disc cluster (leads and self annotated).
+function rosterTitle(roster: ShiftSlot['roster']): string {
+  return roster
+    .map(r => `${r.name}${r.isLead ? ' (lead)' : ''}${r.isSelf ? ' (you)' : ''}`)
+    .join(', ')
+}
+
+// A compact strip of initial discs — the at-a-glance "who's on this" read on a
+// shift card. Leads wear a gold ring; the whole strip carries the full names as
+// a hover title. Overflow past `max` collapses into a "+N" disc.
+function RosterCluster({ roster, hue, max = 4 }: {
+  roster: ShiftSlot['roster']
+  hue: { rgb: string; accent: string }
+  max?: number
+}) {
+  if (roster.length === 0) return null
+  const shown = roster.slice(0, max)
+  const extra = roster.length - shown.length
+  const disc = (bg: string, ring: string, color: string): React.CSSProperties => ({
+    width: '16px', height: '16px', borderRadius: '50%', flexShrink: 0,
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: '0.55rem', lineHeight: 1, fontWeight: 600,
+    background: bg, border: `1px solid ${ring}`, color,
+  })
+  return (
+    <div
+      title={rosterTitle(roster)}
+      aria-label={`Signed up: ${rosterTitle(roster)}`}
+      style={{ display: 'flex', alignItems: 'center', gap: '2px', marginTop: '0.3rem', flexWrap: 'wrap' }}
+    >
+      {shown.map((r, i) => r.isLead
+        ? (
+          // Lead: gold disc + a ✦ crown badge at the corner so the lead reads at
+          // a glance, not just by the ring colour.
+          <span key={i} style={{ position: 'relative', display: 'inline-flex', flexShrink: 0 }}>
+            <span style={disc('rgba(200,168,72,0.22)', 'rgba(200,168,72,0.85)', '#F3EDE6')}>{initialOf(r.name)}</span>
+            <span aria-hidden style={{ position: 'absolute', top: '-5px', right: '-4px', fontSize: '0.5rem', lineHeight: 1, color: '#C8A848', textShadow: '0 0 2px #1A0A24, 0 0 2px #1A0A24' }}>✦</span>
+          </span>
+        )
+        : <span key={i} style={disc(`rgba(${hue.rgb},0.2)`, `rgba(${hue.rgb},0.5)`, '#F3EDE6')}>{initialOf(r.name)}</span>,
+      )}
+      {extra > 0 && (
+        <span style={disc('rgba(255,255,255,0.06)', 'rgba(255,255,255,0.15)', 'rgba(243,237,230,0.75)')}>+{extra}</span>
+      )}
+    </div>
+  )
+}
+
 function ShiftCard({
   slot, hue, busy, onSignUp, onCancel,
 }: {
@@ -829,6 +888,7 @@ function ShiftCard({
           ✦ needs a lead
         </p>
       ) : null}
+      <RosterCluster roster={slot.roster} hue={hue} />
     </button>
   )
 }
@@ -897,10 +957,26 @@ function ShiftConfirmModal({
             </span>
           </label>
         )}
-        {!isCancel && slot.needs_lead && slot.lead_names.length > 0 && (
-          <p style={{ fontSize: '0.72rem', color: '#C8A848', opacity: 0.6, margin: '0.6rem 0 0' }}>
-            ✦ Led by {slot.lead_names.join(' & ')}
-          </p>
+        {/* Who's on this night — leads first (✦), the current member marked
+            "you". Subsumes the old lead-only line; scrolls if the shift is deep. */}
+        {slot.roster.length > 0 && (
+          <div style={{ marginTop: '1rem', paddingTop: '0.9rem', borderTop: `1px solid rgba(${hue.rgb},0.15)` }}>
+            <p style={{ fontSize: '0.62rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: hue.accent, opacity: 0.7, margin: '0 0 0.5rem' }}>
+              Signed up ({slot.roster.length})
+            </p>
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '0.3rem', maxHeight: '148px', overflowY: 'auto' }}>
+              {slot.roster.map((r, i) => (
+                <li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.8rem', color: '#F3EDE6', opacity: r.isLead ? 0.95 : 0.8 }}>
+                  <span aria-hidden style={{ color: r.isLead ? '#C8A848' : hue.accent, opacity: r.isLead ? 0.95 : 0.5, fontSize: '0.7rem', width: '0.8rem', flexShrink: 0 }}>
+                    {r.isLead ? '✦' : '·'}
+                  </span>
+                  <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
+                  {r.isLead && <span style={{ fontSize: '0.6rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.7 }}>lead</span>}
+                  {r.isSelf && <span style={{ fontSize: '0.6rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: hue.accent, opacity: 0.7 }}>you</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.4rem' }}>
           <button

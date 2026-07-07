@@ -86,19 +86,32 @@ export async function fetchAllHolds() {
   const pairs = new Set<string>()
   // leads keyed by (event, occurrence) so a lead is scoped to the night held.
   const leadsByOcc = new Map<string, string[]>()
+  // Every holder (member id) on each (event, occurrence), deduped — backs the
+  // roster shown on the shift cards + confirm modal. Same key as leadsByOcc.
+  const holdersByOcc = new Map<string, Set<string>>()
+  const addHolder = (eventId: string, date: string | null, uid: string) => {
+    const k = `${eventId}|${date ?? ''}`
+    const set = holdersByOcc.get(k) ?? new Set<string>()
+    set.add(uid)
+    holdersByOcc.set(k, set)
+  }
   for (const r of many ?? []) {
     if (!r.schedule_event_id) continue
     const date = (r.occurrence_date as string | null) ?? null
     pairs.add(holdOccKey(r.clerk_user_id, r.schedule_event_id, date))
+    addHolder(r.schedule_event_id, date, r.clerk_user_id)
     if (r.role === 'lead') {
       const k = `${r.schedule_event_id}|${date ?? ''}`
       leadsByOcc.set(k, [...(leadsByOcc.get(k) ?? []), r.clerk_user_id])
     }
   }
   for (const r of legacy ?? []) {
-    if (r.schedule_event_id) pairs.add(holdOccKey(r.clerk_user_id, r.schedule_event_id, null))
+    if (r.schedule_event_id) {
+      pairs.add(holdOccKey(r.clerk_user_id, r.schedule_event_id, null))
+      addHolder(r.schedule_event_id, null, r.clerk_user_id)
+    }
   }
-  return { pairs, leadsByOcc }
+  return { pairs, leadsByOcc, holdersByOcc }
 }
 
 // Holds on one specific occurrence (event + night). occDate null = the single
@@ -139,7 +152,11 @@ export async function getShiftSignupData(userId: string): Promise<ShiftSignupDat
   const shiftSignupOpen = config['config_shift_signup_open'] !== 'false'
   const rangeDays = eventRangeDays(config['config_event_start_date'], config['config_event_end_date'])
 
-  const leadNames = await memberDisplayNames(Array.from(holds.leadsByOcc.values()).flat())
+  // Resolve names for every holder once (leads are a subset) — both the "Led
+  // by …" line and the full signed-up roster read from this one map.
+  const holderNames = await memberDisplayNames(
+    Array.from(holds.holdersByOcc.values()).flatMap(s => Array.from(s)),
+  )
 
   // Each occurrence is a regular shift: a non-recurring event yields one slot
   // (occurrence_date null); a recurring event yields one slot per night, each
@@ -157,6 +174,13 @@ export async function getShiftSignupData(userId: string): Promise<ShiftSignupDat
       const leadKey = `${e.id}|${occDate ?? ''}`
       const leadIds = holds.leadsByOcc.get(leadKey) ?? []
       const held = holds.pairs.has(holdOccKey(userId, e.id, occDate))
+      // Named holders on this night — leads first, then alphabetical; the
+      // caller (self) is flagged so the UI can mark "you". Unnamed holders
+      // (no member row) fall out; the signed_up count stays authoritative.
+      const roster = Array.from(holds.holdersByOcc.get(leadKey) ?? [])
+        .map(id => ({ name: holderNames[id], isLead: leadIds.includes(id), isSelf: id === userId }))
+        .filter(r => r.name)
+        .sort((a, b) => (a.isLead === b.isLead ? a.name.localeCompare(b.name) : a.isLead ? -1 : 1))
       return {
         id: occDate ? `${e.id}::${occDate}` : e.id,
         schedule_event_id: e.id,
@@ -165,6 +189,9 @@ export async function getShiftSignupData(userId: string): Promise<ShiftSignupDat
         subtitle: e.subtitle,
         day: e.day,
         time: e.time,
+        // 24h start ("HH:MM") kept for chronological sort within a day column —
+        // the display `time` is 12-hour and awkward to order by.
+        start_time: e.start_time ?? null,
         // The night this slot represents drives its calendar column.
         event_date: e.is_recurring ? occDate : (e.event_date ?? null),
         duration_hours: duration,
@@ -175,10 +202,22 @@ export async function getShiftSignupData(userId: string): Promise<ShiftSignupDat
         shift_type_icon: st?.icon ?? null,
         held,
         held_role: held ? (leadIds.includes(userId) ? 'lead' : 'member') : null,
-        lead_names: leadIds.map(id => leadNames[id]).filter(Boolean),
+        lead_names: leadIds.map(id => holderNames[id]).filter(Boolean),
+        roster,
         needs_lead: e.needs_lead ?? false,
       }
     })
+  })
+
+  // Chronological within each day column: expanding recurring events into
+  // per-night occurrences interleaves them by source event, which floated a
+  // late-night shift above an earlier-afternoon one in the same column. Sort by
+  // date then 24h start (both zero-padded, so lexical compare is chronological);
+  // undated/untimed slots sink last.
+  shifts.sort((a, b) => {
+    const d = (a.event_date ?? '9999-99-99').localeCompare(b.event_date ?? '9999-99-99')
+    if (d !== 0) return d
+    return (a.start_time ?? '99:99').localeCompare(b.start_time ?? '99:99')
   })
 
   // Owed requirements = derived (groups/roles) merged with universal typed shift
