@@ -147,9 +147,12 @@ export async function getShiftSignupData(userId: string): Promise<ShiftSignupDat
   const shifts = (eventsRes.data ?? []).flatMap(e => {
     const st = e.shift_types as unknown as { name?: string; icon?: string | null } | null
     const duration = shiftDurationHours(e.start_time, e.end_time)
+    // Recurring → one slot per night (occurrence_date = the night). Non-recurring
+    // → one slot with occurrence_date NULL (that's how its hold is keyed + what
+    // the API validates); its calendar column comes from event_date below.
     const dates: (string | null)[] = e.is_recurring
       ? shiftOccurrenceDates(e, rangeDays)
-      : [e.event_date ?? null]
+      : [null]
     return dates.map(occDate => {
       const leadKey = `${e.id}|${occDate ?? ''}`
       const leadIds = holds.leadsByOcc.get(leadKey) ?? []

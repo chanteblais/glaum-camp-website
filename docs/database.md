@@ -277,18 +277,18 @@ The configurable registry of shift **kinds** (Setup, Teardown, Decor, Service, �
 
 Many-to-many shift holds — a member can sign up for **any number** of shift occurrences (replaces the single `camp_signups.schedule_event_id`). Written by the member `/api/shift-signups` API (POST/DELETE) and the admin `remove_shift`/`clear_shift`/`set_shift_role` actions. A member's held hours per shift type (summed `shiftDurationHours` of their held occurrences, `lib/shift-attunement.ts`) are what satisfy hour requirements.
 
-**Per-night model (migration `063`):** recurrence is only an admin authoring convenience — each night of a recurring shift is a regular shift in its own right, signed independently, with its own capacity, roster, hours and lead. A signup names its night via `occurrence_date`. The concrete nights of an event come from `lib/shift-occurrences.ts` (`recurrence_days`, or every day of the configured event range for an "every day" shift).
+**Per-night model (migration `064`):** recurrence is only an admin authoring convenience — each night of a recurring shift is a regular shift in its own right, signed independently, with its own capacity, roster, hours and lead. A signup names its night via `occurrence_date`. The concrete nights of an event come from `lib/shift-occurrences.ts` (`recurrence_days`, or every day of the configured event range for an "every day" shift).
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | UUID PK | |
 | `clerk_user_id` | TEXT NOT NULL | Join key (matches `group_members` / `camp_signups`) |
 | `schedule_event_id` | UUID FK → `schedule_events.id` ON DELETE CASCADE | |
-| `occurrence_date` | DATE | **The night held.** `NULL` = the single occurrence of a non-recurring shift; a date = one night of a recurring event (validated against its occurrences by the API). Migration `063` |
+| `occurrence_date` | DATE | **The night held.** `NULL` = the single occurrence of a non-recurring shift; a date = one night of a recurring event (validated against its occurrences by the API). Migration `064` |
 | `role` | TEXT NOT NULL | `'member'` (default) / `'lead'` — offered to lead this shift. Lives on the signup row (dies with it; co-leads allowed; display-only). Scoped to the occurrence. Migration `048` |
 | `created_at` | TIMESTAMPTZ | |
 
-Uniqueness is two **partial** unique indexes (a plain `UNIQUE` treats NULLs as distinct): `(clerk_user_id, schedule_event_id) WHERE occurrence_date IS NULL` and `(clerk_user_id, schedule_event_id, occurrence_date) WHERE occurrence_date IS NOT NULL` — one hold per non-recurring shift, one per night. Migration `063` (replaced the old whole-event `UNIQUE`).
+Uniqueness is two **partial** unique indexes (a plain `UNIQUE` treats NULLs as distinct): `(clerk_user_id, schedule_event_id) WHERE occurrence_date IS NULL` and `(clerk_user_id, schedule_event_id, occurrence_date) WHERE occurrence_date IS NOT NULL` — one hold per non-recurring shift, one per night. Migration `064` (replaced the old whole-event `UNIQUE`).
 
 ---
 
@@ -601,7 +601,7 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `060_backfill_missing_members.sql` | **Backfill missing `members` rows from `applications`.** QA sweep 2026-07-03 found 4 approved applications (submitted June 27–30, before the profile-source-of-truth dual-write) with no `members` row — `getApprovedMember` gates every member-only surface on `members.status`, so those campers were locked out of /participate, /schedule, /members and /roles. Inserts a members row for any application with no clerk-id / email / application-id match in `members`. Pure INSERT (non-destructive), idempotent. The systemic hole is also closed in code: `/api/admin/[id]/approve` now mirrors via `upsertMember` (insert-or-update) instead of the update-only `setMemberStatus`. |
 | `061_radio.sql` | **Radio.** Creates `radio_events` (the curated community feed — see [radio.md](radio.md)) + DESC index on `created_at`, and backfills one `welcome` post per approved application from `reviewed_at`. Additive + idempotent (guarded backfill), non-destructive; **applied in prod 2026-07-03** — the home dashboard teaser and `/radio` read the new table. |
 | `062_push_tokens.sql` | **Push notification device tokens** (061 is reserved by the Radio branch). `push_tokens` table: one row per device a member granted notifications on (`clerk_user_id`, `platform` ios/android, unique FCM `token`, `created_at`/`last_seen_at`) + index on `clerk_user_id`. Registered by the native app via `POST /api/push/register`; dead tokens deleted when FCM reports them unregistered. Additive + idempotent; safe to apply before the app exists (`lib/push.ts` no-ops without tokens/config). |
-| `063_shift_occurrence_date.sql` | **Per-night shift signups.** Adds `member_shift_signups.occurrence_date` (DATE, NULL = a non-recurring shift's single occurrence; a date = one night of a recurring event). Backfills existing recurring-event holds to the event's anchor date. Replaces the whole-event `UNIQUE` with two partial unique indexes (NULL-date vs dated) + an `occurrence_date` index. Recurrence becomes purely an authoring convenience: each night is treated as a regular shift everywhere (signup, capacity, roster, hours, ledger). Additive + idempotent. |
+| `064_shift_occurrence_date.sql` | **Per-night shift signups.** Adds `member_shift_signups.occurrence_date` (DATE, NULL = a non-recurring shift's single occurrence; a date = one night of a recurring event). Backfills existing recurring-event holds to the event's anchor date. Replaces the whole-event `UNIQUE` with two partial unique indexes (NULL-date vs dated) + an `occurrence_date` index. Recurrence becomes purely an authoring convenience: each night is treated as a regular shift everywhere (signup, capacity, roster, hours, ledger). Additive + idempotent. |
 
 ---
 

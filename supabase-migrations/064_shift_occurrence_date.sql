@@ -1,4 +1,5 @@
--- 063: Per-night shift signups (docs/shifts-redesign.md → Per-night occurrences).
+-- 064: Per-night shift signups (docs/shifts-redesign.md → Per-night occurrences).
+-- (Renumbered from 063 — 063 was taken by member-suspension on main.)
 -- Recurrence is only an admin authoring convenience — each night of a recurring
 -- shift is a regular shift in its own right. A signup now names its night via
 -- occurrence_date: NULL = the single occurrence of a non-recurring shift; a date
