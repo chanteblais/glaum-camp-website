@@ -12,10 +12,13 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
 
   const { data: app } = await supabaseAdmin
     .from('members')
-    .select('status')
+    .select('status, suspended_at')
     .eq('clerk_user_id', userId)
     .maybeSingle()
   if (app?.status !== 'approved') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (app.suspended_at) {
+    return NextResponse.json({ error: 'Your attendance is suspended — resume it on your profile to join groups.' }, { status: 403 })
+  }
 
   const { data: group } = await supabaseAdmin
     .from('groups')

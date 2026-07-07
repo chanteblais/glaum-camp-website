@@ -15,8 +15,12 @@ export async function POST(req: NextRequest) {
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   // Approved members only — same gate as the /participate page this backs.
-  if (!(await getApprovedMember(userId))) {
+  const member = await getApprovedMember(userId)
+  if (!member) {
     return NextResponse.json({ error: 'Only approved members can suggest resources' }, { status: 403 })
+  }
+  if (member.suspended_at) {
+    return NextResponse.json({ error: 'Your attendance is suspended — resume it on your profile to bring items.' }, { status: 403 })
   }
 
   const { list_id, name, note, bring } = await req.json()

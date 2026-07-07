@@ -33,6 +33,9 @@ export async function POST(req: NextRequest) {
 
   const application = await getApprovedMember(userId)
   if (!application) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (application.suspended_at) {
+    return NextResponse.json({ error: 'Your attendance is suspended — resume it on your profile to sign up for shifts.' }, { status: 403 })
+  }
 
   const { schedule_event_id, role: rawRole } = await req.json()
   if (!schedule_event_id) return NextResponse.json({ error: 'schedule_event_id required' }, { status: 400 })

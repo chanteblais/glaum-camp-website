@@ -50,13 +50,19 @@ export async function POST(req: NextRequest) {
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   // Approved members only — same gate as the /participate page this backs.
-  if (!(await getApprovedMember(userId))) {
+  const member = await getApprovedMember(userId)
+  if (!member) {
     return NextResponse.json({ error: 'Only approved members can join groups' }, { status: 403 })
   }
 
   const { group_id, joined } = await req.json()
   if (!group_id || typeof joined !== 'boolean') {
     return NextResponse.json({ error: 'group_id and joined are required' }, { status: 400 })
+  }
+
+  // A suspended member can still leave a group but can't take on new ones.
+  if (joined && member.suspended_at) {
+    return NextResponse.json({ error: 'Your attendance is suspended — resume it on your profile to join groups.' }, { status: 403 })
   }
 
   // Only selectable groups in a visible collection are self-manageable.

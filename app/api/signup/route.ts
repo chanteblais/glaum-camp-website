@@ -50,6 +50,11 @@ export async function POST(req: NextRequest) {
   const isRoleChange = existing?.role_id !== next_role_id
   const isEventChange = existing?.schedule_event_id !== next_event_id
 
+  // A suspended member can clear a role/shift but can't take on new ones.
+  if (application.suspended_at && ((isRoleChange && next_role_id) || (isEventChange && next_event_id))) {
+    return NextResponse.json({ error: 'Your attendance is suspended — resume it on your profile to sign up.' }, { status: 403 })
+  }
+
   // Block new/changed shift selections while shift signup is closed.
   // Clearing a shift (next_event_id === null) stays allowed so members can cancel.
   if (isEventChange && next_event_id) {
