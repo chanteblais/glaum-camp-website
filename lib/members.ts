@@ -23,10 +23,16 @@ export type MemberRecord = {
   avatar_url: string | null
   status: string | null
   application_id: string | null
+  // Suspension (migration 063) — orthogonal to status: a suspended member is
+  // still 'approved' (keeps full read access) but holds no group/shift
+  // commitments and can't take new ones until the suspension is lifted.
+  suspended_at: string | null
+  suspended_by: string | null
+  suspension_note: string | null
 }
 
 const MEMBER_COLUMNS =
-  'id, clerk_user_id, email, first_name, last_name, preferred_name, pronouns, phone, avatar_url, status, application_id'
+  'id, clerk_user_id, email, first_name, last_name, preferred_name, pronouns, phone, avatar_url, status, application_id, suspended_at, suspended_by, suspension_note'
 
 export type MemberIdentity = Partial<Omit<MemberRecord, 'id' | 'clerk_user_id'>>
 

@@ -29,6 +29,7 @@ type CampMember = {
   contributions: string[] | null
   attendance: string | null
   schedule_event_id: string | null
+  suspended?: boolean
 }
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
@@ -106,12 +107,17 @@ function CampMemberRow({ member }: { member: CampMember }) {
         }}
       >
         <div style={{ flex: 1, minWidth: '160px' }}>
-          <p style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.15rem' }}>
+          <p style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.15rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
             {displayName} {member.last_name}
+            {member.suspended && (
+              <span style={{ fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#ffcf80', border: '1px solid rgba(255,180,80,0.35)', borderRadius: '9999px', padding: '0.1rem 0.5rem', fontWeight: 400 }}>
+                Suspended
+              </span>
+            )}
           </p>
           <p style={{ fontSize: '0.8rem', opacity: 0.45 }}>{member.email}</p>
         </div>
-        <ShiftStatus satisfied={shiftsSatisfied} />
+        {!member.suspended && <ShiftStatus satisfied={shiftsSatisfied} />}
         {member.attendance && (
           <span style={{ fontSize: '0.75rem', opacity: 0.45, flexShrink: 0 }}>{member.attendance}</span>
         )}

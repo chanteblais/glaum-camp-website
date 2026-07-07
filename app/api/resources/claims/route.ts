@@ -18,7 +18,8 @@ export async function POST(req: NextRequest) {
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   // Approved members only — same gate as the /participate page this backs.
-  if (!(await getApprovedMember(userId))) {
+  const member = await getApprovedMember(userId)
+  if (!member) {
     return NextResponse.json({ error: 'Only approved members can claim resources' }, { status: 403 })
   }
 
@@ -27,6 +28,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'resource_id and quantity are required' }, { status: 400 })
   }
   const qty = Math.min(99, Math.max(0, Math.floor(quantity)))
+
+  // A suspended member can drop a claim (qty 0) but can't take on a new one.
+  if (qty > 0 && member.suspended_at) {
+    return NextResponse.json({ error: 'Your attendance is suspended — resume it on your profile to bring items.' }, { status: 403 })
+  }
 
   // Only items on a member-visible list can be claimed.
   const { data: resource } = await supabaseAdmin

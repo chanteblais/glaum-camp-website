@@ -7,7 +7,7 @@ type Notification = {
   application_id: string | null
   event_type: string
   message: string
-  details: { email?: string; reason?: string; changes?: Record<string, unknown>; volunteer_id?: string } | null
+  details: { email?: string; reason?: string; note?: string; changes?: Record<string, unknown>; volunteer_id?: string } | null
   created_at: string
   read_at: string | null
 }
@@ -226,6 +226,11 @@ export function NotificationBell({
                     {n.event_type === 'attendance_cancelled' && n.details?.reason && (
                       <p style={{ margin: '0.35rem 0 0', fontSize: '0.77rem', opacity: 0.5, fontStyle: 'italic' }}>
                         "{n.details.reason}"
+                      </p>
+                    )}
+                    {n.event_type === 'attendance_suspended' && n.details?.note && (
+                      <p style={{ margin: '0.35rem 0 0', fontSize: '0.77rem', opacity: 0.5, fontStyle: 'italic' }}>
+                        "{n.details.note}"
                       </p>
                     )}
                     {link && (

@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { requireAdmin } from '@/lib/admin-auth'
 import { AdminActions } from '../AdminActions'
 import { RemoveMemberButton } from '../RemoveMemberButton'
+import { SuspendMemberButton } from '../SuspendMemberButton'
 import { MemberSignupCard } from '../MemberSignupCard'
 import { mergeMemberConfig } from '@/lib/form-config'
 import { resolveMember, getMemberProfileValues } from '@/lib/members'
@@ -111,6 +112,8 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
   const submitted = new Date(app.submitted_at).toLocaleDateString('en-CA', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   })
+
+  const isSuspended = !!member?.suspended_at
 
   // Render the application strictly from the member-form config so the review
   // mirrors the live form: sections + fields in config order, honouring admin
@@ -285,6 +288,16 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
             {app.status === 'pending' ? '○ Pending Review' : app.status === 'approved' ? '✦ Approved' : app.status === 'rejected' ? 'Rejected' : 'Cancelled'}
           </span>
 
+          {isSuspended && (
+            <span style={{
+              display: 'inline-block', marginLeft: '0.5rem', padding: '0.3rem 1.1rem', borderRadius: '9999px',
+              fontSize: '0.7rem', letterSpacing: '0.12em', textTransform: 'uppercase',
+              backgroundColor: 'rgba(255,180,80,0.12)', border: '1px solid rgba(255,180,80,0.35)', color: '#ffcf80',
+            }}>
+              ❙❙ Suspended
+            </span>
+          )}
+
           <p style={{ fontSize: '0.72rem', opacity: 0.3, marginTop: '0.75rem', fontStyle: 'italic' }}>Submitted {submitted}</p>
 
           {/* Cross-reference chips — the member's linked entities (A5) */}
@@ -386,11 +399,24 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
           </>
         )}
 
-        {/* Remove an approved member */}
+        {/* Suspend or remove an approved member */}
         {app.status === 'approved' && (
           <>
             <Divider />
+            {isSuspended && member?.suspension_note && (
+              <div style={{ maxWidth: '480px', margin: '0 auto 1.25rem', padding: '1rem 1.25rem', border: '1px solid rgba(255,180,80,0.3)', borderRadius: '0.75rem', background: 'rgba(255,180,80,0.05)' }}>
+                <p style={{ fontSize: '0.7rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#ffcf80', marginBottom: '0.5rem' }}>
+                  Suspension note
+                </p>
+                <p style={{ fontSize: '0.9rem', lineHeight: 1.7, opacity: 0.75, fontStyle: 'italic' }}>{member.suspension_note}</p>
+              </div>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+              <SuspendMemberButton
+                id={app.id}
+                name={`${app.preferred_name || app.first_name} ${app.last_name}`}
+                suspended={isSuspended}
+              />
               <RemoveMemberButton
                 id={app.id}
                 name={`${app.preferred_name || app.first_name} ${app.last_name}`}
