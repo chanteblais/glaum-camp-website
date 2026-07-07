@@ -20,9 +20,11 @@ import { getMemberShiftState } from '@/lib/shift-attunement'
 import { buildMemberFacts } from '@/lib/member-facts'
 import { parseDistinctions, evaluateDistinctions } from '@/lib/distinctions'
 import { resolveMember, getMemberProfileValues } from '@/lib/members'
+import { parseProfileFields, storedFields, profileGaps } from '@/lib/profile-fields'
 import { getMemberAwards } from '@/lib/distinction-awards'
 import { CabinetOfDistinctions } from './CabinetOfDistinctions'
 import { ProfileDetails } from './ProfileDetails'
+import { ProfileNudge } from './ProfileNudge'
 import { isImageIcon } from '@/lib/icon-src'
 import { roleSlug } from '@/lib/role-slug'
 
@@ -109,12 +111,12 @@ export default async function ProfilePage() {
           supabaseAdmin
             .from('camp_signups')
             .select('role_id, schedule_event_id, role_approval_status, roles(name, description, purpose, department_id, departments(name, icon)), schedule_events(id, title, day, time, icon_type, event_date)')
-            .eq('clerk_user_id', userId)
+            .eq('clerk_user_id', memberClerkId)
             .maybeSingle(),
           supabaseAdmin
             .from('member_shift_signups')
             .select('schedule_events(id, title, day, time, icon_type, event_date)')
-            .eq('clerk_user_id', userId),
+            .eq('clerk_user_id', memberClerkId),
         ])
       : ([{ data: null }, { data: null }] as const),
     // Groups the member belongs to (replaces the old setup_preference "contributions").
@@ -125,7 +127,7 @@ export default async function ProfilePage() {
     supabaseAdmin
       .from('page_content')
       .select('key, value')
-      .in('key', ['config_attunement_tasks', 'config_shift_signup_open', 'config_distinctions']),
+      .in('key', ['config_attunement_tasks', 'config_shift_signup_open', 'config_distinctions', 'config_profile_fields']),
     // Shift-hours state: held hours per shift type + obligations derived from the
     // member's groups/roles. Same helper as the home dashboard — keep in sync.
     getMemberShiftState(memberClerkId),
@@ -187,6 +189,14 @@ export default async function ProfilePage() {
   const [profileValues, awardIds] = profileMember
     ? await Promise.all([getMemberProfileValues(profileMember.id), getMemberAwards(profileMember.id)])
     : [{} as Record<string, unknown>, null]
+  // Profile-completion nudge: registry fields flagged "catch-up" (askExisting)
+  // that this member hasn't filled and hasn't permanently dismissed. Computed
+  // server-side so the top banner renders with data in place (no client fetch).
+  const profileGapList = profileGaps(
+    storedFields(parseProfileFields(attuneConfig['config_profile_fields'])),
+    profileValues,
+  ).map(f => ({ key: f.key, label: f.label, required: !!f.required }))
+
   // Member facts → earned distinctions (Cabinet of Distinctions). Facts are
   // derived from existing data; medals are never persisted — they're recomputed
   // here from the admin-configured rules. See lib/member-facts.ts + lib/distinctions.ts.
@@ -549,6 +559,10 @@ export default async function ProfilePage() {
         {application && application.status === 'approved' && (
           <>
 
+            {/* Gentle profile-completion nudge — top of the body so it's actually
+                seen (the editable fields live in the Profile Details card below). */}
+            <ProfileNudge gaps={profileGapList} />
+
             <div className="profile-main-grid">
               <CommitmentsSection
                 title="Active Commitments"
@@ -600,8 +614,11 @@ export default async function ProfilePage() {
 
             {/* Registry-defined profile fields the member can view / edit
                 (Phase 4 — reads/writes member_profiles.values). Renders nothing
-                until the registry has member-visible fields. */}
-            <ProfileDetails />
+                until the registry has member-visible fields. The id is the
+                ProfileNudge "Add now" scroll target. */}
+            <div id="profile-details">
+              <ProfileDetails />
+            </div>
 
             <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.2), transparent)', margin: '2.5rem 0' }} />
 
