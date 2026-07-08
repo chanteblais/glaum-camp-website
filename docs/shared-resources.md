@@ -13,7 +13,7 @@ was **removed entirely** and list/item authoring moved to `/participate`, where
 **any approved member creates lists and adds items**. Editing is wiki-open; the
 one guardrail is that **deleting a whole list is admin-only**.
 
-Built 2026-07-02 · migrations `051_shared_resources.sql` + `052_resource_list_stewards.sql` + `053_resource_offers.sql` + `055_resource_item_icons.sql`. The member-ownership move needed **no migration** (wiki editing needs no owner column; list-delete reuses `requireAdmin`).
+Built 2026-07-02 · migrations `051_shared_resources.sql` + `052_resource_list_stewards.sql` + `053_resource_offers.sql` + `055_resource_item_icons.sql` + `065_resource_list_dashboard.sql`. The member-ownership move itself needed no migration (wiki editing needs no owner column; list-delete reuses `requireAdmin`); the dashboard opt-in added `065` (`show_on_dashboard`).
 
 ## The model
 
@@ -21,11 +21,13 @@ Three tables (see `docs/database.md`):
 
 - **`resource_lists`** — a named collection ("Shared Kitchen", "Setup
   Equipment"), created by any approved member. **No owner column** — editing is
-  wiki-open, so there's no per-user gate to record. The legacy **steward** FKs
-  (group / department / role, at-most-one CHECK, migration `052`) survive on
-  admin-made lists as display-only context but are no longer settable. `visible`
-  survives too but is no longer toggleable — member lists go live on create
-  (legacy `visible = false` lists stay hidden).
+  wiki-open, so there's no per-user gate to record. `show_on_dashboard`
+  (migration `065`, default **false**) is a per-list opt-in to the home
+  dashboard widget, toggled in the list editor — distinct from `visible`. The
+  legacy **steward** FKs (group / department / role, at-most-one CHECK,
+  migration `052`) survive on admin-made lists as display-only context but are
+  no longer settable. `visible` survives too but is no longer toggleable —
+  member lists go live on create (legacy `visible = false` lists stay hidden).
 - **`resources`** — one item per row: name, optional note, `quantity_needed`.
   A **NULL target = open offer** (migration `053`) — gear added without a "how
   many needed". Any approved member sets or edits a target (blank ↔ number)
@@ -123,31 +125,31 @@ with the added ability to delete a list.
 - **Home dashboard: the Bring Something widget** — a configurable dashboard
   widget (id `resources`, reorder/hide/resize via the page editor like any
   other). It answers *"what does the community still need from me?"*, not
-  "here is a link to the Resources page" (redesigned 2026-07-03):
-  - **One list, not a directory** — it surfaces only the list currently
-    needing the most attention (largest shortfall in units, then lowest
-    readiness); other lists with gaps compress to "+N more lists could use a
-    hand".
-  - **Collective progress** — "% Ready" in the header (unit-weighted, same
-    math as the board; never rounds up to 100 while short) + a 3px hairline
-    progress bar. A whisper of momentum, not project management.
-  - **Urgency-adaptive copy** — "1 Camping stove still needed." / "Still
-    need 2 × Extension cord." / "7 items still needed — …", plus a purple
-    **Needs attention** chip when ≥5 units short or readiness <50%.
-    Everything covered is a **celebration state** ("✨ Everything Covered",
-    "29 of 30 resources covered — the community is ready."), not a hidden
-    widget — it hides only while **no** visible list has a targeted item.
+  "here is a link to the Resources page":
+  - **A compact index of opted-in lists** (2026-07-08, reversing the earlier
+    "one list, not a directory"): **one row per list** flagged
+    `show_on_dashboard` — the list title + a right-aligned status (*"3 still
+    needed"* gold / *"✓ all covered"* green / *"N being brought"* or *"No needs
+    yet"* dim). Capped at 6 rows with "+N more lists". Members opt a list in via
+    the **"Show this list on the home dashboard"** checkbox in the list
+    create/edit form (default off) — so the widget shows exactly the lists the
+    community chose to surface, empty or not.
+  - **Collective progress** — an overall "% Ready" in the header (unit-weighted
+    across all flagged lists; never rounds up to 100 while short); shown only
+    when some flagged list has a target.
   - **Personal line** — with claims: "You're bringing Camping Stove ×2,
     Cooler — thank you ✦" (gold); without: "You haven't committed anything
-    yet — see what's needed →".
-  - The **whole card** links to `/participate#bring`; data via
-    `getResourceWidgetState` (`lib/resources.ts`, suggestions/offers never
-    gate readiness; over-fulfillment never inflates it). The page's sections
-    arrive server-rendered (initial data via `lib/participate-data.ts` /
-    `getMemberResourceView`), but late layout shifts (images, fonts) can
-    still nudge the anchor, so `ResourceCommitments` **pins** `#bring` on
-    every layout change for the first ~3s (ResizeObserver on body; the first
-    wheel/touch cancels).
+    yet — see what's needed →"; all covered: "Everything's covered…".
+  - **Hidden entirely until a list is flagged** (`show_on_dashboard`) — with
+    the opt-in default off, the widget renders nothing until a member turns a
+    list on. The **whole card** links to `/participate#bring`; data via
+    `getResourceWidgetState` (`lib/resources.ts`; untargeted contributions
+    never gate readiness; over-fulfillment never inflates it). The participate
+    page's sections arrive server-rendered (initial data via
+    `lib/participate-data.ts` / `getMemberResourceView`), but late layout shifts
+    (images, fonts) can still nudge the anchor, so `ResourceCommitments` **pins**
+    `#bring` on every layout change for the first ~3s (ResizeObserver on body;
+    the first wheel/touch cancels).
 - **Profile → Active Commitments**: each claim renders as a `BRINGING` row
   ("Camping Stove ×2 · Shared Kitchen", with the item's icon when set) via
   `lib/resources.ts` → `getMemberResourceClaims`, and counts toward the

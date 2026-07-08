@@ -38,6 +38,8 @@ type ResourceList = {
   // The list's steward — a group, department, or role name (display context
   // only; legacy admin-set, no longer editable here).
   steward_name: string | null
+  // Opt-in to the home "Bring Something" dashboard widget (migration 065).
+  show_on_dashboard: boolean
   items: ResourceItem[]
 }
 // Proof that people are preparing together — derived from claim timestamps.
@@ -105,12 +107,14 @@ export function ResourceCommitments({
   const [newListOpen, setNewListOpen] = useState(false)
   const [newListTitle, setNewListTitle] = useState('')
   const [newListDesc, setNewListDesc] = useState('')
+  const [newListDash, setNewListDash] = useState(false)
   const [newListBusy, setNewListBusy] = useState(false)
 
   // Inline edit of a list header (wiki).
   const [editListId, setEditListId] = useState<string | null>(null)
   const [editListTitle, setEditListTitle] = useState('')
   const [editListDesc, setEditListDesc] = useState('')
+  const [editListDash, setEditListDash] = useState(false)
 
   // Inline edit of an item (wiki).
   const [editItemId, setEditItemId] = useState<string | null>(null)
@@ -260,14 +264,14 @@ export function ResourceCommitments({
     const res = await fetch('/api/resources/lists', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: newListTitle, description: newListDesc }),
+      body: JSON.stringify({ title: newListTitle, description: newListDesc, show_on_dashboard: newListDash }),
     })
     if (!res.ok) {
       const d = await res.json().catch(() => ({}))
       setError(d.error ?? 'Could not create the list. Try again.')
     } else {
       const created = await res.json().catch(() => ({}))
-      setNewListOpen(false); setNewListTitle(''); setNewListDesc('')
+      setNewListOpen(false); setNewListTitle(''); setNewListDesc(''); setNewListDash(false)
       if (created?.list?.id) expandList(created.list.id) // open the new list to fill it
       await load()
       router.refresh()
@@ -276,7 +280,7 @@ export function ResourceCommitments({
   }
 
   const openEditList = (list: ResourceList) => {
-    setEditListId(list.id); setEditListTitle(list.title); setEditListDesc(list.description ?? '')
+    setEditListId(list.id); setEditListTitle(list.title); setEditListDesc(list.description ?? ''); setEditListDash(list.show_on_dashboard)
   }
   async function submitEditList(listId: string) {
     if (!editListTitle.trim()) return
@@ -284,7 +288,7 @@ export function ResourceCommitments({
     const res = await fetch(`/api/resources/lists/${listId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: editListTitle, description: editListDesc }),
+      body: JSON.stringify({ title: editListTitle, description: editListDesc, show_on_dashboard: editListDash }),
     })
     if (!res.ok) {
       const d = await res.json().catch(() => ({}))
@@ -425,6 +429,15 @@ export function ResourceCommitments({
     >
       {label}
     </button>
+  )
+
+  // "Show on the home dashboard" opt-in (migration 065) — shared by the new-
+  // and edit-list forms.
+  const dashCheckbox = (checked: boolean, onChange: (v: boolean) => void): React.ReactNode => (
+    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', opacity: 0.75, cursor: 'pointer', userSelect: 'none', marginBottom: '0.75rem' }}>
+      <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} style={{ accentColor: GOLD }} />
+      Show this list on the home dashboard
+    </label>
   )
 
   // One shared "add an item" form. When `showPicker`, the member chooses which
@@ -679,6 +692,7 @@ export function ResourceCommitments({
               placeholder="Description (optional)" maxLength={300}
               style={{ ...fieldStyle, fontSize: '0.82rem', border: '1px solid rgba(200,168,72,0.2)' }}
             />
+            {dashCheckbox(editListDash, setEditListDash)}
             <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end' }}>
               {pillBtn('Cancel', () => setEditListId(null), false, false)}
               {pillBtn('Save', () => submitEditList(list.id), !editListTitle.trim(), true)}
@@ -822,16 +836,17 @@ export function ResourceCommitments({
           <input
             value={newListDesc} onChange={e => setNewListDesc(e.target.value)}
             placeholder="What's it for? (optional)" maxLength={300}
-            style={{ ...fieldStyle, fontSize: '0.82rem', border: '1px solid rgba(200,168,72,0.2)', marginBottom: '0.75rem' }}
+            style={{ ...fieldStyle, fontSize: '0.82rem', border: '1px solid rgba(200,168,72,0.2)' }}
           />
+          {dashCheckbox(newListDash, setNewListDash)}
           <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end' }}>
-            {pillBtn('Cancel', () => { setNewListOpen(false); setNewListTitle(''); setNewListDesc('') }, false, false)}
+            {pillBtn('Cancel', () => { setNewListOpen(false); setNewListTitle(''); setNewListDesc(''); setNewListDash(false) }, false, false)}
             {pillBtn(newListBusy ? 'Creating…' : 'Create list', submitNewList, newListBusy || !newListTitle.trim(), true)}
           </div>
         </div>
       ) : (
         <button
-          onClick={() => { setNewListOpen(true); setNewListTitle(''); setNewListDesc('') }}
+          onClick={() => { setNewListOpen(true); setNewListTitle(''); setNewListDesc(''); setNewListDash(false) }}
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
             width: '100%', boxSizing: 'border-box', padding: '0.9rem 1.25rem', cursor: 'pointer',

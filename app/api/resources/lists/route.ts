@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Your attendance is suspended — resume it on your profile to manage resources.' }, { status: 403 })
   }
 
-  const { title, description } = await req.json()
+  const { title, description, show_on_dashboard } = await req.json()
   if (!title?.trim()) return NextResponse.json({ error: 'A title is required' }, { status: 400 })
 
   const { data: list, error } = await supabaseAdmin
@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
     .insert({
       title: title.trim().slice(0, 80),
       description: description?.trim().slice(0, 300) || null,
+      show_on_dashboard: show_on_dashboard === true,
     })
     .select()
     .single()

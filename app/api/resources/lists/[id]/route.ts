@@ -21,13 +21,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ error: 'Your attendance is suspended — resume it on your profile to manage resources.' }, { status: 403 })
   }
 
-  const { title, description } = await req.json()
+  const { title, description, show_on_dashboard } = await req.json()
   const patch: Record<string, unknown> = {}
   if (title !== undefined) {
     if (!title?.trim()) return NextResponse.json({ error: 'A title is required' }, { status: 400 })
     patch.title = title.trim().slice(0, 80)
   }
   if (description !== undefined) patch.description = description?.trim().slice(0, 300) || null
+  if (show_on_dashboard !== undefined) patch.show_on_dashboard = show_on_dashboard === true
   if (Object.keys(patch).length === 0) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
 
   const { error } = await supabaseAdmin.from('resource_lists').update(patch).eq('id', params.id)
