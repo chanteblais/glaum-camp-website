@@ -11,7 +11,6 @@ import { CategoryHeading } from './CategoryHeading'
 import { COMMUNITY_CATEGORIES } from './admin-sections'
 import { AnnouncementsManager } from './AnnouncementsManager'
 import { RadioManager } from './RadioManager'
-import { ResourcesManager } from './ResourcesManager'
 import { DuesManager } from './DuesManager'
 import { parseDuesConfig } from '@/lib/dues'
 import { getDuesRoster } from '@/lib/dues-roster'
@@ -19,7 +18,7 @@ import { getGroupNamesByUser } from '@/lib/groups'
 import { getShiftEventByUser } from '@/lib/shift-signups'
 import { getAdminRunway } from '@/lib/admin-attention'
 import { parseRadioSources } from '@/lib/radio'
-import { getAdminRadioEvents, getAdminResourceLists, getStewardOptions } from '@/lib/admin-program-data'
+import { getAdminRadioEvents } from '@/lib/admin-program-data'
 import { RoleRequestsSection } from './RoleRequestsSection'
 import { RoleSuggestionsSection } from './RoleSuggestionsSection'
 
@@ -43,8 +42,6 @@ export default async function AdminPage() {
     { data: notifications, error: notificationsError },
     radioEvents,
     { data: radioConfigRow },
-    resourceLists,
-    stewardOptions,
     { data: duesConfigRow },
   ] = await Promise.all([
     supabaseAdmin
@@ -77,8 +74,6 @@ export default async function AdminPage() {
       .select('value')
       .eq('key', 'config_radio')
       .maybeSingle(),
-    safe(getAdminResourceLists()),
-    safe(getStewardOptions()),
     supabaseAdmin
       .from('page_content')
       .select('value')
@@ -158,7 +153,7 @@ export default async function AdminPage() {
           Community
         </h1>
         <p style={{ textAlign: 'center', opacity: 0.5, fontSize: '0.85rem', marginBottom: '2.5rem' }}>
-          The people of camp, what they hear, and what they&apos;re bringing
+          The people of camp, what they hear, and what they owe
         </p>
 
         {dbError && (
@@ -283,17 +278,9 @@ export default async function AdminPage() {
         </CollapsibleSection>
 
         {/* ═══════════════ LOGISTICS ═══════════════ */}
+        {/* Shared Resources left the console 2026-07-08 (now member-owned on
+            /participate → Bring Something); Camp Dues remains. */}
         <CategoryHeading id="logistics" />
-
-        <CollapsibleSection
-          title="Shared Resources"
-          summary={resourceLists
-            ? `${resourceLists.length} list${resourceLists.length === 1 ? '' : 's'} · ${resourceLists.reduce((n, l) => n + l.items.length, 0)} items`
-            : 'Bring Something — needs & claims'}
-          defaultOpen={false}
-        >
-          <ResourcesManager initialLists={resourceLists} initialStewards={stewardOptions} />
-        </CollapsibleSection>
 
         <CollapsibleSection
           title="Camp Dues"

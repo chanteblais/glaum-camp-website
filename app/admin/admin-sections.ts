@@ -9,8 +9,9 @@ export type AdminCategory = {
 }
 
 // Community — tend the community's shared life: its people, its voice, its
-// provisioning. (Formerly the "Members" tab, renamed when Shared Resources
-// moved in from Program.)
+// logistics. (Formerly the "Members" tab. Logistics once held Shared Resources,
+// which became member-owned on /participate 2026-07-08 and left the console;
+// Camp Dues remains under Logistics.)
 export const COMMUNITY_CATEGORIES: AdminCategory[] = [
   { id: 'people', label: 'People' },
   { id: 'communication', label: 'Communication' },

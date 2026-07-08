@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { getApprovedMember } from '@/lib/members'
+import { requireAdmin } from '@/lib/admin-auth'
 import { getRoleSignupData, getShiftSignupData, getSelfJoinGroups } from '@/lib/participate-data'
 import { getMemberResourceView } from '@/lib/resources'
 import { SignupSection, type SignupInitialData } from '@/app/profile/SignupSection'
@@ -18,14 +19,20 @@ export default async function SignupPage() {
   // same assembly the /api/signup, /api/shift-signups, /api/groups/membership
   // and /api/resources routes serve, so the sections render with their data
   // in place instead of fetching it after hydration.
-  const [member, roleData, shiftData, selfJoinGroups, resourceView] = await Promise.all([
+  const [member, roleData, shiftData, selfJoinGroups, resourceView, adminUserId] = await Promise.all([
     getApprovedMember(userId),
     getRoleSignupData(userId),
     getShiftSignupData(userId),
     getSelfJoinGroups(userId),
     getMemberResourceView(userId),
+    requireAdmin(),
   ])
   if (!member) redirect('/profile')
+
+  // Shared Resources is member-owned: approved (non-suspended) members author
+  // lists and items; deleting a whole list is the one admin-gated action.
+  const canManageResources = !member.suspended_at
+  const canDeleteResourceLists = !!adminUserId
 
   // The lib types the payloads loosely (they're built for JSON serialization);
   // the shapes are exactly what the client components' own types describe.
@@ -69,11 +76,16 @@ export default async function SignupPage() {
             Bring Something
           </h2>
           <p style={{ fontSize: '0.9rem', opacity: 0.55, margin: 0, lineHeight: 1.6 }}>
-            The camp runs on what we carry in together. Claim the gear you can bring — you can change your mind anytime.
+            The camp runs on what we carry in together. Claim the gear you can bring, add what's missing, or start a new list — you can change your mind anytime.
           </p>
         </div>
 
-        <ResourceCommitments initialLists={resourceView.lists} initialPulse={resourceView.pulse} />
+        <ResourceCommitments
+          initialLists={resourceView.lists}
+          initialPulse={resourceView.pulse}
+          canManage={canManageResources}
+          canDeleteLists={canDeleteResourceLists}
+        />
 
         {/* Self-join groups, grouped by collection (Contributions, Skills, …) */}
         <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.25), transparent)', margin: '3rem 0 2rem' }} />
