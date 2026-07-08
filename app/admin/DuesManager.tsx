@@ -395,41 +395,41 @@ export function DuesManager({
                 )}
               </div>
 
-              {state === 'paid' ? (
-                <button
-                  onClick={() => setPaid(row, false)}
-                  disabled={loading}
-                  style={{ background: 'none', border: '1px solid rgba(200,168,72,0.25)', borderRadius: '9999px', color: CREAM, opacity: loading ? 0.4 : 0.6, fontSize: '0.7rem', padding: '0.25rem 0.7rem', cursor: loading ? 'default' : 'pointer', fontFamily: 'inherit' }}
-                >
-                  {loading ? '…' : 'Undo'}
-                </button>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                {/* Note field to jot before flipping (only while not yet paid) */}
+                {state !== 'paid' && (
                   <input
                     value={noteDraft[row.id] ?? ''}
                     onChange={e => setNoteDraft(d => ({ ...d, [row.id]: e.target.value }))}
                     placeholder="note (e.g. $50 e-transfer)"
-                    style={{ ...inputStyle, width: '170px', fontSize: '0.75rem', padding: '0.3rem 0.5rem' }}
+                    style={{ ...inputStyle, width: '150px', fontSize: '0.75rem', padding: '0.3rem 0.5rem' }}
                   />
+                )}
+                {/* Dismiss an unconfirmed self-report without marking paid */}
+                {state === 'awaiting' && (
                   <button
-                    onClick={() => setPaid(row, true)}
+                    onClick={() => setPaid(row, false)}
                     disabled={loading}
-                    style={{ background: 'rgba(200,168,72,0.14)', border: '1px solid rgba(200,168,72,0.4)', borderRadius: '9999px', color: GOLD, fontSize: '0.72rem', letterSpacing: '0.04em', padding: '0.3rem 0.85rem', cursor: loading ? 'default' : 'pointer', opacity: loading ? 0.5 : 1, fontFamily: 'inherit', whiteSpace: 'nowrap' }}
+                    title="Clear the member's claim — back to owed"
+                    style={{ background: 'none', border: 'none', color: CREAM, opacity: loading ? 0.3 : 0.5, fontSize: '0.7rem', padding: '0.25rem 0.3rem', cursor: loading ? 'default' : 'pointer', fontFamily: 'inherit', textDecoration: 'underline', whiteSpace: 'nowrap' }}
                   >
-                    {loading ? '…' : state === 'awaiting' ? 'Confirm' : 'Mark paid'}
+                    Not received
                   </button>
-                  {state === 'awaiting' && (
-                    <button
-                      onClick={() => setPaid(row, false)}
-                      disabled={loading}
-                      title="Clear the member's claim — back to owed"
-                      style={{ background: 'none', border: 'none', color: CREAM, opacity: loading ? 0.3 : 0.5, fontSize: '0.7rem', padding: '0.25rem 0.3rem', cursor: loading ? 'default' : 'pointer', fontFamily: 'inherit', textDecoration: 'underline', whiteSpace: 'nowrap' }}
-                    >
-                      Not received
-                    </button>
-                  )}
+                )}
+                {/* Paid on/off toggle */}
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <span style={{ fontSize: '0.68rem', letterSpacing: '0.06em', textTransform: 'uppercase', opacity: state === 'paid' ? 0.85 : 0.45, color: state === 'paid' ? GOLD : CREAM }}>Paid</span>
+                  <button
+                    onClick={() => setPaid(row, state !== 'paid')}
+                    disabled={loading}
+                    aria-pressed={state === 'paid'}
+                    title={state === 'paid' ? 'Mark unpaid' : state === 'awaiting' ? 'Confirm payment' : 'Mark paid'}
+                    style={{ width: '40px', height: '22px', borderRadius: '9999px', flexShrink: 0, border: 'none', cursor: loading ? 'default' : 'pointer', background: state === 'paid' ? GOLD : 'rgba(255,255,255,0.14)', transition: 'background 0.2s', position: 'relative', opacity: loading ? 0.5 : 1 }}
+                  >
+                    <div style={{ position: 'absolute', top: '3px', left: state === 'paid' ? '21px' : '3px', width: '16px', height: '16px', borderRadius: '50%', background: state === 'paid' ? '#1A0A24' : 'rgba(255,255,255,0.5)', transition: 'left 0.2s' }} />
+                  </button>
                 </div>
-              )}
+              </div>
             </div>
           )
         })}
