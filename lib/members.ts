@@ -139,15 +139,25 @@ export async function setProfileValues(
  * Upsert a member (matched by clerk_user_id, else email), patching identity and
  * linking the clerk id if not yet set. Optionally seeds profile values. Returns
  * the member id, or null on failure. Guaranteed not to throw.
+ *
+ * Pass `{ updateOnly: true }` to mirror onto an EXISTING member only — no row is
+ * inserted when none matches, and the call returns null. Use this for writers
+ * that carry no identity (e.g. the avatar dual-write): inserting from them would
+ * create a nameless, emailless phantom `members` row for every signed-in
+ * non-member (volunteers, browsers). Members are created only where identity is
+ * present — apply / approve / profile-edit.
  */
 export async function upsertMember(
   clerkUserId: string | null,
   identity: MemberIdentity,
   profileValues?: Record<string, unknown>,
+  options?: { updateOnly?: boolean },
 ): Promise<string | null> {
   try {
     const existing = await resolveMember(clerkUserId, identity.email ?? null)
     let memberId: string | null = existing?.id ?? null
+
+    if (!memberId && options?.updateOnly) return null
 
     if (memberId) {
       const patch: Record<string, unknown> = { ...identity, updated_at: new Date().toISOString() }
