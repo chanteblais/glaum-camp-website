@@ -93,7 +93,7 @@ export function DuesManager({
 
   // ── Tracker (per-member paid state) ──────────────────────────────
   const [roster, setRoster] = useState<DuesRosterRow[]>(initialRoster)
-  const [filter, setFilter] = useState<'all' | 'awaiting' | 'owed'>('all')
+  const [filter, setFilter] = useState<'all' | 'awaiting' | 'owed' | 'paid'>('all')
   const [noteDraft, setNoteDraft] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState<Record<string, boolean>>({})
   const [rowError, setRowError] = useState<string | null>(null)
@@ -112,6 +112,7 @@ export function DuesManager({
       if (r.suspended) return filter === 'all'
       if (filter === 'awaiting') return stateOf(r) === 'awaiting'
       if (filter === 'owed') return stateOf(r) !== 'paid'
+      if (filter === 'paid') return stateOf(r) === 'paid'
       return true
     })
     // Awaiting review first (needs your action), then owed, then paid, then
@@ -333,7 +334,7 @@ export function DuesManager({
       </div>
 
       <div style={{ display: 'inline-flex', border: '1px solid rgba(200,168,72,0.2)', borderRadius: '0.5rem', overflow: 'hidden', marginBottom: '0.9rem' }}>
-        {(['all', 'awaiting', 'owed'] as const).map(f => (
+        {(['all', 'awaiting', 'owed', 'paid'] as const).map(f => (
           <button
             key={f}
             onClick={() => setFilter(f)}
@@ -344,7 +345,7 @@ export function DuesManager({
               color: filter === f ? GOLD : CREAM, opacity: filter === f ? 1 : 0.55,
             }}
           >
-            {f === 'all' ? 'All members' : f === 'awaiting' ? `To review${awaitingCount ? ` (${awaitingCount})` : ''}` : 'Owed'}
+            {f === 'all' ? 'All members' : f === 'awaiting' ? `To review${awaitingCount ? ` (${awaitingCount})` : ''}` : f === 'owed' ? 'Owed' : `Paid${paidCount ? ` (${paidCount})` : ''}`}
           </button>
         ))}
       </div>
@@ -358,7 +359,9 @@ export function DuesManager({
               ? 'Nothing to review right now.'
               : filter === 'owed'
                 ? 'Everyone has paid — nothing outstanding.'
-                : 'No approved members yet.'}
+                : filter === 'paid'
+                  ? 'No one has paid yet.'
+                  : 'No approved members yet.'}
           </p>
         )}
 
