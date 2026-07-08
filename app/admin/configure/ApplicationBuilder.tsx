@@ -470,7 +470,7 @@ function StepSection({
   step, index, total, displayNum, expanded, saving,
   onToggleExpand, onToggleVisible, onMoveUp, onMoveDown,
   onTitleChange, onSubtitleChange, onFieldChange, onDelete, onAddField, onDeleteField,
-  fieldsModular, onMoveField, onToggleFieldWidth, onAddElement, groups, profileFieldOptions,
+  fieldsModular, onMoveField, onReorderField, onToggleFieldWidth, onAddElement, groups, profileFieldOptions,
 }: {
   step: StepConfig
   index: number
@@ -494,9 +494,26 @@ function StepSection({
   // the modular renderer on the live form).
   fieldsModular?: boolean
   onMoveField?: (fieldKey: string, dir: -1 | 1) => void
+  onReorderField?: (fieldKey: string, toIndex: number) => void
   onToggleFieldWidth?: (fieldKey: string) => void
   onAddElement?: (element: 'divider' | 'paragraph') => void
 }) {
+  // Drag-to-reorder within this section. The row only becomes draggable while
+  // its grip is pressed (grabKey) — otherwise dragging would hijack text
+  // selection in the inline label/description inputs. Arrows stay as the
+  // touch/keyboard fallback (HTML5 drag doesn't fire on touch).
+  const dragEnabled = !!(fieldsModular && onReorderField)
+  const [grabKey, setGrabKey] = useState<string | null>(null)
+  const [dragKey, setDragKey] = useState<string | null>(null)
+  const [overIdx, setOverIdx] = useState<number | null>(null)
+
+  const endDrag = () => { setDragKey(null); setGrabKey(null); setOverIdx(null) }
+  // Insertion index for a pointer at clientY over the row at fIdx.
+  const insertionIndex = (e: React.DragEvent, fIdx: number) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    return e.clientY < r.top + r.height / 2 ? fIdx : fIdx + 1
+  }
+
   return (
     <div style={{
       border: '1px solid rgba(200,168,72,0.15)',
@@ -594,9 +611,8 @@ function StepSection({
             // locked core fields (which can't be grabbed directly themselves).
             const pinUp = fIdx === 0
             const pinDown = fIdx === step.fields.length - 1
-            return field.element ? (
+            const row = field.element ? (
               <ElementRow
-                key={field.key}
                 field={field}
                 saving={saving}
                 onLabelChange={v => onFieldChange(field.key, { label: v })}
@@ -610,7 +626,6 @@ function StepSection({
               />
             ) : (
               <FieldRow
-                key={field.key}
                 field={field}
                 saving={saving}
                 onToggleVisible={() => onFieldChange(field.key, { visible: !field.visible })}
@@ -628,6 +643,65 @@ function StepSection({
                 profileFieldOptions={profileFieldOptions}
                 onBindProfileField={field.isCustom ? key => onFieldChange(field.key, { profileFieldKey: key }) : undefined}
               />
+            )
+            if (!dragEnabled) return <div key={field.key}>{row}</div>
+            const canDrag = !field.locked && !saving
+            return (
+              <div
+                key={field.key}
+                draggable={grabKey === field.key}
+                onDragStart={e => {
+                  setDragKey(field.key)
+                  e.dataTransfer.setData('text/plain', field.key) // Firefox needs data to start a drag
+                  e.dataTransfer.effectAllowed = 'move'
+                }}
+                onDragEnd={endDrag}
+                onDragOver={e => {
+                  if (!dragKey) return // a drag from some other section — ignore
+                  e.preventDefault()
+                  e.dataTransfer.dropEffect = 'move'
+                  setOverIdx(insertionIndex(e, fIdx))
+                }}
+                onDrop={e => {
+                  if (!dragKey) return
+                  e.preventDefault()
+                  onReorderField!(dragKey, insertionIndex(e, fIdx))
+                  endDrag()
+                }}
+                style={{
+                  display: 'flex', alignItems: 'stretch', gap: '0.45rem',
+                  borderRadius: '0.5rem',
+                  opacity: dragKey === field.key ? 0.35 : 1,
+                  // Gold insertion line above the row the drop would land before
+                  // (below the last row for an at-the-end drop).
+                  boxShadow: dragKey && overIdx === fIdx ? `0 -3px 0 0 ${GOLD}`
+                    : dragKey && pinDown && overIdx === fIdx + 1 ? `0 3px 0 0 ${GOLD}`
+                    : 'none',
+                  transition: 'opacity 0.15s',
+                }}
+              >
+                {canDrag ? (
+                  <div
+                    onMouseDown={() => setGrabKey(field.key)}
+                    onMouseUp={() => setGrabKey(null)}
+                    title="Drag to reorder"
+                    style={{
+                      display: 'flex', alignItems: 'center', flexShrink: 0,
+                      cursor: 'grab', color: CREAM, opacity: 0.3,
+                      padding: '0 0.15rem', userSelect: 'none',
+                    }}
+                  >
+                    <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor" aria-hidden="true">
+                      <circle cx="3" cy="3" r="1.3" /><circle cx="7" cy="3" r="1.3" />
+                      <circle cx="3" cy="8" r="1.3" /><circle cx="7" cy="8" r="1.3" />
+                      <circle cx="3" cy="13" r="1.3" /><circle cx="7" cy="13" r="1.3" />
+                    </svg>
+                  </div>
+                ) : (
+                  <div style={{ width: 'calc(10px + 0.3rem)', flexShrink: 0 }} /> // keep locked rows aligned
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>{row}</div>
+              </div>
             )
           })}
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
@@ -727,12 +801,16 @@ export function ApplicationBuilder({
   volunteerConfig: VolunteerFormConfig
   trackCopy?: TrackCopy
 }) {
+  type SaveKey = 'config_member_form' | 'config_volunteer_form' | 'config_track_picker'
+
   const [memberConfig, setMemberConfig] = useState<MemberFormConfig>(initialMember)
   const [volunteerConfig, setVolunteerConfig] = useState<VolunteerFormConfig>(initialVolunteer)
   const [trackCopy, setTrackCopy] = useState<TrackCopy>(initialTrackCopy ?? DEFAULT_TRACK_COPY)
   const [saving, setSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [saveError, setSaveError] = useState<string | null>(null)
+  // Config keys with local edits that haven't been persisted yet.
+  const [dirtyKeys, setDirtyKeys] = useState<Set<SaveKey>>(new Set())
   const [activeTab, setActiveTab] = useState<'member' | 'volunteer'>('member')
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set())
   const { confirm, confirmDialog } = useConfirm()
@@ -758,79 +836,136 @@ export function ApplicationBuilder({
       .catch(() => { /* leave empty */ })
   }, [])
 
-  // Pending debounced text-edit save + the value it will persist.
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const pendingSave = useRef<{ key: SaveKey; value: object } | null>(null)
+  // ── Manual save ──
+  // Edits only touch local state and mark their config key dirty; nothing is
+  // persisted until the admin clicks Save (or ⌘S). `savedRef` holds the
+  // last-persisted value of each key so Discard can restore it and the
+  // open/closed toggles can go live without committing unsaved edits.
 
-  // ── Patch helper ──
+  const savedRef = useRef<{
+    config_member_form: MemberFormConfig
+    config_volunteer_form: VolunteerFormConfig
+    config_track_picker: TrackCopy
+  }>({
+    config_member_form: initialMember,
+    config_volunteer_form: initialVolunteer,
+    config_track_picker: initialTrackCopy ?? DEFAULT_TRACK_COPY,
+  })
 
-  type SaveKey = 'config_member_form' | 'config_volunteer_form' | 'config_track_picker'
+  const dirty = dirtyKeys.size > 0
 
-  const patch = useCallback(async (key: SaveKey, value: object) => {
-    // An immediate (structural) save supersedes any pending debounced one.
-    if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null }
-    pendingSave.current = null
+  const markDirty = useCallback((key: SaveKey) => {
+    setDirtyKeys(prev => (prev.has(key) ? prev : new Set(prev).add(key)))
+  }, [])
+
+  // Persist the given config keys in one PATCH. Returns true on success.
+  const persist = useCallback(async (updates: Partial<Record<SaveKey, object>>) => {
     setSaving(true)
     setSaveStatus('saving')
     setSaveError(null)
     try {
+      const body: Record<string, string> = {}
+      for (const [k, v] of Object.entries(updates)) body[k] = JSON.stringify(v)
       const res = await fetch('/api/admin/page-content', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [key]: JSON.stringify(value) }),
+        body: JSON.stringify(body),
       })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
         setSaveError(d.error ?? 'Save failed')
         setSaveStatus('error')
-      } else {
-        setSaveStatus('saved')
+        setSaving(false)
+        return false
       }
+      for (const [k, v] of Object.entries(updates)) {
+        ;(savedRef.current as Record<SaveKey, object>)[k as SaveKey] = v as object
+      }
+      setSaveStatus('saved')
+      setSaving(false)
+      return true
     } catch {
       setSaveError('Network error')
       setSaveStatus('error')
+      setSaving(false)
+      return false
     }
-    setSaving(false)
   }, [])
 
-  // Debounced autosave for text edits (typing a label/description/title). Shows
-  // "Saving…" immediately, then persists once typing pauses.
-  const queueSave = useCallback((key: SaveKey, value: object) => {
-    pendingSave.current = { key, value }
-    setSaveStatus('saving')
-    setSaveError(null)
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => {
-      saveTimer.current = null
-      if (pendingSave.current) patch(pendingSave.current.key, pendingSave.current.value)
-    }, 700)
-  }, [patch])
+  const handleSave = useCallback(async () => {
+    if (dirtyKeys.size === 0 || saving) return
+    const current: Record<SaveKey, object> = {
+      config_member_form: memberConfig,
+      config_volunteer_form: volunteerConfig,
+      config_track_picker: trackCopy,
+    }
+    const updates: Partial<Record<SaveKey, object>> = {}
+    dirtyKeys.forEach(k => { updates[k] = current[k] })
+    if (await persist(updates)) {
+      // Clear only the keys this save covered — an edit that landed mid-flight
+      // re-marks its key dirty and survives this functional update.
+      setDirtyKeys(prev => {
+        const next = new Set(prev)
+        for (const k of Object.keys(updates)) next.delete(k as SaveKey)
+        return next
+      })
+    }
+  }, [dirtyKeys, saving, memberConfig, volunteerConfig, trackCopy, persist])
 
-  // Flush a pending save on unmount so a quick edit + navigate away isn't lost.
-  useEffect(() => () => {
-    if (saveTimer.current) {
-      clearTimeout(saveTimer.current)
-      if (pendingSave.current) {
-        const { key, value } = pendingSave.current
-        navigator.sendBeacon?.('/api/admin/page-content', new Blob([JSON.stringify({ [key]: JSON.stringify(value) })], { type: 'application/json' }))
+  async function handleDiscard() {
+    const ok = await confirm({
+      title: 'Discard unsaved changes?',
+      body: 'The builder returns to the last saved version.',
+      confirmLabel: 'Discard',
+      danger: true,
+    })
+    if (!ok) return
+    setMemberConfig(savedRef.current.config_member_form)
+    setVolunteerConfig(savedRef.current.config_volunteer_form)
+    setTrackCopy(savedRef.current.config_track_picker)
+    setDirtyKeys(new Set())
+    setSaveStatus('idle')
+  }
+
+  // Warn before leaving the page with unsaved edits (reload / close / external
+  // links — client-side nav within the SPA isn't interceptable, the floating
+  // bar is the guard there).
+  useEffect(() => {
+    if (!dirty) return
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [dirty])
+
+  // ⌘S / Ctrl+S saves.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault()
+        handleSave()
       }
     }
-  }, [])
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [handleSave])
 
   // ── Member helpers ──
 
   function toggleMemberOpen() {
-    const next = { ...memberConfig, open: !memberConfig.open }
-    setMemberConfig(next)
-    patch('config_member_form', next)
+    const open = !memberConfig.open
+    // The open/closed switch stays live (it's an operational control, not a
+    // form edit) — but it must not silently commit unsaved edits, so it
+    // persists the last-saved config with just the flag flipped. The local
+    // (possibly edited) state flips too, so a later Save keeps the flag.
+    setMemberConfig({ ...memberConfig, open })
+    persist({ config_member_form: { ...savedRef.current.config_member_form, open } })
+      .then(ok => { if (!ok) markDirty('config_member_form') })
   }
 
-  function setMemberStep(stepKey: string, stepPatch: Partial<Pick<StepConfig, 'title' | 'subtitle' | 'visible'>>, autosave = false) {
+  function setMemberStep(stepKey: string, stepPatch: Partial<Pick<StepConfig, 'title' | 'subtitle' | 'visible'>>) {
     const steps = memberConfig.steps.map(s => s.key === stepKey ? { ...s, ...stepPatch } : s)
-    const next = { ...memberConfig, steps }
-    setMemberConfig(next)
-    if (autosave) patch('config_member_form', next)
-    else queueSave('config_member_form', next)
+    setMemberConfig({ ...memberConfig, steps })
+    markDirty('config_member_form')
   }
 
   function moveMemberStep(index: number, dir: -1 | 1) {
@@ -838,9 +973,8 @@ export function ApplicationBuilder({
     const target = index + dir
     if (target < 0 || target >= steps.length) return
     ;[steps[index], steps[target]] = [steps[target], steps[index]]
-    const next = { ...memberConfig, steps }
-    setMemberConfig(next)
-    patch('config_member_form', next)
+    setMemberConfig({ ...memberConfig, steps })
+    markDirty('config_member_form')
   }
 
   function moveMemberField(stepKey: string, fieldKey: string, dir: -1 | 1) {
@@ -856,9 +990,24 @@ export function ApplicationBuilder({
       ;[fields[idx], fields[target]] = [fields[target], fields[idx]]
       return { ...s, fields }
     })
-    const next = { ...memberConfig, steps }
-    setMemberConfig(next)
-    patch('config_member_form', next)
+    setMemberConfig({ ...memberConfig, steps })
+    markDirty('config_member_form')
+  }
+
+  // Drag-and-drop: move a field to an arbitrary position within its section.
+  // `toIndex` is the insertion index in the pre-removal list.
+  function reorderMemberField(stepKey: string, fieldKey: string, toIndex: number) {
+    const steps = memberConfig.steps.map(s => {
+      if (s.key !== stepKey) return s
+      const fields = [...s.fields]
+      const from = fields.findIndex(f => f.key === fieldKey)
+      if (from < 0 || fields[from].locked) return s
+      const [moved] = fields.splice(from, 1)
+      fields.splice(toIndex > from ? toIndex - 1 : toIndex, 0, moved)
+      return { ...s, fields }
+    })
+    setMemberConfig({ ...memberConfig, steps })
+    markDirty('config_member_form')
   }
 
   function toggleMemberFieldWidth(stepKey: string, fieldKey: string) {
@@ -871,21 +1020,18 @@ export function ApplicationBuilder({
       )
       return { ...s, fields }
     })
-    const next = { ...memberConfig, steps }
-    setMemberConfig(next)
-    patch('config_member_form', next)
+    setMemberConfig({ ...memberConfig, steps })
+    markDirty('config_member_form')
   }
 
-  function setMemberField(stepKey: string, fieldKey: string, fieldPatch: Partial<FieldConfig>, autosave = false) {
+  function setMemberField(stepKey: string, fieldKey: string, fieldPatch: Partial<FieldConfig>) {
     const steps = memberConfig.steps.map(s => {
       if (s.key !== stepKey) return s
       const fields = s.fields.map(f => f.key === fieldKey ? { ...f, ...fieldPatch } : f)
       return { ...s, fields }
     })
-    const next = { ...memberConfig, steps }
-    setMemberConfig(next)
-    if (autosave) patch('config_member_form', next)
-    else queueSave('config_member_form', next)
+    setMemberConfig({ ...memberConfig, steps })
+    markDirty('config_member_form')
   }
 
   // ── Delete / add step ──
@@ -898,14 +1044,13 @@ export function ApplicationBuilder({
       title: `Delete “${step.title}”?`,
       body: hasRequiredCore
         ? "It has required fields — applicants won't see them."
-        : 'This cannot be undone without resetting to defaults.',
+        : 'The section disappears when you save — discard unsaved changes to bring it back.',
       confirmLabel: 'Delete section',
       danger: true,
     })
     if (!ok) return
-    const next = { ...memberConfig, steps: memberConfig.steps.filter(s => s.key !== stepKey) }
-    setMemberConfig(next)
-    patch('config_member_form', next)
+    setMemberConfig({ ...memberConfig, steps: memberConfig.steps.filter(s => s.key !== stepKey) })
+    markDirty('config_member_form')
     setExpandedSteps(prev => { const n = new Set(prev); n.delete(stepKey); return n })
   }
 
@@ -915,9 +1060,8 @@ export function ApplicationBuilder({
       key, num: '', title: 'NEW SECTION', subtitle: 'Describe this section.',
       visible: true, canHide: true, isCustom: true, fields: [],
     }
-    const next = { ...memberConfig, steps: [...memberConfig.steps, newStep] }
-    setMemberConfig(next)
-    patch('config_member_form', next)
+    setMemberConfig({ ...memberConfig, steps: [...memberConfig.steps, newStep] })
+    markDirty('config_member_form')
     setExpandedSteps(prev => { const n = new Set(prev); n.add(key); return n })
   }
 
@@ -935,20 +1079,19 @@ export function ApplicationBuilder({
         : type === 'agreement' ? ['I agree to…']
         : undefined,
     }
-    const next = {
+    setMemberConfig({
       ...memberConfig,
       steps: memberConfig.steps.map(s =>
         s.key === stepKey ? { ...s, fields: [...s.fields, newField] } : s
       ),
-    }
-    setMemberConfig(next)
-    patch('config_member_form', next)
+    })
+    markDirty('config_member_form')
   }
 
   async function handleResetMemberForm() {
     const ok = await confirm({
       title: 'Reset the member application form to its defaults?',
-      body: 'Custom fields, text blocks, deletions, and layout changes will be lost. (The open/closed status is kept.)',
+      body: 'Custom fields, text blocks, deletions, and layout changes will be lost when you save. (The open/closed status is kept.)',
       confirmLabel: 'Reset form',
       danger: true,
     })
@@ -956,7 +1099,7 @@ export function ApplicationBuilder({
     const fresh = mergeMemberConfig({ open: memberConfig.open })
     setMemberConfig(fresh)
     setExpandedSteps(new Set())
-    patch('config_member_form', fresh)
+    markDirty('config_member_form')
   }
 
   function handleAddElement(stepKey: string, element: 'divider' | 'paragraph') {
@@ -968,54 +1111,46 @@ export function ApplicationBuilder({
       visible: true, required: false, canHide: true, canChangeRequired: false,
       isCustom: true,
     }
-    const next = {
+    setMemberConfig({
       ...memberConfig,
       steps: memberConfig.steps.map(s =>
         s.key === stepKey ? { ...s, fields: [...s.fields, newEl] } : s
       ),
-    }
-    setMemberConfig(next)
-    patch('config_member_form', next)
+    })
+    markDirty('config_member_form')
   }
 
   function handleDeleteField(stepKey: string, fieldKey: string) {
-    const next = {
+    setMemberConfig({
       ...memberConfig,
       steps: memberConfig.steps.map(s =>
         s.key === stepKey ? { ...s, fields: s.fields.filter(f => f.key !== fieldKey) } : s
       ),
-    }
-    setMemberConfig(next)
-    patch('config_member_form', next)
+    })
+    markDirty('config_member_form')
   }
 
   // ── Volunteer helpers ──
 
   function toggleVolunteerOpen() {
-    const next = { ...volunteerConfig, open: !volunteerConfig.open }
-    setVolunteerConfig(next)
-    patch('config_volunteer_form', next)
+    const open = !volunteerConfig.open
+    // Live operational switch — same pattern as toggleMemberOpen.
+    setVolunteerConfig({ ...volunteerConfig, open })
+    persist({ config_volunteer_form: { ...savedRef.current.config_volunteer_form, open } })
+      .then(ok => { if (!ok) markDirty('config_volunteer_form') })
   }
 
-  function setVolunteerField(fieldKey: string, fieldPatch: Partial<FieldConfig>, autosave = false) {
+  function setVolunteerField(fieldKey: string, fieldPatch: Partial<FieldConfig>) {
     const fields = volunteerConfig.fields.map(f => f.key === fieldKey ? { ...f, ...fieldPatch } : f)
-    const next = { ...volunteerConfig, fields }
-    setVolunteerConfig(next)
-    if (autosave) patch('config_volunteer_form', next)
-    else queueSave('config_volunteer_form', next)
+    setVolunteerConfig({ ...volunteerConfig, fields })
+    markDirty('config_volunteer_form')
   }
 
-  // ── Explicit save ──
+  // ── Track-card copy ──
 
   function setTrackCopyField(key: keyof TrackCopy, value: string) {
-    const next = { ...trackCopy, [key]: value }
-    setTrackCopy(next)
-    queueSave('config_track_picker', next)
-  }
-
-  function handleSave() {
-    if (activeTab === 'member') patch('config_member_form', memberConfig)
-    else patch('config_volunteer_form', volunteerConfig)
+    setTrackCopy({ ...trackCopy, [key]: value })
+    markDirty('config_track_picker')
   }
 
   // ── Tab style ──
@@ -1046,34 +1181,74 @@ export function ApplicationBuilder({
 
         <AdminNav />
 
-        {/* Floating save indicator — always visible, even scrolled down */}
-        <div style={{
-          position: 'fixed', top: '1rem', right: '1rem', zIndex: 50,
-          display: 'flex', alignItems: 'center', gap: '0.5rem',
-          padding: '0.45rem 0.9rem', borderRadius: '9999px',
-          background: 'rgba(20,10,30,0.82)', backdropFilter: 'blur(6px)',
-          border: `1px solid ${saveStatus === 'error' ? 'rgba(255,138,138,0.4)' : saveStatus === 'saving' ? 'rgba(200,168,72,0.35)' : 'rgba(125,207,142,0.3)'}`,
-          fontSize: '0.72rem', letterSpacing: '0.04em', boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-          transition: 'border-color 0.2s',
+        {/* Floating save bar — always visible, even scrolled down. Manual save:
+            edits mark the config dirty, the bar shows it unmissably, and only
+            the Save button (or ⌘S) persists. Positioning lives in the class so
+            the mobile media query can move it to a thumb-reachable spot. */}
+        <style dangerouslySetInnerHTML={{ __html: `
+          .ab-savebar { position: fixed; top: 1rem; right: 1rem; z-index: 50; }
+          @media (max-width: 640px) {
+            .ab-savebar { top: auto; bottom: 1.25rem; right: 50%; transform: translateX(50%); max-width: calc(100vw - 2rem); }
+          }
+          @keyframes ab-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+        ` }} />
+        <div className="ab-savebar" style={{
+          display: 'flex', alignItems: 'center', gap: '0.6rem',
+          padding: dirty && saveStatus !== 'saving' ? '0.35rem 0.4rem 0.35rem 1rem' : '0.45rem 0.9rem',
+          borderRadius: '9999px',
+          background: 'rgba(20,10,30,0.88)', backdropFilter: 'blur(6px)',
+          border: `1px solid ${
+            saveStatus === 'error' ? 'rgba(255,138,138,0.4)'
+            : saveStatus === 'saving' ? 'rgba(200,168,72,0.35)'
+            : dirty ? 'rgba(200,168,72,0.55)'
+            : 'rgba(125,207,142,0.3)'
+          }`,
+          fontSize: '0.72rem', letterSpacing: '0.04em',
+          boxShadow: dirty ? '0 4px 20px rgba(200,168,72,0.18), 0 4px 16px rgba(0,0,0,0.4)' : '0 4px 16px rgba(0,0,0,0.4)',
+          transition: 'border-color 0.2s, box-shadow 0.2s',
         }}>
-          {saveStatus === 'error' ? (
+          {saveStatus === 'saving' ? (
+            <span style={{ color: GOLD, opacity: 0.9, display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: GOLD, display: 'inline-block' }} />
+              Saving…
+            </span>
+          ) : saveStatus === 'error' ? (
             <>
               <span style={{ color: '#ff8a8a' }}>⚠ Couldn&apos;t save{saveError ? ` — ${saveError}` : ''}</span>
               <button
                 onClick={handleSave}
                 disabled={saving}
                 style={{
-                  padding: '0.25rem 0.8rem', borderRadius: '9999px', border: 'none',
+                  padding: '0.3rem 0.9rem', borderRadius: '9999px', border: 'none',
                   background: 'linear-gradient(135deg, #C8A848, #A8882A)', color: '#1A0A00',
                   fontSize: '0.7rem', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer',
                 }}
               >Retry</button>
             </>
-          ) : saveStatus === 'saving' ? (
-            <span style={{ color: GOLD, opacity: 0.9, display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
-              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: GOLD, display: 'inline-block' }} />
-              Saving…
-            </span>
+          ) : dirty ? (
+            <>
+              <span style={{ color: GOLD, display: 'inline-flex', alignItems: 'center', gap: '0.45rem', whiteSpace: 'nowrap' }}>
+                <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: GOLD, display: 'inline-block', animation: 'ab-pulse 1.6s ease-in-out infinite' }} />
+                Unsaved changes
+              </span>
+              <button
+                onClick={handleDiscard}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: CREAM, opacity: 0.45, fontSize: '0.7rem', letterSpacing: '0.04em',
+                  textDecoration: 'underline', textUnderlineOffset: '3px', padding: '0.3rem 0.15rem',
+                }}
+              >Discard</button>
+              <button
+                onClick={handleSave}
+                style={{
+                  padding: '0.35rem 1.1rem', borderRadius: '9999px', border: 'none',
+                  background: 'linear-gradient(135deg, #C8A848, #A8882A)', color: '#1A0A00',
+                  fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.05em', cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(200,168,72,0.35)',
+                }}
+              >Save</button>
+            </>
           ) : (
             <span style={{ color: '#7dcf8e', opacity: saveStatus === 'saved' ? 0.95 : 0.6, display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
               <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#7dcf8e', display: 'inline-block' }} />
@@ -1125,22 +1300,18 @@ export function ApplicationBuilder({
                   else next.add(step.key)
                   return next
                 })}
-                onToggleVisible={() => setMemberStep(step.key, { visible: !step.visible }, true)}
+                onToggleVisible={() => setMemberStep(step.key, { visible: !step.visible })}
                 onMoveUp={() => moveMemberStep(idx, -1)}
                 onMoveDown={() => moveMemberStep(idx, 1)}
                 onTitleChange={v => setMemberStep(step.key, { title: v })}
                 onSubtitleChange={v => setMemberStep(step.key, { subtitle: v })}
-                onFieldChange={(fieldKey, fp) => {
-                  // Toggles/type save immediately; typed text (label/description/
-                  // options) debounces via queueSave.
-                  const isStructural = 'visible' in fp || 'required' in fp || 'type' in fp
-                  setMemberField(step.key, fieldKey, fp, isStructural)
-                }}
+                onFieldChange={(fieldKey, fp) => setMemberField(step.key, fieldKey, fp)}
                 onDelete={() => handleDeleteStep(step.key)}
                 onAddField={type => handleAddField(step.key, type)}
                 onDeleteField={fieldKey => handleDeleteField(step.key, fieldKey)}
                 fieldsModular={MODULAR_STEP_KEYS.includes(step.key) || !!step.isCustom}
                 onMoveField={(fieldKey, dir) => moveMemberField(step.key, fieldKey, dir)}
+                onReorderField={(fieldKey, toIdx) => reorderMemberField(step.key, fieldKey, toIdx)}
                 onToggleFieldWidth={fieldKey => toggleMemberFieldWidth(step.key, fieldKey)}
                 onAddElement={element => handleAddElement(step.key, element)}
                 groups={allGroups}
@@ -1176,6 +1347,11 @@ export function ApplicationBuilder({
               >
                 Test this application →
               </a>
+              {dirty && (
+                <span style={{ fontSize: '0.7rem', fontStyle: 'italic', opacity: 0.45, width: '100%' }}>
+                  The preview shows the saved form — save first to see your latest edits.
+                </span>
+              )}
               <button
                 onClick={handleResetMemberForm}
                 disabled={saving}
@@ -1218,8 +1394,8 @@ export function ApplicationBuilder({
                   key={field.key}
                   field={field}
                   saving={saving}
-                  onToggleVisible={() => setVolunteerField(field.key, { visible: !field.visible }, true)}
-                  onToggleRequired={() => setVolunteerField(field.key, { required: !field.required }, true)}
+                  onToggleVisible={() => setVolunteerField(field.key, { visible: !field.visible })}
+                  onToggleRequired={() => setVolunteerField(field.key, { required: !field.required })}
                   onLabelChange={v => setVolunteerField(field.key, { label: v })}
                   onDescChange={v => setVolunteerField(field.key, { description: v })}
                 />
@@ -1241,6 +1417,11 @@ export function ApplicationBuilder({
               >
                 Test this application →
               </a>
+              {dirty && (
+                <p style={{ fontSize: '0.7rem', fontStyle: 'italic', opacity: 0.45, marginTop: '0.6rem' }}>
+                  The preview shows the saved form — save first to see your latest edits.
+                </p>
+              )}
             </div>
           </div>
         )}
