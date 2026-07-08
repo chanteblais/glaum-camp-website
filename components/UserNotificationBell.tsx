@@ -162,6 +162,7 @@ export function UserNotificationBell() {
                     case 'volunteer_approved':       return { href: '/profile', label: 'Go to profile →' }
                     case 'lead_up_gathering':        return { href: '/schedule', label: 'View gathering →' }
                     case 'radio_broadcast':          return { href: '/radio', label: 'Tune in →' }
+                    case 'radio_mention':            return { href: '/radio', label: 'Tune in →' }
                     case 'new_message': {
                       const senderId = (n.details as Record<string,string> | null)?.senderId
                       return senderId ? { href: `/messages/${senderId}`, label: 'View message →' } : { href: '/messages', label: 'View messages →' }
