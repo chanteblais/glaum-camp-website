@@ -241,6 +241,105 @@ export async function sendAttunementNudgeEmail(opts: {
   return sendUserEmail(to, subject, html)
 }
 
+// One gathering or shift as it appears in a confirmation / reminder email.
+export type ReminderItem = {
+  kind: 'gathering' | 'shift'
+  title: string
+  whenText: string  // human "when", e.g. "Sat, Jul 22 · 7:00 PM"
+  href: string      // absolute URL or an app-relative path ("/schedule")
+}
+
+/**
+ * Immediate confirmation when a member RSVPs to a lead-up gathering or signs up
+ * for a shift ("you're in"). Transactional, but still gated by the recipient's
+ * `email_event_reminders` preference (checked by the caller) so one switch turns
+ * off all gathering/shift email.
+ */
+export async function sendSignupConfirmationEmail(opts: {
+  to: string
+  recipientName: string
+  kind: 'gathering' | 'shift'
+  title: string
+  whenText: string
+  location?: string | null
+  href: string
+}) {
+  const { to, recipientName, kind, title, whenText, location, href } = opts
+  const prefsUrl = `${APP_URL}/profile#notifications`
+  const url = href.startsWith('http') ? href : `${APP_URL}${href}`
+  const lead = kind === 'gathering' ? "You're on the list for this gathering:" : "You're signed up for this shift:"
+  const locRow = location ? `<p style="margin:4px 0"><strong>Where:</strong> ${escapeHtml(location)}</p>` : ''
+
+  const html = `
+    <p>Hi ${escapeHtml(recipientName)},</p>
+    <p>${lead}</p>
+    <div style="margin:18px 0;padding:14px 18px;border-left:3px solid #C8A848;background:rgba(200,168,72,0.06);color:#3a2b14;border-radius:6px">
+      <p style="margin:0 0 6px;font-size:17px;color:#634D0B"><strong>${escapeHtml(title)}</strong></p>
+      <p style="margin:4px 0"><strong>When:</strong> ${escapeHtml(whenText)}</p>
+      ${locRow}
+    </div>
+    <p style="margin:24px 0">
+      <a href="${encodeURI(url)}" style="display:inline-block;background:#C8A848;color:#1A0A24;text-decoration:none;padding:11px 22px;border-radius:8px;font-weight:bold">View details ✦</a>
+    </p>
+    <p style="font-size:12px;color:#8a8a8a;margin-top:28px">
+      We'll send a reminder before it. You're receiving this because you have gathering &amp; shift emails turned on.
+      <a href="${prefsUrl}" style="color:#8a8a8a">Manage your notification preferences</a>.
+    </p>`
+
+  const subject = kind === 'gathering' ? `You're in: ${title}` : `Shift confirmed: ${title}`
+  return sendUserEmail(to, subject, html)
+}
+
+/**
+ * Batched reminder — one email per member per phase per day, listing every
+ * gathering + shift they have that day. `phase` is 'day_before' (sent the
+ * evening before) or 'morning_of' (sent that morning). Gated by the recipient's
+ * `email_event_reminders` preference (checked by the caller).
+ */
+export async function sendEventReminderEmail(opts: {
+  to: string
+  recipientName: string
+  phase: 'day_before' | 'morning_of'
+  items: ReminderItem[]
+}) {
+  const { to, recipientName, phase, items } = opts
+  const prefsUrl = `${APP_URL}/profile#notifications`
+  const whenWord = phase === 'day_before' ? 'tomorrow' : 'today'
+
+  const list = `
+    <ul style="margin:10px 0 18px;padding-left:0;list-style:none">
+      ${items.map(it => {
+        const url = it.href.startsWith('http') ? it.href : `${APP_URL}${it.href}`
+        const tag = it.kind === 'gathering' ? 'Gathering' : 'Shift'
+        return `
+        <li style="margin:6px 0;padding:9px 14px;border-left:3px solid #C8A848;background:rgba(200,168,72,0.06);border-radius:6px;color:#3a2b14">
+          <span style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#8a7a4a">${tag}</span><br/>
+          <a href="${encodeURI(url)}" style="color:#634D0B;text-decoration:none;font-weight:bold">${escapeHtml(it.title)}</a>
+          <span style="color:#6b5a3e"> — ${escapeHtml(it.whenText)}</span>
+        </li>`
+      }).join('')}
+    </ul>`
+
+  const count = items.length
+  const subject = phase === 'day_before'
+    ? (count === 1 ? `Tomorrow: ${items[0].title}` : `${count} things on your Glåüm calendar tomorrow`)
+    : (count === 1 ? `Today: ${items[0].title}` : `${count} things on your Glåüm calendar today`)
+
+  const html = `
+    <p>Hi ${escapeHtml(recipientName)},</p>
+    <p>A gentle reminder — here's what you have coming up ${whenWord}:</p>
+    ${list}
+    <p style="margin:24px 0">
+      <a href="${APP_URL}/schedule" style="display:inline-block;background:#C8A848;color:#1A0A24;text-decoration:none;padding:11px 22px;border-radius:8px;font-weight:bold">View your schedule ✦</a>
+    </p>
+    <p style="font-size:12px;color:#8a8a8a;margin-top:28px">
+      You're receiving this because you have gathering &amp; shift reminders turned on.
+      <a href="${prefsUrl}" style="color:#8a8a8a">Manage your notification preferences</a>.
+    </p>`
+
+  return sendUserEmail(to, subject, html)
+}
+
 // ── Helpers ───────────────────────────────────────────────────────
 
 function escapeHtml(s: string): string {
