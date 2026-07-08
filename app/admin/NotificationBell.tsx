@@ -198,6 +198,8 @@ export function NotificationBell({
                 })
 
                 const link: { href: string; label: string } | null = (() => {
+                  // Dues report → jump straight to the member's Camp Dues section.
+                  if (n.event_type === 'dues_reported' && n.application_id) return { href: `/admin/${n.application_id}#dues`, label: 'Confirm payment →' }
                   if (n.application_id) return { href: `/admin/${n.application_id}`, label: 'View application →' }
                   if (n.event_type === 'volunteer_signup' && n.details?.volunteer_id) return { href: `/admin#volunteer-${n.details.volunteer_id}`, label: 'View volunteer →' }
                   if (n.event_type === 'volunteer_signup') return { href: '/admin', label: 'View volunteers →' }

@@ -13,7 +13,7 @@ was **removed entirely** and list/item authoring moved to `/participate`, where
 **any approved member creates lists and adds items**. Editing is wiki-open; the
 one guardrail is that **deleting a whole list is admin-only**.
 
-Built 2026-07-02 · migrations `051_shared_resources.sql` + `052_resource_list_stewards.sql` + `053_resource_offers.sql` + `055_resource_item_icons.sql` + `065_resource_list_dashboard.sql`. The member-ownership move itself needed no migration (wiki editing needs no owner column; list-delete reuses `requireAdmin`); the dashboard opt-in added `065` (`show_on_dashboard`).
+Built 2026-07-02 · migrations `051_shared_resources.sql` + `052_resource_list_stewards.sql` + `053_resource_offers.sql` + `055_resource_item_icons.sql` + `070_resource_list_dashboard.sql`. The member-ownership move itself needed no migration (wiki editing needs no owner column; list-delete reuses `requireAdmin`); the dashboard opt-in added `070` (`show_on_dashboard`).
 
 ## The model
 
@@ -22,7 +22,7 @@ Three tables (see `docs/database.md`):
 - **`resource_lists`** — a named collection ("Shared Kitchen", "Setup
   Equipment"), created by any approved member. **No owner column** — editing is
   wiki-open, so there's no per-user gate to record. `show_on_dashboard`
-  (migration `065`, default **false**) is a per-list opt-in to the home
+  (migration `070`, default **false**) is a per-list opt-in to the home
   dashboard widget, toggled in the list editor — distinct from `visible`. The
   legacy **steward** FKs (group / department / role, at-most-one CHECK,
   migration `052`) survive on admin-made lists as display-only context but are

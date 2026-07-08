@@ -149,7 +149,7 @@ export async function getMemberResourceView(userId: string): Promise<MemberResou
 
 // ── Home-dashboard "Bring Something" widget ──────────────────────────────────
 // A compact index: ONE row per list a member has opted into the dashboard
-// (`show_on_dashboard`, migration 065 — default off, so the widget shows
+// (`show_on_dashboard`, migration 070 — default off, so the widget shows
 // nothing until at least one list is flagged). Each row carries its
 // unit-weighted readiness; the header shows the overall %. Plus the caller's
 // own commitments for the personal line. Untargeted contributions never gate

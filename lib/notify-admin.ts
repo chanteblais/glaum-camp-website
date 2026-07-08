@@ -4,7 +4,7 @@ import { sendAdminEmail } from '@/lib/send-email'
 
 type NotifyAdminInput = {
   applicationId?: string | null
-  eventType: 'new_application' | 'profile_updated' | 'attendance_cancelled' | 'attendance_suspended' | 'suspension_lifted' | 'volunteer_cancelled' | 'volunteer_signup'
+  eventType: 'new_application' | 'profile_updated' | 'attendance_cancelled' | 'attendance_suspended' | 'suspension_lifted' | 'volunteer_cancelled' | 'volunteer_signup' | 'dues_reported'
   message: string
   details?: Record<string, unknown>
 }

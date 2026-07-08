@@ -1,0 +1,11 @@
+-- 068_dues_self_report.sql
+-- Members can self-report that they've sent their e-transfer; an admin then
+-- reviews and confirms it (which sets dues_paid_at, migration 067).
+--
+-- dues_reported_at = the member's unconfirmed claim. States:
+--   owed            → dues_reported_at NULL, dues_paid_at NULL
+--   awaiting review → dues_reported_at NOT NULL, dues_paid_at NULL
+--   paid            → dues_paid_at NOT NULL (admin-confirmed; wins over reported)
+-- Resetting a member to unpaid (admin "Not received" / "Undo") clears both.
+-- Additive, idempotent, non-destructive.
+ALTER TABLE members ADD COLUMN IF NOT EXISTS dues_reported_at TIMESTAMPTZ;

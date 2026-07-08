@@ -8,13 +8,14 @@ export type AdminCategory = {
   label: string
 }
 
-// Community — tend the community's shared life: its people and its voice.
-// (Formerly the "Members" tab. The Logistics category held Shared Resources,
-// which moved off the admin console entirely on 2026-07-08 — it's now
-// member-owned on /participate → Bring Something.)
+// Community — tend the community's shared life: its people, its voice, its
+// logistics. (Formerly the "Members" tab. Logistics once held Shared Resources,
+// which became member-owned on /participate 2026-07-08 and left the console;
+// Camp Dues remains under Logistics.)
 export const COMMUNITY_CATEGORIES: AdminCategory[] = [
   { id: 'people', label: 'People' },
   { id: 'communication', label: 'Communication' },
+  { id: 'logistics', label: 'Logistics' },
 ]
 
 // Program — the schedule and the runway of gatherings. These ids double as

@@ -10,6 +10,7 @@ import { getMemberGroups } from '@/lib/groups'
 import { getResourceWidgetState } from '@/lib/resources'
 import { buildAttunementChecklist, memberGroupCounts, requiredItems, commitmentItems } from '@/lib/attunement'
 import { getMemberShiftState, EMPTY_MEMBER_SHIFT_STATE } from '@/lib/shift-attunement'
+import { parseDuesConfig, duesAppliesToMembers } from '@/lib/dues'
 import { getRadioFeed, type RadioEventRow } from '@/lib/radio'
 import { RadioMessage } from '@/components/RadioMessage'
 import { daysUntilEvent } from '@/lib/camp-event'
@@ -246,10 +247,12 @@ let canManagePolls = false
     // Suspension flag (063) — a suspended member holds no commitments, so we
     // swap the attunement banner for a "paused" notice instead of nagging them.
     isApprovedForBatch && application?.clerk_user_id
-      ? supabaseAdmin.from('members').select('suspended_at').eq('clerk_user_id', application.clerk_user_id as string).maybeSingle()
+      ? supabaseAdmin.from('members').select('suspended_at, dues_paid_at, dues_reported_at').eq('clerk_user_id', application.clerk_user_id as string).maybeSingle()
       : Promise.resolve({ data: null }),
   ])
   const isSuspended = !!(suspendedResult?.data?.suspended_at)
+  const duesPaid = !!(suspendedResult?.data?.dues_paid_at)
+  const duesReported = !!(suspendedResult?.data?.dues_reported_at)
   const contentRows = pageContentResult.data
   const pageContent: Record<string, string> = Object.fromEntries((contentRows ?? []).map(r => [r.key, r.value]))
   const c = (key: string, fallback: string) => pageContent[key] ?? fallback
@@ -281,6 +284,9 @@ let canManagePolls = false
   // so the home banner's outstanding count always matches the profile checklist.
   const attunementTasks = buildAttunementChecklist(pageContent['config_attunement_tasks'], {
     hasPhoto: !!application?.avatar_url,
+    duesPaid,
+    duesReported,
+    duesActiveForMembers: duesAppliesToMembers(parseDuesConfig(pageContent['config_dues'])),
     groupCountsByCollection,
     totalGroupCount,
     roleDone: !!campSignup?.role_id && campSignup?.role_approval_status !== 'pending',
@@ -576,7 +582,7 @@ let canManagePolls = false
 
                 // "Bring Something" answers "what does the community still
                 // need from me?" at a glance: a compact index — one row per list
-                // a member opted into the dashboard (show_on_dashboard, mig 065)
+                // a member opted into the dashboard (show_on_dashboard, mig 070)
                 // with its readiness — an overall % header, and a personal line
                 // (my commitments, or a nudge). Whole card clicks through to
                 // /participate#bring. Hidden entirely until a list is flagged

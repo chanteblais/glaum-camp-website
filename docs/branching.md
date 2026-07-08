@@ -55,7 +55,21 @@ Rules:
    ```
 3. **Never `git add -A` / `git add .` in the shared checkout.** Stage explicit
    paths only — the tree may contain another session's (or Chante's) in-flight
-   files.
+   files. This applies to quick `git commit -m "docs"`-style snapshots too:
+   `git add docs/` beats `git add -A`, and a glance at `git status` first
+   catches stray `lib/…` or `.claude/worktrees/` entries that belong to another
+   session. (Learned 2026-07-08: a terse `git add -A && commit -m docs` swept a
+   worktree session's stray `lib/asset-library.ts` edit + untracked
+   `.claude/worktrees/*` gitlinks onto `main` and deployed a 404'ing icon — a
+   lib entry referencing an asset that was never committed. The gitlinks +
+   `__pycache__/` are now gitignored, but explicit staging is still the guard.)
+3a. **In a worktree, keep every file path inside the worktree.** Bash `cp`/`git`
+   inherit the worktree cwd, but Read/Edit/Write take a *literal* path — an
+   absolute path missing the `.claude/worktrees/<name>/` segment silently edits
+   the **shared** checkout (same 2026-07-08 incident: the asset was written in
+   the worktree, the `lib` edit in the shared root, so the branch commit carried
+   only half the change). Prefix edit paths with the worktree root, or confirm
+   the path contains `/.claude/worktrees/`.
 4. Sessions that only *read* need no branch and no worktree.
 5. **Commit work-in-progress to the feature branch; never leave the shared
    checkout dirty between turns.** (Learned 2026-07-02: review-round edits sat

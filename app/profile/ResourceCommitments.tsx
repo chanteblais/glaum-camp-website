@@ -38,7 +38,7 @@ type ResourceList = {
   // The list's steward — a group, department, or role name (display context
   // only; legacy admin-set, no longer editable here).
   steward_name: string | null
-  // Opt-in to the home "Bring Something" dashboard widget (migration 065).
+  // Opt-in to the home "Bring Something" dashboard widget (migration 070).
   show_on_dashboard: boolean
   items: ResourceItem[]
 }
@@ -431,7 +431,7 @@ export function ResourceCommitments({
     </button>
   )
 
-  // "Show on the home dashboard" opt-in (migration 065) — shared by the new-
+  // "Show on the home dashboard" opt-in (migration 070) — shared by the new-
   // and edit-list forms.
   const dashCheckbox = (checked: boolean, onChange: (v: boolean) => void): React.ReactNode => (
     <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', opacity: 0.75, cursor: 'pointer', userSelect: 'none', marginBottom: '0.75rem' }}>
