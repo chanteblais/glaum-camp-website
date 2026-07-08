@@ -7,7 +7,7 @@ const GOLD = '#C8A848'
 const CREAM = '#F3EDE6'
 
 // Member self-report control on /dues. When they haven't reported, a primary
-// "I've sent my dues" button files the claim (dues_reported_at, 066). When they
+// "I've sent my dues" button files the claim (dues_reported_at, 068). When they
 // have (but an admin hasn't confirmed yet), a quiet "Undo" retracts it.
 // router.refresh() re-renders the server page with the new state.
 export function DuesReportButton({ reported }: { reported: boolean }) {

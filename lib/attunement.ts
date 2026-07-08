@@ -26,15 +26,15 @@ export const commitmentItems = (items: AttunementChecklistItem[]) =>
 // The member's current state, derived from their application + camp signup.
 export type AttunementState = {
   hasPhoto: boolean
-  // Camp dues (migration 065): true once an admin records the member paid.
+  // Camp dues (migration 067): true once an admin records the member paid.
   // Manual/email-collected this year, so it's admin-set rather than derived.
   duesPaid: boolean
-  // The member self-reported paying (066), pending admin confirmation. Counts as
+  // The member self-reported paying (068), pending admin confirmation. Counts as
   // done for the checklist (they've done their part) — shown "awaiting
   // confirmation" — so they aren't nudged; an admin can revert if it never lands.
   duesReported: boolean
   // Whether camp dues are live for members (config_dues enabled + members
-  // audience, 067). When off, any authored `dues` task is dropped from the list.
+  // audience, 069). When off, any authored `dues` task is dropped from the list.
   duesActiveForMembers: boolean
   // Member's group-membership counts: per collection id, and the total across
   // all collections (drives 'collection' requirement tasks).

@@ -2,7 +2,7 @@
 // Member-facing payment info for camp dues, shown on /dues and configured in
 // Admin → Community → Camp Dues. Stored as JSON in page_content key
 // "config_dues". Per-member paid state lives on members.dues_paid_at (migration
-// 065); this config only describes HOW to pay, not WHO has paid.
+// 067); this config only describes HOW to pay, not WHO has paid.
 //
 // This year dues are collected manually (by email / e-transfer). Amounts are
 // free text so the organizer controls currency + formatting (no currency
@@ -10,7 +10,7 @@
 
 export type DuesMode = 'fixed' | 'sliding'
 
-// Which populations owe dues (migration 067). Camp members get the full flow
+// Which populations owe dues (migration 069). Camp members get the full flow
 // (self-report + attunement + tracker); volunteers are admin-tracked only (they
 // have no self-serve dues surface). Default: members only.
 export type DuesAudience = {

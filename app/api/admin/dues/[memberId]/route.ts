@@ -28,7 +28,7 @@ export async function POST(req: NextRequest, { params }: { params: { memberId: s
 
   // paid=true confirms (records payment). paid=false is a full reset to "owed"
   // (admin "Undo" or "Not received"). For members that also clears any
-  // self-report (066); volunteers have no such column.
+  // self-report (068); volunteers have no such column.
   const base = paid
     ? { dues_paid_at: new Date().toISOString(), dues_paid_by: userId, dues_note: note || null }
     : { dues_paid_at: null, dues_paid_by: null, dues_note: null }

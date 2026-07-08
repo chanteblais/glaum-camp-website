@@ -1,4 +1,4 @@
--- 065_camp_dues.sql
+-- 067_camp_dues.sql
 -- Camp dues. This year dues are collected manually (by email / e-transfer);
 -- a Stripe integration is a future TODO that will write the same `dues_paid_at`.
 --

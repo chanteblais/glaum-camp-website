@@ -1,6 +1,6 @@
--- 066_dues_self_report.sql
+-- 068_dues_self_report.sql
 -- Members can self-report that they've sent their e-transfer; an admin then
--- reviews and confirms it (which sets dues_paid_at, migration 065).
+-- reviews and confirms it (which sets dues_paid_at, migration 067).
 --
 -- dues_reported_at = the member's unconfirmed claim. States:
 --   owed            → dues_reported_at NULL, dues_paid_at NULL

@@ -11,11 +11,11 @@ export type DuesRosterRow = {
   name: string
   email: string | null
   paidAt: string | null
-  // Members only: self-reported (066) but not yet admin-confirmed → "awaiting
+  // Members only: self-reported (068) but not yet admin-confirmed → "awaiting
   // review". Always null for volunteers (they have no self-serve surface).
   reportedAt: string | null
   note: string | null
-  // Suspended members (065 × 063) are shown de-emphasized and left out of the
+  // Suspended members (067 × 063) are shown de-emphasized and left out of the
   // counts — a paused member isn't expected to pay while away.
   suspended: boolean
 }

@@ -73,7 +73,7 @@ export function parseTrackCopy(raw?: string | null): TrackCopy {
 
 // 'collection' = membership in a group collection (migration 042); the task
 // carries which collection and how many memberships are required.
-// 'dues' = camp dues recorded paid (migration 065). Unlike every other
+// 'dues' = camp dues recorded paid (migration 067). Unlike every other
 // requirement it isn't derived from a member action — this year dues are
 // collected by email and an admin marks each member paid (Community → Camp Dues).
 export type AttunementRequirement = 'role' | 'shift' | 'collection' | 'photo' | 'approved' | 'dues'

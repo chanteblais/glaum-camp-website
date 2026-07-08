@@ -6,7 +6,7 @@ import { notifyAdmin } from '@/lib/notify-admin'
 import { parseDuesConfig, duesAppliesToMembers } from '@/lib/dues'
 
 // Self-serve camp-dues report: POST { reported: boolean }.
-// A member marks that they've sent their e-transfer (dues_reported_at, 066);
+// A member marks that they've sent their e-transfer (dues_reported_at, 068);
 // an admin then reviews and confirms it in Community → Camp Dues. Members can
 // also un-report a mistaken claim — but not once an admin has confirmed payment.
 export async function POST(req: NextRequest) {

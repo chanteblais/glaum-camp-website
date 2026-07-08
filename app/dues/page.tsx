@@ -50,7 +50,7 @@ export default async function DuesPage() {
 
   const amount = formatDuesAmount(cfg)
   const paid = !!member.dues_paid_at
-  // Self-reported but not yet admin-confirmed → "awaiting confirmation" (066).
+  // Self-reported but not yet admin-confirmed → "awaiting confirmation" (068).
   const reported = !paid && !!member.dues_reported_at
   const owed = !paid && !reported
   const fmtDate = (d: string) => new Date(d).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })

@@ -26,7 +26,7 @@ export function DuesMemberControl({
 }) {
   const [paid, setPaid] = useState(!!paidAt)
   const [paidDate, setPaidDate] = useState<string | null>(paidAt)
-  // Self-reported (066) but not yet confirmed → an "awaiting review" state with
+  // Self-reported (068) but not yet confirmed → an "awaiting review" state with
   // Confirm / Not received. Cleared once confirmed or reset.
   const [reported, setReported] = useState(!paidAt && !!reportedAt)
   const [note, setNote] = useState('')
