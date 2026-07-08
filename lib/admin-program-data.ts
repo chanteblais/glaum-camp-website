@@ -2,7 +2,6 @@ import { supabaseAdmin } from './supabase'
 import { memberDisplayNames } from './member-names'
 import type { ScheduleEvent, ShiftTypeOption, RosterEntry } from '@/app/admin/ScheduleManager'
 import type { LeadUpEvent } from '@/app/admin/LeadUpGatheringsManager'
-import type { ResourceList, StewardOptions } from '@/app/admin/ResourcesManager'
 import type { AdminRadioEvent } from '@/app/admin/RadioManager'
 
 // Server-side assembly for the Program tab's managers. Each function is the
@@ -106,84 +105,6 @@ export async function getAdminLeadUpEvents(): Promise<LeadUpEvent[]> {
     counts[r.lead_up_event_id] = (counts[r.lead_up_event_id] ?? 0) + 1
   }
   return (data ?? []).map(e => ({ ...e, rsvp_count: counts[e.id] ?? 0 })) as LeadUpEvent[]
-}
-
-// Full admin resources view: every list (visible or not) with its items, and
-// per-item claims carrying display names — the organizer always sees who to chase.
-export async function getAdminResourceLists(): Promise<ResourceList[]> {
-  const [{ data: lists, error }, { data: items }, { data: claims }] = await Promise.all([
-    supabaseAdmin
-      .from('resource_lists')
-      .select('id, title, description, group_id, department_id, role_id, visible, sort_order, groups(name), departments(name), roles(name)')
-      .order('sort_order', { ascending: true })
-      .order('created_at', { ascending: true }),
-    supabaseAdmin
-      .from('resources')
-      .select('id, list_id, name, note, quantity_needed, offered_by, icon, sort_order')
-      .order('sort_order', { ascending: true })
-      .order('created_at', { ascending: true }),
-    supabaseAdmin
-      .from('resource_claims')
-      .select('resource_id, clerk_user_id, quantity'),
-  ])
-  if (error) throw new Error(error.message)
-
-  const names = await memberDisplayNames([
-    ...(claims ?? []).map(c => c.clerk_user_id),
-    ...(items ?? []).map(i => i.offered_by).filter(Boolean) as string[],
-  ])
-
-  const claimsByResource: Record<string, { name: string; quantity: number }[]> = {}
-  for (const c of claims ?? []) {
-    ;(claimsByResource[c.resource_id] ??= []).push({
-      name: names[c.clerk_user_id] ?? 'Unknown member',
-      quantity: c.quantity,
-    })
-  }
-
-  const itemsByList: Record<string, unknown[]> = {}
-  for (const it of items ?? []) {
-    const itemClaims = claimsByResource[it.id] ?? []
-    ;(itemsByList[it.list_id] ??= []).push({
-      ...it,
-      // NULL quantity_needed = open member offer (migration 053).
-      offered_by_name: it.offered_by ? names[it.offered_by] ?? 'Unknown member' : null,
-      claimed: itemClaims.reduce((s, c) => s + c.quantity, 0),
-      claimants: itemClaims,
-    })
-  }
-
-  // Supabase types the embeds as arrays; runtime returns a single row for a to-one FK.
-  type NameEmbed = { name: string } | { name: string }[] | null
-  const embedName = (e: NameEmbed) => (Array.isArray(e) ? e[0]?.name : e?.name) ?? null
-  type ListRow = { id: string; title: string; description: string | null; group_id: string | null; department_id: string | null; role_id: string | null; visible: boolean; sort_order: number; groups: NameEmbed; departments: NameEmbed; roles: NameEmbed }
-  return ((lists ?? []) as unknown as ListRow[]).map(l => ({
-    id: l.id, title: l.title, description: l.description,
-    group_id: l.group_id, department_id: l.department_id, role_id: l.role_id,
-    visible: l.visible, sort_order: l.sort_order,
-    // The steward is display context only; at most one FK is set (migration 052).
-    steward_name: embedName(l.groups) ?? embedName(l.departments) ?? embedName(l.roles),
-    items: itemsByList[l.id] ?? [],
-  })) as ResourceList[]
-}
-
-// The steward dropdown's option pools (at most one steward per list — migration 052).
-export async function getStewardOptions(): Promise<StewardOptions> {
-  const [{ data: groups }, { data: departments }, { data: roles }] = await Promise.all([
-    supabaseAdmin.from('groups').select('id, name').order('sort_order', { ascending: true }),
-    supabaseAdmin.from('departments').select('id, name').order('sort_order', { ascending: true }),
-    supabaseAdmin.from('roles').select('id, name, department_id').order('sort_order', { ascending: true }),
-  ])
-  const deptName = Object.fromEntries((departments ?? []).map(d => [d.id as string, d.name as string]))
-  return {
-    groups: (groups ?? []).map(g => ({ id: g.id as string, name: g.name as string })),
-    departments: (departments ?? []).map(d => ({ id: d.id as string, name: d.name as string })),
-    roles: (roles ?? []).map(r => ({
-      id: r.id as string,
-      name: r.name as string,
-      department_name: r.department_id ? deptName[r.department_id] ?? null : null,
-    })),
-  }
 }
 
 // The Radio manager's "recently on the air" list (all kinds, for curation).

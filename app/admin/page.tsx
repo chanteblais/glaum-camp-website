@@ -11,12 +11,11 @@ import { CategoryHeading } from './CategoryHeading'
 import { COMMUNITY_CATEGORIES } from './admin-sections'
 import { AnnouncementsManager } from './AnnouncementsManager'
 import { RadioManager } from './RadioManager'
-import { ResourcesManager } from './ResourcesManager'
 import { getGroupNamesByUser } from '@/lib/groups'
 import { getShiftEventByUser } from '@/lib/shift-signups'
 import { getAdminRunway } from '@/lib/admin-attention'
 import { parseRadioSources } from '@/lib/radio'
-import { getAdminRadioEvents, getAdminResourceLists, getStewardOptions } from '@/lib/admin-program-data'
+import { getAdminRadioEvents } from '@/lib/admin-program-data'
 import { RoleRequestsSection } from './RoleRequestsSection'
 import { RoleSuggestionsSection } from './RoleSuggestionsSection'
 
@@ -40,8 +39,6 @@ export default async function AdminPage() {
     { data: notifications, error: notificationsError },
     radioEvents,
     { data: radioConfigRow },
-    resourceLists,
-    stewardOptions,
   ] = await Promise.all([
     supabaseAdmin
       .from('volunteers')
@@ -73,8 +70,6 @@ export default async function AdminPage() {
       .select('value')
       .eq('key', 'config_radio')
       .maybeSingle(),
-    safe(getAdminResourceLists()),
-    safe(getStewardOptions()),
   ])
 
   const volunteers = volunteersRaw ?? []
@@ -144,7 +139,7 @@ export default async function AdminPage() {
           Community
         </h1>
         <p style={{ textAlign: 'center', opacity: 0.5, fontSize: '0.85rem', marginBottom: '2.5rem' }}>
-          The people of camp, what they hear, and what they&apos;re bringing
+          The people of camp and what they hear
         </p>
 
         {dbError && (
@@ -268,18 +263,8 @@ export default async function AdminPage() {
           />
         </CollapsibleSection>
 
-        {/* ═══════════════ LOGISTICS ═══════════════ */}
-        <CategoryHeading id="logistics" />
-
-        <CollapsibleSection
-          title="Shared Resources"
-          summary={resourceLists
-            ? `${resourceLists.length} list${resourceLists.length === 1 ? '' : 's'} · ${resourceLists.reduce((n, l) => n + l.items.length, 0)} items`
-            : 'Bring Something — needs & claims'}
-          defaultOpen={false}
-        >
-          <ResourcesManager initialLists={resourceLists} initialStewards={stewardOptions} />
-        </CollapsibleSection>
+        {/* Shared Resources moved off the admin console 2026-07-08 — it's now
+            member-owned on /participate → Bring Something. */}
 
       </div>
     </div>
