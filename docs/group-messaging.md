@@ -193,8 +193,8 @@ fan-out doesn't re-parse text.
 ## UI
 
 - **`/messages` inbox** — group conversations as rows alongside DMs; group rows show group
-  name + icon and an unread count. Minimal visual distinction (icon) so it's obvious which are
-  crews vs people.
+  name + icon (uploaded `icon_image` art when set, else the emoji glyph) and an unread count.
+  Minimal visual distinction (icon) so it's obvious which are crews vs people.
 - **Thread view** — flat channel; each top-level message shows "💬 N replies" that expands its
   reply thread inline (one level). Composer supports `@mention` autocomplete. Per-thread overflow
   menu: mute, email opt-in, (open groups) leave, view roster.

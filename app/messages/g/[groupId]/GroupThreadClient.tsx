@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabaseResizedUrl } from '@/lib/supabase-image'
+import { IconImage } from '@/components/IconImage'
 import { useConfirm } from '../../../components/ConfirmDialog'
 
 type GroupMessage = {
@@ -21,6 +22,7 @@ type Props = {
   groupId: string
   groupName: string
   groupIcon: string | null
+  groupIconImage: string | null
   members: Member[]
   canLeave: boolean
   initialMuted: boolean
@@ -96,7 +98,7 @@ function MessageBubble({ msg, isMe, showSender, avatarSize = 30, renderBody }: {
   )
 }
 
-export function GroupThreadClient({ currentUserId, groupId, groupName, groupIcon, members, canLeave, initialMuted, initialEmailOptIn }: Props) {
+export function GroupThreadClient({ currentUserId, groupId, groupName, groupIcon, groupIconImage, members, canLeave, initialMuted, initialEmailOptIn }: Props) {
   const [messages, setMessages] = useState<GroupMessage[]>([])
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -401,10 +403,12 @@ export function GroupThreadClient({ currentUserId, groupId, groupName, groupIcon
         <div style={{
           width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
           border: '1px solid rgba(111,73,31,0.7)', background: 'rgba(200,168,72,0.08)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: '1.15rem',
         }}>
-          <span aria-hidden="true">{groupIcon || '✦'}</span>
+          {groupIconImage
+            ? <IconImage src={groupIconImage} size="100%" fill={0.85} />
+            : <span aria-hidden="true">{groupIcon || '✦'}</span>}
         </div>
         <div>
           <p style={{ margin: 0, fontFamily: 'TokyoDreams, serif', fontSize: '1.05rem', color: '#C8A848' }}>{groupName}</p>

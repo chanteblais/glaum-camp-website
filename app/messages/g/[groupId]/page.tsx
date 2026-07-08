@@ -21,7 +21,7 @@ export default async function GroupThreadPage({ params }: { params: { groupId: s
     // The group must exist…
     supabaseAdmin
       .from('groups')
-      .select('id, name, icon, join_policy')
+      .select('id, name, icon, icon_image, join_policy')
       .eq('id', params.groupId)
       .maybeSingle(),
     // …and group threads are members-only.
@@ -65,6 +65,7 @@ export default async function GroupThreadPage({ params }: { params: { groupId: s
         groupId={group.id}
         groupName={group.name}
         groupIcon={group.icon}
+        groupIconImage={group.icon_image}
         members={members}
         canLeave={group.join_policy === 'open'}
         initialMuted={prefs.muted}
