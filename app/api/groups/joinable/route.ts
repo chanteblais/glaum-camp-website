@@ -25,7 +25,7 @@ export async function GET() {
 
   const { data: groups, error } = await supabaseAdmin
     .from('groups')
-    .select('id, name, icon, description')
+    .select('id, name, icon, icon_image, description')
     .eq('join_policy', 'open')
     .eq('visibility', 'listed')
     .order('sort_order', { ascending: true })

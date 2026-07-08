@@ -226,7 +226,7 @@ Linked from nav as "Many Hands".
 **Who:** Approved members  
 **What:** Inbox listing **direct conversations and group threads** together, most recent first.
 
-- Each row shows an avatar (or the **group's icon** for group threads), display name, last message preview, timestamp, and unread count badge. Group rows link to `/messages/g/[groupId]`; DM rows to `/messages/[userId]`.
+- Each row shows an avatar (or the **group's icon** for group threads — uploaded `groups.icon_image` art via `IconImage`, else the emoji `icon`, else `✦`; same precedence as the profile Commitments card), display name, last message preview, timestamp, and unread count badge. Group rows link to `/messages/g/[groupId]`; DM rows to `/messages/[userId]`.
 - **Filter tabs — All / Direct / Groups** (shown only when you have both kinds), each with its own unread badge so groups don't get buried under DMs.
 - **Group threads always appear** for groups you belong to — even with no messages yet (an entry point: "No messages yet — start the conversation"). Direct conversations appear only once they have messages.
 - **"✉ New Message" button** (top-right) opens a searchable member picker modal for **DMs**. **"✦ Find a group"** (beside it) opens a picker of **open, listed** groups you can self-join (`/api/groups/joinable` → `/join`); admin-assigned groups still appear automatically once you're a member.
@@ -257,7 +257,7 @@ Linked from nav as "Many Hands".
 **Who:** **Approved** members of that group (non-members are redirected to `/messages`; the API returns 403). The thread API checks approved status alongside `group_members` so a lingering membership row from a removed/rejected member never grants access.  
 **What:** A shared thread for a group to coordinate. Every group has one (group messaging — full design in [group-messaging.md](group-messaging.md)).
 
-- Sticky header: back arrow, the group's icon + name. Flat, chronological message list with sender name + avatar; consecutive messages from the same sender are grouped.
+- Sticky header: back arrow, the group's icon (uploaded `icon_image` art / emoji `icon` / `✦`) + name. Flat, chronological message list with sender name + avatar; consecutive messages from the same sender are grouped.
 - **Replies (one level, Slack-style):** each top-level message shows **💬 N replies** (or **↳ Reply**) that expands a collapsible reply thread inline with its own composer. Replies never nest further — enforced both in the UI and in `POST /api/messages/g/[groupId]` (a reply's parent must be a top-level message in the same conversation).
 - **`@mention`:** typing `@` in the composer opens a member autocomplete (arrow/Enter/Tab/Esc, caret-aware). On send, the server matches `@Name` against current member display names (so mentions typed in replies notify too), creating an in-app notification **and** an email to the mentioned member. In the rendered message, a recognized mention is shown as a colored pill **linked to that member's profile** (`/members/[id]`) — purple for others, gold when it's **you** — so a successful mention is visually confirmed (an `@name` that doesn't match a member stays plain text).
 - **Quiet by default:** ordinary posts create **no emails or notification-feed rows** — the unread badge is the only signal. `@mentions` are the deliberate exception (email gated by the recipient's `email_new_message` pref, throttled 30 min per group).
