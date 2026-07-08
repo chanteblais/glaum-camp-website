@@ -470,7 +470,7 @@ function StepSection({
   step, index, total, displayNum, expanded, saving,
   onToggleExpand, onToggleVisible, onMoveUp, onMoveDown,
   onTitleChange, onSubtitleChange, onFieldChange, onDelete, onAddField, onDeleteField,
-  fieldsModular, onMoveField, onToggleFieldWidth, onAddElement, groups, profileFieldOptions,
+  fieldsModular, onMoveField, onReorderField, onToggleFieldWidth, onAddElement, groups, profileFieldOptions,
 }: {
   step: StepConfig
   index: number
@@ -494,9 +494,26 @@ function StepSection({
   // the modular renderer on the live form).
   fieldsModular?: boolean
   onMoveField?: (fieldKey: string, dir: -1 | 1) => void
+  onReorderField?: (fieldKey: string, toIndex: number) => void
   onToggleFieldWidth?: (fieldKey: string) => void
   onAddElement?: (element: 'divider' | 'paragraph') => void
 }) {
+  // Drag-to-reorder within this section. The row only becomes draggable while
+  // its grip is pressed (grabKey) — otherwise dragging would hijack text
+  // selection in the inline label/description inputs. Arrows stay as the
+  // touch/keyboard fallback (HTML5 drag doesn't fire on touch).
+  const dragEnabled = !!(fieldsModular && onReorderField)
+  const [grabKey, setGrabKey] = useState<string | null>(null)
+  const [dragKey, setDragKey] = useState<string | null>(null)
+  const [overIdx, setOverIdx] = useState<number | null>(null)
+
+  const endDrag = () => { setDragKey(null); setGrabKey(null); setOverIdx(null) }
+  // Insertion index for a pointer at clientY over the row at fIdx.
+  const insertionIndex = (e: React.DragEvent, fIdx: number) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    return e.clientY < r.top + r.height / 2 ? fIdx : fIdx + 1
+  }
+
   return (
     <div style={{
       border: '1px solid rgba(200,168,72,0.15)',
@@ -594,9 +611,8 @@ function StepSection({
             // locked core fields (which can't be grabbed directly themselves).
             const pinUp = fIdx === 0
             const pinDown = fIdx === step.fields.length - 1
-            return field.element ? (
+            const row = field.element ? (
               <ElementRow
-                key={field.key}
                 field={field}
                 saving={saving}
                 onLabelChange={v => onFieldChange(field.key, { label: v })}
@@ -610,7 +626,6 @@ function StepSection({
               />
             ) : (
               <FieldRow
-                key={field.key}
                 field={field}
                 saving={saving}
                 onToggleVisible={() => onFieldChange(field.key, { visible: !field.visible })}
@@ -628,6 +643,65 @@ function StepSection({
                 profileFieldOptions={profileFieldOptions}
                 onBindProfileField={field.isCustom ? key => onFieldChange(field.key, { profileFieldKey: key }) : undefined}
               />
+            )
+            if (!dragEnabled) return <div key={field.key}>{row}</div>
+            const canDrag = !field.locked && !saving
+            return (
+              <div
+                key={field.key}
+                draggable={grabKey === field.key}
+                onDragStart={e => {
+                  setDragKey(field.key)
+                  e.dataTransfer.setData('text/plain', field.key) // Firefox needs data to start a drag
+                  e.dataTransfer.effectAllowed = 'move'
+                }}
+                onDragEnd={endDrag}
+                onDragOver={e => {
+                  if (!dragKey) return // a drag from some other section — ignore
+                  e.preventDefault()
+                  e.dataTransfer.dropEffect = 'move'
+                  setOverIdx(insertionIndex(e, fIdx))
+                }}
+                onDrop={e => {
+                  if (!dragKey) return
+                  e.preventDefault()
+                  onReorderField!(dragKey, insertionIndex(e, fIdx))
+                  endDrag()
+                }}
+                style={{
+                  display: 'flex', alignItems: 'stretch', gap: '0.45rem',
+                  borderRadius: '0.5rem',
+                  opacity: dragKey === field.key ? 0.35 : 1,
+                  // Gold insertion line above the row the drop would land before
+                  // (below the last row for an at-the-end drop).
+                  boxShadow: dragKey && overIdx === fIdx ? `0 -3px 0 0 ${GOLD}`
+                    : dragKey && pinDown && overIdx === fIdx + 1 ? `0 3px 0 0 ${GOLD}`
+                    : 'none',
+                  transition: 'opacity 0.15s',
+                }}
+              >
+                {canDrag ? (
+                  <div
+                    onMouseDown={() => setGrabKey(field.key)}
+                    onMouseUp={() => setGrabKey(null)}
+                    title="Drag to reorder"
+                    style={{
+                      display: 'flex', alignItems: 'center', flexShrink: 0,
+                      cursor: 'grab', color: CREAM, opacity: 0.3,
+                      padding: '0 0.15rem', userSelect: 'none',
+                    }}
+                  >
+                    <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor" aria-hidden="true">
+                      <circle cx="3" cy="3" r="1.3" /><circle cx="7" cy="3" r="1.3" />
+                      <circle cx="3" cy="8" r="1.3" /><circle cx="7" cy="8" r="1.3" />
+                      <circle cx="3" cy="13" r="1.3" /><circle cx="7" cy="13" r="1.3" />
+                    </svg>
+                  </div>
+                ) : (
+                  <div style={{ width: 'calc(10px + 0.3rem)', flexShrink: 0 }} /> // keep locked rows aligned
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>{row}</div>
+              </div>
             )
           })}
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
@@ -914,6 +988,22 @@ export function ApplicationBuilder({
       // past them (the locked field shifts by one, keeping its relative order).
       if (fields[idx].locked) return s
       ;[fields[idx], fields[target]] = [fields[target], fields[idx]]
+      return { ...s, fields }
+    })
+    setMemberConfig({ ...memberConfig, steps })
+    markDirty('config_member_form')
+  }
+
+  // Drag-and-drop: move a field to an arbitrary position within its section.
+  // `toIndex` is the insertion index in the pre-removal list.
+  function reorderMemberField(stepKey: string, fieldKey: string, toIndex: number) {
+    const steps = memberConfig.steps.map(s => {
+      if (s.key !== stepKey) return s
+      const fields = [...s.fields]
+      const from = fields.findIndex(f => f.key === fieldKey)
+      if (from < 0 || fields[from].locked) return s
+      const [moved] = fields.splice(from, 1)
+      fields.splice(toIndex > from ? toIndex - 1 : toIndex, 0, moved)
       return { ...s, fields }
     })
     setMemberConfig({ ...memberConfig, steps })
@@ -1221,6 +1311,7 @@ export function ApplicationBuilder({
                 onDeleteField={fieldKey => handleDeleteField(step.key, fieldKey)}
                 fieldsModular={MODULAR_STEP_KEYS.includes(step.key) || !!step.isCustom}
                 onMoveField={(fieldKey, dir) => moveMemberField(step.key, fieldKey, dir)}
+                onReorderField={(fieldKey, toIdx) => reorderMemberField(step.key, fieldKey, toIdx)}
                 onToggleFieldWidth={fieldKey => toggleMemberFieldWidth(step.key, fieldKey)}
                 onAddElement={element => handleAddElement(step.key, element)}
                 groups={allGroups}
