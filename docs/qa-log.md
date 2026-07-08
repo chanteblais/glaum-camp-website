@@ -4,6 +4,29 @@ Running record of QA sweeps: what was tested, what was fixed, and — most
 useful for the next tester — what is *known and deliberate* so it doesn't get
 re-reported, plus where the remaining risk lives. Newest sweep first.
 
+## Sweep 2026-07-08 — apply-wizard QA fixes (branch `fix/apply-wizard-qa`)
+
+Three items pulled off the 2026-07-03 "still open" list.
+
+### Fixed in this sweep
+
+- **Reject/remove now surface email-send failures** — both routes return an
+  `emailWarning` in their JSON response, mirroring approve's pattern exactly
+  (degrade instead of 500 on a deleted/unknown Clerk account or a failed
+  send); `AdminActions` (Reject) and `RemoveMemberButton` (Remove) show it via
+  the same notice-mode confirm dialog approve already uses.
+- **Required "Other" answers now need the fill-in text** — a required
+  single-choice or multi-choice field with "Other" selected no longer counts
+  as answered until its free-text fill-in is non-empty. Covers the built-in
+  `onboarding_status` field (its dedicated `onboarding_status_other` slot) and
+  any admin-added custom radio/checkbox field with an "Other" option (its
+  `key + '__other'` slot in `custom_answers`).
+- **Apply-wizard radio/checkbox rows are keyboard-accessible** — the custom
+  `RadioGroup`/`CheckboxGroup` rows now carry `role="radio"`/`"checkbox"`,
+  `aria-checked`, `tabIndex={0}`, and toggle on Enter/Space, with a gold
+  (`#C8A848`) focus outline (not a border/box-shadow, so it doesn't add
+  layout weight on the mobile-stacked columns).
+
 ## Sweep 2026-07-03 (2) — application ↔ profiles ↔ groups pipeline (branch `fix/application-profile-qa`)
 
 Focused trace of where every piece of application data lives and how it flows
@@ -127,14 +150,11 @@ code-traced end-to-end with live-DB consistency checks, `tsc` + full
 
 ### Still open (candidates for the next sweep)
 
-- Reject/remove email-send failures aren't surfaced to the admin (approve's
-  are, via `emailWarning`).
-- Apply-wizard radio/checkbox rows aren't keyboard-accessible (custom divs,
-  no focus handling).
-- Required radio fields with an "Other" option accept "Other" selected with an
-  empty fill-in.
 - The disabled CONTINUE/SUBMIT buttons don't say *which* required field is
   missing — fine at current form size, worth a pointer if forms grow.
+
+(Reject/remove `emailWarning`, apply-wizard keyboard accessibility, and the
+required-"Other" validation gap — all fixed in the 2026-07-08 sweep above.)
 
 ### Highest-value manual tests before What If
 

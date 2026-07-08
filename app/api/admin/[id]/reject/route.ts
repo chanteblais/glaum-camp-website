@@ -44,6 +44,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   // Notify the applicant
+  let emailWarning: string | undefined
   if (application?.clerk_user_id) {
     const message = 'The Many Hands have reviewed your application. Unfortunately it wasn\'t a fit for this gathering.'
     await supabaseAdmin.from('user_notifications').insert([{
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }])
 
     // A deleted / unknown Clerk account must not turn the (already committed)
-    // rejection into a 500 — skip the email instead.
+    // rejection into a 500 — degrade to the email warning instead.
     let email: string | undefined
     try {
       const clerkUser = await client.users.getUser(application.clerk_user_id)
@@ -62,13 +63,19 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       email = undefined
     }
     if (email) {
-      await sendUserEmail(
+      const result = await sendUserEmail(
         email,
         'An update on your Glåüm application',
         `<p>Hi ${application.preferred_name || application.first_name || 'there'},</p><p>${message}</p><p>Thank you for your interest in Glåüm.</p>`,
       )
+      // Rejection itself succeeded (status + in-app notification); only the
+      // email failed. Surface it so the admin knows to follow up manually
+      // instead of assuming the applicant was emailed.
+      if (!result.ok) emailWarning = `Application rejected, but the email to ${email} failed to send: ${result.error}`
+    } else {
+      emailWarning = 'Application rejected, but no email address was found for this applicant.'
     }
   }
 
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true, emailWarning })
 }
