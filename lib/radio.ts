@@ -32,6 +32,7 @@ export type RadioEventRow = {
   actor_name: string | null
   link: string | null
   created_at: string
+  created_by?: string | null
 }
 
 // ── Config (page_content.config_radio) ────────────────────────────
@@ -280,7 +281,7 @@ export async function resourceStateAfterClaim(
 export async function getRadioFeed(limit = 60): Promise<RadioEventRow[]> {
   const { data, error } = await supabaseAdmin
     .from('radio_events')
-    .select('id, kind, message, detail, icon, actor_clerk_id, actor_name, link, created_at')
+    .select('id, kind, message, detail, icon, actor_clerk_id, actor_name, link, created_at, created_by')
     .eq('visible', true)
     .order('created_at', { ascending: false })
     .limit(limit)
@@ -288,6 +289,28 @@ export async function getRadioFeed(limit = 60): Promise<RadioEventRow[]> {
     if (error) console.error('[radio] feed read failed', error)
     return []
   }
+
+  // Every spoken row reads "— Name". New posts store actor_name at write time;
+  // legacy rows (broadcasts posted before signing) may not — so derive the
+  // signature from the post's author (created_by, else actor_clerk_id) when
+  // it's missing. Best-effort, never persisted; skipped entirely once no row
+  // needs it (the steady state), so it costs nothing on a normal feed load.
+  const needsName = data.filter(r => !r.actor_name && (r.created_by || r.actor_clerk_id))
+  if (needsName.length) {
+    const ids = Array.from(new Set(needsName.map(r => r.created_by || r.actor_clerk_id).filter(Boolean))) as string[]
+    const { data: mem } = await supabaseAdmin
+      .from('members')
+      .select('clerk_user_id, preferred_name, first_name')
+      .in('clerk_user_id', ids)
+    const nameById = new Map((mem ?? []).map(m => [m.clerk_user_id, m.preferred_name || m.first_name]))
+    for (const r of data) {
+      if (r.actor_name) continue
+      const who = r.created_by || r.actor_clerk_id
+      const nm = who ? nameById.get(who) : null
+      if (nm) r.actor_name = nm
+    }
+  }
+
   return data
 }
 

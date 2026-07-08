@@ -340,6 +340,71 @@ export async function sendEventReminderEmail(opts: {
   return sendUserEmail(to, subject, html)
 }
 
+/**
+ * Notify a member they were @mentioned in a Radio post. Gated by the
+ * recipient's message-notification preference (checked at the seam).
+ */
+export async function sendRadioMentionEmail(opts: {
+  to: string
+  recipientName: string
+  senderName: string
+  preview: string
+}) {
+  const { to, recipientName, senderName, preview } = opts
+  const radioUrl = `${APP_URL}/radio`
+  const prefsUrl = `${APP_URL}/profile#notifications`
+  const safePreview = escapeHtml(preview).slice(0, 280)
+
+  const html = wrap(`
+    <p>Hi ${escapeHtml(recipientName)},</p>
+    <p><strong style="color:#634D0B">${escapeHtml(senderName)}</strong> mentioned you on Glåüm Radio:</p>
+    <blockquote style="margin:18px 0;padding:12px 16px;border-left:3px solid #C8A848;background:rgba(200,168,72,0.06);color:#3a2b14;font-style:italic;border-radius:6px">
+      ${safePreview}${preview.length > 280 ? '…' : ''}
+    </blockquote>
+    <p style="margin:24px 0">
+      <a href="${radioUrl}" style="display:inline-block;background:#C8A848;color:#1A0A24;text-decoration:none;padding:11px 22px;border-radius:8px;font-weight:bold">Tune in ✦</a>
+    </p>
+    <p style="font-size:12px;color:#8a8a8a;margin-top:28px">
+      You're receiving this because you were mentioned and have message email notifications turned on.
+      <a href="${prefsUrl}" style="color:#8a8a8a">Manage your notification preferences</a>.
+    </p>`)
+
+  await sendUserEmail(to, `${senderName} mentioned you on Radio`, html)
+}
+
+/**
+ * The "notify everyone" megaphone: a Radio post that deliberately rings the
+ * whole camp. Gated by the recipient's announcement preference (checked by the
+ * caller). Mirrors the organizer-broadcast email so both read the same.
+ */
+export async function sendRadioBroadcastEmail(opts: {
+  to: string
+  recipientName: string
+  senderName: string
+  message: string
+}) {
+  const { to, recipientName, senderName, message } = opts
+  const radioUrl = `${APP_URL}/radio`
+  const prefsUrl = `${APP_URL}/profile#notifications`
+  const safeMessage = escapeHtml(message).slice(0, 400)
+
+  const html = wrap(`
+    <p>Hi ${escapeHtml(recipientName)},</p>
+    <p>📢 <strong style="color:#634D0B">${escapeHtml(senderName)}</strong> is on the air:</p>
+    <blockquote style="margin:18px 0;padding:12px 16px;border-left:3px solid #C8A848;background:rgba(200,168,72,0.06);color:#3a2b14;font-style:italic;border-radius:6px">
+      ${safeMessage}${message.length > 400 ? '…' : ''}
+    </blockquote>
+    <p style="margin:24px 0">
+      <a href="${radioUrl}" style="display:inline-block;background:#C8A848;color:#1A0A24;text-decoration:none;padding:11px 22px;border-radius:8px;font-weight:bold">Tune in to Radio ✦</a>
+    </p>
+    <p style="font-size:12px;color:#8a8a8a;margin-top:28px">
+      You're receiving this because you have announcement emails turned on.
+      <a href="${prefsUrl}" style="color:#8a8a8a">Manage your notification preferences</a>.
+    </p>`)
+
+  await sendUserEmail(to, `${senderName} on Radio: ${message.slice(0, 60)}${message.length > 60 ? '…' : ''}`, html)
+}
+
 // ── Helpers ───────────────────────────────────────────────────────
 
 function escapeHtml(s: string): string {
