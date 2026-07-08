@@ -321,6 +321,20 @@ export function GroupThreadClient({ currentUserId, groupId, groupName, groupIcon
     }
   }, [body])
 
+  // Size the composer to its content, up to the 160px cap — an effect rather
+  // than onInput so programmatic changes (the post-send clear, mention
+  // insertion) resize too. scrollHeight excludes the border that the
+  // border-box height includes; add it back or the box sits 2px short and
+  // grows a permanent scrollbar.
+  useEffect(() => {
+    const t = textareaRef.current
+    if (!t) return
+    t.style.height = 'auto'
+    const full = t.scrollHeight + t.offsetHeight - t.clientHeight
+    t.style.height = Math.min(full, 160) + 'px'
+    t.style.overflowY = full > 160 ? 'auto' : 'hidden'
+  }, [body])
+
   const handleSend = async () => {
     const trimmed = body.trim()
     if (!trimmed || sending) return
@@ -626,15 +640,10 @@ export function GroupThreadClient({ currentUserId, groupId, groupName, groupIcon
                 resize: 'none', outline: 'none',
                 fontFamily: 'var(--font-libre-baskerville), Georgia, serif',
                 lineHeight: 1.5, transition: 'border-color 0.15s', boxSizing: 'border-box',
-                maxHeight: '160px', overflowY: 'auto',
+                maxHeight: '160px', overflowY: 'hidden',
               }}
               onFocus={e => { e.target.style.borderColor = 'rgba(210,57,248,0.45)' }}
               onBlur={e => { e.target.style.borderColor = isOver ? 'rgba(248,113,113,0.5)' : 'rgba(200,168,72,0.2)' }}
-              onInput={e => {
-                const t = e.currentTarget
-                t.style.height = 'auto'
-                t.style.height = Math.min(t.scrollHeight, 160) + 'px'
-              }}
             />
             {body.length > MAX_CHARS * 0.8 && (
               <span aria-live="polite" style={{ position: 'absolute', bottom: '0.45rem', right: '0.6rem', fontSize: '0.65rem', opacity: 0.4, color: isOver ? '#f87171' : '#F3EDE6' }}>
