@@ -14,6 +14,7 @@ import { RadioManager } from './RadioManager'
 import { ResourcesManager } from './ResourcesManager'
 import { getGroupNamesByUser } from '@/lib/groups'
 import { getShiftEventByUser } from '@/lib/shift-signups'
+import { getSuspendedClerkUserIds, isSuspended } from '@/lib/admin-counts'
 import { getAdminRunway } from '@/lib/admin-attention'
 import { parseRadioSources } from '@/lib/radio'
 import { getAdminRadioEvents, getAdminResourceLists, getStewardOptions } from '@/lib/admin-program-data'
@@ -33,7 +34,7 @@ export default async function AdminPage() {
   const [
     { data: volunteersRaw },
     { data: applications, error: dbError },
-    { data: suspendedRows },
+    suspendedClerkIds,
     groupNamesByUser,
     signupEventMap,
     runway,
@@ -53,12 +54,9 @@ export default async function AdminPage() {
       .select('id, clerk_user_id, first_name, last_name, preferred_name, email, status, submitted_at, attendance, membership_type, camped_before, setup_preference')
       .order('submitted_at', { ascending: false }),
     // Suspended members (063) — marked in the roster so a member with released
-    // commitments doesn't read as inexplicably empty.
-    supabaseAdmin
-      .from('members')
-      .select('clerk_user_id')
-      .eq('status', 'approved')
-      .not('suspended_at', 'is', null),
+    // commitments doesn't read as inexplicably empty. Shared with Overview
+    // (lib/admin-counts.ts) so "who is suspended" can never drift between tabs.
+    getSuspendedClerkUserIds(),
     getGroupNamesByUser(),
     getShiftEventByUser(),
     getAdminRunway(),
@@ -85,9 +83,6 @@ export default async function AdminPage() {
   if (notificationsError) console.error('[Admin] Notifications query error:', notificationsError)
 
   const all = applications ?? []
-  const suspendedClerkIds = new Set(
-    (suspendedRows ?? []).map(r => r.clerk_user_id).filter((id): id is string => !!id)
-  )
   const pending = all.filter(a => a.status === 'pending')
   const approved = all.filter(a => a.status === 'approved')
   const rejected = all.filter(a => a.status === 'rejected')
@@ -177,7 +172,7 @@ export default async function AdminPage() {
               contributions: a.clerk_user_id ? groupNamesByUser[a.clerk_user_id] ?? null : null,
               attendance: a.attendance ?? null,
               schedule_event_id: signupEventMap[a.clerk_user_id] ?? null,
-              suspended: !!(a.clerk_user_id && suspendedClerkIds.has(a.clerk_user_id)),
+              suspended: isSuspended(a.clerk_user_id, suspendedClerkIds),
             }))}
           />
         </CollapsibleSection>
