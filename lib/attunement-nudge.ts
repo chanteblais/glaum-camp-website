@@ -49,10 +49,10 @@ export async function collectOutstandingAttunement(): Promise<MemberAttunement[]
   const members = (membersRaw ?? []).filter(m => m.clerk_user_id)
   if (members.length === 0) return []
 
-  // Role/legacy-shift state for everyone in one query (fetch + join in JS).
+  // Role state for everyone in one query (fetch + join in JS).
   const { data: signupRows } = await supabaseAdmin
     .from('camp_signups')
-    .select('clerk_user_id, role_id, role_approval_status, schedule_event_id')
+    .select('clerk_user_id, role_id, role_approval_status')
     .in('clerk_user_id', members.map(m => m.clerk_user_id as string))
   const signupByClerkId = new Map((signupRows ?? []).map(r => [r.clerk_user_id, r]))
 
@@ -73,7 +73,7 @@ export async function collectOutstandingAttunement(): Promise<MemberAttunement[]
           groupCountsByCollection,
           totalGroupCount,
           roleDone: !!signup?.role_id && signup?.role_approval_status !== 'pending',
-          hasShift: shiftState.hasShift || !!signup?.schedule_event_id,
+          hasShift: shiftState.hasShift,
           shiftSignupOpen: config['config_shift_signup_open'] !== 'false',
           hoursByShiftType: shiftState.hoursByShiftType,
           derivedShiftRequirements: shiftState.derivedShiftRequirements,

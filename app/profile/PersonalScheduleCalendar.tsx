@@ -13,7 +13,6 @@ export type PersonalEvent = {
   detail_desc: string | null
   icon_type: string
   highlight: boolean
-  event_type: string | null
   event_date?: string | null
   participation_type?: string | null
   shift_color_index?: number | null
@@ -54,8 +53,7 @@ function parseEventTimes(timeStr: string | null) {
 type EventColors = { border: string; bg: string; time: string; title: string; subtitle: string; label?: string }
 
 // Mandatory events = everyone attends (not a personal shift).
-const isMandatory = (ev: PersonalEvent) =>
-  ev.participation_type === 'mandatory' || ev.event_type === 'all_hands'
+const isMandatory = (ev: PersonalEvent) => ev.participation_type === 'mandatory'
 
 function eventColors(ev: PersonalEvent): EventColors {
   const label = ev.isPersonal && !isMandatory(ev) ? 'Your Shift' : undefined
@@ -70,12 +68,6 @@ function eventColors(ev: PersonalEvent): EventColors {
       bg: `linear-gradient(145deg, rgba(${hue.rgb},0.22), rgba(18,4,28,0.94))`,
       time: hue.accent, title: CREAM, subtitle: hue.accent, label,
     }
-  }
-  if (ev.event_type === 'camp_tending') {
-    return { border: '#B68018', bg: 'linear-gradient(145deg, rgba(36,15,43,0.92), rgba(18,5,30,0.94))', time: '#D19B30', title: GOLD, subtitle: CREAM, label }
-  }
-  if (ev.event_type === 'service') {
-    return { border: 'rgba(182,80,200,0.85)', bg: 'linear-gradient(145deg, rgba(86,13,94,0.86), rgba(42,4,64,0.94))', time: '#D889E0', title: CREAM, subtitle: '#D7A6D8', label }
   }
   return { border: '#8F329D', bg: 'linear-gradient(145deg, rgba(59,7,78,0.9), rgba(32,4,52,0.96))', time: '#C86BD0', title: CREAM, subtitle: '#C49AC1', label }
 }

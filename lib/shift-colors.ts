@@ -1,5 +1,5 @@
-// Schedule colour scheme (shifts redesign). Colours used to key off the legacy
-// event_type text (all_hands / camp_tending / service); events now carry
+// Schedule colour scheme (shifts redesign). Colours used to key off a legacy
+// free-text tag (dropped in migration 065); events carry
 // participation_type + shift_type_id instead, so:
 //   · mandatory  → the old all-hands teal (fixed)
 //   · shift      → a hue from SHIFT_HUES, assigned by the shift type's position

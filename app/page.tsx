@@ -40,7 +40,7 @@ export default async function Home() {
   // ── Fetch member data when signed in ─────────────────────────
   let application: Record<string, unknown> | null = null
   let campSignup: Record<string, unknown> | null = null
-  let upcomingEvents: { id: string; day: string; time: string; title: string; subtitle: string | null; icon_type: string; event_date: string | null; event_category: string }[] = []
+  let upcomingEvents: { id: string; day: string; time: string; title: string; subtitle: string | null; icon_type: string; event_date: string | null }[] = []
   let nextEventDate: string | null = null
   let leadUpEvents: { id: string; title: string; event_date: string | null; start_time: string | null; location: string | null; host: string | null; image_url: string | null }[] = []
   let spotlightPool: unknown[] = []
@@ -96,16 +96,15 @@ let canManagePolls = false
       const [signupResult, eventsResult, leadUpResult, spotlightResult, announcementsResult, pollsResult, pollVotesResult, shoutoutsResult, nextEventResult, radioFeed] = await Promise.all([
         supabaseAdmin
           .from('camp_signups')
-          .select('role_id, schedule_event_id, role_approval_status, roles(name, description, purpose, department_id, departments(name, icon)), schedule_events(title, day, time, icon_type)')
+          .select('role_id, role_approval_status, roles(name, description, purpose, department_id, departments(name, icon))')
           .eq('clerk_user_id', userId)
           .maybeSingle(),
         supabaseAdmin
           .from('schedule_events')
-          .select('id, day, time, title, subtitle, icon_type, event_date, event_category')
+          .select('id, day, time, title, subtitle, icon_type, event_date')
           .eq('visible', true)
           // The teaser previews the schedule page — off-schedule events skip it too.
           .eq('show_on_schedule', true)
-          .not('event_type', 'eq', 'camp_tending')
           .or(`event_date.is.null,event_date.lte.${new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)}`)
           .or(`event_date.is.null,event_date.gte.${new Date().toISOString().slice(0, 10)}`)
           .order('event_date', { ascending: true, nullsFirst: false })
@@ -284,7 +283,7 @@ let canManagePolls = false
     groupCountsByCollection,
     totalGroupCount,
     roleDone: !!campSignup?.role_id && campSignup?.role_approval_status !== 'pending',
-    hasShift: shiftState.hasShift || !!campSignup?.schedule_event_id,
+    hasShift: shiftState.hasShift,
     shiftSignupOpen: pageContent['config_shift_signup_open'] !== 'false',
     hoursByShiftType: shiftState.hoursByShiftType,
     derivedShiftRequirements: shiftState.derivedShiftRequirements,
@@ -476,7 +475,7 @@ let canManagePolls = false
 
             {/* ── WIDGETS (order + visibility controlled by admin) ── */}
             {(() => {
-              const atCamp = upcomingEvents.filter(e => e.event_category !== 'pre_camp')
+              const atCamp = upcomingEvents
               // Lead-up gatherings come from their own table; map them into the
               // EventList shape (real dates → weekday label).
               const leadUp = leadUpEvents.map(e => ({
@@ -487,7 +486,6 @@ let canManagePolls = false
                 subtitle: e.location || (e.host ? `with ${e.host}` : null),
                 icon_type: 'star',
                 event_date: e.event_date,
-                event_category: 'lead_up',
                 image_url: e.image_url,
               }))
               // When nothing falls inside the teaser window but dated events exist

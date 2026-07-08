@@ -35,7 +35,7 @@ const daysUntil = (iso: string) =>
 // At most five prioritized, actionable lines. Every line names work and links
 // to where it's done. Order = review queues first, then time-sensitive comms.
 export async function getAttentionItems(): Promise<AttentionItem[]> {
-  const [apps, vols, roleReqs, roleSuggs, { data: gatherings }, { data: leadShifts }, { data: shiftHolds }, { data: legacyHolds }, { data: rangeRows }] = await Promise.all([
+  const [apps, vols, roleReqs, roleSuggs, { data: gatherings }, { data: leadShifts }, { data: shiftHolds }, { data: rangeRows }] = await Promise.all([
     supabaseAdmin.from('applications').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     supabaseAdmin.from('volunteers').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     supabaseAdmin.from('camp_signups').select('clerk_user_id', { count: 'exact', head: true }).eq('role_approval_status', 'pending'),
@@ -58,7 +58,6 @@ export async function getAttentionItems(): Promise<AttentionItem[]> {
       .gt('capacity', 0)
       .or(`event_date.is.null,event_date.gte.${todayLocal()},is_recurring.eq.true`),
     supabaseAdmin.from('member_shift_signups').select('clerk_user_id, schedule_event_id, occurrence_date, role'),
-    supabaseAdmin.from('camp_signups').select('clerk_user_id, schedule_event_id').not('schedule_event_id', 'is', null),
     supabaseAdmin.from('page_content').select('key, value').in('key', ['config_event_start_date', 'config_event_end_date']),
   ])
 
@@ -93,18 +92,14 @@ export async function getAttentionItems(): Promise<AttentionItem[]> {
     verb: 'Notify', href: '/admin/program#lead-up',
   })
 
-  // Holds = member_shift_signups ∪ legacy camp_signups.schedule_event_id,
-  // deduped per (member, event, night); leads exist only on the new table.
+  // Holds = member_shift_signups, deduped per (member, event, night).
   // Each night of a recurring shift is checked independently for fullness, so a
   // single full-and-leadless night flags. Mirrors fetchAllHolds so "full" agrees
   // with the member-facing counts.
   const occKey = (eventId: string, date: string | null) => `${eventId}|${date ?? ''}`
   const holdsByOcc = new Map<string, Set<string>>()
   const leadOccs = new Set<string>()
-  for (const r of [
-    ...(shiftHolds ?? []).map(r => ({ ...r, occurrence_date: (r.occurrence_date as string | null) ?? null })),
-    ...(legacyHolds ?? []).map(r => ({ ...r, occurrence_date: null as string | null, role: 'member' })),
-  ]) {
+  for (const r of (shiftHolds ?? []).map(r => ({ ...r, occurrence_date: (r.occurrence_date as string | null) ?? null }))) {
     if (!r.schedule_event_id) continue
     const k = occKey(r.schedule_event_id, r.occurrence_date)
     const set = holdsByOcc.get(k) ?? new Set<string>()

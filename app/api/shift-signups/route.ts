@@ -6,9 +6,8 @@ import { getShiftSignupData, fetchAllHolds, countHoldsFor } from '@/lib/particip
 import { eventRangeDays, isValidOccurrence } from '@/lib/shift-occurrences'
 
 // Member-facing multi-shift signup (shifts redesign). A member holds any number
-// of shift occurrences via member_shift_signups; this replaces the single
-// camp_signups.schedule_event_id (still read for back-compat, never written here;
-// cancelling a legacy-held shift clears both so hours never double-count).
+// of shift occurrences via member_shift_signups — the single source of shift
+// holds (the legacy camp_signups.schedule_event_id column was dropped in 065).
 //
 // Each night of a recurring shift is a regular shift in its own right: a signup
 // names its night via occurrence_date (NULL = a non-recurring shift's single
@@ -162,14 +161,6 @@ export async function DELETE(req: NextRequest) {
   del = occurrenceDate == null ? del.is('occurrence_date', null) : del.eq('occurrence_date', occurrenceDate)
   const { error } = await del
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  // Clear the legacy single-shift column too if it pointed at this event, so
-  // the hours union (lib/shift-attunement.ts) doesn't keep counting it.
-  await supabaseAdmin
-    .from('camp_signups')
-    .update({ schedule_event_id: null })
-    .eq('clerk_user_id', userId)
-    .eq('schedule_event_id', schedule_event_id)
 
   return NextResponse.json({ success: true })
 }

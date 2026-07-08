@@ -1,6 +1,6 @@
 # Database Schema
 
-All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations in `supabase-migrations/` document incremental changes (latest here: `061`; all of `025`–`058` and `060` **applied in prod** as of 2026-07-03 — `059` is the reserved/generated Clerk remap, applied at cutover; `061` **pending** — Radio). Confirm `025` (column renames), `029` (the `application-files` bucket), `033` (group messaging), `034`/`035` (group icon images + `group-badges` bucket, `badge_image` → `icon_image`), `036`–`038` (public profile fields, members/profiles, member distinctions), `039`–`041` (lead-up gatherings + notify/image), `042`–`044` (group collections + per-collection profile visibility + per-collection self-join), `045`–`047` (shifts redesign + shift times), and `048`/`049` (participation leads + per-event lead opt-in; the gathering halves are dropped by `050`) are applied before relying on those features.
+All tables live in a Supabase (Postgres) project. The base schema is in `supabase-schema.sql`; migrations in `supabase-migrations/` document incremental changes (latest here: `065`; all of `025`–`058` and `060` **applied in prod** as of 2026-07-03 — `059` is the reserved/generated Clerk remap, applied at cutover; `061` **pending** — Radio). Confirm `025` (column renames), `029` (the `application-files` bucket), `033` (group messaging), `034`/`035` (group icon images + `group-badges` bucket, `badge_image` → `icon_image`), `036`–`038` (public profile fields, members/profiles, member distinctions), `039`–`041` (lead-up gatherings + notify/image), `042`–`044` (group collections + per-collection profile visibility + per-collection self-join), `045`–`047` (shifts redesign + shift times), and `048`/`049` (participation leads + per-event lead opt-in; the gathering halves are dropped by `050`) are applied before relying on those features.
 
 ---
 
@@ -253,10 +253,8 @@ Public camp schedule entries. **Reworked by the shifts redesign** (see [shifts-r
 | `start_time` / `end_time` | TEXT | `"HH:MM"` 24-hour, **on every event** (was shift-only until `054`; backfilled from the old free-text `time` by `054`). Editor requires a start on all events, an end on shifts. Duration = `shiftDurationHours` (`lib/shift-hours.ts`) — what counts toward hours requirements. Migrations `047` + `054` |
 | `needs_lead` | BOOL | Whether this shift has a lead role (organizer's call at creation; shift events only). Gates all member lead affordances; the offer appears in the signup confirm. Migration `049` |
 | `capacity` | INT | Shift events only: max signups per slot. NULL = unlimited |
-| `event_type` | TEXT | **Legacy** (`'all_hands'`/`'camp_tending'`/`'service'`). No longer set by hand — derived (`'all_hands'` for mandatory) by `lib/event-type-compat.ts` for old readers. Drop in final cleanup |
-| `contribution_type` | TEXT | **Legacy** group-name tag. Now derived (= shift type name) by `lib/event-type-compat.ts`. Drop in final cleanup |
-| `event_category` | TEXT | **Legacy** `'at_camp'`/`'pre_camp'` — pre-camp superseded by Lead-Up Gatherings; no longer editable in the admin. Drop in final cleanup |
-| `event_type_id` | UUID FK | **Dormant** — migration `045`'s first-draft registry (`event_types`), superseded by `046`'s `shift_types` model. Drop in final cleanup |
+
+*(The legacy `event_type` / `contribution_type` / `all_hands` / `event_category` columns and `045`'s dormant `event_type_id` were dropped by migration `065`.)*
 
 Colours key off `participation_type` + the shift type's palette slot — see [design-system.md → Event Type Colors](design-system.md#event-type-colors).
 
@@ -278,7 +276,7 @@ The configurable registry of shift **kinds** (Setup, Teardown, Decor, Service, �
 
 ### `member_shift_signups`
 
-Many-to-many shift holds — a member can sign up for **any number** of shift occurrences (replaces the single `camp_signups.schedule_event_id`). Written by the member `/api/shift-signups` API (POST/DELETE) and the admin `remove_shift`/`clear_shift`/`set_shift_role` actions. A member's held hours per shift type (summed `shiftDurationHours` of their held occurrences, `lib/shift-attunement.ts`) are what satisfy hour requirements.
+Many-to-many shift holds — a member can sign up for **any number** of shift occurrences. **The single source of shift holds** (the legacy single `camp_signups.schedule_event_id` was dropped by `065`). Written by the member `/api/shift-signups` API (POST/DELETE) and the admin `remove_shift`/`clear_shift`/`set_shift_role` actions. A member's held hours per shift type (summed `shiftDurationHours` of their held occurrences, `lib/shift-attunement.ts`) are what satisfy hour requirements.
 
 **Per-night model (migration `064`):** recurrence is only an admin authoring convenience — each night of a recurring shift is a regular shift in its own right, signed independently, with its own capacity, roster, hours and lead. A signup names its night via `occurrence_date`. The concrete nights of an event come from `lib/shift-occurrences.ts` (`recurrence_days`, or every day of the configured event range for an "every day" shift).
 
@@ -295,24 +293,16 @@ Uniqueness is two **partial** unique indexes (a plain `UNIQUE` treats NULLs as d
 
 ---
 
-### `event_types` *(dormant)*
-
-Migration `045`'s first-draft registry (behaviour + binding + hours **on the type**) — superseded within the same day by the corrected model (`shift_types` + requirements on groups/roles/attunement, migration `046`). No code reads it. Dropped in the final cleanup migration along with `schedule_events.event_type_id`.
-
----
-
 ### `camp_signups`
 
-One row per approved camper's **role** assignment (the shift half is superseded).
+One row per approved camper's **role** assignment (shifts live in `member_shift_signups`; the legacy `schedule_event_id`/`shift_id` columns were dropped by `065`).
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | UUID PK | |
 | `clerk_user_id` | TEXT | |
 | `role_id` | UUID FK → `roles.id` | |
-| `schedule_event_id` | UUID FK → `schedule_events.id` | **Legacy single shift** — superseded by `member_shift_signups` (many-to-many). Still read (unioned, deduped) for back-compat; never written by the new member flow; cancelling a shift clears it too. Drop in final cleanup |
 | `role_approval_status` | TEXT | Approval state for the specific role claim |
-| `shift_id` | UUID FK | **Dead** — pointed at the removed original `shifts` table. Drop in final cleanup |
 
 > **Note:** There is no Supabase FK between `camp_signups` and `applications`. Always fetch both tables separately and join in JS.
 
@@ -606,6 +596,7 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `062_push_tokens.sql` | **Push notification device tokens** (061 is reserved by the Radio branch). `push_tokens` table: one row per device a member granted notifications on (`clerk_user_id`, `platform` ios/android, unique FCM `token`, `created_at`/`last_seen_at`) + index on `clerk_user_id`. Registered by the native app via `POST /api/push/register`; dead tokens deleted when FCM reports them unregistered. Additive + idempotent; safe to apply before the app exists (`lib/push.ts` no-ops without tokens/config). |
 | `063_member_suspension.sql` | **Member suspension.** Adds `suspended_at` / `suspended_by` / `suspension_note` to `members`. A member (self-serve) or an admin can suspend attendance: releases **all** the member's commitments — role + legacy shift (`camp_signups`), groups (`group_members`), shifts (`member_shift_signups`), resource claims (`resource_claims`) — and blocks new ones (`lib/suspension.ts`, gated in `/api/signup`, `/api/shift-signups`, `/api/groups/membership`, `/api/groups/[id]/join`, `/api/resources/claims`, `/api/resources/offers`) while keeping full read access and `status` intact. Suspended members are excluded from Overview participation counts (shown in their own box) and attunement nudges. Additive + idempotent, non-destructive (the column adds are; the commitment releases run at suspend time). |
 | `064_shift_occurrence_date.sql` | **Per-night shift signups.** Adds `member_shift_signups.occurrence_date` (DATE, NULL = a non-recurring shift's single occurrence; a date = one night of a recurring event). Backfills existing recurring-event holds to the event's anchor date. Replaces the whole-event `UNIQUE` with two partial unique indexes (NULL-date vs dated) + an `occurrence_date` index. Recurrence becomes purely an authoring convenience: each night is treated as a regular shift everywhere (signup, capacity, roster, hours, ledger). Additive + idempotent. |
+| `065_shifts_legacy_drop.sql` | **Shifts-redesign final cleanup (Phase 7).** Drops the dead `shifts` table; `camp_signups.shift_id` + `.schedule_event_id` (legacy single shift — `member_shift_signups` is the single source); `045`'s dormant `event_types` table + `schedule_events.event_type_id`; and the legacy `schedule_events` columns `contribution_type` / `event_type` / `all_hands` / `event_category`. Companion code change removes `/api/admin/shifts`, `lib/event-type-compat.ts`, and every legacy-column read/write. Opens with a **defensive orphan backfill** (any hold still living only in the legacy column is inserted into `member_shift_signups`, recurring events anchored to `event_date` per `064`'s convention) so the drop can't lose a live signup. **Destructive by design** (drops tables + columns); idempotent via `IF EXISTS` + a `NOT EXISTS` guard. Deploy the code first — it runs fine against a pre-`065` database. |
 
 ---
 

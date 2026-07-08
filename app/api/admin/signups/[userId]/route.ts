@@ -5,8 +5,7 @@ import { requireAdmin } from '@/lib/admin-auth'
 // PATCH: clear the member's role, remove one shift (remove_shift: <event_id>),
 // clear all their shifts (clear_shift), or set their lead status on one shift
 // (set_shift_role: { schedule_event_id, role }). Shifts live in
-// member_shift_signups (many-to-many) plus the legacy
-// camp_signups.schedule_event_id — both cleared.
+// member_shift_signups (many-to-many); roles on camp_signups.
 export async function PATCH(req: NextRequest, { params }: { params: { userId: string } }) {
   if (!(await requireAdmin())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
@@ -16,8 +15,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { userId: st
     return NextResponse.json({ error: 'Nothing to change' }, { status: 400 })
   }
 
-  // Admin promote/demote a lead on a shift the member already holds. Only the
-  // many-to-many table carries roles; a legacy-only hold can't be promoted.
+  // Admin promote/demote a lead on a shift the member already holds.
   // occurrence_date targets one night of a recurring shift (omit it to affect
   // every held night — back-compatible with callers that don't send it).
   if (body.set_shift_role) {
@@ -55,11 +53,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { userId: st
       .eq('clerk_user_id', params.userId)
       .eq('schedule_event_id', body.remove_shift)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    await supabaseAdmin
-      .from('camp_signups')
-      .update({ schedule_event_id: null })
-      .eq('clerk_user_id', params.userId)
-      .eq('schedule_event_id', body.remove_shift)
   }
 
   if (body.clear_shift) {
@@ -68,10 +61,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { userId: st
       .delete()
       .eq('clerk_user_id', params.userId)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    await supabaseAdmin
-      .from('camp_signups')
-      .update({ schedule_event_id: null })
-      .eq('clerk_user_id', params.userId)
   }
 
   return NextResponse.json({ success: true })

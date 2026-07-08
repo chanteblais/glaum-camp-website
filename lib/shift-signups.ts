@@ -1,18 +1,14 @@
 import { supabaseAdmin } from './supabase'
 
-// clerk_user_id → a schedule_event_id they hold (or null if they have a signup
-// row but no shift). Union of the many-to-many `member_shift_signups` table and
-// the legacy `camp_signups` single column — a member counts as holding a shift
-// if at least one row in either table carries an event. Shared by the Manage
-// and Overview admin pages so "has a shift" means the same thing on both.
+// clerk_user_id → a schedule_event_id they hold (any one of them). Reads
+// member_shift_signups — the single source of shift holds since the legacy
+// camp_signups column drop (migration 065). Shared by the Manage and Overview
+// admin pages so "has a shift" means the same thing on both.
 export async function getShiftEventByUser(): Promise<Record<string, string | null>> {
-  const [{ data: signupsRaw }, { data: multiSignupsRaw }] = await Promise.all([
-    supabaseAdmin.from('camp_signups').select('clerk_user_id, schedule_event_id'),
-    supabaseAdmin.from('member_shift_signups').select('clerk_user_id, schedule_event_id'),
-  ])
-  const map: Record<string, string | null> = Object.fromEntries(
-    (signupsRaw ?? []).map(s => [s.clerk_user_id, s.schedule_event_id ?? null])
-  )
+  const { data: multiSignupsRaw } = await supabaseAdmin
+    .from('member_shift_signups')
+    .select('clerk_user_id, schedule_event_id')
+  const map: Record<string, string | null> = {}
   for (const s of multiSignupsRaw ?? []) {
     if (s.schedule_event_id) map[s.clerk_user_id] = s.schedule_event_id
   }

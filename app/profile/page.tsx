@@ -110,7 +110,7 @@ export default async function ProfilePage() {
       ? Promise.all([
           supabaseAdmin
             .from('camp_signups')
-            .select('role_id, schedule_event_id, role_approval_status, roles(name, description, purpose, department_id, departments(name, icon)), schedule_events(id, title, day, time, icon_type, event_date)')
+            .select('role_id, role_approval_status, roles(name, description, purpose, department_id, departments(name, icon))')
             .eq('clerk_user_id', memberClerkId)
             .maybeSingle(),
           supabaseAdmin
@@ -139,15 +139,13 @@ export default async function ProfilePage() {
   const roleInfo = campSignup?.roles as { name?: string; description?: string | null; purpose?: string | null; departments?: { name?: string; icon?: string } | null } | null
   const roleApproved = !!campSignup?.role_id && campSignup?.role_approval_status !== 'pending'
 
-  // Every shift the member holds: many-to-many + the legacy single, deduped.
+  // Every shift the member holds (member_shift_signups), deduped by event.
   type HeldShiftRow = { id: string; title: string; day: string; time: string; icon_type: string; event_date: string | null }
   const heldShiftMap = new Map<string, HeldShiftRow>()
   for (const r of heldShiftRows ?? []) {
     const ev = r.schedule_events as unknown as HeldShiftRow | null
     if (ev?.id) heldShiftMap.set(ev.id, ev)
   }
-  const legacyShiftEv = campSignup?.schedule_events as unknown as HeldShiftRow | null
-  if (legacyShiftEv?.id) heldShiftMap.set(legacyShiftEv.id, legacyShiftEv)
   const heldShifts = Array.from(heldShiftMap.values()).map(ev => ({
     id: ev.id,
     title: ev.title ?? '',
@@ -175,7 +173,7 @@ export default async function ProfilePage() {
     groupCountsByCollection,
     totalGroupCount,
     roleDone: !!campSignup?.role_id && campSignup?.role_approval_status !== 'pending',
-    hasShift: shiftState.hasShift || !!campSignup?.schedule_event_id,
+    hasShift: shiftState.hasShift,
     shiftSignupOpen: attuneConfig['config_shift_signup_open'] !== 'false',
     hoursByShiftType: shiftState.hoursByShiftType,
     derivedShiftRequirements: shiftState.derivedShiftRequirements,
