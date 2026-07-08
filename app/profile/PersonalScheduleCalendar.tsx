@@ -290,12 +290,12 @@ export function PersonalScheduleCalendar({ events, days }: { events: PersonalEve
             </>
           ) : (
             <>
-              <style>{`
+              <style dangerouslySetInnerHTML={{ __html: `
                 @media (max-width: 760px) {
                   #${calendarId} .schedule-scroll { overflow-x: auto; padding-bottom: 0.5rem; }
                   #${calendarId} .schedule-grid   { min-width: ${Math.max(activeDays.length * 168 + 46, 560)}px; }
                 }
-              `}</style>
+              ` }} />
               <div id={calendarId} className="schedule-scroll">
                 <div className="schedule-grid" style={{ display: 'flex', gap: '0' }}>
                   <div style={{ width: '46px', flexShrink: 0, position: 'relative', height: TOTAL_HEIGHT, marginTop: '44px', borderRight: '1px solid rgba(200,168,72,0.14)' }}>

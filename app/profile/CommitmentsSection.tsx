@@ -131,7 +131,7 @@ export function CommitmentsSection({ contributions, role, dept, shifts, bringing
 
   return (
     <div style={{ border: '1.5px solid rgba(200,168,72,0.7)', borderRadius: '1rem', background: 'rgba(10,0,20,0.6)', overflow: 'hidden', boxShadow: '0 0 0 1px rgba(200,168,72,0.12), 0 0 24px rgba(200,168,72,0.08)', height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         .commitments-rows { padding: ${sidepad}; }
         .commitments-row  { display: flex; align-items: center; gap: ${rowGap}; padding: ${rowPad}; }
         .commitments-row-text { flex: 1; min-width: 0; padding-right: 0.5rem; }
@@ -140,7 +140,7 @@ export function CommitmentsSection({ contributions, role, dept, shifts, bringing
           .commitments-row  { gap: 0.6rem; }
           .commitments-row-text { padding-right: 0; }
         }
-      `}</style>
+      ` }} />
       {/* Header */}
       <div style={{ padding: compact ? '0.8rem 1.25rem 0.6rem' : '1rem 1.5rem 0.8rem' }}>
         <AccentHeader title={title} compact={compact} />

@@ -607,7 +607,7 @@ function RolePicker({
         >
           {/* Seal sizes step down on narrow screens so a full row of
               departments still wraps cleanly at phone width. */}
-          <style>{`
+          <style dangerouslySetInnerHTML={{ __html: `
             .role-seal-strip { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem 1.1rem; margin-bottom: 1.4rem; }
             .role-seal { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; width: 90px; }
             .role-seal-ring { width: 56px; height: 56px; border-radius: 50%; border: 1.5px solid #C8A848; background: radial-gradient(circle at 42% 38%, rgba(200,168,72,0.18), rgba(8,0,18,0.85)); display: flex; align-items: center; justify-content: center; }
@@ -617,7 +617,7 @@ function RolePicker({
               .role-seal-ring { width: 68px; height: 68px; }
               .role-seal-ring .role-seal-emoji { font-size: 1.85rem; }
             }
-          `}</style>
+          ` }} />
           <div className="role-seal-strip">
             {withRoles.map(dept => (
               <span key={dept.id} className="role-seal">
@@ -653,10 +653,10 @@ function RolePicker({
         </button>
       </div>
 
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         .role-grid { display: grid; grid-template-columns: 1fr; gap: 0.55rem; }
         @media (min-width: 560px) { .role-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-      `}</style>
+      ` }} />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2.75rem' }}>
         {withRoles.map(dept => (
@@ -1050,7 +1050,7 @@ function ShiftsPicker({
       {/* Mobile-first: days stack vertically with a compact inline date bar and
           full-width cards. From 640px up, the days sit side by side in ONE row
           (no scroll, no wrap) so the whole event span reads as a calendar. */}
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         .shift-cal { display: flex; flex-direction: column; gap: 0.75rem; }
         .shift-cal-day { display: flex; flex-direction: column; min-width: 0; }
         .shift-cal-head { display: flex; align-items: baseline; gap: 0.45rem; padding: 0.5rem 0.8rem; border-radius: 0.6rem 0.6rem 0 0; background: rgba(210,57,248,0.08); border: 1px solid rgba(210,57,248,0.18); border-bottom: none; }
@@ -1065,7 +1065,7 @@ function ShiftsPicker({
              day columns get real width on desktop (centered over the viewport). */
           .shift-panel-breakout { width: min(1150px, calc(100vw - 3rem)); margin-left: calc((100% - min(1150px, calc(100vw - 3rem))) / 2); }
         }
-      `}</style>
+      ` }} />
       <div className="shift-cal">
         {columns.map(([key, slots]) => {
           const label = key === 'tbd' ? null : dateColumnLabel(key)
