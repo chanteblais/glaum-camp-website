@@ -65,9 +65,13 @@ with the added ability to delete a list.
   anchored `#bring`, **above** Your Groups — needs are live and time-sensitive,
   group membership is set-once): a **preparation board**, not an inventory —
   it answers *"what can I do that would be most helpful?"* first (redesigned
-  2026-07-02 on Chante's direction). **Each list is ONE card** (gold border,
-  header / items / footer, 2026-07-03) — bare sections read as unrelated
-  sibling cards and the add box got mistaken for its own card:
+  2026-07-02 on Chante's direction). **Each list is ONE collapsible card**
+  (gold border, header / items / footer, 2026-07-03) — **collapsed by default**
+  (2026-07-08): the board reads as a scannable index of *every* list (a header
+  row with title + health pill + a one-line summary like "3 still needed · 14
+  items" or "No items yet — tap to add"), so empty lists are as visible as full
+  ones. Tap a header to open it (items + add footer + Edit/Delete); creating a
+  list or adding an item auto-opens that list. Below:
   - **Toolbar** (top, 2026-07-08) — **＋ New list** (title + description inline
     → live immediately) and **＋ Contribute something** (add an item to any list
     via a list picker, without hunting for the right card). Two-up on desktop,

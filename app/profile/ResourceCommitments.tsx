@@ -87,6 +87,9 @@ export function ResourceCommitments({
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  // Lists start COLLAPSED — the board is a scannable index of every list
+  // (empty ones included); tap a header to open it. Tracks which are open.
+  const [openLists, setOpenLists] = useState<Set<string>>(new Set())
 
   // The "add an item" form. Open on at most one target at a time: TOP_FORM
   // (top-level, with a list picker) or a specific list id (footer).
@@ -159,6 +162,15 @@ export function ResourceCommitments({
       else next.add(id)
       return next
     })
+
+  const toggleList = (id: string) =>
+    setOpenLists(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  const expandList = (id: string) => setOpenLists(prev => new Set(prev).add(id))
 
   // My claim on `item` becomes `qty` — locally adjust mine, the total, AND my
   // entry in the visible claimant names, so the board stays truthful mid-flight.
@@ -233,6 +245,7 @@ export function ResourceCommitments({
       setError(d.error ?? 'Could not add it. Try again.')
     } else {
       closeForm()
+      expandList(listId) // so the just-added item is visible
       await load()
       router.refresh()
     }
@@ -253,7 +266,9 @@ export function ResourceCommitments({
       const d = await res.json().catch(() => ({}))
       setError(d.error ?? 'Could not create the list. Try again.')
     } else {
+      const created = await res.json().catch(() => ({}))
       setNewListOpen(false); setNewListTitle(''); setNewListDesc('')
+      if (created?.list?.id) expandList(created.list.id) // open the new list to fill it
       await load()
       router.refresh()
     }
@@ -353,12 +368,13 @@ export function ResourceCommitments({
 
   // ── I'M BRINGING — everything I've committed to, pinned up top ──
   const myCommitments = lists.flatMap(l =>
-    l.items.filter(i => i.mine > 0).map(i => ({ item: i, listTitle: l.title })))
+    l.items.filter(i => i.mine > 0).map(i => ({ item: i, listTitle: l.title, listId: l.id })))
 
-  const jumpToItem = (id: string) => {
+  const jumpToItem = (id: string, listId: string) => {
+    expandList(listId) // the item only renders once its list is open
     setExpanded(prev => new Set(prev).add(id))
     // Let the expansion render before scrolling to it.
-    setTimeout(() => document.getElementById(`res-item-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50)
+    setTimeout(() => document.getElementById(`res-item-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60)
   }
 
   const stepBtn: React.CSSProperties = {
@@ -625,127 +641,156 @@ export function ResourceCommitments({
     const covered = list.items.filter(i => i.needed !== null && i.claimed >= (i.needed as number))
     const contributed = list.items.filter(i => i.needed === null)
     const isEditingList = editListId === list.id
+    const isOpen = openLists.has(list.id)
+    const totalItems = list.items.length
+    // Collapsed one-liner — every list reads as an index row, empty or full.
+    const summary =
+      totalItems === 0 ? 'No items yet — tap to add'
+      : targeted.length === 0 ? `${totalItems} item${totalItems === 1 ? '' : 's'}`
+      : itemsShort > 0 ? `${itemsShort} still needed · ${totalItems} item${totalItems === 1 ? '' : 's'}`
+      : `All covered · ${totalItems} item${totalItems === 1 ? '' : 's'}`
+
+    const pill = status && (
+      <span style={{
+        fontSize: '0.6rem', letterSpacing: '0.16em', textTransform: 'uppercase',
+        padding: '0.25rem 0.7rem', borderRadius: '9999px', whiteSpace: 'nowrap',
+        color: status === 'complete' ? GREEN : status === 'almost' ? GOLD : PURPLE,
+        border: `1px solid ${status === 'complete' ? 'rgba(125,207,142,0.45)' : status === 'almost' ? 'rgba(200,168,72,0.45)' : 'rgba(210,57,248,0.4)'}`,
+        background: status === 'complete' ? 'rgba(125,207,142,0.08)' : status === 'almost' ? 'rgba(200,168,72,0.07)' : 'rgba(210,57,248,0.07)',
+      }}>
+        {status === 'complete' ? 'Complete' : status === 'almost' ? 'Almost Ready' : 'Needs Attention'}
+      </span>
+    )
 
     return (
-      // One list = one card: header, items, and the add footer share a
-      // visible boundary (bare sections read as unrelated sibling cards).
+      // One list = one collapsible card. Collapsed by default: a header row
+      // (title + health + summary) so the board is a scannable index of every
+      // list. Open it to see items + add. Empty lists read just as clearly.
       <div key={list.id} style={{ border: '1px solid rgba(200,168,72,0.25)', borderRadius: '1rem', background: 'rgba(10,0,20,0.5)', overflow: 'hidden' }}>
-        {/* List header: the shared goal, not the inventory */}
-        <div style={{ padding: '1.1rem 1.25rem 1rem', borderBottom: '1px solid rgba(200,168,72,0.12)' }}>
-          {isEditingList ? (
-            /* Inline list header edit (wiki) */
-            <div>
-              <input
-                autoFocus value={editListTitle} onChange={e => setEditListTitle(e.target.value)}
-                placeholder="List title" maxLength={80} style={{ ...fieldStyle, fontSize: '1rem' }}
-              />
-              <input
-                value={editListDesc} onChange={e => setEditListDesc(e.target.value)}
-                placeholder="Description (optional)" maxLength={300}
-                style={{ ...fieldStyle, fontSize: '0.82rem', border: '1px solid rgba(200,168,72,0.2)' }}
-              />
-              <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end' }}>
-                {pillBtn('Cancel', () => setEditListId(null), false, false)}
-                {pillBtn('Save', () => submitEditList(list.id), !editListTitle.trim(), true)}
+        {isEditingList ? (
+          /* Inline list header edit (wiki) */
+          <div style={{ padding: '1.1rem 1.25rem' }}>
+            <input
+              autoFocus value={editListTitle} onChange={e => setEditListTitle(e.target.value)}
+              placeholder="List title" maxLength={80} style={{ ...fieldStyle, fontSize: '1rem' }}
+            />
+            <input
+              value={editListDesc} onChange={e => setEditListDesc(e.target.value)}
+              placeholder="Description (optional)" maxLength={300}
+              style={{ ...fieldStyle, fontSize: '0.82rem', border: '1px solid rgba(200,168,72,0.2)' }}
+            />
+            <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end' }}>
+              {pillBtn('Cancel', () => setEditListId(null), false, false)}
+              {pillBtn('Save', () => submitEditList(list.id), !editListTitle.trim(), true)}
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Header row — the whole row toggles open/closed */}
+            <div
+              onClick={() => toggleList(list.id)}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', padding: '1rem 1.25rem', cursor: 'pointer' }}
+            >
+              <span aria-hidden style={{ color: GOLD, opacity: 0.5, fontSize: '0.9rem', flexShrink: 0, transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>›</span>
+              <p style={{ margin: 0, flex: 1, minWidth: 0, fontSize: '1.2rem', letterSpacing: '0.05em', color: GOLD, opacity: 0.95, fontFamily: 'TokyoDreams, serif', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {list.title}
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flexShrink: 0 }}>
+                {pill}
+                {isOpen ? (
+                  <>
+                    {canManage && textLink('Edit', () => openEditList(list))}
+                    {canDeleteLists && textLink('Delete', () => deleteList(list), '#ff8a8a')}
+                  </>
+                ) : (
+                  <span style={{ fontSize: '0.72rem', color: CREAM, opacity: 0.45, whiteSpace: 'nowrap' }}>{summary}</span>
+                )}
               </div>
             </div>
-          ) : (
-            <>
-              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
-                <p style={{ margin: 0, fontSize: '1.25rem', letterSpacing: '0.05em', color: GOLD, opacity: 0.95, fontFamily: 'TokyoDreams, serif' }}>
-                  {list.title}
-                </p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                  {status && (
-                    <span style={{
-                      fontSize: '0.6rem', letterSpacing: '0.16em', textTransform: 'uppercase',
-                      padding: '0.25rem 0.7rem', borderRadius: '9999px', whiteSpace: 'nowrap',
-                      color: status === 'complete' ? GREEN : status === 'almost' ? GOLD : PURPLE,
-                      border: `1px solid ${status === 'complete' ? 'rgba(125,207,142,0.45)' : status === 'almost' ? 'rgba(200,168,72,0.45)' : 'rgba(210,57,248,0.4)'}`,
-                      background: status === 'complete' ? 'rgba(125,207,142,0.08)' : status === 'almost' ? 'rgba(200,168,72,0.07)' : 'rgba(210,57,248,0.07)',
-                    }}>
-                      {status === 'complete' ? 'Complete' : status === 'almost' ? 'Almost Ready' : 'Needs Attention'}
-                    </span>
-                  )}
-                  {canManage && textLink('Edit', () => openEditList(list))}
-                  {canDeleteLists && textLink('Delete', () => deleteList(list), '#ff8a8a')}
-                </div>
-              </div>
-              {(list.description || list.steward_name) && (
-                <p style={{ margin: '0.25rem 0 0', fontSize: '0.78rem', opacity: 0.45, lineHeight: 1.5 }}>
-                  {[list.description, list.steward_name ? `Stewarded by ${list.steward_name}` : null].filter(Boolean).join(' · ')}
-                </p>
-              )}
-              {status === 'complete' ? (
-                <p style={{ margin: '0.5rem 0 0', fontSize: '0.82rem', color: GREEN, opacity: 0.9 }}>
-                  ✨ {list.title} is fully equipped! Thanks to everyone contributing.
-                </p>
-              ) : status ? (
-                <>
-                  {status === 'almost' && (
-                    <p style={{ margin: '0.5rem 0 0', fontSize: '0.82rem', color: GOLD, opacity: 0.9 }}>
-                      ✨ {list.title} is almost ready — only {itemsShort} more item{itemsShort === 1 ? '' : 's'} needed.
-                    </p>
-                  )}
-                  <p style={{ margin: '0.4rem 0 0', fontSize: '0.72rem', opacity: 0.45 }}>
-                    {coveredItems} of {targeted.length} resources covered · {itemsShort} still need{itemsShort === 1 ? 's' : ''} attention
-                  </p>
-                </>
-              ) : null}
-            </>
-          )}
-        </div>
 
-        {/* Items grouped by what needs attention */}
-        {list.items.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1.1rem 1.25rem 1.25rem' }}>
-            {stillNeeded.length > 0 && (
-              <div>
-                <p style={{ ...groupLabelStyle, color: GOLD, opacity: 0.75 }}>Still Needed</p>
-                <div style={{ border: '1px solid rgba(200,168,72,0.14)', borderRadius: '0.6rem', overflow: 'hidden' }}>
-                  {stillNeeded.map(renderItem)}
-                </div>
-              </div>
-            )}
-            {covered.length > 0 && (
-              <div>
-                <p style={{ ...groupLabelStyle, color: GREEN, opacity: 0.6 }}>Covered</p>
-                <div style={{ border: '1px solid rgba(200,168,72,0.14)', borderRadius: '0.6rem', overflow: 'hidden', opacity: 0.8 }}>
-                  {covered.map(renderItem)}
-                </div>
-              </div>
-            )}
-            {contributed.length > 0 && (
-              <div>
-                <p style={{ ...groupLabelStyle, color: LAVENDER, opacity: 0.65 }}>Member Contributions</p>
-                <div style={{ border: '1px solid rgba(200,168,72,0.14)', borderRadius: '0.6rem', overflow: 'hidden' }}>
-                  {contributed.map(renderItem)}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+            {isOpen && (
+              <div style={{ borderTop: '1px solid rgba(200,168,72,0.12)' }}>
+                {/* Description + health copy — the shared goal, on demand */}
+                {(list.description || list.steward_name || status) && (
+                  <div style={{ padding: '0.95rem 1.25rem 0.2rem' }}>
+                    {(list.description || list.steward_name) && (
+                      <p style={{ margin: 0, fontSize: '0.78rem', opacity: 0.45, lineHeight: 1.5 }}>
+                        {[list.description, list.steward_name ? `Stewarded by ${list.steward_name}` : null].filter(Boolean).join(' · ')}
+                      </p>
+                    )}
+                    {status === 'complete' ? (
+                      <p style={{ margin: '0.5rem 0 0', fontSize: '0.82rem', color: GREEN, opacity: 0.9 }}>
+                        ✨ {list.title} is fully equipped! Thanks to everyone contributing.
+                      </p>
+                    ) : status ? (
+                      <>
+                        {status === 'almost' && (
+                          <p style={{ margin: '0.5rem 0 0', fontSize: '0.82rem', color: GOLD, opacity: 0.9 }}>
+                            ✨ {list.title} is almost ready — only {itemsShort} more item{itemsShort === 1 ? '' : 's'} needed.
+                          </p>
+                        )}
+                        <p style={{ margin: '0.4rem 0 0', fontSize: '0.72rem', opacity: 0.45 }}>
+                          {coveredItems} of {targeted.length} resources covered · {itemsShort} still need{itemsShort === 1 ? 's' : ''} attention
+                        </p>
+                      </>
+                    ) : null}
+                  </div>
+                )}
 
-        {/* Add an item to this list (wiki). A footer OF the card. */}
-        {canManage && (
-          <div style={{ borderTop: '1px solid rgba(200,168,72,0.12)' }}>
-            {openForm === list.id ? (
-              renderAddItemForm(false, list.id)
-            ) : (
-              <button
-                onClick={() => openContribute(list.id)}
-                style={{
-                  display: 'block', width: '100%', boxSizing: 'border-box', textAlign: 'center',
-                  padding: '0.85rem 1.25rem', cursor: 'pointer',
-                  border: 'none', background: 'transparent',
-                  color: GOLD, opacity: 0.65, fontSize: '0.78rem',
-                  letterSpacing: '0.05em', fontFamily: 'inherit',
-                }}
-              >
-                ＋ Add something to this list
-              </button>
+                {/* Items grouped by what needs attention */}
+                {list.items.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1.1rem 1.25rem 1.25rem' }}>
+                    {stillNeeded.length > 0 && (
+                      <div>
+                        <p style={{ ...groupLabelStyle, color: GOLD, opacity: 0.75 }}>Still Needed</p>
+                        <div style={{ border: '1px solid rgba(200,168,72,0.14)', borderRadius: '0.6rem', overflow: 'hidden' }}>
+                          {stillNeeded.map(renderItem)}
+                        </div>
+                      </div>
+                    )}
+                    {covered.length > 0 && (
+                      <div>
+                        <p style={{ ...groupLabelStyle, color: GREEN, opacity: 0.6 }}>Covered</p>
+                        <div style={{ border: '1px solid rgba(200,168,72,0.14)', borderRadius: '0.6rem', overflow: 'hidden', opacity: 0.8 }}>
+                          {covered.map(renderItem)}
+                        </div>
+                      </div>
+                    )}
+                    {contributed.length > 0 && (
+                      <div>
+                        <p style={{ ...groupLabelStyle, color: LAVENDER, opacity: 0.65 }}>Member Contributions</p>
+                        <div style={{ border: '1px solid rgba(200,168,72,0.14)', borderRadius: '0.6rem', overflow: 'hidden' }}>
+                          {contributed.map(renderItem)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Add an item to this list (wiki). A footer OF the card. */}
+                {canManage && (
+                  <div style={{ borderTop: '1px solid rgba(200,168,72,0.12)' }}>
+                    {openForm === list.id ? (
+                      renderAddItemForm(false, list.id)
+                    ) : (
+                      <button
+                        onClick={() => openContribute(list.id)}
+                        style={{
+                          display: 'block', width: '100%', boxSizing: 'border-box', textAlign: 'center',
+                          padding: '0.85rem 1.25rem', cursor: 'pointer',
+                          border: 'none', background: 'transparent',
+                          color: GOLD, opacity: 0.65, fontSize: '0.78rem',
+                          letterSpacing: '0.05em', fontFamily: 'inherit',
+                        }}
+                      >
+                        ＋ Add something to this list
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
-          </div>
+          </>
         )}
       </div>
     )
@@ -873,7 +918,7 @@ export function ResourceCommitments({
             </p>
           </div>
           <div style={{ padding: '0.5rem 1.25rem 0.75rem' }}>
-            {myCommitments.map(({ item, listTitle }) => (
+            {myCommitments.map(({ item, listTitle, listId }) => (
               <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.4rem 0' }}>
                 <span style={{ color: GREEN, flexShrink: 0 }}>✓</span>
                 <p style={{ flex: 1, margin: 0, fontSize: '0.85rem', color: CREAM, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -881,7 +926,7 @@ export function ResourceCommitments({
                   <span style={{ opacity: 0.4, fontSize: '0.75rem' }}> — {listTitle}</span>
                 </p>
                 <button
-                  onClick={() => jumpToItem(item.id)}
+                  onClick={() => jumpToItem(item.id, listId)}
                   style={{ background: 'none', border: 'none', padding: 0, color: GOLD, opacity: 0.6, cursor: 'pointer', fontSize: '0.72rem', letterSpacing: '0.05em', fontFamily: 'inherit', flexShrink: 0 }}
                 >
                   Edit ›
