@@ -12,6 +12,9 @@ import { COMMUNITY_CATEGORIES } from './admin-sections'
 import { AnnouncementsManager } from './AnnouncementsManager'
 import { RadioManager } from './RadioManager'
 import { ResourcesManager } from './ResourcesManager'
+import { DuesManager } from './DuesManager'
+import { parseDuesConfig } from '@/lib/dues'
+import { getDuesRoster } from '@/lib/dues-roster'
 import { getGroupNamesByUser } from '@/lib/groups'
 import { getShiftEventByUser } from '@/lib/shift-signups'
 import { getAdminRunway } from '@/lib/admin-attention'
@@ -42,6 +45,7 @@ export default async function AdminPage() {
     { data: radioConfigRow },
     resourceLists,
     stewardOptions,
+    { data: duesConfigRow },
   ] = await Promise.all([
     supabaseAdmin
       .from('volunteers')
@@ -75,7 +79,17 @@ export default async function AdminPage() {
       .maybeSingle(),
     safe(getAdminResourceLists()),
     safe(getStewardOptions()),
+    supabaseAdmin
+      .from('page_content')
+      .select('value')
+      .eq('key', 'config_dues')
+      .maybeSingle(),
   ])
+
+  // Dues roster depends on the configured audience (members / volunteers), so it
+  // loads after the config row above.
+  const duesConfig = parseDuesConfig(duesConfigRow?.value)
+  const duesRoster = await safe(getDuesRoster(duesConfig.audience))
 
   const volunteers = volunteersRaw ?? []
   const pendingVolunteers = volunteers.filter(v => v.status === 'pending')
@@ -279,6 +293,26 @@ export default async function AdminPage() {
           defaultOpen={false}
         >
           <ResourcesManager initialLists={resourceLists} initialStewards={stewardOptions} />
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          title="Camp Dues"
+          summary={(() => {
+            if (!duesConfig.enabled) return 'Off'
+            if (!duesRoster) return 'Payment info + who has paid'
+            const paid = duesRoster.filter(r => r.paidAt && !r.suspended).length
+            const awaiting = duesRoster.filter(r => !r.paidAt && r.reportedAt && !r.suspended).length
+            const owed = duesRoster.filter(r => !r.paidAt && !r.reportedAt && !r.suspended).length
+            return `${paid} paid${awaiting ? ` · ${awaiting} to review` : ''} · ${owed} owed`
+          })()}
+          defaultOpen={false}
+        >
+          {/* key remounts with fresh server roster when the audience/on-off changes */}
+          <DuesManager
+            key={`dues-${duesConfig.enabled}-${duesConfig.audience.members}-${duesConfig.audience.volunteers}`}
+            initialConfig={duesConfig}
+            initialRoster={duesRoster ?? []}
+          />
         </CollapsibleSection>
 
       </div>
