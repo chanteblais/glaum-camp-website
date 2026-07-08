@@ -620,7 +620,7 @@ export function HomePageEditor({ initialContent }: { initialContent: Content }) 
 
       {/* Offset page content when edit bar is showing */}
       {editMode && (
-        <style>{`body { padding-top: 48px !important; }`}</style>
+        <style dangerouslySetInnerHTML={{ __html: `body { padding-top: 48px !important; }` }} />
       )}
 
       {/* ── Floating toggle button ── */}
@@ -628,10 +628,10 @@ export function HomePageEditor({ initialContent }: { initialContent: Content }) 
         <>
           {/* On phones the full pill sits on top of body text — collapse it to
               a small ✎ disc so it stops covering announcements */}
-          <style>{`@media (max-width: 640px) {
+          <style dangerouslySetInnerHTML={{ __html: `@media (max-width: 640px) {
             .hp-edit-fab { padding: 0.55rem 0.8rem !important; }
             .hp-edit-fab .hp-edit-fab-label { display: none; }
-          }`}</style>
+          }` }} />
           <button
             className="hp-edit-fab"
             onClick={() => setEditMode(true)}

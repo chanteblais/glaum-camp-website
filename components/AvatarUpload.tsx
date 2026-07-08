@@ -208,10 +208,10 @@ export function AvatarUpload({
         style={{ display: 'none' }}
       />
 
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         button:hover .avatar-overlay { opacity: 1 !important; }
         @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
+      ` }} />
     </div>
   )
 }

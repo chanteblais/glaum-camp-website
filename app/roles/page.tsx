@@ -147,12 +147,12 @@ export default async function RolesRegistryPage() {
         </nav>
 
         {/* Two-column responsibilities on wider screens */}
-        <style>{`
+        <style dangerouslySetInnerHTML={{ __html: `
           .registry-charge { display: grid; grid-template-columns: 1fr; gap: 1rem; }
           @media (min-width: 640px) {
             .registry-charge-2col { grid-template-columns: 1fr 1fr; gap: 1.5rem; }
           }
-        `}</style>
+        ` }} />
 
         {departments.length === 0 && (
           <p style={{ textAlign: 'center', fontSize: '0.9rem', opacity: 0.5, fontStyle: 'italic', margin: '3rem 0', lineHeight: 1.7 }}>

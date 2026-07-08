@@ -111,7 +111,7 @@ export function CabinetOfDistinctions({ distinctions, title = 'Cabinet of Distin
       overflow: 'hidden',
       boxShadow: compact ? '0 0 0 1px rgba(200,168,72,0.06)' : '0 0 0 1px rgba(200,168,72,0.12), 0 0 24px rgba(200,168,72,0.08)',
     }}>
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         .cabinet-grid {
           display: flex;
           flex-wrap: wrap;
@@ -125,7 +125,7 @@ export function CabinetOfDistinctions({ distinctions, title = 'Cabinet of Distin
           .cabinet-grid { gap: 0.5rem 0.75rem; padding: 0.1rem 1.25rem 0.5rem; }
           .cabinet-medal { width: ${cellSm}px; }
         }
-      `}</style>
+      ` }} />
 
       {/* Header */}
       <div style={{ padding: compact ? '0.55rem 1.25rem 0' : '0.6rem 1.5rem 0.1rem', textAlign: 'center' }}>
