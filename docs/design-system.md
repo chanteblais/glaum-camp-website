@@ -57,7 +57,7 @@ Inside `.site-shell .clerk-scope` (Clerk auth embeds), headings reset to dark in
 - **Container:** centered, with responsive horizontal padding (1rem → 6rem at 2xl)
 - **Max page width:** `1100px` (profile page)
 - **Border radius:** `2xl` = `1rem`
-- **Mobile breakpoint:** `768px` (JS-detected for nav), `640px` (CSS media queries for schedule calendar)
+- **Mobile breakpoint:** `768px` (JS-detected: nav + public schedule calendar), `640px` (personal schedule calendar, CSS media queries)
 
 ---
 
@@ -131,8 +131,9 @@ Most content cards use a parchment aesthetic:
 ### Schedule Calendar
 
 **Public** (`ScheduleCalendarClient`):
-- Mobile (< 640px): day-tab switcher
+- Mobile (< 768px, matching the nav breakpoint): day-tab switcher
 - Desktop: 6-column grid
+- Event blocks fit content to their slot height (short blocks drop the icon/caret, titles clamp to whole lines — never sliced mid-glyph); tapping a block with detail expands it past its slot over an opaque backing
 
 **Personal** (`PersonalScheduleCalendar`):
 - Mobile (< 640px): day-tab switcher
