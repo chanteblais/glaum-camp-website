@@ -24,7 +24,7 @@ Paste at the start of a new Claude session. Deliberately short; the detailed doc
 - No shared layout header — each page owns its header row. Mobile nav breakpoint in JS (`window.innerWidth < 768`). `overflow-x: hidden` on html/body.
 - Fetch `applications` and `camp_signups` separately and join in JS (no resolvable FK).
 - **Stale dev bundles ("page renders but clicks die") — root cause found & fixed 2026-07-02:** the PWA service worker cached same-origin `.js` cache-first, which poisons dev (stable chunk paths, no content hashes). Now `sw.js` no-ops on localhost and `ServiceWorkerRegister` unregisters + clears caches in dev. If a browser still serves stale code once, reload twice (first load swaps in the fixed worker). `rm -rf .next` + restart remains the fallback for genuine HMR staleness.
-- Inline `<style>` must **always** use `dangerouslySetInnerHTML` — React HTML-escapes children (`>`, `'`, `&`, quotes — child combinators, attribute selectors, even an apostrophe in a CSS comment), the server sends the escaped text, and hydration trips on the mismatch. Bitten twice on 2026-07-03; don't gamble on "this block has no special chars".
+- Inline `<style>` with attribute selectors must use `dangerouslySetInnerHTML` (avoids hydration mismatch).
 
 ## Key files
 - `app/page.tsx` — homepage (marketing + member dashboard) · `app/HomePageEditor.tsx` — inline page editor · `app/ShoutoutWidget.tsx` — member shoutouts dashboard widget
