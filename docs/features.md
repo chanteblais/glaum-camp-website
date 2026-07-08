@@ -36,7 +36,7 @@ Nav links for non-approved signed-in users (pending/rejected) show the public se
 - TokyoDreams display heading + camp logo
 - Hero tagline (`home_tagline` from `page_content`)
 - Embedded public schedule (`ScheduleSection` + `ScheduleCalendarClient`)
-  - Mobile: day-tab switcher (< 640px)
+  - Mobile: day-tab switcher (< 768px)
   - Desktop: 6-column grid
 - About + Participate sections (editable via Admin → Edit Page)
 - Footer with hands SVG decorations
