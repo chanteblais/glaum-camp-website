@@ -29,10 +29,17 @@ export type MemberRecord = {
   suspended_at: string | null
   suspended_by: string | null
   suspension_note: string | null
+  // Camp dues (migration 067) — non-NULL `dues_paid_at` = dues recorded paid.
+  // Collected manually this year; `dues_note` holds amount/method free text.
+  // `dues_reported_at` (068) = the member's self-reported (unconfirmed) claim.
+  dues_paid_at: string | null
+  dues_paid_by: string | null
+  dues_note: string | null
+  dues_reported_at: string | null
 }
 
 const MEMBER_COLUMNS =
-  'id, clerk_user_id, email, first_name, last_name, preferred_name, pronouns, phone, avatar_url, status, application_id, suspended_at, suspended_by, suspension_note'
+  'id, clerk_user_id, email, first_name, last_name, preferred_name, pronouns, phone, avatar_url, status, application_id, suspended_at, suspended_by, suspension_note, dues_paid_at, dues_paid_by, dues_note, dues_reported_at'
 
 export type MemberIdentity = Partial<Omit<MemberRecord, 'id' | 'clerk_user_id'>>
 

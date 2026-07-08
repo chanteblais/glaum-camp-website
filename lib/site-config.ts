@@ -73,7 +73,10 @@ export function parseTrackCopy(raw?: string | null): TrackCopy {
 
 // 'collection' = membership in a group collection (migration 042); the task
 // carries which collection and how many memberships are required.
-export type AttunementRequirement = 'role' | 'shift' | 'collection' | 'photo' | 'approved'
+// 'dues' = camp dues recorded paid (migration 067). Unlike every other
+// requirement it isn't derived from a member action — this year dues are
+// collected by email and an admin marks each member paid (Community → Camp Dues).
+export type AttunementRequirement = 'role' | 'shift' | 'collection' | 'photo' | 'approved' | 'dues'
 
 export type AttunementTask = {
   id: string
@@ -104,6 +107,7 @@ export const ATTUNEMENT_REQUIREMENTS: { value: AttunementRequirement; label: str
   { value: 'role',     label: 'Role selected',        hint: 'Completes when the member has an approved role.' },
   { value: 'photo',    label: 'Photo uploaded',       hint: 'Completes when the member uploads a profile photo.' },
   { value: 'approved', label: 'Application approved',  hint: 'Always complete on the member profile — use as a reassuring first step.' },
+  { value: 'dues',     label: 'Camp dues paid',       hint: 'Completes when you mark the member paid in Community → Camp Dues. Set how members pay there too.' },
 ]
 
 // Requirements accepted when parsing saved config. Includes 'collection' (the
