@@ -657,9 +657,11 @@ export function ResourceCommitments({
     const isOpen = openLists.has(list.id)
     const totalItems = list.items.length
     // Collapsed one-liner — every list reads as an index row, empty or full.
+    // A list with no tracked needs is an OPEN CALL (nothing prescribed — bring
+    // what fits), so it reads as an invitation rather than an empty inventory.
     const summary =
-      totalItems === 0 ? 'No items yet — tap to add'
-      : targeted.length === 0 ? `${totalItems} item${totalItems === 1 ? '' : 's'}`
+      totalItems === 0 ? 'Open call — tap to contribute'
+      : targeted.length === 0 ? `Open call · ${totalItems} item${totalItems === 1 ? '' : 's'}`
       : itemsShort > 0 ? `${itemsShort} still needed · ${totalItems} item${totalItems === 1 ? '' : 's'}`
       : `All covered · ${totalItems} item${totalItems === 1 ? '' : 's'}`
 
@@ -724,12 +726,18 @@ export function ResourceCommitments({
 
             {isOpen && (
               <div style={{ borderTop: '1px solid rgba(200,168,72,0.12)' }}>
-                {/* Description + health copy — the shared goal, on demand */}
-                {(list.description || list.steward_name || status) && (
-                  <div style={{ padding: '0.95rem 1.25rem 0.2rem' }}>
+                {/* Description + health copy — the shared goal, on demand.
+                    No tracked needs (status null) = an open call: an
+                    invitation to contribute, not an inventory to fill. */}
+                <div style={{ padding: '0.95rem 1.25rem 0.2rem' }}>
                     {(list.description || list.steward_name) && (
                       <p style={{ margin: 0, fontSize: '0.78rem', opacity: 0.45, lineHeight: 1.5 }}>
                         {[list.description, list.steward_name ? `Stewarded by ${list.steward_name}` : null].filter(Boolean).join(' · ')}
+                      </p>
+                    )}
+                    {status === null && (
+                      <p style={{ margin: list.description || list.steward_name ? '0.5rem 0 0' : 0, fontSize: '0.82rem', color: GOLD, opacity: 0.8 }}>
+                        ✦ An open call — bring whatever you think would help.
                       </p>
                     )}
                     {status === 'complete' ? (
@@ -748,8 +756,7 @@ export function ResourceCommitments({
                         </p>
                       </>
                     ) : null}
-                  </div>
-                )}
+                </div>
 
                 {/* Items grouped by what needs attention */}
                 {list.items.length > 0 && (

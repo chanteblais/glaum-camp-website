@@ -156,6 +156,10 @@ export async function getMemberResourceView(userId: string): Promise<MemberResou
 // readiness. Returns null when no list is flagged for the dashboard.
 export type ResourceWidgetListRow = {
   title: string
+  // A list with no targets is an OPEN CALL — its description doubles as the
+  // callout copy on the widget ("Bring anything that sparkles"), so an
+  // open-ended list reads as an invitation, never as a dead "No needs yet".
+  description: string | null
   hasTargets: boolean // has at least one item with a target
   remaining: number // units still needed (targeted only)
   percentReady: number // unit-weighted for this list; 100 when no targets
@@ -176,7 +180,7 @@ export async function getResourceWidgetState(clerkUserId: string | null | undefi
     getMemberResourceClaims(clerkUserId),
     supabaseAdmin
       .from('resource_lists')
-      .select('id, title, sort_order')
+      .select('id, title, description, sort_order')
       .eq('visible', true)
       .eq('show_on_dashboard', true)
       .order('sort_order', { ascending: true })
@@ -198,9 +202,9 @@ export async function getResourceWidgetState(clerkUserId: string | null | undefi
   const claimed: Record<string, number> = {}
   for (const c of claims ?? []) claimed[c.resource_id] = (claimed[c.resource_id] ?? 0) + c.quantity
 
-  type Agg = { title: string; sort: number; covered: number; total: number; remaining: number; contributions: number }
+  type Agg = { title: string; description: string | null; sort: number; covered: number; total: number; remaining: number; contributions: number }
   const agg: Record<string, Agg> = Object.fromEntries(
-    lists.map(l => [l.id, { title: l.title, sort: l.sort_order, covered: 0, total: 0, remaining: 0, contributions: 0 }])
+    lists.map(l => [l.id, { title: l.title, description: l.description ?? null, sort: l.sort_order, covered: 0, total: 0, remaining: 0, contributions: 0 }])
   )
   for (const i of items ?? []) {
     const a = agg[i.list_id]
@@ -219,6 +223,7 @@ export async function getResourceWidgetState(clerkUserId: string | null | undefi
 
   const rows: ResourceWidgetListRow[] = Object.values(agg).map(a => ({
     title: a.title,
+    description: a.description,
     hasTargets: a.total > 0,
     remaining: a.remaining,
     percentReady: percent(a.covered, a.total),

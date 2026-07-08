@@ -594,9 +594,14 @@ let canManagePolls = false
                   const moreLists = w.lists.length - shown.length
                   const bringing = w.myClaims.slice(0, 3).map(cl => (cl.quantity > 1 ? `${cl.resourceName} ×${cl.quantity}` : cl.resourceName)).join(', ')
                   const moreClaims = w.myClaims.length - 3
+                  // A list with no tracked needs is an OPEN CALL, not an empty
+                  // inventory — it reads as an invitation, and its description
+                  // (written in the list editor) is the callout copy.
                   const rowStatus = (r: typeof w.lists[number]) =>
                     !r.hasTargets
-                      ? { text: r.contributions > 0 ? `${r.contributions} being brought` : 'No needs yet', color: '#F3EDE6', op: 0.4 }
+                      ? r.contributions > 0
+                        ? { text: `${r.contributions} being brought`, color: '#F3EDE6', op: 0.4 }
+                        : { text: '✦ open call', color: '#C8A848', op: 0.75 }
                       : r.allCovered
                         ? { text: '✓ all covered', color: '#7dcf8e', op: 0.9 }
                         : { text: `${r.remaining} still needed`, color: '#C8A848', op: 0.95 }
@@ -614,9 +619,15 @@ let canManagePolls = false
                           {shown.map((r, i) => {
                             const s = rowStatus(r)
                             return (
-                              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', padding: '0.4rem 0', borderTop: i > 0 ? '1px solid rgba(200,168,72,0.07)' : 'none' }}>
-                                <span style={{ fontFamily: 'TokyoDreams, serif', fontSize: '0.92rem', color: '#C8A848', opacity: 0.9, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
-                                <span style={{ fontSize: '0.72rem', color: s.color, opacity: s.op, flexShrink: 0, whiteSpace: 'nowrap' }}>{s.text}</span>
+                              <div key={i} style={{ padding: '0.4rem 0', borderTop: i > 0 ? '1px solid rgba(200,168,72,0.07)' : 'none' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+                                  <span style={{ fontFamily: 'TokyoDreams, serif', fontSize: '0.92rem', color: '#C8A848', opacity: 0.9, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
+                                  <span style={{ fontSize: '0.72rem', color: s.color, opacity: s.op, flexShrink: 0, whiteSpace: 'nowrap' }}>{s.text}</span>
+                                </div>
+                                {/* The open-ended callout — the list's own words */}
+                                {!r.hasTargets && r.description && (
+                                  <p style={{ margin: '0.1rem 0 0', fontSize: '0.7rem', fontStyle: 'italic', color: '#F3EDE6', opacity: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description}</p>
+                                )}
                               </div>
                             )
                           })}
