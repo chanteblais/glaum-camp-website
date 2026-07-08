@@ -22,6 +22,19 @@ export type RadioKind =
   | 'milestone'     // 🎉 a community goal completes
   | 'voice'         // ✦ a member puts a moment on the air
 
+// Default emoji + short plural label per kind — the single source for any UI
+// that needs to name a kind (currently the /radio feed's kind filter row).
+// Individual posts can still override their own icon (radio_events.icon);
+// this is only the canonical default/label pairing.
+export const RADIO_KIND_META: Record<RadioKind, { emoji: string; label: string }> = {
+  broadcast: { emoji: '📢', label: 'Broadcasts' },
+  welcome: { emoji: '👋', label: 'Welcomes' },
+  contribution: { emoji: '✨', label: 'Contributions' },
+  achievement: { emoji: '🏅', label: 'Achievements' },
+  milestone: { emoji: '🎉', label: 'Milestones' },
+  voice: { emoji: '✦', label: 'Voices' },
+}
+
 export type RadioEventRow = {
   id: string
   kind: string

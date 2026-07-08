@@ -1,5 +1,5 @@
 import { supabaseAdmin } from './supabase'
-import { memberDisplayNames } from './member-names'
+import { memberDisplayNames, applicationIdsByClerkId } from './member-names'
 import type { ScheduleEvent, ShiftTypeOption, RosterEntry } from '@/app/admin/ScheduleManager'
 import type { LeadUpEvent } from '@/app/admin/LeadUpGatheringsManager'
 import type { ResourceList, StewardOptions } from '@/app/admin/ResourcesManager'
@@ -71,13 +71,17 @@ export async function getAdminRosters(): Promise<Record<string, RosterEntry[]>> 
   }
 
   const allIds = Array.from(byEvent.values()).flatMap(h => Array.from(h.values()).map(v => v.clerk_user_id))
-  const names = await memberDisplayNames(allIds)
+  const [names, applicationIds] = await Promise.all([
+    memberDisplayNames(allIds),
+    applicationIdsByClerkId(allIds),
+  ])
 
   const rosters: Record<string, RosterEntry[]> = {}
   byEvent.forEach((holders, eventId) => {
     rosters[eventId] = Array.from(holders.values())
       .map(h => ({
         clerk_user_id: h.clerk_user_id,
+        application_id: applicationIds[h.clerk_user_id] ?? null,
         name: names[h.clerk_user_id] ?? 'Unknown member',
         role: h.role,
         legacy_only: h.legacy_only,
@@ -128,16 +132,21 @@ export async function getAdminResourceLists(): Promise<ResourceList[]> {
   ])
   if (error) throw new Error(error.message)
 
-  const names = await memberDisplayNames([
+  const claimantIds = [
     ...(claims ?? []).map(c => c.clerk_user_id),
     ...(items ?? []).map(i => i.offered_by).filter(Boolean) as string[],
+  ]
+  const [names, applicationIds] = await Promise.all([
+    memberDisplayNames(claimantIds),
+    applicationIdsByClerkId(claimantIds),
   ])
 
-  const claimsByResource: Record<string, { name: string; quantity: number }[]> = {}
+  const claimsByResource: Record<string, { name: string; quantity: number; application_id: string | null }[]> = {}
   for (const c of claims ?? []) {
     ;(claimsByResource[c.resource_id] ??= []).push({
       name: names[c.clerk_user_id] ?? 'Unknown member',
       quantity: c.quantity,
+      application_id: applicationIds[c.clerk_user_id] ?? null,
     })
   }
 
@@ -148,6 +157,7 @@ export async function getAdminResourceLists(): Promise<ResourceList[]> {
       ...it,
       // NULL quantity_needed = open member offer (migration 053).
       offered_by_name: it.offered_by ? names[it.offered_by] ?? 'Unknown member' : null,
+      offered_by_application_id: it.offered_by ? applicationIds[it.offered_by] ?? null : null,
       claimed: itemClaims.reduce((s, c) => s + c.quantity, 0),
       claimants: itemClaims,
     })

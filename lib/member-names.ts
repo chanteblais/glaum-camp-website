@@ -19,3 +19,22 @@ export async function memberDisplayNames(clerkUserIds: string[]): Promise<Record
   }
   return names
 }
+
+// clerk_user_id → applications.id, for admin surfaces that show a member's
+// name and need to link it to their /admin/[id] dossier (the admin detail
+// route keys on the application id, not clerk_user_id or members.id). Ids
+// with no matching application are simply absent — callers should render
+// the name unlinked in that case.
+export async function applicationIdsByClerkId(clerkUserIds: string[]): Promise<Record<string, string>> {
+  const ids = Array.from(new Set(clerkUserIds.filter(Boolean)))
+  if (ids.length === 0) return {}
+  const { data } = await supabaseAdmin
+    .from('applications')
+    .select('id, clerk_user_id')
+    .in('clerk_user_id', ids)
+  const result: Record<string, string> = {}
+  for (const a of data ?? []) {
+    if (a.clerk_user_id) result[a.clerk_user_id] = a.id
+  }
+  return result
+}

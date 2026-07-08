@@ -7,7 +7,7 @@ import { AssetImagePicker } from './AssetImagePicker'
 import { isImageIcon } from '@/lib/icon-src'
 import { useConfirm } from '../components/ConfirmDialog'
 
-type Claimant = { name: string; quantity: number }
+type Claimant = { name: string; quantity: number; application_id: string | null }
 type ResourceItem = {
   id: string
   list_id: string
@@ -17,6 +17,7 @@ type ResourceItem = {
   quantity_needed: number | null
   icon: string | null
   offered_by_name: string | null
+  offered_by_application_id: string | null
   sort_order: number
   claimed: number
   claimants: Claimant[]
@@ -437,14 +438,27 @@ export function ResourcesManager({ initialLists, initialStewards }: {
                     {item.name}
                     {item.offered_by_name && (
                       <span style={{ marginLeft: '0.5rem', fontSize: '0.6rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#D9B8E8', border: '1px solid rgba(210,57,248,0.3)', borderRadius: '9999px', padding: '0.1rem 0.5rem', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
-                        offered by {item.offered_by_name}
+                        offered by {item.offered_by_application_id ? (
+                          <a href={`/admin/${item.offered_by_application_id}`} style={{ color: 'inherit', textDecoration: 'none' }}>{item.offered_by_name}</a>
+                        ) : item.offered_by_name}
                       </span>
                     )}
                     {item.note && <span style={{ opacity: 0.45, fontSize: '0.74rem' }}> — {item.note}</span>}
                   </p>
                   {item.claimants.length > 0 && (
                     <p style={{ fontSize: '0.68rem', opacity: 0.45, margin: '0.15rem 0 0' }}>
-                      {item.claimants.map(c => c.quantity > 1 ? `${c.name} ×${c.quantity}` : c.name).join(' · ')}
+                      {item.claimants.map((c, i) => (
+                        <span key={i}>
+                          {i > 0 && ' · '}
+                          {c.application_id ? (
+                            <a href={`/admin/${c.application_id}`} style={{ color: '#C8A848', opacity: 0.85, textDecoration: 'none' }}>
+                              {c.quantity > 1 ? `${c.name} ×${c.quantity}` : c.name}
+                            </a>
+                          ) : (
+                            c.quantity > 1 ? `${c.name} ×${c.quantity}` : c.name
+                          )}
+                        </span>
+                      ))}
                     </p>
                   )}
                 </div>

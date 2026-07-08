@@ -47,7 +47,7 @@ export type ShiftTypeOption = { id: string; name: string }
 // One holder of a shift, from GET /api/admin/schedule/rosters (member_shift_signups
 // ∪ legacy camp_signups). legacy_only holds have no member_shift_signups row,
 // so the lead toggle can't touch them.
-export type RosterEntry = { clerk_user_id: string; name: string; role: 'member' | 'lead'; legacy_only: boolean; occurrence_date: string | null }
+export type RosterEntry = { clerk_user_id: string; application_id: string | null; name: string; role: 'member' | 'lead'; legacy_only: boolean; occurrence_date: string | null }
 
 // Weekday fallback order — only used to sort legacy UNDATED rows among themselves.
 const DAY_ORDER: Record<string, number> = {
@@ -545,25 +545,35 @@ function ShiftRosterLine({ event, entries, label, busyKey, onToggleLead }: {
         const busy = busyKey === `${event.id}|${e.clerk_user_id}|${e.occurrence_date ?? ''}`
         const lead = e.role === 'lead'
         return (
-          <button
-            key={`${e.clerk_user_id}|${e.occurrence_date ?? ''}`}
-            onClick={() => onToggleLead(e)}
-            disabled={busy || e.legacy_only}
-            title={e.legacy_only
-              ? 'Legacy signup — manage from their member page'
-              : lead ? 'Demote to member' : 'Make shift lead ✦'}
-            style={{
-              background: 'none', borderRadius: '9999px', padding: '0.12rem 0.55rem',
-              fontSize: '0.68rem', whiteSpace: 'nowrap',
-              border: `1px solid ${lead ? 'rgba(200,168,72,0.45)' : 'rgba(255,255,255,0.12)'}`,
-              color: lead ? '#C8A848' : '#F3EDE6',
-              cursor: e.legacy_only ? 'default' : 'pointer',
-              opacity: busy ? 0.35 : e.legacy_only ? 0.45 : lead ? 0.95 : 0.65,
-            }}
-          >
-            {lead && <span style={{ marginRight: '0.3rem' }}>✦</span>}
-            {e.name}
-          </button>
+          <span key={`${e.clerk_user_id}|${e.occurrence_date ?? ''}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+            <button
+              onClick={() => onToggleLead(e)}
+              disabled={busy || e.legacy_only}
+              title={e.legacy_only
+                ? 'Legacy signup — manage from their member page'
+                : lead ? 'Demote to member' : 'Make shift lead ✦'}
+              style={{
+                background: 'none', borderRadius: '9999px', padding: '0.12rem 0.55rem',
+                fontSize: '0.68rem', whiteSpace: 'nowrap',
+                border: `1px solid ${lead ? 'rgba(200,168,72,0.45)' : 'rgba(255,255,255,0.12)'}`,
+                color: lead ? '#C8A848' : '#F3EDE6',
+                cursor: e.legacy_only ? 'default' : 'pointer',
+                opacity: busy ? 0.35 : e.legacy_only ? 0.45 : lead ? 0.95 : 0.65,
+              }}
+            >
+              {lead && <span style={{ marginRight: '0.3rem' }}>✦</span>}
+              {e.name}
+            </button>
+            {e.application_id && (
+              <a
+                href={`/admin/${e.application_id}`}
+                title={`View ${e.name}'s application`}
+                style={{ fontSize: '0.6rem', color: '#C8A848', opacity: 0.4, textDecoration: 'none' }}
+              >
+                ↗
+              </a>
+            )}
+          </span>
         )
       })}
     </div>

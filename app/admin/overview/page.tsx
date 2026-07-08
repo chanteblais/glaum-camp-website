@@ -526,14 +526,20 @@ export default async function OverviewPage() {
   )
 }
 
-function MemberPills({ members }: { members: Array<{ preferred_name?: unknown; first_name?: unknown; last_name?: unknown }> }) {
+function MemberPills({ members }: { members: Array<{ id?: unknown; preferred_name?: unknown; first_name?: unknown; last_name?: unknown }> }) {
   if (members.length === 0) return <p style={{ fontSize: '0.78rem', opacity: 0.35, fontStyle: 'italic', marginTop: '0.5rem' }}>None yet</p>
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginTop: '0.6rem' }}>
       {members.map((m, i) => {
         const name = (m.preferred_name || m.first_name || '?') as string
-        return (
-          <span key={i} style={{ padding: '0.2rem 0.6rem', borderRadius: '9999px', background: 'rgba(200,168,72,0.08)', border: '1px solid rgba(200,168,72,0.15)', fontSize: '0.72rem', opacity: 0.8 }}>
+        const id = m.id as string | undefined
+        const pillStyle: React.CSSProperties = { padding: '0.2rem 0.6rem', borderRadius: '9999px', background: 'rgba(200,168,72,0.08)', border: '1px solid rgba(200,168,72,0.15)', fontSize: '0.72rem', opacity: 0.8, textDecoration: 'none', color: 'inherit' }
+        return id ? (
+          <a key={i} href={`/admin/${id}`} style={pillStyle}>
+            {name}
+          </a>
+        ) : (
+          <span key={i} style={pillStyle}>
             {name}
           </span>
         )
