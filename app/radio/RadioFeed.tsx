@@ -2,19 +2,29 @@
 
 // The Radio feed — a curated stream of moments, not an audit log
 // (docs/radio.md; visual language from Chante's 2026-07-03 mockup): an airy
-// hairline-separated list, no card boxes. Each row = a large emblem, a
-// headline with the moment's entity lit gold (RadioMessage), a quiet
-// supporting line, and a timestamp that whispers from the right. Client
-// component so times and day groupings read in the member's own clock; the
-// posts themselves arrive server-fetched.
+// hairline-separated list, no card boxes. Automatic moments read as a large
+// emblem + a headline with the moment's entity lit gold (RadioMessage) + a
+// quiet supporting line, timestamp whispering from the right. Human speech —
+// anyone picking up the mic, organizer or member — reads the SAME way
+// (Chante 2026-07-08): right-aligned, purple, signed "— Name", a call coming
+// in from the other side of the airwaves. Client component so times and day
+// groupings read in the member's own clock; posts arrive server-fetched.
 
-import { useState } from 'react'
+import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { IconImage } from '@/components/IconImage'
 import { RadioMessage } from '@/components/RadioMessage'
 import { RADIO_KIND_META, type RadioEventRow, type RadioKind } from '@/lib/radio'
 
+// The roster the feed needs to turn "@Name" into a profile-linked pill — the
+// same name-based match the post route uses to decide who got notified.
+export type RadioMember = { userId: string; displayName: string }
+
 const isImageIcon = (icon: string | null): icon is string =>
   Boolean(icon && (icon.startsWith('/') || icon.startsWith('http')))
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
 
 function dayLabel(ts: string): string {
   const d = new Date(ts)
@@ -29,37 +39,118 @@ function dayLabel(ts: string): string {
 const clockOf = (ts: string) =>
   new Date(ts).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 
-function RadioRow({ e, last }: { e: RadioEventRow; last: boolean }) {
-  const isVoice = e.kind === 'voice'
-  // Human speech sits apart from the automatic moments (whose emblem column
-  // indents them): organizer broadcasts flush-left in lavender; member
-  // voices RIGHT-aligned in a deep purple — a voice calling in from the
-  // other side of the airwaves.
-  const isSpeech = e.kind === 'broadcast' || isVoice
+// Highlight @mentions of members inside a spoken message — a gold-lit pill for
+// yourself, purple for everyone else, each linking to the member's profile.
+// Matches display names (the composer inserts the exact name), mirroring the
+// group-thread convention.
+function useMentionRenderer(members: RadioMember[], currentUserId: string | null) {
+  const memberByName = useMemo(() => {
+    const map = new Map<string, RadioMember>()
+    for (const m of members) if (m.displayName) map.set(m.displayName.toLowerCase(), m)
+    return map
+  }, [members])
+
+  // "here" always joins the alternation so @here highlights even in a camp with
+  // no other members typed.
+  const mentionRegex = useMemo(() => {
+    const names = [...members.map(m => m.displayName).filter(Boolean), 'here'].sort((a, b) => b.length - a.length)
+    return new RegExp(`@(${names.map(escapeRegExp).join('|')})(?![\\w])`, 'gi')
+  }, [members])
+
+  return useCallback((body: string): ReactNode => {
+    if (!mentionRegex) return body
+    const out: ReactNode[] = []
+    let last = 0
+    mentionRegex.lastIndex = 0
+    let m: RegExpExecArray | null
+    while ((m = mentionRegex.exec(body)) !== null) {
+      const start = m.index
+      if (start > last) out.push(body.slice(last, start))
+      const key = m[1].toLowerCase()
+      const mem = memberByName.get(key)
+      if (mem) {
+        const isSelf = mem.userId === currentUserId
+        out.push(
+          <a
+            key={start}
+            href={`/members/${mem.userId}`}
+            title={`View ${mem.displayName}'s profile`}
+            style={{
+              color: isSelf ? '#FFF1C2' : '#F8DBFF',
+              background: isSelf ? 'rgba(200,168,72,0.42)' : 'rgba(210,57,248,0.38)',
+              border: `1px solid ${isSelf ? 'rgba(200,168,72,0.4)' : 'rgba(210,57,248,0.4)'}`,
+              borderRadius: '0.35rem',
+              padding: '0.02rem 0.28rem',
+              fontWeight: 700,
+              fontStyle: 'normal',
+              textDecoration: 'none',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {m[0]}
+          </a>,
+        )
+      } else if (key === 'here') {
+        // @here — the megaphone that rang the whole camp. A gold everyone-pill,
+        // not a link.
+        out.push(
+          <span
+            key={start}
+            style={{
+              color: '#FFF1C2',
+              background: 'rgba(200,168,72,0.42)',
+              border: '1px solid rgba(200,168,72,0.5)',
+              borderRadius: '0.35rem',
+              padding: '0.02rem 0.28rem',
+              fontWeight: 700,
+              fontStyle: 'normal',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {m[0]}
+          </span>,
+        )
+      } else {
+        out.push(m[0])
+      }
+      last = start + m[0].length
+    }
+    if (last < body.length) out.push(body.slice(last))
+    return out
+  }, [mentionRegex, memberByName, currentUserId])
+}
+
+function RadioRow({ e, last, renderMentions }: {
+  e: RadioEventRow
+  last: boolean
+  renderMentions: (body: string) => ReactNode
+}) {
+  // Human speech — organizer broadcast or member voice alike — reads the same:
+  // right-aligned, purple, italic, signed. The inline emoji carries meaning: a
+  // 📢 megaphone means the post rang the whole camp (see the composer's "notify
+  // everyone"); ✦ is an ordinary voice on the air.
+  const isSpeech = e.kind === 'broadcast' || e.kind === 'voice'
   const VOICE_PURPLE = 'rgba(158,68,202,0.95)'      // the words: deep and dark
   const VOICE_SIGNATURE = 'rgba(206,132,244,0.85)'  // the signature: lighter, luminous
   const hasEntity = e.message.includes('**')
 
   const body = (
-    <div style={{ minWidth: 0, flex: 1, textAlign: isVoice ? 'right' : 'left' }}>
+    <div style={{ minWidth: 0, flex: 1, textAlign: isSpeech ? 'right' : 'left' }}>
       <p
         className="radio-row-msg"
         style={{
           margin: 0,
-          color: isVoice ? VOICE_PURPLE : isSpeech ? 'rgba(216,180,232,0.95)' : '#F3EDE6',
+          color: isSpeech ? VOICE_PURPLE : '#F3EDE6',
           opacity: isSpeech ? 1 : 0.92,
-          fontStyle: isVoice ? 'italic' : undefined,
+          fontStyle: isSpeech ? 'italic' : undefined,
           overflowWrap: 'anywhere',
         }}
       >
-        {isSpeech && !isVoice && (
-          <span aria-hidden style={{ marginRight: '0.6rem' }}>
-            {isImageIcon(e.icon) ? null : (e.icon || '📢')}
+        {isSpeech ? renderMentions(e.message) : <RadioMessage text={e.message} href={hasEntity ? e.link : undefined} />}
+        {isSpeech && (
+          <span aria-hidden style={{ marginLeft: '0.6rem', opacity: 0.85 }}>
+            {isImageIcon(e.icon) ? null : (e.icon || '✦')}
           </span>
-        )}
-        {isVoice ? e.message : <RadioMessage text={e.message} href={hasEntity ? e.link : undefined} />}
-        {isVoice && (
-          <span aria-hidden style={{ marginLeft: '0.6rem', opacity: 0.8 }}>{e.icon || '✦'}</span>
         )}
       </p>
       {e.detail && (
@@ -67,7 +158,7 @@ function RadioRow({ e, last }: { e: RadioEventRow; last: boolean }) {
           {e.detail}
         </p>
       )}
-      {isVoice && e.actor_name && (
+      {isSpeech && e.actor_name && (
         <p className="radio-row-sig" style={{ color: VOICE_SIGNATURE }}>
           — {e.actor_name}
         </p>
@@ -75,9 +166,10 @@ function RadioRow({ e, last }: { e: RadioEventRow; last: boolean }) {
     </div>
   )
 
-  // A row with a destination but no lit entity (e.g. a hand-written broadcast
-  // with a link) stays clickable as a whole.
-  const wholeRowLink = e.link && !hasEntity && !isVoice
+  // A row with a destination but no lit entity (e.g. an automatic milestone
+  // with a link) stays clickable as a whole. Speech carries its links on the
+  // mention pills instead, so it's never a whole-row link.
+  const wholeRowLink = e.link && !hasEntity && !isSpeech
 
   return (
     <article
@@ -97,8 +189,8 @@ function RadioRow({ e, last }: { e: RadioEventRow; last: boolean }) {
         </span>
       )}
 
-      {/* voices are right-aligned, so their clock keeps the LEFT edge */}
-      {isVoice && (
+      {/* Speech is right-aligned, so its clock keeps the LEFT edge. */}
+      {isSpeech && (
         <span className="radio-row-clock" style={{ flexShrink: 0, color: '#F3EDE6', opacity: 0.35, letterSpacing: '0.04em', marginRight: '0.75rem' }}>
           {clockOf(e.created_at)}
         </span>
@@ -112,7 +204,8 @@ function RadioRow({ e, last }: { e: RadioEventRow; last: boolean }) {
         body
       )}
 
-      {!isVoice && (
+      {/* Automatic moments keep their clock on the right. */}
+      {!isSpeech && (
         <span className="radio-row-clock" style={{ flexShrink: 0, color: '#F3EDE6', opacity: 0.35, letterSpacing: '0.04em', marginLeft: '0.75rem' }}>
           {clockOf(e.created_at)}
         </span>
@@ -180,7 +273,12 @@ function RadioFilterRow({ value, onChange }: { value: 'all' | RadioKind; onChang
   )
 }
 
-export function RadioFeed({ events }: { events: RadioEventRow[] }) {
+export function RadioFeed({ events, members = [], currentUserId = null }: {
+  events: RadioEventRow[]
+  members?: RadioMember[]
+  currentUserId?: string | null
+}) {
+  const renderMentions = useMentionRenderer(members, currentUserId)
   const [filter, setFilter] = useState<'all' | RadioKind>('all')
 
   if (events.length === 0) {
@@ -236,7 +334,7 @@ export function RadioFeed({ events }: { events: RadioEventRow[] }) {
 
             <div>
               {section.items.map((e, i) => (
-                <RadioRow key={e.id} e={e} last={i === section.items.length - 1} />
+                <RadioRow key={e.id} e={e} last={i === section.items.length - 1} renderMentions={renderMentions} />
               ))}
             </div>
           </section>

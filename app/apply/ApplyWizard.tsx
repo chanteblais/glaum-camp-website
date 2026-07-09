@@ -150,22 +150,53 @@ function Textarea({ value, onChange, placeholder, maxLength = 500 }: {
   )
 }
 
+// Focus ring shared by the custom radio/checkbox rows below — visible
+// keyboard-focus indicator (outline doesn't consume layout space, so it can't
+// shift the mobile-stacked columns).
+function focusRingOn(e: React.FocusEvent<HTMLElement>) {
+  e.currentTarget.style.outline = `2px solid ${GOLD}`
+  e.currentTarget.style.outlineOffset = '2px'
+}
+function focusRingOff(e: React.FocusEvent<HTMLElement>) {
+  e.currentTarget.style.outline = 'none'
+}
+function toggleOnKey(onActivate: () => void) {
+  return (e: React.KeyboardEvent<HTMLElement>) => {
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+      e.preventDefault()
+      onActivate()
+    }
+  }
+}
+
 function RadioGroup({ options, value, onChange }: { options: string[]; value: string; onChange: (v: string) => void }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-      {options.map(opt => (
-        <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', fontSize: '0.9rem', color: CREAM, opacity: value === opt ? 1 : 0.65 }}>
-          <div style={{
-            width: '18px', height: '18px', borderRadius: '50%', flexShrink: 0,
-            border: `1.5px solid ${value === opt ? GOLD : 'rgba(200,168,72,0.35)'}`,
-            background: value === opt ? 'rgba(200,168,72,0.12)' : 'transparent',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }} onClick={() => onChange(opt)}>
-            {value === opt && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: GOLD }} />}
-          </div>
-          <span onClick={() => onChange(opt)}>{opt}</span>
-        </label>
-      ))}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }} role="radiogroup">
+      {options.map(opt => {
+        const checked = value === opt
+        return (
+          <label
+            key={opt}
+            role="radio"
+            aria-checked={checked}
+            tabIndex={0}
+            onKeyDown={toggleOnKey(() => onChange(opt))}
+            onFocus={focusRingOn}
+            onBlur={focusRingOff}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', fontSize: '0.9rem', color: CREAM, opacity: checked ? 1 : 0.65, borderRadius: '0.4rem' }}
+          >
+            <div style={{
+              width: '18px', height: '18px', borderRadius: '50%', flexShrink: 0,
+              border: `1.5px solid ${checked ? GOLD : 'rgba(200,168,72,0.35)'}`,
+              background: checked ? 'rgba(200,168,72,0.12)' : 'transparent',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }} onClick={() => onChange(opt)}>
+              {checked && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: GOLD }} />}
+            </div>
+            <span onClick={() => onChange(opt)}>{opt}</span>
+          </label>
+        )
+      })}
     </div>
   )
 }
@@ -173,20 +204,32 @@ function RadioGroup({ options, value, onChange }: { options: string[]; value: st
 function CheckboxGroup({ options, value, onChange }: { options: string[]; value: string[]; onChange: (v: string[]) => void }) {
   const toggle = (opt: string) => onChange(value.includes(opt) ? value.filter(v => v !== opt) : [...value, opt])
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-      {options.map(opt => (
-        <label key={opt} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer', fontSize: '0.9rem', color: CREAM, opacity: value.includes(opt) ? 1 : 0.65, lineHeight: 1.5 }}>
-          <div style={{
-            width: '18px', height: '18px', borderRadius: '3px', flexShrink: 0, marginTop: '2px',
-            border: `1.5px solid ${value.includes(opt) ? GOLD : 'rgba(200,168,72,0.35)'}`,
-            background: value.includes(opt) ? 'rgba(200,168,72,0.12)' : 'transparent',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }} onClick={() => toggle(opt)}>
-            {value.includes(opt) && <span style={{ fontSize: '0.7rem', color: GOLD, fontWeight: 700 }}>✓</span>}
-          </div>
-          <span onClick={() => toggle(opt)}>{opt}</span>
-        </label>
-      ))}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }} role="group">
+      {options.map(opt => {
+        const checked = value.includes(opt)
+        return (
+          <label
+            key={opt}
+            role="checkbox"
+            aria-checked={checked}
+            tabIndex={0}
+            onKeyDown={toggleOnKey(() => toggle(opt))}
+            onFocus={focusRingOn}
+            onBlur={focusRingOff}
+            style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer', fontSize: '0.9rem', color: CREAM, opacity: checked ? 1 : 0.65, lineHeight: 1.5, borderRadius: '0.4rem' }}
+          >
+            <div style={{
+              width: '18px', height: '18px', borderRadius: '3px', flexShrink: 0, marginTop: '2px',
+              border: `1.5px solid ${checked ? GOLD : 'rgba(200,168,72,0.35)'}`,
+              background: checked ? 'rgba(200,168,72,0.12)' : 'transparent',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }} onClick={() => toggle(opt)}>
+              {checked && <span style={{ fontSize: '0.7rem', color: GOLD, fontWeight: 700 }}>✓</span>}
+            </div>
+            <span onClick={() => toggle(opt)}>{opt}</span>
+          </label>
+        )
+      })}
     </div>
   )
 }
@@ -817,12 +860,26 @@ export function ApplyWizard({ userEmail, formConfig, agreementItems, attendanceO
         if (!d) {
           const val = form.custom_answers[f.key]
           if (f.type === 'agreement') return Array.isArray(val) && val.length === (f.options?.length ?? 0)
+          // "Other" selected on a single/multi-choice field isn't a real answer
+          // until its fill-in text (stored at `key + '__other'`) is non-empty.
+          const other = f.options?.find(o => o.trim().toLowerCase() === 'other')
+          if (other && f.type === 'radio' && val === other) {
+            return !!(form.custom_answers[f.key + '__other'] as string)?.trim()
+          }
+          if (other && f.type === 'checkbox' && Array.isArray(val) && val.includes(other)) {
+            return !!(form.custom_answers[f.key + '__other'] as string)?.trim()
+          }
           return Array.isArray(val) ? val.length > 0 : !!(val as string)?.trim()
         }
         if (d.widget === 'photo') return !!form.avatar_url
         if (d.widget === 'agreement') {
           const clauses = f.options?.length ? f.options : (optionSources[f.key] ?? [])
           return form.acknowledgements.length === clauses.length
+        }
+        // onboarding_status reveals a free-text field when "Other" is selected
+        // (see FieldControl) — require it filled before counting as answered.
+        if (f.key === 'onboarding_status' && form.onboarding_status === 'Other') {
+          return !!form.onboarding_status_other.trim()
         }
         const val = form[(d.formKey ?? f.key) as keyof FormData]
         return Array.isArray(val) ? val.length > 0 : !!(typeof val === 'string' ? val.trim() : val)

@@ -7,6 +7,7 @@ type Prefs = {
   email_announcements: boolean
   email_application: boolean
   email_attunement_nudges: boolean
+  email_event_reminders: boolean
 }
 
 const TOGGLES: { key: keyof Prefs; label: string; description: string }[] = [
@@ -29,6 +30,11 @@ const TOGGLES: { key: keyof Prefs; label: string; description: string }[] = [
     key: 'email_attunement_nudges',
     label: 'Attunement reminders',
     description: 'Email me reminders while I have outstanding attunement tasks.',
+  },
+  {
+    key: 'email_event_reminders',
+    label: 'Gathering & shift reminders',
+    description: 'Confirm my sign-ups and remind me before the gatherings and shifts I join.',
   },
 ]
 

@@ -23,6 +23,28 @@ export default function ServiceWorkerRegister() {
       return
     }
 
+    // Auto-heal the "reload twice to see changes" case. sw.js already calls
+    // skipWaiting() + clients.claim(), so a freshly-deployed worker takes control
+    // of open pages immediately — but the page in front of the member was still
+    // assembled by the OLD worker (with old caches), so its new rules only bite
+    // on the next load. Instead of asking members to refresh a second time, we
+    // reload once, automatically, the moment control changes hands.
+    //
+    // Two guards keep it safe:
+    //   • `refreshing` ensures at most one reload (never a loop).
+    //   • We only arm this when a worker ALREADY controls the page at load time.
+    //     A member's first-ever visit has no controller; skipping the reload
+    //     there avoids a pointless refresh on their very first paint. Only an
+    //     existing member picking up an update triggers the auto-reload.
+    if (navigator.serviceWorker.controller) {
+      let refreshing = false
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (refreshing) return
+        refreshing = true
+        window.location.reload()
+      })
+    }
+
     const register = () => {
       navigator.serviceWorker.register('/sw.js').catch(() => {
         /* registration failures are non-fatal */

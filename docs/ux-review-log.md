@@ -26,9 +26,10 @@ had a `clerk_user_id` needed a small join added to thread the id through:
   existing `memberDisplayNames`.
 - **Overview** (`MemberPills`, `MembersDropdown`) — the `id` was already
   selected by the page's `applications` query; this was UI-only.
-- **Shared Resources claimants** (`ResourcesManager.tsx`) — claimant and
-  "offered by" names now link too; `getAdminResourceLists` resolves
-  `application_id` via the same helper.
+- ~~Shared Resources claimants~~ — obsolete before it landed: the admin
+  resources console (`ResourcesManager.tsx`) was removed the same day when
+  Shared Resources pivoted to member-owned authoring on `/participate`, so
+  there is no admin claimant surface to link from.
 
 Not covered this round (found during the sweep, out of the four listed
 surfaces — flagged for a follow-up pass if it still bothers her):

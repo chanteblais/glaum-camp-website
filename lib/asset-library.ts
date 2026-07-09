@@ -476,6 +476,15 @@ export const BUILTIN_ASSETS: AssetLibraryItem[] = [
     source: 'builtin',
     tags: ['pennant', 'flag', 'milestone', 'marker', 'hand'],
   },
+  {
+    id: 'songbird',
+    label: 'Songbird',
+    src: '/asset-library/icons/songbird.webp',
+    kind: 'raster',
+    category: 'icon',
+    source: 'builtin',
+    tags: ['bird', 'songbird', 'lark', 'early', 'dawn', 'morning', 'song', 'arrival', 'setup'],
+  },
 ]
 
 /** Built-in assets usable in a given category. */

@@ -10,3 +10,10 @@ scripts/clerk-id-map.json
 
 # clerk configuration (can include secrets)
 /.clerk/
+
+# git worktrees live here; never track them as gitlinks in the tree
+.claude/worktrees/
+
+# python bytecode from scripts/
+__pycache__/
+*.pyc

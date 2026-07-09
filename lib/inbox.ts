@@ -13,6 +13,7 @@ export type InboxConversation = {
   displayName: string
   avatarUrl: string | null
   icon: string | null
+  iconImage: string | null // group: uploaded icon art (takes precedence over the emoji glyph)
   muted: boolean
   lastMessage: string | null
   lastMessageAt: string | null
@@ -47,7 +48,7 @@ export async function getInboxConversations(userId: string): Promise<InboxConver
       .order('created_at', { ascending: false }),
     // Group names/icons.
     groupIds.length
-      ? supabaseAdmin.from('groups').select('id, name, icon').in('id', groupIds)
+      ? supabaseAdmin.from('groups').select('id, name, icon, icon_image').in('id', groupIds)
       : Promise.resolve({ data: [] }),
     // Profiles for the other party in each direct conversation.
     // Phase 5: identity resolution reads the canonical `members` table.
@@ -93,6 +94,7 @@ export async function getInboxConversations(userId: string): Promise<InboxConver
         groupId: conv.groupId,
         displayName: g?.name ?? 'Group',
         icon: g?.icon ?? null,
+        iconImage: g?.icon_image ?? null,
         avatarUrl: null,
         muted: conv.muted,
         lastMessage: s?.lastBody ?? null,
@@ -108,6 +110,7 @@ export async function getInboxConversations(userId: string): Promise<InboxConver
       displayName: prof?.preferred_name || prof?.first_name || s?.otherName || 'Member',
       avatarUrl: prof?.avatar_url ?? null,
       icon: null,
+      iconImage: null,
       muted: conv.muted,
       lastMessage: s?.lastBody ?? null,
       lastMessageAt: s?.lastAt ?? null,

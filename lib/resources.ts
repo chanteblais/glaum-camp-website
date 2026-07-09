@@ -26,6 +26,7 @@ export type MemberResourceList = {
   title: string
   description: string | null
   steward_name: string | null
+  show_on_dashboard: boolean
   items: MemberResourceItem[]
 }
 // The community "pulse" — small proof that people are preparing together
@@ -41,7 +42,7 @@ const EMPTY_PULSE: ResourcePulse = { contributorsToday: 0, latest: null }
 export async function getMemberResourceView(userId: string): Promise<MemberResourceView> {
   const { data: lists, error } = await supabaseAdmin
     .from('resource_lists')
-    .select('id, title, description, visible, sort_order, groups(name), departments(name), roles(name)')
+    .select('id, title, description, visible, show_on_dashboard, sort_order, groups(name), departments(name), roles(name)')
     .eq('visible', true)
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: true })
@@ -131,7 +132,7 @@ export async function getMemberResourceView(userId: string): Promise<MemberResou
   // Supabase types the embeds as arrays; runtime returns a single row for a to-one FK.
   type NameEmbed = { name: string } | { name: string }[] | null
   const embedName = (e: NameEmbed) => (Array.isArray(e) ? e[0]?.name : e?.name) ?? null
-  type ListRow = { id: string; title: string; description: string | null; groups: NameEmbed; departments: NameEmbed; roles: NameEmbed }
+  type ListRow = { id: string; title: string; description: string | null; show_on_dashboard: boolean; groups: NameEmbed; departments: NameEmbed; roles: NameEmbed }
   // Empty visible lists stay: they're valid offer targets (e.g. a catch-all
   // "Odds & Ends" list) — hiding work-in-progress is what `visible` is for.
   const memberLists = ((lists ?? []) as unknown as ListRow[]).map(l => ({
@@ -140,29 +141,36 @@ export async function getMemberResourceView(userId: string): Promise<MemberResou
     description: l.description,
     // At most one steward FK is set (migration 052) — group, department, or role.
     steward_name: embedName(l.groups) ?? embedName(l.departments) ?? embedName(l.roles),
+    show_on_dashboard: l.show_on_dashboard ?? false,
     items: itemsByList[l.id] ?? [],
   }))
   return { lists: memberLists, pulse }
 }
 
 // ── Home-dashboard "Bring Something" widget ──────────────────────────────────
-// One glance answers "what does the community still need from me?". Surfaces
-// the single list with the largest shortfall (not every list) with its
-// unit-weighted readiness, plus the caller's own commitments for the personal
-// line. Everything-covered is a real state (celebration), not a hidden one —
-// null only when no visible list has a targeted item (pre-setup: widget
-// renders nothing). Suggestions/offers (quantity_needed NULL) never gate
-// readiness.
-export type ResourceWidgetNeed = { name: string; remaining: number }
+// A compact index: ONE row per list a member has opted into the dashboard
+// (`show_on_dashboard`, migration 070 — default off, so the widget shows
+// nothing until at least one list is flagged). Each row carries its
+// unit-weighted readiness; the header shows the overall %. Plus the caller's
+// own commitments for the personal line. Untargeted contributions never gate
+// readiness. Returns null when no list is flagged for the dashboard.
+export type ResourceWidgetListRow = {
+  title: string
+  // A list with no targets is an OPEN CALL — its description doubles as the
+  // callout copy on the widget ("Bring anything that sparkles"), so an
+  // open-ended list reads as an invitation, never as a dead "No needs yet".
+  description: string | null
+  hasTargets: boolean // has at least one item with a target
+  remaining: number // units still needed (targeted only)
+  percentReady: number // unit-weighted for this list; 100 when no targets
+  allCovered: boolean // has targets and all covered
+  contributions: number // untargeted items on this list (things being brought)
+}
 export type ResourceWidgetState = {
-  listTitle: string // '' when everything is covered (community-wide framing)
-  // Units for the surfaced list — community-wide when everything is covered.
-  unitsCovered: number
-  unitsTotal: number
-  percentReady: number // unit-weighted; never rounds up to 100 while short
-  needs: ResourceWidgetNeed[] // the surfaced list's gaps, largest first
-  otherListsShort: number // additional lists that also have gaps
-  allCovered: boolean
+  lists: ResourceWidgetListRow[] // dashboard-visible lists, most-attention first
+  percentReady: number // overall unit-weighted across all flagged lists
+  hasAnyTargets: boolean
+  allCovered: boolean // there are targets and every one is covered
   myClaims: MemberResourceClaim[] // the caller's claims, board order
 }
 
@@ -170,71 +178,70 @@ export async function getResourceWidgetState(clerkUserId: string | null | undefi
   // The caller's claims depend on nothing below — fetch alongside the lists.
   const [myClaims, listsRes] = await Promise.all([
     getMemberResourceClaims(clerkUserId),
-    supabaseAdmin.from('resource_lists').select('id, title, sort_order').eq('visible', true),
+    supabaseAdmin
+      .from('resource_lists')
+      .select('id, title, description, sort_order')
+      .eq('visible', true)
+      .eq('show_on_dashboard', true)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true }),
   ])
-  // Table missing (pre-migration) → no widget rather than a crash.
+  // Table/column missing (pre-migration) or no flagged lists → no widget.
   if (listsRes.error || !listsRes.data || listsRes.data.length === 0) return null
   const lists = listsRes.data
 
   const { data: items } = await supabaseAdmin
     .from('resources')
-    .select('id, list_id, name, quantity_needed')
+    .select('id, list_id, quantity_needed')
     .in('list_id', lists.map(l => l.id))
-    .not('quantity_needed', 'is', null)
-  if (!items || items.length === 0) return null
 
-  const { data: claims } = await supabaseAdmin
-    .from('resource_claims')
-    .select('resource_id, quantity')
-    .in('resource_id', items.map(i => i.id))
+  const targeted = (items ?? []).filter(i => i.quantity_needed !== null)
+  const { data: claims } = targeted.length
+    ? await supabaseAdmin.from('resource_claims').select('resource_id, quantity').in('resource_id', targeted.map(i => i.id))
+    : { data: [] as { resource_id: string; quantity: number }[] }
   const claimed: Record<string, number> = {}
   for (const c of claims ?? []) claimed[c.resource_id] = (claimed[c.resource_id] ?? 0) + c.quantity
 
-  type ListAgg = { title: string; sort: number; covered: number; total: number; needs: ResourceWidgetNeed[] }
-  const agg: Record<string, ListAgg> = Object.fromEntries(
-    lists.map(l => [l.id, { title: l.title, sort: l.sort_order, covered: 0, total: 0, needs: [] }])
+  type Agg = { title: string; description: string | null; sort: number; covered: number; total: number; remaining: number; contributions: number }
+  const agg: Record<string, Agg> = Object.fromEntries(
+    lists.map(l => [l.id, { title: l.title, description: l.description ?? null, sort: l.sort_order, covered: 0, total: 0, remaining: 0, contributions: 0 }])
   )
-  for (const i of items) {
+  for (const i of items ?? []) {
     const a = agg[i.list_id]
     if (!a) continue
+    if (i.quantity_needed === null) { a.contributions += 1; continue }
     const needed = i.quantity_needed as number
     // Over-fulfillment is allowed on the board but never inflates readiness.
     const got = Math.min(claimed[i.id] ?? 0, needed)
     a.total += needed
     a.covered += got
-    if (got < needed) a.needs.push({ name: i.name, remaining: needed - got })
+    a.remaining += needed - got
   }
-
-  const withTargets = Object.values(agg).filter(a => a.total > 0)
-  if (withTargets.length === 0) return null
-  const short = withTargets.filter(a => a.covered < a.total)
 
   const percent = (covered: number, total: number) =>
-    covered >= total ? 100 : Math.min(99, Math.round((covered / total) * 100))
+    total === 0 ? 100 : covered >= total ? 100 : Math.min(99, Math.round((covered / total) * 100))
 
-  if (short.length === 0) {
-    const covered = withTargets.reduce((s, a) => s + a.covered, 0)
-    const total = withTargets.reduce((s, a) => s + a.total, 0)
-    return { listTitle: '', unitsCovered: covered, unitsTotal: total, percentReady: 100, needs: [], otherListsShort: 0, allCovered: true, myClaims }
-  }
+  const rows: ResourceWidgetListRow[] = Object.values(agg).map(a => ({
+    title: a.title,
+    description: a.description,
+    hasTargets: a.total > 0,
+    remaining: a.remaining,
+    percentReady: percent(a.covered, a.total),
+    allCovered: a.total > 0 && a.remaining === 0,
+    contributions: a.contributions,
+  }))
+  // Most attention first: lists still short (largest shortfall), then covered,
+  // then board order.
+  rows.sort((a, b) => (b.remaining - a.remaining) || Number(b.hasTargets) - Number(a.hasTargets) || 0)
 
-  // "Needs the most attention": largest shortfall in units, then lowest
-  // readiness, then board order.
-  short.sort((a, b) =>
-    (b.total - b.covered) - (a.total - a.covered) ||
-    (a.covered / a.total) - (b.covered / b.total) ||
-    a.sort - b.sort
-  )
-  const top = short[0]
-  top.needs.sort((a, b) => b.remaining - a.remaining)
+  const totalCovered = Object.values(agg).reduce((s, a) => s + a.covered, 0)
+  const totalUnits = Object.values(agg).reduce((s, a) => s + a.total, 0)
+  const hasAnyTargets = totalUnits > 0
   return {
-    listTitle: top.title,
-    unitsCovered: top.covered,
-    unitsTotal: top.total,
-    percentReady: percent(top.covered, top.total),
-    needs: top.needs,
-    otherListsShort: short.length - 1,
-    allCovered: false,
+    lists: rows,
+    percentReady: percent(totalCovered, totalUnits),
+    hasAnyTargets,
+    allCovered: hasAnyTargets && totalCovered >= totalUnits,
     myClaims,
   }
 }

@@ -18,12 +18,14 @@ export function RemoveMemberButton({ id, name, redirectAfter }: { id: string; na
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ reason: reason.trim() }),
     })
+    const data = await res.json().catch(() => ({}))
     if (!res.ok) {
       setLoading(false)
       setConfirming(false)
       await confirm({ title: `Could not remove ${name}`, body: 'Something went wrong — please try again.', notice: true })
       return
     }
+    if (data?.emailWarning) await confirm({ title: 'Removed, with a hiccup', body: data.emailWarning, notice: true })
     if (redirectAfter) router.push(redirectAfter)
     else router.refresh()
   }

@@ -1,12 +1,13 @@
-import { auth, currentUser } from '@clerk/nextjs/server'
+import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { getApprovedMember } from '@/lib/members'
+import { supabaseAdmin } from '@/lib/supabase'
 import { getRadioFeed, getRadioNowData, getRadioStats } from '@/lib/radio'
 import { Header } from '@/components/Header'
 import { RadioHero } from './RadioHero'
 import { RadioNowStrip } from './RadioNowStrip'
 import { RadioComposer, GoLiveBar } from './RadioComposer'
-import { RadioFeed } from './RadioFeed'
+import { RadioFeed, type RadioMember } from './RadioFeed'
 
 export const dynamic = 'force-dynamic'
 
@@ -49,13 +50,21 @@ export default async function RadioPage() {
   const member = await getApprovedMember(userId)
   if (!member) redirect('/profile')
 
-  const [events, nowData, stats, user] = await Promise.all([
+  const [events, nowData, stats, rosterRes] = await Promise.all([
     getRadioFeed(60),
     getRadioNowData(),
     getRadioStats(),
-    currentUser(),
+    // The roster for @mention autocomplete + turning "@Name" into profile-linked
+    // pills. Approved members with a Clerk id and a display name.
+    supabaseAdmin
+      .from('members')
+      .select('clerk_user_id, first_name, preferred_name')
+      .eq('status', 'approved'),
   ])
-  const isBroadcaster = user?.publicMetadata?.role === 'admin'
+
+  const members: RadioMember[] = (rosterRes.data ?? [])
+    .map(m => ({ userId: m.clerk_user_id as string, displayName: (m.preferred_name || m.first_name || '') as string }))
+    .filter(m => m.userId && m.displayName)
 
   const statCells: { icon: keyof typeof statIcon; value: number; label: string }[] = [
     { icon: 'waves', value: stats.postsThisWeek, label: 'broadcasts this week' },
@@ -131,13 +140,13 @@ export default async function RadioPage() {
           ))}
         </div>
 
-        <RadioComposer isBroadcaster={isBroadcaster} />
+        <RadioComposer members={members} currentUserId={userId} />
 
         <RadioNowStrip welcome={nowData.welcome} todayEvents={nowData.todayEvents} />
 
-        <RadioFeed events={events} />
+        <RadioFeed events={events} members={members} currentUserId={userId} />
 
-        {isBroadcaster && <GoLiveBar />}
+        <GoLiveBar />
 
       </main>
     </>
