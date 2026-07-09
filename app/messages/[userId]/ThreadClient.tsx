@@ -142,7 +142,7 @@ export function ThreadClient({ currentUserId, recipientId, displayName, avatarUr
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', maxWidth: '720px', width: '100%', margin: '0 auto', position: 'relative', zIndex: 1 }}>
 
       {/* Thread header */}
-      <div style={{
+      <div className="glass-bar" style={{
         padding: '5.5rem 1.5rem 1.25rem',
         borderBottom: '1px solid rgba(200,168,72,0.15)',
         display: 'flex',
@@ -150,9 +150,7 @@ export function ThreadClient({ currentUserId, recipientId, displayName, avatarUr
         gap: '0.85rem',
         position: 'sticky',
         top: 0,
-        background: 'rgba(26,10,36,0.92)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
+        ['--glass-bg' as string]: 'rgba(26,10,36,0.92)',
         zIndex: 10,
       }}>
         <a href="/messages" aria-label="Back to all messages" style={{ color: '#C8A848', opacity: 0.5, textDecoration: 'none', fontSize: '0.8rem', letterSpacing: '0.08em', flexShrink: 0 }}>
@@ -274,28 +272,24 @@ export function ThreadClient({ currentUserId, recipientId, displayName, avatarUr
 
       {/* Compose — or a notice when the other member is no longer active */}
       {!recipientActive ? (
-        <div style={{
+        <div className="glass-bar" style={{
           padding: '1.1rem 1.5rem 2rem',
           borderTop: '1px solid rgba(200,168,72,0.12)',
           position: 'sticky',
           bottom: 0,
-          background: 'rgba(26,10,36,0.92)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
+          ['--glass-bg' as string]: 'rgba(26,10,36,0.92)',
         }}>
           <p style={{ textAlign: 'center', fontSize: '0.8rem', opacity: 0.45, fontStyle: 'italic', margin: 0 }}>
             This member is no longer active. You can read this conversation but can&rsquo;t reply.
           </p>
         </div>
       ) : (
-      <div style={{
+      <div className="glass-bar" style={{
         padding: '0.85rem 1.5rem 2rem',
         borderTop: '1px solid rgba(200,168,72,0.12)',
         position: 'sticky',
         bottom: 0,
-        background: 'rgba(26,10,36,0.92)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
+        ['--glass-bg' as string]: 'rgba(26,10,36,0.92)',
       }}>
         {error && (
           <p role="alert" style={{ color: '#f87171', fontSize: '0.78rem', marginBottom: '0.5rem', opacity: 0.85 }}>{error}</p>

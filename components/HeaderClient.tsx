@@ -401,15 +401,13 @@ export function HeaderClient({ initialAuth }: { initialAuth?: NavAuthState }) {
     <>
     <header
       role="banner"
+      className="glass-bar"
       style={{
         position: 'fixed',
         top: 0,
         left: 0,
         right: 0,
         zIndex: 50,
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        backgroundColor: 'rgba(26, 10, 36, 0.75)',
         borderBottom: '1px solid rgba(200, 168, 72, 0.2)',
       }}
     >

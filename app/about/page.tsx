@@ -36,9 +36,10 @@ export default async function AboutPage() {
               transform: 'translate(-50%, -50%)',
               width: '700px', height: '400px',
               borderRadius: '50%',
-              background: 'radial-gradient(ellipse, rgba(210,57,248,0.1) 0%, transparent 70%)',
+              // The gradient is the glow — no filter: blur() needed (big
+              // offscreen paint on phones).
+              background: 'radial-gradient(ellipse, rgba(210,57,248,0.1) 0%, transparent 72%)',
               pointerEvents: 'none',
-              filter: 'blur(40px)',
             }}
           />
           <p style={{ fontSize: '0.68rem', letterSpacing: '0.32em', textTransform: 'uppercase', color: '#D239F8', marginBottom: '1rem', opacity: 0.85 }}>

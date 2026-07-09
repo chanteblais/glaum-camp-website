@@ -1,5 +1,6 @@
 'use client'
 
+import { HandsBackdrop } from '@/components/HandsBackdrop'
 import { useState, useRef, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import type { VolunteerFormConfig } from '@/lib/form-config'
@@ -193,8 +194,7 @@ export function VolunteerForm({ userEmail, userFirstName, userLastName, formConf
 
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
-      <img src="/hands-left.svg"  alt="" aria-hidden style={{ position: 'fixed', left: 0,  top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
-      <img src="/hands-right.svg" alt="" aria-hidden style={{ position: 'fixed', right: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
+      <HandsBackdrop />
 
       <div style={{ maxWidth: '640px', margin: '0 auto', padding: '3rem 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
 

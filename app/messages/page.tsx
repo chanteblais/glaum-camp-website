@@ -1,3 +1,4 @@
+import { HandsBackdrop } from '@/components/HandsBackdrop'
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
@@ -50,8 +51,7 @@ export default async function MessagesPage() {
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1 }}>
       <Header />
-      <img src="/hands-left.svg"  alt="" aria-hidden="true" role="presentation" style={{ position: 'fixed', left: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
-      <img src="/hands-right.svg" alt="" aria-hidden="true" role="presentation" style={{ position: 'fixed', right: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
+      <HandsBackdrop />
       <main aria-labelledby="messages-heading" style={{ maxWidth: '720px', margin: '0 auto', padding: '4.5rem 1.5rem 3rem', position: 'relative', zIndex: 1 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2.5rem' }}>
           <div>

@@ -71,6 +71,7 @@ Defined in `globals.css` under `@layer components`:
 | `.shimmer` | Animated shimmer sweep (10s loop, 25% active, 75% paused) |
 | `.gold-divider` | 1px horizontal line, gold gradient, 40% opacity |
 | `.purple-glow` | Box shadow with layered purple glow |
+| `.glass-bar` | Frosted fixed/sticky bars (site header, message-thread header + composer). Desktop (≥769px): `backdrop-filter: blur(12px)` over a translucent ink tint (override via `--glass-bg`). Mobile: **no blur**, near-opaque ink instead (`--glass-bg-mobile`) — a fixed backdrop-filter re-blurs everything behind it on every scroll frame and was the main mobile scroll-lag source. Don't add `backdropFilter` inline to persistent bars; use this class. (Transient surfaces — modals, dropdowns — may still blur inline.) |
 | `.site-shell` | Full site wrapper — background, dot grid, base text color |
 | `.mobile-stack` | Collapses a hardcoded two-column inline grid (`gridTemplateColumns: '1fr 1fr'`) to one column under 560px (`!important`, since the grids are inline styles). Used by paired form fields (apply wizard, volunteer form, profile settings) and the Your Role / Your Shifts cards. |
 
@@ -111,6 +112,10 @@ Most content cards use a parchment aesthetic:
 ### Confirm Dialog
 
 `ConfirmDialog` / `useConfirm()` (`components/ConfirmDialog.tsx`) — in-app replacement for native `confirm()`/`alert()`. Ink card on a dimmed overlay: gold uppercase eyebrow ("✦ A moment of pause"), TokyoDreams title, cream body, pill buttons ("Never mind" ghost + confirm; red accent when `danger`). `notice: true` = single "Understood" button (alert replacement, eyebrow "✦ A small snag"). Promise-based: `const { confirm, confirmDialog } = useConfirm()`, `await confirm({ title, body, confirmLabel, danger })`, render `{confirmDialog}` in the tree. Esc / overlay click cancel. Used everywhere — no native `confirm()`/`alert()` calls remain in the app (delete confirmations name the item and use `danger: true`; error alerts use `notice: true`). The one styled sibling is `ShiftConfirmModal` (shift sign-up/cancel), which predates this component.
+
+### Ornamental hands (page backdrop)
+
+`HandsBackdrop` (`components/HandsBackdrop.tsx`) — the fixed hands framing most pages, one component instead of per-page `<img>` pairs. Props: `opacity` (default `0.85`; message threads use `0.6`). Desktop renders the crisp SVGs; below 768px a `<picture>` swaps in pre-struck WebP rasters (`public/hands-*.mobile.webp`) because the ~750-path SVGs are expensive for phones to rasterize at 3× DPR. After editing the source SVGs, re-strike the rasters: `node scripts/raster-hands.mjs`.
 
 ### Avatar
 

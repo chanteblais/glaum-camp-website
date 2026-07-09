@@ -1,12 +1,12 @@
 'use client'
 
+import { HandsBackdrop } from '@/components/HandsBackdrop'
 import { DEFAULT_TRACK_COPY, type TrackCopy } from '@/lib/site-config'
 
 export function TrackPicker({ hideMember = false, hideVolunteer = false, copy = DEFAULT_TRACK_COPY }: { hideMember?: boolean; hideVolunteer?: boolean; copy?: TrackCopy }) {
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
-      <img src="/hands-left.svg" alt="" aria-hidden style={{ position: 'fixed', left: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
-      <img src="/hands-right.svg" alt="" aria-hidden style={{ position: 'fixed', right: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
+      <HandsBackdrop />
 
       <div style={{ maxWidth: '720px', margin: '0 auto', padding: '3rem 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
