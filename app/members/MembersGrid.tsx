@@ -275,8 +275,9 @@ export function MembersGrid({ members, volunteers }: { members: MemberCard[]; vo
       </ul>
 
       {/* Volunteers — helpers without a member profile, listed apart so the
-          distinction from full members stays legible. Cards aren't links
-          (volunteers have no /members/[id] page). */}
+          distinction from full members stays legible. Cards match the member
+          cards (same outline) — the section heading and the purple Volunteer
+          tag carry the distinction — and link to the volunteer's profile. */}
       {filteredVolunteers.length > 0 && (
         <section aria-labelledby="volunteers-heading" style={{ marginTop: filtered.length > 0 ? '3.5rem' : '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', marginBottom: '0.4rem' }}>
@@ -310,65 +311,73 @@ export function MembersGrid({ members, volunteers }: { members: MemberCard[]; vo
           }}>
             {filteredVolunteers.map(v => (
               <li key={v.dbId} style={{ display: 'flex', height: '100%' }}>
-                <div style={{
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.75rem',
-                  padding: '1.25rem 1rem',
-                  border: '1px dashed rgba(210,57,248,0.3)',
-                  borderRadius: '1rem',
-                  background: 'rgba(210,57,248,0.03)',
-                }}>
-                  {/* Avatar — purple ring marks the volunteer register */}
+                <a
+                  href={`/members/${v.dbId}`}
+                  aria-label={`View ${v.name}'s profile — Volunteer`}
+                  style={{ textDecoration: 'none', color: 'inherit', display: 'flex', height: '100%', width: '100%' }}
+                >
                   <div style={{
-                    width: '80px', height: '80px',
-                    borderRadius: '50%',
-                    border: '2px solid rgba(210,57,248,0.4)',
-                    background: 'rgba(210,57,248,0.06)',
-                    overflow: 'hidden',
-                    flexShrink: 0,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.75rem',
+                    padding: '1.25rem 1rem',
+                    border: '1px solid rgba(200,168,72,0.15)',
+                    borderRadius: '1rem',
+                    background: 'rgba(255,255,255,0.02)',
+                    cursor: 'pointer',
+                    transition: 'border-color 0.2s, background 0.2s',
                   }}>
-                    {v.avatarUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={supabaseResizedUrl(v.avatarUrl, 160) ?? ''} alt="" aria-hidden="true" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <span aria-hidden="true" style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.5rem', color: '#D239F8', opacity: 0.7 }}>
-                        ✦
-                      </span>
-                    )}
+                    {/* Avatar */}
+                    <div style={{
+                      width: '80px', height: '80px',
+                      borderRadius: '50%',
+                      border: '2px solid rgba(111,73,31,0.6)',
+                      background: 'rgba(200,168,72,0.08)',
+                      overflow: 'hidden',
+                      flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      {v.avatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={supabaseResizedUrl(v.avatarUrl, 160) ?? ''} alt="" aria-hidden="true" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <span aria-hidden="true" style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.5rem', color: '#C8A848', opacity: 0.85 }}>
+                          ✦
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Name */}
+                    <p style={{
+                      fontSize: '0.88rem',
+                      color: '#EDE0C8',
+                      textAlign: 'center',
+                      margin: 0,
+                      lineHeight: 1.3,
+                      letterSpacing: '0.03em',
+                    }}>
+                      {v.name}
+                    </p>
+
+                    {/* Register tag — sits where a member card's role sits */}
+                    <p style={{
+                      fontSize: '0.62rem',
+                      color: '#D239F8',
+                      opacity: 0.75,
+                      textAlign: 'center',
+                      margin: 0,
+                      letterSpacing: '0.08em',
+                      textTransform: 'uppercase',
+                      lineHeight: 1.3,
+                      userSelect: 'none',
+                    }}>
+                      Volunteer
+                    </p>
                   </div>
-
-                  {/* Name */}
-                  <p style={{
-                    fontSize: '0.88rem',
-                    color: '#EDE0C8',
-                    textAlign: 'center',
-                    margin: 0,
-                    lineHeight: 1.3,
-                    letterSpacing: '0.03em',
-                  }}>
-                    {v.name}
-                  </p>
-
-                  {/* Register tag — sits where a member card's role sits */}
-                  <p style={{
-                    fontSize: '0.62rem',
-                    color: '#D239F8',
-                    opacity: 0.75,
-                    textAlign: 'center',
-                    margin: 0,
-                    letterSpacing: '0.08em',
-                    textTransform: 'uppercase',
-                    lineHeight: 1.3,
-                    userSelect: 'none',
-                  }}>
-                    Volunteer
-                  </p>
-                </div>
+                </a>
               </li>
             ))}
           </ul>
