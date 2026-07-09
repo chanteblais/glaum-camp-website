@@ -57,8 +57,12 @@ export async function POST(req: NextRequest) {
     .update({ avatar_url: avatarUrl })
     .eq('clerk_user_id', userId)
 
-  // Dual-write: mirror the new avatar onto the canonical member record.
-  await upsertMember(userId, { avatar_url: avatarUrl })
+  // Dual-write: mirror the new avatar onto the canonical member record — but
+  // update-only. This route carries no identity (a volunteer's name/email lives
+  // in `volunteers`, not here), so inserting would create a nameless, emailless
+  // phantom member for every signed-in non-member. Members are created on
+  // apply/approve, where identity is present.
+  await upsertMember(userId, { avatar_url: avatarUrl }, undefined, { updateOnly: true })
 
   return NextResponse.json({ avatarUrl })
 }

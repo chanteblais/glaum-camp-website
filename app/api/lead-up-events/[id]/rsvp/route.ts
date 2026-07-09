@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getNotificationPreferences } from '@/lib/notification-prefs'
+import { sendSignupConfirmationEmail } from '@/lib/send-email'
+import { whenText } from '@/lib/event-reminders'
 
 // Confirm the signed-in user is an approved member before they may RSVP.
 async function requireApprovedMember(userId: string): Promise<boolean> {
@@ -37,7 +40,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     // Verify the gathering exists, is visible, and hasn't already happened.
     const { data: event } = await supabaseAdmin
       .from('lead_up_events')
-      .select('id, event_date')
+      .select('id, title, event_date, start_time, location')
       .eq('id', params.id)
       .eq('visible', true)
       .maybeSingle()
@@ -80,6 +83,31 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         .from('lead_up_event_rsvps')
         .insert({ lead_up_event_id: params.id, clerk_user_id: userId })
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+      // Confirmation email (best-effort — never block or fail the RSVP on it),
+      // only on a fresh RSVP and only if the member hasn't opted out of
+      // gathering/shift email.
+      try {
+        const prefs = await getNotificationPreferences(userId)
+        if (prefs.email_event_reminders) {
+          const { data: m } = await supabaseAdmin
+            .from('members').select('email, first_name, preferred_name')
+            .eq('clerk_user_id', userId).maybeSingle()
+          if (m?.email) {
+            await sendSignupConfirmationEmail({
+              to: m.email,
+              recipientName: m.preferred_name || m.first_name || 'there',
+              kind: 'gathering',
+              title: event.title,
+              whenText: event.event_date ? whenText(event.event_date, event.start_time) : 'Date to be confirmed',
+              location: event.location,
+              href: '/schedule',
+            })
+          }
+        }
+      } catch (e) {
+        console.error('[rsvp] confirmation email failed:', e)
+      }
     }
 
     return NextResponse.json({ rsvped: true, count: await rsvpCount(params.id) })

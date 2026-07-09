@@ -5,6 +5,7 @@ import { requireAdmin } from '@/lib/admin-auth'
 import { AdminActions } from '../AdminActions'
 import { RemoveMemberButton } from '../RemoveMemberButton'
 import { SuspendMemberButton } from '../SuspendMemberButton'
+import { DuesMemberControl } from '../DuesMemberControl'
 import { MemberSignupCard } from '../MemberSignupCard'
 import { mergeMemberConfig } from '@/lib/form-config'
 import { resolveMember, getMemberProfileValues } from '@/lib/members'
@@ -13,6 +14,7 @@ import { getMemberAwards } from '@/lib/distinction-awards'
 import { getMemberGroups } from '@/lib/groups'
 import { getAdminRunway } from '@/lib/admin-attention'
 import { parseDistinctions } from '@/lib/distinctions'
+import { parseDuesConfig, duesAppliesToMembers } from '@/lib/dues'
 import { DistinctionAwards } from './DistinctionAwards'
 import { AdminNav } from '../AdminNav'
 
@@ -62,7 +64,7 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
     supabaseAdmin
       .from('page_content')
       .select('key, value')
-      .in('key', ['config_member_form', 'config_distinctions', 'config_profile_fields']),
+      .in('key', ['config_member_form', 'config_distinctions', 'config_profile_fields', 'config_dues']),
     // The person's canonical member record (manual distinctions + profile values).
     (app.clerk_user_id || app.email) ? resolveMember(app.clerk_user_id ?? null, app.email) : null,
   ])
@@ -397,6 +399,24 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
               <DistinctionAwards memberId={member?.id ?? null} rules={awardRules} initialAwards={memberAwards} />
             </Section>
           </>
+        )}
+
+        {/* Camp dues — mark paid / unpaid (also settable in Community → Camp Dues).
+            id="dues" is the target of the "Confirm payment" notification link.
+            Hidden when dues are off or not applied to members. */}
+        {app.status === 'approved' && member?.id && duesAppliesToMembers(parseDuesConfig(cfgMap['config_dues'])) && (
+          <div id="dues" style={{ scrollMarginTop: '5.5rem' }}>
+            <Divider />
+            <Section title="Camp Dues">
+              <DuesMemberControl
+                memberId={member.id}
+                name={`${app.preferred_name || app.first_name} ${app.last_name}`}
+                paidAt={member.dues_paid_at}
+                reportedAt={member.dues_reported_at}
+                note={member.dues_note}
+              />
+            </Section>
+          </div>
         )}
 
         {/* Suspend or remove an approved member */}

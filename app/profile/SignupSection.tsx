@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type CSSProperties } from 'react'
 import { IconImage } from '@/components/IconImage'
 import { SuggestRoleModal } from './SuggestRoleModal'
 import { isImageIcon } from '@/lib/icon-src'
@@ -544,6 +544,20 @@ function RoleDetailModal({ role, dept, signup, saving, error, onConfirm, onClose
   )
 }
 
+// Pick how many seals sit per row so the folded registry never leaves one
+// stranded on its own line. Walk down from the breakpoint's comfortable max and
+// take the first column count whose last row holds more than one seal (remainder
+// ≠ 1) — for 7 departments that's 5 (5+2) on desktop, 4 (4+3) on phones. The
+// seals then size to 1/cols of the row, so more departments simply means smaller
+// emblems rather than an orphan.
+function balancedSealColumns(count: number, maxCols: number) {
+  const cap = Math.min(count, maxCols)
+  for (let c = cap; c >= 2; c--) {
+    if (count % c !== 1) return c
+  }
+  return cap
+}
+
 // ── Role Picker (flat registry — every role visible) ───────────────────────────
 
 function RolePicker({
@@ -571,6 +585,10 @@ function RolePicker({
 
   const withRoles = departments.filter(d => d.roles.length > 0)
   if (withRoles.length === 0) return null
+
+  // Seals-per-row, tuned to the count so the collapsed strip wraps evenly.
+  const sealColsMobile = balancedSealColumns(withRoles.length, 4)
+  const sealColsDesktop = balancedSealColumns(withRoles.length, 5)
 
   const allRoles = withRoles.flatMap(d => d.roles)
   const openRole = allRoles.find(r => r.id === openRoleId) ?? null
@@ -605,20 +623,23 @@ function RolePicker({
           aria-expanded={false}
           style={{ display: 'block', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '0.5rem 0', textAlign: 'center' }}
         >
-          {/* Seal sizes step down on narrow screens so a full row of
-              departments still wraps cleanly at phone width. */}
+          {/* Count-aware seals: the strip is capped to exactly `--cols` emblems
+              wide and each seal fills 1/cols of the row, so the departments always
+              wrap into even rows (no lone straggler) and the emblems scale down as
+              the count grows. Seal sizes also step down at phone width. */}
           <style dangerouslySetInnerHTML={{ __html: `
-            .role-seal-strip { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem 1.1rem; margin-bottom: 1.4rem; }
-            .role-seal { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; width: 90px; }
-            .role-seal-ring { width: 56px; height: 56px; border-radius: 50%; border: 1.5px solid #C8A848; background: radial-gradient(circle at 42% 38%, rgba(200,168,72,0.18), rgba(8,0,18,0.85)); display: flex; align-items: center; justify-content: center; }
+            .role-seal-strip { --cols: var(--cols-m); display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem 1.1rem; margin: 0 auto 1.4rem; max-width: calc(var(--cols) * 90px + (var(--cols) - 1) * 1.1rem); }
+            .role-seal { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; width: calc((100% - (var(--cols) - 1) * 1.1rem) / var(--cols)); max-width: 90px; }
+            .role-seal-ring { width: 100%; max-width: 56px; aspect-ratio: 1; border-radius: 50%; border: 1.5px solid #C8A848; background: radial-gradient(circle at 42% 38%, rgba(200,168,72,0.18), rgba(8,0,18,0.85)); display: flex; align-items: center; justify-content: center; }
             .role-seal-ring .role-seal-emoji { font-size: 1.5rem; line-height: 1; }
             @media (min-width: 560px) {
-              .role-seal { width: 108px; }
-              .role-seal-ring { width: 68px; height: 68px; }
+              .role-seal-strip { --cols: var(--cols-d); max-width: calc(var(--cols) * 108px + (var(--cols) - 1) * 1.1rem); }
+              .role-seal { max-width: 108px; }
+              .role-seal-ring { max-width: 68px; }
               .role-seal-ring .role-seal-emoji { font-size: 1.85rem; }
             }
           ` }} />
-          <div className="role-seal-strip">
+          <div className="role-seal-strip" style={{ '--cols-m': sealColsMobile, '--cols-d': sealColsDesktop } as CSSProperties}>
             {withRoles.map(dept => (
               <span key={dept.id} className="role-seal">
                 <span className="role-seal-ring">
