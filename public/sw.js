@@ -19,7 +19,9 @@ const STATIC_EXT = /\.(?:png|jpe?g|svg|gif|webp|ico|woff2?|ttf|otf|css|js)$/
 // (icons, medals), so cache-first would pin stale art forever (it did: the
 // pre-normalization icons survived in every installed PWA until the v3 bump
 // above purged them). Let the network + HTTP etags keep these fresh.
-const MUTABLE_PATH = /^\/asset-library\//
+// /hands-* covers the ornamental hands (SVGs still being color-tuned + their
+// mobile WebP strikes from scripts/raster-hands.mjs).
+const MUTABLE_PATH = /^\/(?:asset-library\/|hands-)/
 
 self.addEventListener('install', () => {
   self.skipWaiting()

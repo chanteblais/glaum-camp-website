@@ -1,3 +1,4 @@
+import { HandsBackdrop } from '@/components/HandsBackdrop'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { IconImage } from '@/components/IconImage'
 import { redirect } from 'next/navigation'
@@ -406,8 +407,7 @@ export default async function ProfilePage() {
           .profile-header-portrait { order: 1; }
         }
       ` }} />
-      <img src="/hands-left.svg" alt="" aria-hidden style={{ position: 'fixed', left: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
-      <img src="/hands-right.svg" alt="" aria-hidden style={{ position: 'fixed', right: 0, top: 0, height: '100%', width: 'auto', pointerEvents: 'none', userSelect: 'none', opacity: 0.85, zIndex: 0 }} />
+      <HandsBackdrop />
       <RememberSignedIn firstName={user?.firstName} email={email} />
       <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '5.5rem 1.5rem 3rem', position: 'relative', zIndex: 1 }}>
 

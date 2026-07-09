@@ -1,4 +1,5 @@
 import { auth } from '@clerk/nextjs/server'
+import { HandsBackdrop } from '@/components/HandsBackdrop'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { requireAdmin } from '@/lib/admin-auth'
@@ -108,38 +109,7 @@ export default async function AdminPage() {
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflowX: 'clip' }}>
 
       {/* Decorative hands */}
-      <img
-        src="/hands-left.svg"
-        alt=""
-        aria-hidden
-        style={{
-          position: 'fixed',
-          left: 0,
-          top: 0,
-          height: '100%',
-          width: 'auto',
-          pointerEvents: 'none',
-          userSelect: 'none',
-          opacity: 0.85,
-          zIndex: 0,
-        }}
-      />
-      <img
-        src="/hands-right.svg"
-        alt=""
-        aria-hidden
-        style={{
-          position: 'fixed',
-          right: 0,
-          top: 0,
-          height: '100%',
-          width: 'auto',
-          pointerEvents: 'none',
-          userSelect: 'none',
-          opacity: 0.85,
-          zIndex: 0,
-        }}
-      />
+      <HandsBackdrop />
 
       <div style={{ maxWidth: '960px', margin: '0 auto', padding: '0 1.5rem 6rem', position: 'relative', zIndex: 1 }}>
 

@@ -782,9 +782,10 @@ let canManagePolls = false
               width: '900px',
               height: '600px',
               borderRadius: '50%',
-              background: 'radial-gradient(ellipse, rgba(210,57,248,0.12) 0%, rgba(200,168,72,0.04) 50%, transparent 70%)',
+              // The gradient is the glow — a filter: blur() on top was visually
+              // redundant and costs a huge offscreen paint on phones.
+              background: 'radial-gradient(ellipse, rgba(210,57,248,0.12) 0%, rgba(200,168,72,0.04) 50%, transparent 72%)',
               pointerEvents: 'none',
-              filter: 'blur(50px)',
             }}
           />
 

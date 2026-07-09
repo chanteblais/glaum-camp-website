@@ -142,6 +142,23 @@ textarea::placeholder {
     100% { left: 100%; }
   }
 
+  /* Frosted fixed/sticky bars (header, thread chrome). backdrop-filter
+     re-blurs everything behind the bar on every scroll frame — fine on
+     desktop GPUs, the main scroll-lag source on phones — so small screens
+     trade the glass for near-opaque ink. Components override the desktop
+     tint via --glass-bg where their design differs. */
+  .glass-bar {
+    background-color: var(--glass-bg-mobile, rgba(24, 9, 34, 0.97));
+  }
+
+  @media (min-width: 769px) {
+    .glass-bar {
+      background-color: var(--glass-bg, rgba(26, 10, 36, 0.75));
+      -webkit-backdrop-filter: blur(12px);
+      backdrop-filter: blur(12px);
+    }
+  }
+
   .gold-divider {
     height: 1px;
     background: linear-gradient(90deg, transparent, #C8A848, transparent);
