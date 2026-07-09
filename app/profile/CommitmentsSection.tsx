@@ -1,5 +1,5 @@
 import { EventIcon } from '@/components/EventIcon'
-import { IconImage } from '@/components/IconImage'
+import { IconImage, ROUND_FILL } from '@/components/IconImage'
 import { isImageIcon } from '@/lib/icon-src'
 import type { ContributionType } from '@/lib/application-options'
 import { DEFAULT_CONTRIBUTION_TYPES } from '@/lib/application-options'
@@ -155,7 +155,7 @@ export function CommitmentsSection({ contributions, role, dept, shifts, bringing
               circleContent={
                 dept?.icon
                   ? isImageIcon(dept.icon)
-                    ? <IconImage src={dept.icon} size="86%" fill={0.82} opacity={0.85} />
+                    ? <IconImage src={dept.icon} size="100%" fill={ROUND_FILL} opacity={0.85} />
                     : <span style={{ fontSize: compact ? '1.1rem' : '1.4rem', lineHeight: 1 }}>{dept.icon}</span>
                   : <img src="/handicon.png" alt="" aria-hidden style={{ width: '62%', height: '62%', objectFit: 'contain', opacity: 0.85 }} />
               }
@@ -181,15 +181,9 @@ export function CommitmentsSection({ contributions, role, dept, shifts, bringing
                 circleContent={
                   isImg
                     // eslint-disable-next-line @next/next/no-img-element
-                    // Icon files are normalized by lib/icon-image.ts: the artwork is
-                    // trimmed tight, scaled to one uniform target box, and centered on a
-                    // 1536×1024 frame — so every icon arrives the same size with margin
-                    // around it. The CircleIcon clips to a *round* mask, so we size by
-                    // height and let the transparent side margins overflow and get clipped
-                    // by overflow:hidden. 74% fills the circle while leaving a clear gap so
-                    // even corner-heavy art (a tasseled cushion, a wide tent base) — which
-                    // pokes toward the round edge at its corners — stays comfortably inside.
-                    ? <IconImage src={meta.icon} size="100%" fill={0.75} />
+                    // CircleIcon clips to a round mask, so the fill must keep the art's
+                    // bounding-box corners inside the circle — ROUND_FILL is that bound.
+                    ? <IconImage src={meta.icon} size="100%" fill={ROUND_FILL} />
                     : <span style={{ fontSize: compact ? '1.1rem' : '1.4rem', lineHeight: 1 }}>{meta.icon}</span>
                 }
                 title={c}
@@ -210,9 +204,16 @@ export function CommitmentsSection({ contributions, role, dept, shifts, bringing
           <div key={shift.id}>
             <Row
               circleContent={
-                <div style={{ color: '#C8A848', opacity: 0.75 }}>
-                  <EventIcon type={shift.icon_type} size={compact ? 28 : 36} />
-                </div>
+                isImageIcon(shift.icon_type)
+                  // Image icons render exactly like the group rows above (same fill,
+                  // full opacity) so every circle in the card carries the same weight.
+                  // EventIcon's 1.5x box would overfill the ring (effective fill ~0.91).
+                  ? <IconImage src={shift.icon_type} size="100%" fill={ROUND_FILL} />
+                  // display:flex — an inline line box here baseline-shifts the icon
+                  // ~2px above the circle's center.
+                  : <div style={{ color: '#C8A848', opacity: 0.75, display: 'flex' }}>
+                      <EventIcon type={shift.icon_type} size={compact ? 28 : 36} />
+                    </div>
               }
               title={shift.title}
               description={`${shiftDayLabel(shift)}\n${shift.time}`}
@@ -232,10 +233,9 @@ export function CommitmentsSection({ contributions, role, dept, shifts, bringing
             <Row
               circleContent={
                 b.icon && isImageIcon(b.icon)
-                  // Same sizing rule as the group icon rows above: normalized icon
-                  // frames size by height and let the margins clip on the round mask.
+                  // Same sizing rule as the group icon rows above.
                   // eslint-disable-next-line @next/next/no-img-element
-                  ? <IconImage src={b.icon} size="100%" fill={0.75} />
+                  ? <IconImage src={b.icon} size="100%" fill={ROUND_FILL} />
                   : <span style={{ fontSize: compact ? '1.1rem' : '1.4rem', lineHeight: 1, color: '#8fc4cf', opacity: 0.85 }}>✦</span>
               }
               title={b.quantity > 1 ? `${b.resourceName} ×${b.quantity}` : b.resourceName}
