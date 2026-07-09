@@ -106,6 +106,7 @@ The member site runs inside the native app shell, so the web *is* the app. Whene
 4. **Safe areas on fixed chrome.** Any `position: fixed` element respects `env(safe-area-inset-*)` (the tab bar does; a fixed top header needs the top inset once the shell exists).
 5. **Touch-first.** No hover-only affordances on member pages; the existing ~380px pass on all UI work is the app's viewport.
 6. **Notifications through the seam.** New notification-worthy events go through `lib/notify.ts` — never a direct `send-email` call in feature code.
+7. **Fresh content on update.** Members never manually refresh to pick up a deploy. Ordinary changes are already single-refresh (the PWA worker `public/sw.js` caches only immutable content-hashed static assets — HTML/API/auth always hit the network). The one former exception — a changed `sw.js` needing a "reload twice" — is closed: `app/ServiceWorkerRegister.tsx` auto-reloads the page **once** when a new worker takes control (`controllerchange`), guarded so it fires at most once and only for members who already had a worker (not on a first-ever visit). Bumping the `sw.js` cache version (`glaum-static-v3`) still purges old caches on activate; the auto-reload just makes that seamless.
 
 Admin surfaces are exempt (admin is web/desktop, never in the app).
 

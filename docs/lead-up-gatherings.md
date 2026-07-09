@@ -31,6 +31,7 @@ There is still exactly one event (What If). It has a timeline with two zones, an
 
 - **Separate table**, not an extension of `schedule_events`. The camp schedule carries machinery (group-name `contribution_type` matching, capacity-per-role, attunement hooks, personal-schedule filtering) that must **never** leak onto a planning session. A separate, lighter model is the wall.
 - **Per-session RSVP, yes.** Membership already implies attending the *camp*, so RSVP here never means "are you coming to What If." It only ever means **"I'll be at *this* planning session"** — a headcount for the organizer. It does **not** touch attunement, shifts, or signup.
+- **RSVP emails (migration `066`).** A fresh RSVP sends an immediate **confirmation**, and the member gets **evening-before + morning-of reminders** (batched with any shifts that day) via the `event-reminders` cron — the same machinery as shift signups. Governed by the one **Gathering & shift reminders** preference (`notification_preferences.email_event_reminders`, default ON). This is distinct from the admin **"Notify members"** broadcast (`notified_at`, gated by `email_announcements`), which announces a *new* gathering. See [features.md](features.md) → Schedule and [architecture.md](architecture.md) → Cron.
 - **Name:** "Lead-Up Gatherings" (nav label + admin tab).
 - **Audience:** all members (everyone with an account is attending the event).
 

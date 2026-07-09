@@ -122,21 +122,40 @@ function RecurringEventCard({ event }: { event: ScheduleEvent }) {
 
 // ── Event Block ───────────────────────────────────────────────────────────────
 
-function EventBlock({ event, style }: { event: ScheduleEvent; style: React.CSSProperties }) {
+function EventBlock({ event, top, height }: { event: ScheduleEvent; top: number; height: number }) {
   const [expanded, setExpanded] = useState(false)
   const expandedText = event.detail_desc || event.subtitle
   const hasDetail = !!expandedText
+  const style = eventTypeStyle(event)
+
+  // Fit the content to the slot instead of slicing it mid-glyph: short blocks
+  // drop the icon/caret, and the title clamps to however many full lines fit.
+  // Budget (px): padding 8, icon row ~13, caret row ~10, title line ~14.2.
+  const TITLE_LINE = 14.2
+  const showIcon = height >= 8 + 13 + 2 * TITLE_LINE + 10 // icon + 2 title lines + caret
+  const showCaret = hasDetail && height >= 8 + TITLE_LINE + 10
+  const chrome = 8 + (showIcon ? 13 : 0) + (showCaret ? 10 : 0)
+  const titleLines = Math.max(1, Math.floor((height - chrome) / TITLE_LINE))
 
   return (
     <div
+      title={event.title}
       style={{
-        ...style,
         position: 'absolute',
+        top,
         left: '2px', right: '2px',
+        // The grid slot stays true to the event's duration; the expanded card
+        // grows past it (over an opaque backing) so the detail is readable.
+        height: expanded ? 'auto' : height,
+        minHeight: expanded ? height : undefined,
         borderRadius: '0.35rem',
-        border: `1px solid ${eventTypeStyle(event).border}`,
-        background: eventTypeStyle(event).background,
-        boxShadow: event.highlight ? '0 0 10px rgba(200,168,72,0.35), 0 0 20px rgba(200,168,72,0.15)' : undefined,
+        border: `1px solid ${style.border}`,
+        background: expanded
+          ? `linear-gradient(${style.background}, ${style.background}) #1A0A24`
+          : style.background,
+        boxShadow: expanded
+          ? '0 6px 18px rgba(0,0,0,0.55)'
+          : event.highlight ? '0 0 10px rgba(200,168,72,0.35), 0 0 20px rgba(200,168,72,0.15)' : undefined,
         overflow: 'hidden',
         cursor: hasDetail ? 'pointer' : 'default',
         zIndex: expanded ? 10 : 1,
@@ -144,22 +163,33 @@ function EventBlock({ event, style }: { event: ScheduleEvent; style: React.CSSPr
       }}
       onClick={() => hasDetail && setExpanded(o => !o)}
     >
-      <div style={{ padding: '0.25rem 0.35rem' }}>
+      <div style={{ padding: '0.25rem 0.35rem', height: expanded ? 'auto' : '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem', textAlign: 'center' }}>
-          <div style={{ color: '#C8A848', opacity: 0.65 }}>
-            <EventIcon type={event.icon_type} size={10} />
-          </div>
-          <p style={{ fontSize: '0.68rem', color: eventTypeStyle(event).text, margin: 0, lineHeight: 1.3, fontWeight: (event.highlight || isColored(event)) ? 600 : 400, wordBreak: 'break-word' }}>
+          {(showIcon || expanded) && (
+            <div style={{ color: '#C8A848', opacity: 0.65 }}>
+              <EventIcon type={event.icon_type} size={10} />
+            </div>
+          )}
+          <p style={{
+            fontSize: '0.68rem', color: style.text, margin: 0, lineHeight: 1.3,
+            fontWeight: (event.highlight || isColored(event)) ? 600 : 400, wordBreak: 'break-word',
+            ...(expanded ? {} : {
+              display: '-webkit-box',
+              WebkitLineClamp: titleLines,
+              WebkitBoxOrient: 'vertical' as const,
+              overflow: 'hidden',
+            }),
+          }}>
             {event.title}
           </p>
-          {hasDetail && (
+          {(showCaret || (hasDetail && expanded)) && (
             <span style={{ fontSize: '0.45rem', color: '#C8A848', opacity: 0.4 }}>
               {expanded ? '▲' : '▼'}
             </span>
           )}
         </div>
         {expanded && expandedText && (
-          <div style={{ marginTop: '0.3rem', paddingTop: '0.3rem', borderTop: '1px solid rgba(200,168,72,0.1)' }}>
+          <div style={{ marginTop: '0.3rem', paddingTop: '0.3rem', borderTop: '1px solid rgba(200,168,72,0.1)', paddingBottom: '0.15rem' }}>
             <p style={{ fontSize: '0.65rem', opacity: 0.6, margin: 0, lineHeight: 1.5, textAlign: 'center' }}>{expandedText}</p>
           </div>
         )}
@@ -175,7 +205,9 @@ export function ScheduleCalendarClient({ events, days }: { events: ScheduleEvent
   const [selectedDay, setSelectedDay] = useState<string>(days[0]?.iso ?? '')
 
   useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 640)
+    // 768 matches the site-wide mobile-nav breakpoint; below it the 6-column
+    // grid squeezes titles into unreadable slivers, so use the day-tab view.
+    const check = () => setIsMobile(window.innerWidth < 768)
     check()
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
@@ -288,7 +320,7 @@ export function ScheduleCalendarClient({ events, days }: { events: ScheduleEvent
                 if (start === null) return null
                 const top = minutesToTop(start, START_HOUR)
                 const height = end ? minutesToHeight(start, end, START_HOUR, END_HOUR) : Math.max(PX_PER_HOUR * 0.75, 32)
-                return <EventBlock key={`${ev.id}-${selectedDay}`} event={ev} style={{ top, height }} />
+                return <EventBlock key={`${ev.id}-${selectedDay}`} event={ev} top={top} height={height} />
               })}
             </div>
           </div>
@@ -343,7 +375,7 @@ export function ScheduleCalendarClient({ events, days }: { events: ScheduleEvent
                       if (start === null) return null
                       const top = minutesToTop(start, START_HOUR)
                       const height = end ? minutesToHeight(start, end, START_HOUR, END_HOUR) : Math.max(PX_PER_HOUR * 0.75, 32)
-                      return <EventBlock key={`${ev.id}-${day.iso}`} event={ev} style={{ top, height }} />
+                      return <EventBlock key={`${ev.id}-${day.iso}`} event={ev} top={top} height={height} />
                     })}
                   </div>
                 </div>

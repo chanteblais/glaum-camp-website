@@ -55,6 +55,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   // live on member_shift_signups since the shifts redesign) and revoke group
   // memberships — group_members is what grants group-thread access and roster
   // presence, so it must not outlive the membership.
+  let emailWarning: string | undefined
   if (application?.clerk_user_id) {
     await Promise.all([
       supabaseAdmin
@@ -81,7 +82,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }])
 
     // A deleted / unknown Clerk account must not turn the (already committed)
-    // removal into a 500 — skip the email instead.
+    // removal into a 500 — degrade to the email warning instead.
     let email: string | undefined
     try {
       const clerkUser = await client.users.getUser(application.clerk_user_id)
@@ -90,13 +91,19 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       email = undefined
     }
     if (email) {
-      await sendUserEmail(
+      const result = await sendUserEmail(
         email,
         'An update on your Glåüm membership',
         `<p>Hi ${displayName},</p><p>${message}</p>${reason ? `<p>${reason}</p>` : ''}<p>If you believe this was a mistake, please reach out to the camp organizers.</p>`,
       )
+      // Removal itself succeeded (status + slot release + in-app notification);
+      // only the email failed. Surface it so the admin knows to follow up
+      // manually instead of assuming the member was emailed.
+      if (!result.ok) emailWarning = `Membership removed, but the email to ${email} failed to send: ${result.error}`
+    } else {
+      emailWarning = 'Membership removed, but no email address was found for this member.'
     }
   }
 
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true, emailWarning })
 }

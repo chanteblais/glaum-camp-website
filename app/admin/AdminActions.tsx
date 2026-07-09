@@ -27,12 +27,13 @@ export function AdminActions({ id, email, redirectAfter }: { id: string; email: 
   const handleReject = async () => {
     setLoading('reject')
     const res = await fetch(`/api/admin/${id}/reject`, { method: 'POST' })
+    const data = await res.json().catch(() => ({}))
     if (!res.ok) {
-      const data = await res.json().catch(() => ({}))
       await confirm({ title: 'Rejection failed', body: data?.error ?? 'Something went wrong — the application is still pending.', notice: true })
       setLoading(null)
       return
     }
+    if (data?.emailWarning) await confirm({ title: 'Rejected, with a hiccup', body: data.emailWarning, notice: true })
     if (redirectAfter) router.push(redirectAfter)
     else router.refresh()
     setLoading(null)

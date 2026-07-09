@@ -63,6 +63,7 @@ export function HeaderClient({ initialAuth }: { initialAuth?: NavAuthState }) {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const reconciledRef = useRef(false)
 
   // serverAuth is render-time truth (present from the first SSR paint when the
   // server passed it), so it isn't gated on `mounted` — that gate is what used
@@ -189,6 +190,35 @@ export function HeaderClient({ initialAuth }: { initialAuth?: NavAuthState }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mounted])
+
+  // Self-heal a signed-in-but-public nav. When the server passed `initialAuth`
+  // the effect above trusts it and never polls /api/nav-auth — so if that render
+  // resolved signed-out or not-approved (a transient SSR auth hiccup, or on
+  // localhost the dev-instance clerk_user_id split where the email fallback can
+  // miss) while the client Clerk session is valid, the nav is stuck on the public
+  // links until a manual refresh. Once Clerk confirms we're signed in and the
+  // server state doesn't already show an approved member, re-poll once to
+  // reconcile — the nav corrects itself in a beat instead of needing a reload.
+  useEffect(() => {
+    if (!mounted || !isLoaded || !initialAuth) return
+    if (!isSignedIn) return // client agrees we're signed out → public nav is right
+    if (serverAuth?.isSignedIn && serverAuth?.isApproved) return // already correct
+    if (reconciledRef.current) return
+    reconciledRef.current = true
+
+    fetch('/api/nav-auth', { cache: 'no-store' })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: NavAuthState | null) => {
+        if (data?.isSignedIn) {
+          setServerAuth(data)
+          if (data.isApproved) {
+            window.localStorage.setItem(AUTH_MEMORY_KEY, 'true')
+            setHasRememberedAuth(true)
+          }
+        }
+      })
+      .catch(() => {})
+  }, [mounted, isLoaded, isSignedIn, initialAuth, serverAuth?.isSignedIn, serverAuth?.isApproved])
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {

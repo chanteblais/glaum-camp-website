@@ -7,6 +7,7 @@ import {
   type AttunementChecklistItem,
 } from '@/lib/attunement'
 import { getMemberShiftState } from '@/lib/shift-attunement'
+import { parseDuesConfig, duesAppliesToMembers } from '@/lib/dues'
 import { getMemberGroups } from '@/lib/groups'
 
 // Everything the nudge email needs to know about one member. Built with the
@@ -35,17 +36,18 @@ export async function collectOutstandingAttunement(): Promise<MemberAttunement[]
   const [{ data: membersRaw }, { data: configRows }] = await Promise.all([
     supabaseAdmin
       .from('members')
-      .select('clerk_user_id, email, first_name, preferred_name, avatar_url')
+      .select('clerk_user_id, email, first_name, preferred_name, avatar_url, dues_paid_at, dues_reported_at')
       .eq('status', 'approved')
       // Suspended members have no commitments to chase — don't nudge them (063).
       .is('suspended_at', null),
     supabaseAdmin
       .from('page_content')
       .select('key, value')
-      .in('key', ['config_attunement_tasks', 'config_shift_signup_open']),
+      .in('key', ['config_attunement_tasks', 'config_shift_signup_open', 'config_dues']),
   ])
 
   const config = Object.fromEntries((configRows ?? []).map(r => [r.key, r.value]))
+  const duesActiveForMembers = duesAppliesToMembers(parseDuesConfig(config['config_dues']))
   const members = (membersRaw ?? []).filter(m => m.clerk_user_id)
   if (members.length === 0) return []
 
@@ -70,6 +72,9 @@ export async function collectOutstandingAttunement(): Promise<MemberAttunement[]
         const { groupCountsByCollection, totalGroupCount } = memberGroupCounts(memberGroups)
         const tasks = buildAttunementChecklist(config['config_attunement_tasks'], {
           hasPhoto: !!m.avatar_url,
+          duesPaid: !!m.dues_paid_at,
+          duesReported: !!m.dues_reported_at,
+          duesActiveForMembers,
           groupCountsByCollection,
           totalGroupCount,
           roleDone: !!signup?.role_id && signup?.role_approval_status !== 'pending',

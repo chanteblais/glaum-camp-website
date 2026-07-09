@@ -26,6 +26,16 @@ export const commitmentItems = (items: AttunementChecklistItem[]) =>
 // The member's current state, derived from their application + camp signup.
 export type AttunementState = {
   hasPhoto: boolean
+  // Camp dues (migration 067): true once an admin records the member paid.
+  // Manual/email-collected this year, so it's admin-set rather than derived.
+  duesPaid: boolean
+  // The member self-reported paying (068), pending admin confirmation. Counts as
+  // done for the checklist (they've done their part) — shown "awaiting
+  // confirmation" — so they aren't nudged; an admin can revert if it never lands.
+  duesReported: boolean
+  // Whether camp dues are live for members (config_dues enabled + members
+  // audience, 069). When off, any authored `dues` task is dropped from the list.
+  duesActiveForMembers: boolean
   // Member's group-membership counts: per collection id, and the total across
   // all collections (drives 'collection' requirement tasks).
   groupCountsByCollection: Record<string, number>
@@ -66,10 +76,19 @@ export function buildAttunementChecklist(
 ): AttunementChecklistItem[] {
   const tier = 'required' as const
   const authored = parseAttunementTasks(configJson)
-    .filter(t => t.enabled && (t.requirement !== 'shift' || state.shiftSignupOpen))
+    .filter(t => t.enabled
+      && (t.requirement !== 'shift' || state.shiftSignupOpen)
+      && (t.requirement !== 'dues' || state.duesActiveForMembers))
     .map(t => {
       switch (t.requirement) {
         case 'photo':      return { id: t.id, label: t.label, done: state.hasPhoto, section: 'photo' as const, tier }
+        case 'dues': {
+          // Confirmed paid, or self-reported and awaiting confirmation — both
+          // count as done so a member who's paid isn't nagged while unreconciled.
+          const done = state.duesPaid || state.duesReported
+          const label = !state.duesPaid && state.duesReported ? `${t.label} · awaiting confirmation` : t.label
+          return { id: t.id, label, done, href: '/dues', tier }
+        }
         case 'collection': {
           const need = t.requiredCount ?? 1
           const have = t.collectionId

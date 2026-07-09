@@ -17,6 +17,7 @@ import { getMemberGroups, groupCommitmentMeta } from '@/lib/groups'
 import { getMemberResourceClaims } from '@/lib/resources'
 import { buildAttunementChecklist, memberGroupCounts, requiredItems, attunementHoursSummary } from '@/lib/attunement'
 import { getMemberShiftState } from '@/lib/shift-attunement'
+import { parseDuesConfig, duesAppliesToMembers } from '@/lib/dues'
 import { buildMemberFacts } from '@/lib/member-facts'
 import { parseDistinctions, evaluateDistinctions } from '@/lib/distinctions'
 import { resolveMember, getMemberProfileValues } from '@/lib/members'
@@ -127,7 +128,7 @@ export default async function ProfilePage() {
     supabaseAdmin
       .from('page_content')
       .select('key, value')
-      .in('key', ['config_attunement_tasks', 'config_shift_signup_open', 'config_distinctions', 'config_profile_fields']),
+      .in('key', ['config_attunement_tasks', 'config_shift_signup_open', 'config_distinctions', 'config_profile_fields', 'config_dues']),
     // Shift-hours state: held hours per shift type + obligations derived from the
     // member's groups/roles. Same helper as the home dashboard — keep in sync.
     getMemberShiftState(memberClerkId),
@@ -170,6 +171,9 @@ export default async function ProfilePage() {
   // Shared with the home dashboard banner via buildAttunementChecklist — keep both in sync.
   const attunementState = {
     hasPhoto: !!application?.avatar_url,
+    duesPaid: !!profileMember?.dues_paid_at,
+    duesReported: !!profileMember?.dues_reported_at,
+    duesActiveForMembers: duesAppliesToMembers(parseDuesConfig(attuneConfig['config_dues'])),
     groupCountsByCollection,
     totalGroupCount,
     roleDone: !!campSignup?.role_id && campSignup?.role_approval_status !== 'pending',

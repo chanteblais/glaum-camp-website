@@ -104,8 +104,16 @@ everything reversible until the new store is proven.
   `/api/admin/[id]/approve` (status), `/api/profile/application` (identity edits). Reads stay on
   `applications`. **Dual-write coverage now complete:** `/api/apply` (create + *revive* a cancelled
   row), `/api/admin/[id]/approve` + `/api/admin/[id]/reject` + `/api/profile/cancel` (status),
-  `/api/profile/application` (identity edits), `/api/profile/avatar` (avatar_url). So `members`
-  identity + status stay in sync — the prerequisite for the Phase 5 read cutover.
+  `/api/profile/application` (identity edits), `/api/profile/avatar` (avatar_url, **update-only** —
+  see below). So `members` identity + status stay in sync — the prerequisite for the Phase 5 read
+  cutover.
+  - **Phantom-row guard (2026-07-08):** only writers that carry identity may CREATE a member row —
+    `/api/apply`, `/api/admin/[id]/approve`, `/api/profile/application`. Identity-less dual-writes
+    (currently just `/api/profile/avatar`) pass `upsertMember(…, { updateOnly: true })`, which mirrors
+    onto an existing row but never inserts. Before this, uploading an avatar as a signed-in
+    non-member (volunteer, or anyone who never applied) inserted a nameless/emailless `pending`
+    member row that inflated raw member counts and showed as a blank admin listing. Any future
+    dual-write that lacks name/email must also use `updateOnly`.
 - [x] **Phase 2 — Distinction engine reads the merged namespace.** `evaluateDistinctions` now
   takes a generic `FactContext` (`lib/distinctions.ts`); `profile/page.tsx` + `members/[id]`
   build it as `{ ...profileValues, ...systemFacts }` (system facts win on key overlap — guarded,

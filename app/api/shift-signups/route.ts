@@ -4,6 +4,9 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { getApprovedMember, memberDisplayName } from '@/lib/members'
 import { getShiftSignupData, fetchAllHolds, countHoldsFor } from '@/lib/participate-data'
 import { eventRangeDays, isValidOccurrence } from '@/lib/shift-occurrences'
+import { getNotificationPreferences } from '@/lib/notification-prefs'
+import { sendSignupConfirmationEmail } from '@/lib/send-email'
+import { whenText } from '@/lib/event-reminders'
 
 // Member-facing multi-shift signup (shifts redesign). A member holds any number
 // of shift occurrences via member_shift_signups — the single source of shift
@@ -69,7 +72,7 @@ export async function POST(req: NextRequest) {
 
   const { data: event } = await supabaseAdmin
     .from('schedule_events')
-    .select('id, title, capacity, participation_type, visible, needs_lead, is_recurring, recurrence_days, event_date')
+    .select('id, title, capacity, participation_type, visible, needs_lead, is_recurring, recurrence_days, event_date, time, start_time')
     .eq('id', schedule_event_id)
     .single()
   if (!event || event.participation_type !== 'shift' || !event.visible) {
@@ -119,6 +122,27 @@ export async function POST(req: NextRequest) {
       .from('member_shift_signups')
       .insert({ clerk_user_id: userId, schedule_event_id, occurrence_date: occurrenceDate, role: role ?? 'member' })
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    // Confirmation email on a fresh hold (best-effort — never block the signup),
+    // gated by the member's gathering/shift email preference.
+    try {
+      const prefs = await getNotificationPreferences(userId)
+      const nightDate = occurrenceDate ?? (event as { event_date?: string | null }).event_date ?? null
+      if (prefs.email_event_reminders && application.email) {
+        await sendSignupConfirmationEmail({
+          to: application.email,
+          recipientName: memberDisplayName(application, userId),
+          kind: 'shift',
+          title: event.title,
+          whenText: nightDate
+            ? whenText(nightDate, (event as { time?: string | null; start_time?: string | null }).time ?? (event as { start_time?: string | null }).start_time)
+            : 'Time to be confirmed',
+          href: '/schedule',
+        })
+      }
+    } catch (e) {
+      console.error('[shift-signups] confirmation email failed:', e)
+    }
   }
 
   // Admin notification (same shape as the legacy shift_change event). A role

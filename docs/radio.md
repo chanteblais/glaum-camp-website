@@ -40,11 +40,16 @@ carry the story. The lit entity **is the hyperlink** where a destination
 makes sense (welcome names → the member's profile via
 `/members/{clerk_id}`; contribution items and milestones → the Bring
 Something board) — no invisible whole-row links; a linkless post is just a
-post. **Human speech reads differently from automatic moments**: organizer
-broadcasts and member voices sit flush-left (emoji inline, no emblem
-column) — broadcasts in lavender, member voices in the accent purple —
-so a person talking stands apart from the platform narrating, and a
-member's own words stand out most of all. Hero header (`RadioHero.tsx`, from her banner mockup: the ((✦))
+post. **Human speech reads differently from automatic moments, but every
+speaker reads the same**: organizer broadcasts and member voices share one
+style — **right-aligned**, purple, italic, emoji inline (no emblem column),
+the clock on the left edge, and always **signed with the speaker's name**
+("— Sarah") — a voice calling in from the other side of the airwaves, whoever
+holds the mic (Chante 2026-07-08: "anyone messaging to radio should look the
+same"; the earlier broadcast-flush-left / voice-right split was retired — now
+both read as the right-aligned voice). **@mentions** of members render as
+gold/purple profile-linked pills, and the inline emoji is a **📢 megaphone**
+when the post rang the whole camp (notify-all), ✦ otherwise. Hero header (`RadioHero.tsx`, from her banner mockup: the ((✦))
 waves mark beside the title, an ornamental diamond rule, a warm-gold script
 subtitle in Caveat — loaded via `next/font` for this page only — and the
 frequency-waveform graphic with glowing motes, all inline SVG), a **stats band**
@@ -58,28 +63,47 @@ Each kind has its own card language on `/radio`, so the feed has rhythm:
 
 | kind | Written by | Default | Card | Example |
 |---|---|---|---|---|
-| `broadcast` | organizer composer (`POST /api/admin/radio`) | always on | gold-washed, 📢 | 📢 Tea service has moved to the Salon. |
+| `broadcast` | organizer composer (`POST /api/admin/radio`) | always on | speech: right-aligned purple, emoji inline, signed "— Name" (the route stamps the poster's name into `actor_name`) | 📢 Tea service has moved to the Salon. · *— Chanté* |
 | `welcome` | application approve route (dup-guarded) | **on** | purple-tinted, avatar | 👋 Welcome Michael to Glåüm! · *Say hello if you see them around camp.* |
 | `contribution` | first resource claim + bring-it offers (quantity edits/unclaims silent — retreats are never broadcast) | **on** | ✨, gold detail line | ✨ Sarah just covered a camping stove. · *Only one more to go!* |
 | `achievement` | manual distinction grant (rule-derived earns have no stored moment — daily diff via the cron pattern is a future round) | **on** | medal art, ringed disc, engraved italic detail | 🏅 Erik earned the Setup distinction. |
 | `milestone` | claim that completes a resource list (guarded — one per list completion) | **on** | centered celebration, no disc | 🎉 Shared Kitchen is now fully equipped. |
-| `voice` | reserved — see "Writing is gated" below | **on** (dormant) | quiet, italic, "— Sarah" attribution | ✦ *The sunset from the tower is unreal right now.* |
+| `voice` | any approved member (`POST /api/radio`) — see "Writing is open" below | **on** (admin kill-switch) | speech: same style as `broadcast` — right-aligned purple, ✦ (or 📢 if notify-all) inline, signed "— Name" | ✦ The sunset from the tower is unreal right now. · *— Sarah* |
 
 Automatic sources are toggleable in `page_content.config_radio`
 (`{ sources: { welcome, contribution, achievement, milestone, voice } }`,
 parsed by `parseRadioSources` — absent key = all on). Organizer broadcasts
 have no toggle; posting one is already the decision.
 
-## Writing is gated (mockup decision 2026-07-03)
+## Writing is open (Chante 2026-07-08 — reversed the 2026-07-03 gate)
 
-Radio is not open-mic: the `/radio` composer ("Share an announcement with
-camp…", ON AIR button, GO LIVE bar at the feed's end) is **broadcasters
-only** — currently admins; the check sits in one place so a grantable
-`canBroadcast` capability (the poll-managers pattern) can widen it later.
-Non-broadcasters see the composer locked ("🔒 Broadcasters only."). It posts
-`broadcast` kind via the admin route. The member `voice` kind and its
-`POST /api/radio` route remain in the schema/API but have no UI — reserved
-in case member moments come back.
+Radio is an open airwave: the `/radio` composer ("Share with camp…", ON AIR
+button, GO LIVE bar at the feed's end) is available to **any approved member**
+(the page already gates on approved membership). Posts go out as `voice` via
+`POST /api/radio`, right-aligned and signed. Admins keep a separate "official"
+path — the Admin → Radio console posts `broadcast` via `/api/admin/radio` —
+but both render identically. The **Member voices** toggle in `config_radio`
+is the admin kill-switch for open-mic (turning it off makes `/api/radio`
+reject with a real error).
+
+Two things ride on a post:
+
+- **@mention** — the composer autocompletes member names on `@`; a mention
+  rings that member's bell + email (their message preference), and the feed
+  renders it as a profile-linked pill. Server-side matching is the same
+  name-based whole-token match the group threads use.
+- **@here** — the notify-everyone token (Slack-style; Chante 2026-07-08,
+  replacing an earlier "Notify everyone" checkbox). It sits atop the @
+  autocomplete, and the server matches `@here` as a whole token (so a typed one
+  counts too). Posting an `@here` line arms a **confirm step** ("📢 @here alerts
+  every member by bell and email. Send anyway?") so nobody rings the whole camp
+  by reflex. The post is marked with a **📢 megaphone** and alerts every
+  approved member (their announcement preference); `@here` renders as a gold
+  everyone-pill in the feed. Mentioned members get the personal mention instead
+  of the general broadcast — each person is reached once. Radio still never
+  notifies for *ordinary* posts (Messages interrupt; Radio informs) — @here is
+  the deliberate exception, the same seam the organizer broadcast's "Also alert
+  members" uses.
 
 ## Surfaces
 

@@ -34,11 +34,22 @@ export async function POST(req: NextRequest) {
   const detailValue = typeof detail === 'string' && detail.trim() ? detail.trim().slice(0, 280) : null
   const iconValue = typeof icon === 'string' && icon.trim() ? icon.trim().slice(0, 200) : '📢'
 
+  // Sign the broadcast with the organizer's name — Radio speech reads the same
+  // whoever holds the mic (the feed renders "— Name" on every spoken row).
+  const { data: me } = await supabaseAdmin
+    .from('members')
+    .select('preferred_name, first_name')
+    .eq('clerk_user_id', userId)
+    .maybeSingle()
+  const actorName = me?.preferred_name || me?.first_name || null
+
   const id = await postRadioEvent({
     kind: 'broadcast',
     message: body,
     detail: detailValue,
     icon: iconValue,
+    actorClerkId: userId,
+    actorName,
     createdBy: userId,
   })
   if (!id) return NextResponse.json({ error: 'Failed to post' }, { status: 500 })
