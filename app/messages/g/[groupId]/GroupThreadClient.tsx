@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabaseResizedUrl } from '@/lib/supabase-image'
-import { IconImage } from '@/components/IconImage'
+import { IconImage, ROUND_FILL } from '@/components/IconImage'
 import { useConfirm } from '../../../components/ConfirmDialog'
 
 type GroupMessage = {
@@ -421,7 +421,7 @@ export function GroupThreadClient({ currentUserId, groupId, groupName, groupIcon
           fontSize: '1.15rem',
         }}>
           {groupIconImage
-            ? <IconImage src={groupIconImage} size="100%" fill={0.85} />
+            ? <IconImage src={groupIconImage} size="100%" fill={ROUND_FILL} />
             : <span aria-hidden="true">{groupIcon || '✦'}</span>}
         </div>
         <div>
