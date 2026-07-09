@@ -71,9 +71,16 @@ with the added ability to delete a list.
   (gold border, header / items / footer, 2026-07-03) — **collapsed by default**
   (2026-07-08): the board reads as a scannable index of *every* list (a header
   row with title + health pill + a one-line summary like "3 still needed · 14
-  items" or "No items yet — tap to add"), so empty lists are as visible as full
-  ones. Tap a header to open it (items + add footer + Edit/Delete); creating a
-  list or adding an item auto-opens that list. Below:
+  items"), so empty lists are as visible as full ones. Tap a header to open it
+  (items + add footer + Edit/Delete); creating a list or adding an item
+  auto-opens that list. **Open call** (2026-07-08, derived — no flag, no
+  migration): a list with **no tracked needs** (no targeted items, e.g. Decor —
+  the organizer doesn't enumerate; members bring what fits) presents as an
+  **invitation, not an empty inventory** — collapsed summary *"Open call — tap
+  to contribute"* (empty) / *"Open call · N items"*, and the opened card leads
+  with *"✦ An open call — bring whatever you think would help."* under the
+  description. Adding a targeted item flips it back to a tracked list
+  automatically. Below:
   - **Toolbar** (top, 2026-07-08) — **＋ New list** (title + description inline
     → live immediately) and **＋ Contribute something** (add an item to any list
     via a list picker, without hunting for the right card). Two-up on desktop,
@@ -129,11 +136,15 @@ with the added ability to delete a list.
   - **A compact index of opted-in lists** (2026-07-08, reversing the earlier
     "one list, not a directory"): **one row per list** flagged
     `show_on_dashboard` — the list title + a right-aligned status (*"3 still
-    needed"* gold / *"✓ all covered"* green / *"N being brought"* or *"No needs
-    yet"* dim). Capped at 6 rows with "+N more lists". Members opt a list in via
-    the **"Show this list on the home dashboard"** checkbox in the list
-    create/edit form (default off) — so the widget shows exactly the lists the
-    community chose to surface, empty or not.
+    needed"* gold / *"✓ all covered"* green / *"N being brought"* dim /
+    *"✦ open call"* gold for a list with no tracked needs and nothing brought
+    yet). An **open-call list** (no targets) also renders its **description as
+    an italic callout line** under the title — the invitation in the list's own
+    words ("Bring anything that sparkles"), written once in the list editor's
+    description field (no separate callout field). Capped at 6 rows with "+N
+    more lists". Members opt a list in via the **"Show this list on the home
+    dashboard"** checkbox in the list create/edit form (default off) — so the
+    widget shows exactly the lists the community chose to surface, empty or not.
   - **Collective progress** — an overall "% Ready" in the header (unit-weighted
     across all flagged lists; never rounds up to 100 while short); shown only
     when some flagged list has a target.
