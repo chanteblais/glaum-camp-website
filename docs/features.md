@@ -195,11 +195,13 @@ Max content width: `1100px`. Layout uses CSS classes (`profile-main-grid` [`1.1f
 ### Member Directory (`/members`)
 
 **Who:** Approved members only (redirects others to `/profile`)  
-**What:** Grid of approved member cards.
+**What:** Grid of approved member cards, plus a distinct **Volunteers** section below.
 
 Each card shows: circular avatar (gold border), display name, and role name if assigned and approved (gold small-caps). Members without an avatar show a `✦` glyph rather than an initial.
 
 **Equal-height cards (load-bearing):** the role text is always rendered (just hidden when absent) and the grid/flex setup forces uniform card heights across rows. Don't "clean up" the empty role line — it's intentional, removing it makes rows ragged.
+
+**Volunteers section:** `active` rows from `volunteers` render under a purple "VOLUNTEERS" rule with the descriptor "not full camp members". Cards are deliberately distinct: **dashed purple border**, purple avatar ring, purple "Volunteer" tag where a member's role sits — and **not links** (volunteers have no `/members/[id]` page). Anyone who is both an active volunteer and an approved member is deduped (matched by `clerk_user_id` or email) and shows only as a member. The text search covers volunteers by name (searching "volunteer" also lists them all); the department/role filters are member-only concepts and hide the section while active. The heading count reads "N approved members · M volunteers".
 
 Linked from nav as "Many Hands".
 

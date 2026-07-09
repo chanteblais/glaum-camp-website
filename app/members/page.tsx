@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getApprovedMember } from '@/lib/members'
 import { Header } from '@/components/Header'
-import { MembersGrid, type MemberCard } from './MembersGrid'
+import { MembersGrid, type MemberCard, type VolunteerCard } from './MembersGrid'
 
 export default async function MembersPage() {
   const { userId } = await auth()
@@ -12,16 +12,21 @@ export default async function MembersPage() {
 
   // The viewer gate (approved members only) runs alongside the directory
   // queries — it gates the response, not what we fetch.
-  const [viewer, { data: members }, { data: signups }] = await Promise.all([
+  const [viewer, { data: members }, { data: signups }, { data: volunteerRows }] = await Promise.all([
     getApprovedMember(userId),
     supabaseAdmin
       .from('applications')
-      .select('id, first_name, preferred_name, avatar_url, clerk_user_id')
+      .select('id, first_name, preferred_name, avatar_url, clerk_user_id, email')
       .eq('status', 'approved')
       .order('first_name', { ascending: true }),
     supabaseAdmin
       .from('camp_signups')
       .select('clerk_user_id, role_approval_status, roles ( name, departments ( name, icon ) )'),
+    supabaseAdmin
+      .from('volunteers')
+      .select('id, first_name, preferred_name, avatar_url, clerk_user_id, email')
+      .eq('status', 'active')
+      .order('first_name', { ascending: true }),
   ])
 
   if (!viewer) redirect('/profile')
@@ -44,6 +49,21 @@ export default async function MembersPage() {
     }
   })
 
+  // Active volunteers, minus anyone already listed as an approved member
+  // (a person can hold both records — the member card wins).
+  const memberUserIds = new Set((members ?? []).map(m => m.clerk_user_id).filter(Boolean))
+  const memberEmails = new Set((members ?? []).map(m => m.email?.toLowerCase()).filter(Boolean))
+  const volunteers: VolunteerCard[] = (volunteerRows ?? [])
+    .filter(v =>
+      !(v.clerk_user_id && memberUserIds.has(v.clerk_user_id)) &&
+      !(v.email && memberEmails.has(v.email.toLowerCase()))
+    )
+    .map(v => ({
+      dbId: v.id,
+      name: v.preferred_name || v.first_name || 'Volunteer',
+      avatarUrl: v.avatar_url ?? null,
+    }))
+
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
       <Header />
@@ -60,12 +80,13 @@ export default async function MembersPage() {
           </h1>
           <p style={{ fontSize: '0.85rem', opacity: 0.4 }}>
             {all.length} approved {all.length === 1 ? 'member' : 'members'}
+            {volunteers.length > 0 && <> · {volunteers.length} {volunteers.length === 1 ? 'volunteer' : 'volunteers'}</>}
           </p>
         </div>
 
         <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.3), transparent)', marginBottom: '3rem' }} aria-hidden="true" />
 
-        <MembersGrid members={all} />
+        <MembersGrid members={all} volunteers={volunteers} />
 
       </main>
     </div>
