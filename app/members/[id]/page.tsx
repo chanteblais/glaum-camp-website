@@ -76,7 +76,20 @@ export default async function MemberPage({ params }: { params: { id: string } })
 
   // Only approved members can view other profiles
   if (!viewer) redirect('/profile')
-  if (!member) notFound()
+
+  // Not a member id — it may be a volunteer (directory cards link here too).
+  if (!member) {
+    const { data: volunteer } = isUuid
+      ? await supabaseAdmin
+          .from('volunteers')
+          .select('id, first_name, preferred_name, pronouns, avatar_url, submitted_at')
+          .eq('status', 'active')
+          .eq('id', params.id)
+          .maybeSingle()
+      : { data: null }
+    if (!volunteer) notFound()
+    return <VolunteerProfile volunteer={volunteer} />
+  }
 
   // Everything below depends only on the member row: signup with role + dept,
   // group affiliations, the two page_content configs (one keyed read), and the
@@ -445,5 +458,72 @@ function CalendarGlyph() {
       <rect x="3" y="4.5" width="18" height="17" rx="2.5" />
       <path d="M3 9h18M8 2.5v4M16 2.5v4" strokeLinecap="round" />
     </svg>
+  )
+}
+
+// Volunteer variant of the public profile — same hero register as a member
+// (portrait, name, pronouns), with the shared pill relabelled VOLUNTEER.
+// Volunteers carry no roles/groups/distinctions, so the page is the hero alone.
+function VolunteerProfile({ volunteer }: {
+  volunteer: { id: string; first_name: string | null; preferred_name: string | null; pronouns: string | null; avatar_url: string | null; submitted_at: string | null }
+}) {
+  const displayName = volunteer.preferred_name || volunteer.first_name || 'Volunteer'
+  const sinceYear = volunteer.submitted_at ? new Date(volunteer.submitted_at).getFullYear() : null
+
+  return (
+    <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
+      <Header />
+      <style dangerouslySetInnerHTML={{ __html: `
+        .pub-hero { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 2.5rem; }
+        .pub-hero-id { min-width: 0; }
+        @media (max-width: 720px) {
+          .pub-hero { grid-template-columns: 1fr; justify-items: center; text-align: center; gap: 1.4rem; margin-left: 0 !important; }
+          .pub-hero-id { text-align: center; }
+        }
+      ` }} />
+      <HandsBackdrop />
+
+      <main aria-labelledby="member-heading" style={{ maxWidth: '1080px', margin: '0 auto', padding: '6rem 1.5rem 7rem', position: 'relative', zIndex: 1 }}>
+        <header className="pub-hero" style={{ marginBottom: '0.85rem', marginLeft: '2rem' }}>
+          <div style={{
+            width: '260px', height: '260px', borderRadius: '50%',
+            border: '5px solid #6F491F',
+            boxShadow: '0 0 0 1px rgba(60,35,10,0.6), 0 0 20px rgba(111,73,31,0.25), 0 8px 32px rgba(0,0,0,0.55)',
+            background: 'rgba(200,168,72,0.08)', overflow: 'hidden', flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            {volunteer.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={supabaseResizedUrl(volunteer.avatar_url, 520) ?? ''} alt={`${displayName}'s portrait`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <span aria-hidden="true" style={{ fontFamily: 'TokyoDreams, serif', fontSize: '3rem', color: GOLD, opacity: 0.5 }}>
+                {displayName.charAt(0).toUpperCase()}
+              </span>
+            )}
+          </div>
+
+          <div className="pub-hero-id">
+            <h1 id="member-heading" style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(2rem, 4.5vw, 3rem)', color: GOLD, margin: '0 0 0.35rem', textShadow: '0 0 40px rgba(210,57,248,0.4)' }}>
+              {displayName}
+              <span aria-hidden style={{ color: GOLD, fontSize: '0.5em', opacity: 0.8, marginLeft: '0.5rem', verticalAlign: '0.25em' }}>✦</span>
+            </h1>
+            {volunteer.pronouns && (
+              <p style={{ fontSize: '0.9rem', color: PURPLE, opacity: 0.9, margin: '0 0 0.55rem' }}>{volunteer.pronouns}</p>
+            )}
+            {sinceYear && (
+              <p style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.82rem', letterSpacing: '0.05em', color: WARM, opacity: 0.85, margin: '0 0 0.55rem' }}>
+                <CalendarGlyph /> Volunteering since {sinceYear}
+              </p>
+            )}
+            <p style={{ fontSize: '0.92rem', color: ROSE, lineHeight: 1.7, maxWidth: '24rem', margin: '0.15rem 0 0' }}>
+              Lending a hand at camp — one of the many hands that hold it up.
+            </p>
+            <div style={{ marginTop: '1rem' }}>
+              <ApprovedCamperPill label="VOLUNTEER" />
+            </div>
+          </div>
+        </header>
+      </main>
+    </div>
   )
 }

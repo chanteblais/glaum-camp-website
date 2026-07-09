@@ -3,8 +3,9 @@ import type { CSSProperties } from 'react'
 // Shared "APPROVED CAMPER" status pill — illuminated amethyst glass.
 // Single source of truth for both the member's own /profile header and the
 // public /members/[id] profile, so the two never drift. Pass `style` to tweak
-// per-placement (e.g. margins) without forking the look.
-export function ApprovedCamperPill({ style }: { style?: CSSProperties }) {
+// per-placement (e.g. margins) without forking the look; `label` swaps the
+// text for the other registers (e.g. VOLUNTEER) while keeping the glass.
+export function ApprovedCamperPill({ style, label = 'APPROVED CAMPER' }: { style?: CSSProperties; label?: string }) {
   return (
     <span style={{
       display: 'inline-block',
@@ -23,7 +24,7 @@ export function ApprovedCamperPill({ style }: { style?: CSSProperties }) {
       textShadow: '0 1px 1px rgba(20,6,35,0.35)',
       ...style,
     }}>
-      ✦ APPROVED CAMPER ✦
+      ✦ {label} ✦
     </span>
   )
 }

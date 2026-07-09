@@ -201,7 +201,7 @@ Each card shows: circular avatar (gold border), display name, and role name if a
 
 **Equal-height cards (load-bearing):** the role text is always rendered (just hidden when absent) and the grid/flex setup forces uniform card heights across rows. Don't "clean up" the empty role line — it's intentional, removing it makes rows ragged.
 
-**Volunteers section:** `active` rows from `volunteers` render under a purple "VOLUNTEERS" rule with the descriptor "not full camp members". Cards are deliberately distinct: **dashed purple border**, purple avatar ring, purple "Volunteer" tag where a member's role sits — and **not links** (volunteers have no `/members/[id]` page). Anyone who is both an active volunteer and an approved member is deduped (matched by `clerk_user_id` or email) and shows only as a member. The text search covers volunteers by name (searching "volunteer" also lists them all); the department/role filters are member-only concepts and hide the section while active. The heading count reads "N approved members · M volunteers".
+**Volunteers section:** `active` rows from `volunteers` render under a purple "VOLUNTEERS" rule with the descriptor "not full camp members". Cards match the member cards (same outline + avatar ring — deliberate, per 2026-07-09 feedback: no "othering" borders); the distinction is the section itself plus a purple "Volunteer" tag where a member's role sits. Cards **link to `/members/[volunteer-uuid]`**, which renders the volunteer variant of the public profile. Anyone who is both an active volunteer and an approved member is deduped (matched by `clerk_user_id` or email) and shows only as a member. The text search covers volunteers by name (searching "volunteer" also lists them all); the department/role filters are member-only concepts and hide the section while active. The heading count reads "N approved members · M volunteers".
 
 Linked from nav as "Many Hands".
 
@@ -220,6 +220,7 @@ Linked from nav as "Many Hands".
 - **Distinctions:** `CabinetOfDistinctions` (compact) — earned medals, derived.
 - **Profile** + **Skills & Gifts:** public registry fields (see [profile-architecture.md](profile-architecture.md)).
 - Read-only; no editing controls.
+- **Volunteer variant:** a UUID that misses `applications` falls through to `volunteers` (`status = 'active'`; `VolunteerProfile` in the same file). Hero-only page — same portrait/name/pronouns register, "Volunteering since {year}" (from `submitted_at`), a one-line descriptor, and the shared pill relabelled via its `label` prop (`<ApprovedCamperPill label="VOLUNTEER" />`). No roles/groups/distinctions sections (volunteers have none) and no Message button (DM threads are member-keyed).
 
 ---
 
