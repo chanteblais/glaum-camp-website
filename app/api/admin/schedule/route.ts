@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { deriveLegacyColumns } from '@/lib/event-type-compat'
 import { weekdayFromISO } from '@/lib/shift-hours'
 import { requireAdmin } from '@/lib/admin-auth'
 import { getAdminScheduleEvents } from '@/lib/admin-program-data'
@@ -38,10 +37,6 @@ export async function POST(req: NextRequest) {
   const participation_type = body.participation_type ?? 'general'
   const shift_type_id = participation_type === 'shift' ? (body.shift_type_id ?? null) : null
 
-  // Legacy contribution_type / event_type / capacity are derived from the chosen
-  // participation type, not set by hand (see lib/event-type-compat.ts).
-  const legacy = await deriveLegacyColumns(supabaseAdmin, participation_type, shift_type_id, body.capacity ?? null)
-
   const { data, error } = await supabaseAdmin
     .from('schedule_events')
     .insert([{
@@ -68,10 +63,10 @@ export async function POST(req: NextRequest) {
       end_time: body.end_time ?? null,
       requires_ack: participation_type === 'mandatory' ? (body.requires_ack ?? false) : false,
       event_date: body.event_date ?? null,
-      event_category: body.event_category ?? 'at_camp',
+      // Capacity only means something on signable shifts.
+      capacity: participation_type === 'shift' ? (body.capacity ?? null) : null,
       // Lead roles only make sense on signable shifts (049).
       needs_lead: participation_type === 'shift' ? (body.needs_lead ?? false) : false,
-      ...legacy,
     }])
     .select()
     .single()

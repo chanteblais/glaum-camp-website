@@ -87,7 +87,7 @@ Sign-out flow:
 | `/api/apply` | POST | Submit application |
 | `/api/volunteer` | POST | Submit volunteer signup |
 | `/api/signup` | GET/POST | Fetch departments/roles + upsert member **role** selection. Sets `role_approval_status = 'pending'` for roles with `requires_approval = true`. (Shift halves are legacy — shifts moved to `/api/shift-signups`.) |
-| `/api/shift-signups` | GET/POST/DELETE | **Multi-shift signup** (shifts redesign): GET slots + owed hour requirements (incl. `lead_names`/`held_role`), POST sign up for a slot (capacity + signup-open enforced, admin notified; optional `role: 'member'\|'lead'` — omitted keeps the existing role), DELETE cancel (also clears the legacy `camp_signups.schedule_event_id`). Backed by `member_shift_signups`. |
+| `/api/shift-signups` | GET/POST/DELETE | **Multi-shift signup** (shifts redesign): GET slots + owed hour requirements (incl. `lead_names`/`held_role`), POST sign up for a slot (capacity + signup-open enforced, admin notified; optional `role: 'member'\|'lead'` — omitted keeps the existing role), DELETE cancel. Backed by `member_shift_signups` (the single source of shift holds since `065`). |
 | `/api/groups/membership` | GET/POST | Self-service opt-in groups for the current member. GET lists groups whose **collection has `self_join` on** (migration `044`; no collection ⇒ not self-joinable) + the member's joined state, **grouped by collection** (each group carries `collection_id`/`collection_name`, ordered by collection `sort_order`); POST `{ group_id, joined }` joins (`source='application'`) or leaves (re-checks the same gate; **approved members only** — same gate as /participate). Separate from the apply form's `group_select` fields, from `show_on_profile` (profile display), and from group `visibility` (Find-a-group). Powers the **Your Groups** section on `/participate`. |
 | `/api/resources` | GET | Shared resources, member view (`{ lists, pulse }`): **visible** lists (empty ones included — they're suggestion targets) with items, community claimed totals, the caller's own claim quantity (`mine`), **claimant names** (`claimants`, "You" first — the board's social proof), suggestion attribution (`offered_by_name`/`offered_by_me`), plus the **pulse** (contributors in the last 24h + latest claim within 48h, from `resource_claims.updated_at` — never stored). Powers the **Bring Something** board on `/participate`. |
 | `/api/resources/claims` | POST | Set my claim on a resource: `{ resource_id, quantity }` — quantity ≥1 upserts the single per-member claim row (clamped 1–99), 0 removes it. Removing the last claim on **your own contribution** deletes its row too (retraction). Rejects items on hidden lists. **Approved members only.** |
@@ -142,8 +142,7 @@ Sign-out flow:
 | `/api/admin/schedule` | GET/POST | List / create schedule events |
 | `/api/admin/schedule/[id]` | PATCH/DELETE | Update / delete event |
 | `/api/admin/schedule/icon` | POST | Upload custom event icon |
-| `/api/admin/schedule/rosters` | GET | Per-event shift rosters for the schedule editor (`member_shift_signups` ∪ legacy `camp_signups`, deduped; names + lead role + `legacy_only` flag) |
-| `/api/admin/shifts` | GET/POST | **Dead** — legacy of the removed original `shifts` table; nothing calls it (removed in the shifts-redesign cleanup) |
+| `/api/admin/schedule/rosters` | GET | Per-event shift rosters for the schedule editor (`member_shift_signups`; names + lead role, per occurrence) |
 | `/api/admin/shift-types` | GET/POST | List / create shift types (the configurable registry; `/[id]` PATCH/DELETE to edit) |
 | `/api/admin/signups/[userId]` | GET/PATCH | View / manage member signups |
 | `/api/admin/role-requests` | GET | List pending role requests |

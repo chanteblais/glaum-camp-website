@@ -72,7 +72,6 @@ type OwedReq = {
 
 type Signup = {
   role_id: string | null
-  schedule_event_id: string | null
   role_approval_status: string | null
 }
 
@@ -1308,7 +1307,6 @@ export function SignupSection({ showPickers = true, initialData }: { showPickers
     const prevSignup = signup
     const updated: Signup = {
       role_id: selectedRole!,
-      schedule_event_id: signup?.schedule_event_id ?? null,
       role_approval_status: data.signup?.role_approval_status ?? null,
     }
     setSignup(updated)

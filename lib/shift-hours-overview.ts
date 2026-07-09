@@ -6,8 +6,8 @@ import { fetchShiftHolds } from './shift-signups'
 import { getSuspendedClerkUserIds, isSuspended } from './admin-counts'
 
 // Community-wide shift-hours rollup for the admin Overview, built from shift
-// events' real durations × member_shift_signups ∪ the legacy camp_signups
-// single column (deduped).
+// events' real durations × member_shift_signups (the single source of shift
+// holds since migration 065).
 //
 // A recurring shift EVENT is treated as one regular shift PER occurrence — its
 // listed recurrence_days, or every day of the configured event range (same
@@ -64,7 +64,7 @@ export async function getShiftHoursOverview(): Promise<ShiftHoursOverview> {
   const [
     { data: shiftTypes },
     { data: events },
-    { many: signups, legacy },
+    signups,
     { data: configRows },
     { data: approvedRows },
     suspendedClerkIds,
@@ -104,13 +104,10 @@ export async function getShiftHoursOverview(): Promise<ShiftHoursOverview> {
 
   // Occurrence identity: an occurrence is one (event, night). A signup names its
   // night via occurrence_date (NULL = the single occurrence of a non-recurring
-  // shift); occKey collapses that to a stable string. Union the two signup
-  // sources deduped per (member, occurrence) — 045 backfilled the legacy column
-  // into the many-to-many table, so overlap is expected.
+  // shift); occKey collapses that to a stable string.
   const occKey = (eventId: string, date: string | null) => `${eventId}::${date ?? ''}`
   const holdersByOcc = new Map<string, Set<string>>()
-  for (const s of [...signups.map(r => ({ ...r, occurrence_date: r.occurrence_date as string | null })),
-                   ...legacy.map(r => ({ ...r, occurrence_date: null as string | null }))]) {
+  for (const s of signups.map(r => ({ ...r, occurrence_date: r.occurrence_date as string | null }))) {
     if (!s.schedule_event_id || !eventById.has(s.schedule_event_id)) continue
     const key = occKey(s.schedule_event_id, s.occurrence_date)
     const set = holdersByOcc.get(key) ?? new Set<string>()

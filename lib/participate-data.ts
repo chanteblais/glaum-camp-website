@@ -11,23 +11,20 @@ import { eventRangeDays, shiftOccurrenceDates } from './shift-occurrences'
 // no client fetch-after-hydration waterfall; the API routes remain the
 // client's refresh path after a signup/join action.
 
-// ── Roles (legacy /api/signup GET) ────────────────────────────────────────────
+// ── Roles (/api/signup GET) ───────────────────────────────────────────────────
 
 export type RoleSignupData = {
-  signup: { role_id: string | null; schedule_event_id: string | null; role_approval_status: string | null } | null
+  signup: { role_id: string | null; role_approval_status: string | null } | null
   departments: unknown[]
-  scheduleEvents: unknown[]
   shiftSignupOpen: boolean
 }
 
 export async function getRoleSignupData(userId: string): Promise<RoleSignupData> {
-  const [deptRes, rolesRes, signupRes, roleCounts, eventSignupCounts, scheduleRes, shiftFlagRes] = await Promise.all([
+  const [deptRes, rolesRes, signupRes, roleCounts, shiftFlagRes] = await Promise.all([
     supabaseAdmin.from('departments').select('id, name, description, icon, sort_order').order('sort_order'),
     supabaseAdmin.from('roles').select('id, name, description, capacity, sort_order, department_id, purpose, responsibilities_before, responsibilities_during, ideal_for, commitment, commitment_period, requires_approval').order('sort_order'),
-    supabaseAdmin.from('camp_signups').select('role_id, schedule_event_id, role_approval_status').eq('clerk_user_id', userId).maybeSingle(),
+    supabaseAdmin.from('camp_signups').select('role_id, role_approval_status').eq('clerk_user_id', userId).maybeSingle(),
     supabaseAdmin.from('camp_signups').select('role_id').not('role_id', 'is', null),
-    supabaseAdmin.from('camp_signups').select('schedule_event_id').not('schedule_event_id', 'is', null),
-    supabaseAdmin.from('schedule_events').select('id, day, time, title, subtitle, icon_type, highlight, is_recurring, capacity').eq('visible', true).order('sort_order'),
     supabaseAdmin.from('page_content').select('value').eq('key', 'config_shift_signup_open').maybeSingle(),
   ])
 
@@ -36,11 +33,6 @@ export async function getRoleSignupData(userId: string): Promise<RoleSignupData>
   const roleSignupCounts: Record<string, number> = {}
   for (const row of roleCounts.data ?? []) {
     if (row.role_id) roleSignupCounts[row.role_id] = (roleSignupCounts[row.role_id] ?? 0) + 1
-  }
-
-  const evSignupCounts: Record<string, number> = {}
-  for (const row of eventSignupCounts.data ?? []) {
-    if (row.schedule_event_id) evSignupCounts[row.schedule_event_id] = (evSignupCounts[row.schedule_event_id] ?? 0) + 1
   }
 
   const rolesWithCounts = (rolesRes.data ?? []).map(r => ({
@@ -53,16 +45,9 @@ export async function getRoleSignupData(userId: string): Promise<RoleSignupData>
     roles: rolesWithCounts.filter(r => r.department_id === d.id),
   }))
 
-  // Only include capacity on events so the client knows which are signable
-  const scheduleEvents = (scheduleRes.data ?? []).map(e => ({
-    ...e,
-    signed_up: e.capacity != null ? (evSignupCounts[e.id] ?? 0) : null,
-  }))
-
   return {
     signup: signupRes.data ?? null,
     departments,
-    scheduleEvents,
     shiftSignupOpen,
   }
 }
@@ -71,18 +56,16 @@ export async function getRoleSignupData(userId: string): Promise<RoleSignupData>
 
 // A hold is keyed per (member, event, occurrence) — each night of a recurring
 // shift is its own regular shift. occKey collapses the occurrence to a string
-// (empty = a non-recurring shift's single occurrence / a legacy single hold).
+// (empty = a non-recurring shift's single occurrence).
 export const holdOccKey = (userId: string, eventId: string, occDate: string | null) =>
   `${userId}|${eventId}|${occDate ?? ''}`
 
-// Unique (member, event, occurrence) holds across the new table + the legacy
-// single column. Leads (migration 048) only exist on the new table; legacy
-// holds are members (and always the null occurrence).
+// Unique (member, event, occurrence) holds from member_shift_signups (the
+// single source of shift holds since the legacy column drop, migration 065).
 export async function fetchAllHolds() {
-  const [{ data: many }, { data: legacy }] = await Promise.all([
-    supabaseAdmin.from('member_shift_signups').select('clerk_user_id, schedule_event_id, occurrence_date, role'),
-    supabaseAdmin.from('camp_signups').select('clerk_user_id, schedule_event_id').not('schedule_event_id', 'is', null),
-  ])
+  const { data: many } = await supabaseAdmin
+    .from('member_shift_signups')
+    .select('clerk_user_id, schedule_event_id, occurrence_date, role')
   const pairs = new Set<string>()
   // leads keyed by (event, occurrence) so a lead is scoped to the night held.
   const leadsByOcc = new Map<string, string[]>()
@@ -103,12 +86,6 @@ export async function fetchAllHolds() {
     if (r.role === 'lead') {
       const k = `${r.schedule_event_id}|${date ?? ''}`
       leadsByOcc.set(k, [...(leadsByOcc.get(k) ?? []), r.clerk_user_id])
-    }
-  }
-  for (const r of legacy ?? []) {
-    if (r.schedule_event_id) {
-      pairs.add(holdOccKey(r.clerk_user_id, r.schedule_event_id, null))
-      addHolder(r.schedule_event_id, null, r.clerk_user_id)
     }
   }
   return { pairs, leadsByOcc, holdersByOcc }

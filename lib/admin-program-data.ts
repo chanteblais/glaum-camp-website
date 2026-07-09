@@ -35,20 +35,18 @@ export async function getAdminShiftTypes(): Promise<ShiftTypeRow[]> {
 }
 
 // Who holds each shift, for the admin schedule editor's per-event roster.
-// Holds = member_shift_signups (carries the lead role) ∪ the legacy
-// camp_signups.schedule_event_id (members only), deduped per (member, event) —
-// the query is shared with the Overview shift-hours ledger (lib/shift-signups.ts
-// fetchShiftHolds, also the union fetchAllHolds in app/api/shift-signups/route.ts
-// mirrors), so the admin count always agrees with the member-facing "N signed up".
-// legacy_only marks holds with no member_shift_signups row: set_shift_role
-// (PATCH /api/admin/signups/[userId]) can't promote those.
+// Holds come from member_shift_signups — the single source of shift holds
+// (the legacy camp_signups.schedule_event_id column was dropped in 065). The
+// query is shared with the Overview shift-hours ledger (lib/shift-signups.ts
+// fetchShiftHolds), so the admin count always agrees with the member-facing
+// "N signed up".
 export async function getAdminRosters(): Promise<Record<string, RosterEntry[]>> {
-  const { many, legacy } = await fetchShiftHolds()
+  const many = await fetchShiftHolds()
 
   // Each night of a recurring shift is its own roster: hold identity is
   // (event, occurrence, member). Rosters stay keyed by event; the entry carries
   // occurrence_date so the schedule editor can group holders by night.
-  type Hold = { clerk_user_id: string; role: 'member' | 'lead'; legacy_only: boolean; occurrence_date: string | null }
+  type Hold = { clerk_user_id: string; role: 'member' | 'lead'; occurrence_date: string | null }
   const byEvent = new Map<string, Map<string, Hold>>()
   const holdersFor = (eventId: string) => {
     const holders = byEvent.get(eventId) ?? new Map<string, Hold>()
@@ -59,13 +57,7 @@ export async function getAdminRosters(): Promise<Record<string, RosterEntry[]>> 
   for (const r of many ?? []) {
     if (!r.schedule_event_id) continue
     const occ = (r.occurrence_date as string | null) ?? null
-    holdersFor(r.schedule_event_id).set(holdKey(r.clerk_user_id, occ), { clerk_user_id: r.clerk_user_id, role: r.role === 'lead' ? 'lead' : 'member', legacy_only: false, occurrence_date: occ })
-  }
-  for (const r of legacy ?? []) {
-    if (!r.schedule_event_id) continue
-    const holders = holdersFor(r.schedule_event_id)
-    const key = holdKey(r.clerk_user_id, null)
-    if (!holders.has(key)) holders.set(key, { clerk_user_id: r.clerk_user_id, role: 'member', legacy_only: true, occurrence_date: null })
+    holdersFor(r.schedule_event_id).set(holdKey(r.clerk_user_id, occ), { clerk_user_id: r.clerk_user_id, role: r.role === 'lead' ? 'lead' : 'member', occurrence_date: occ })
   }
 
   const allIds = Array.from(byEvent.values()).flatMap(h => Array.from(h.values()).map(v => v.clerk_user_id))
@@ -82,7 +74,6 @@ export async function getAdminRosters(): Promise<Record<string, RosterEntry[]>> 
         application_id: applicationIds[h.clerk_user_id] ?? null,
         name: names[h.clerk_user_id] ?? 'Unknown member',
         role: h.role,
-        legacy_only: h.legacy_only,
         occurrence_date: h.occurrence_date,
       }))
       // Leads first, then alphabetical — the ✦ reads at a glance.

@@ -17,7 +17,6 @@ type ScheduleEvent = {
   is_recurring: boolean
   // Recurring only: NULL = every day; an array of ISO dates = just those days.
   recurrence_days?: string[] | null
-  event_type: string | null
   event_date: string | null
   participation_type?: string | null
   shift_color_index?: number | null
@@ -33,18 +32,11 @@ const PX_PER_HOUR = 56
 // each shift type gets a distinct hue from the palette by registry position;
 // general events wear their own stable hue hashed from the event id (they
 // used to share one neutral styling, which made neighbours read as twins).
-// The legacy event_type text keys are kept as a fallback for undecorated rows.
-const EVENT_TYPE_STYLES: Record<string, { border: string; background: string; text: string }> = {
-  all_hands:    { border: 'rgba(40,200,190,0.45)',  background: 'rgba(40,200,190,0.1)',  text: '#28c8be' },
-  camp_tending: { border: 'rgba(240,90,20,0.55)',   background: 'rgba(240,90,20,0.12)',  text: '#e6781e' },
-  service:      { border: 'rgba(240,100,180,0.5)',   background: 'rgba(240,100,180,0.1)',  text: '#f064b4' },
-}
 
 // True when the event carries a colour of its own (bolder title treatment).
 function isColored(event: ScheduleEvent): boolean {
   return event.participation_type === 'mandatory'
     || (event.participation_type === 'shift' && event.shift_color_index != null)
-    || !!event.event_type
 }
 
 function eventTypeStyle(event: ScheduleEvent) {
@@ -55,7 +47,6 @@ function eventTypeStyle(event: ScheduleEvent) {
     const hue = shiftHue(event.shift_color_index)
     return { border: `rgba(${hue.rgb},0.5)`, background: `rgba(${hue.rgb},0.1)`, text: hue.accent }
   }
-  if (event.event_type && EVENT_TYPE_STYLES[event.event_type]) return EVENT_TYPE_STYLES[event.event_type]
   const hue = generalHue(event.id)
   return { border: `rgba(${hue.rgb},0.5)`, background: `rgba(${hue.rgb},0.12)`, text: hue.accent }
 }

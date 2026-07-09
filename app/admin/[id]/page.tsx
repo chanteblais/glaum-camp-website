@@ -47,7 +47,7 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
     app.clerk_user_id
       ? supabaseAdmin
           .from('camp_signups')
-          .select('role_id, schedule_event_id, role_approval_status')
+          .select('role_id, role_approval_status')
           .eq('clerk_user_id', app.clerk_user_id)
           .maybeSingle()
       : none,
@@ -70,29 +70,21 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
   ])
   const cfgMap: Record<string, string | undefined> = Object.fromEntries((cfgRows ?? []).map(r => [r.key, r.value]))
 
-  // Union many-to-many + legacy single, deduped by event id. Only the
-  // many-to-many rows can carry a lead role (migration 048).
+  // Every shift the member holds (member_shift_signups), deduped by event id.
   const shiftMap = new Map<string, { id: string; title: string; time: string | null; day: string; lead: boolean }>()
   for (const r of heldRows ?? []) {
     const ev = r.schedule_events as any
     if (ev?.id) shiftMap.set(ev.id, { id: ev.id, title: ev.title, time: ev.time ?? null, day: ev.day, lead: (r as any).role === 'lead' })
   }
-  const legacyEventId = signup?.schedule_event_id && !shiftMap.has(signup.schedule_event_id)
-    ? signup.schedule_event_id
-    : null
 
   // Second batch: rows that hang off the signup / member rows above.
-  const [roleRes, { data: legacyEv }, memberAwards, memberProfileValues] = await Promise.all([
+  const [roleRes, memberAwards, memberProfileValues] = await Promise.all([
     signup?.role_id
       ? supabaseAdmin.from('roles').select('name, commitment, department_id, departments(name, icon)').eq('id', signup.role_id).single()
-      : none,
-    legacyEventId
-      ? supabaseAdmin.from('schedule_events').select('id, title, time, day').eq('id', legacyEventId).single()
       : none,
     member ? getMemberAwards(member.id) : [],
     member ? getMemberProfileValues(member.id) : ({} as Record<string, unknown>),
   ])
-  if (legacyEv) shiftMap.set(legacyEv.id, { id: legacyEv.id, title: legacyEv.title, time: legacyEv.time ?? null, day: legacyEv.day, lead: false })
 
   let signupData: { role: any; shifts: { id: string; title: string; time: string | null; day: string; lead: boolean }[] } | null = null
   if (signup || (heldRows ?? []).length > 0) {

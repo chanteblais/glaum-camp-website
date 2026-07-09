@@ -25,10 +25,7 @@ export type ScheduleEvent = {
   highlight: boolean
   is_recurring: boolean
   capacity: number | null
-  event_type: string | null
-  contribution_type: string | null
   event_date: string | null
-  event_category: string
   participation_type: 'general' | 'shift' | 'mandatory'
   shift_type_id: string | null
   requires_ack: boolean
@@ -44,10 +41,8 @@ export type ScheduleEvent = {
 // Shift types offered when an event is a Shift (Configure → Shift Types registry).
 export type ShiftTypeOption = { id: string; name: string }
 
-// One holder of a shift, from GET /api/admin/schedule/rosters (member_shift_signups
-// ∪ legacy camp_signups). legacy_only holds have no member_shift_signups row,
-// so the lead toggle can't touch them.
-export type RosterEntry = { clerk_user_id: string; application_id: string | null; name: string; role: 'member' | 'lead'; legacy_only: boolean; occurrence_date: string | null }
+// One holder of a shift, from GET /api/admin/schedule/rosters (member_shift_signups).
+export type RosterEntry = { clerk_user_id: string; application_id: string | null; name: string; role: 'member' | 'lead'; occurrence_date: string | null }
 
 // Weekday fallback order — only used to sort legacy UNDATED rows among themselves.
 const DAY_ORDER: Record<string, number> = {
@@ -86,7 +81,7 @@ function sortByTime(evs: ScheduleEvent[]): ScheduleEvent[] {
 
 const blank = (): Omit<ScheduleEvent, 'id' | 'sort_order'> => ({
   day: '', time: '', title: '', subtitle: '', detail_desc: '',
-  icon_type: '/asset-library/icons/star.webp', visible: true, highlight: false, is_recurring: false, capacity: null, event_type: null, contribution_type: null, event_date: null, event_category: 'at_camp', participation_type: 'general', shift_type_id: null, requires_ack: false, start_time: null, end_time: null, needs_lead: false, recurrence_days: null, show_on_schedule: true,
+  icon_type: '/asset-library/icons/star.webp', visible: true, highlight: false, is_recurring: false, capacity: null, event_date: null, participation_type: 'general', shift_type_id: null, requires_ack: false, start_time: null, end_time: null, needs_lead: false, recurrence_days: null, show_on_schedule: true,
 })
 
 const inputStyle: React.CSSProperties = {
@@ -548,17 +543,15 @@ function ShiftRosterLine({ event, entries, label, busyKey, onToggleLead }: {
           <span key={`${e.clerk_user_id}|${e.occurrence_date ?? ''}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
             <button
               onClick={() => onToggleLead(e)}
-              disabled={busy || e.legacy_only}
-              title={e.legacy_only
-                ? 'Legacy signup — manage from their member page'
-                : lead ? 'Demote to member' : 'Make shift lead ✦'}
+              disabled={busy}
+              title={lead ? 'Demote to member' : 'Make shift lead ✦'}
               style={{
                 background: 'none', borderRadius: '9999px', padding: '0.12rem 0.55rem',
                 fontSize: '0.68rem', whiteSpace: 'nowrap',
                 border: `1px solid ${lead ? 'rgba(200,168,72,0.45)' : 'rgba(255,255,255,0.12)'}`,
                 color: lead ? '#C8A848' : '#F3EDE6',
-                cursor: e.legacy_only ? 'default' : 'pointer',
-                opacity: busy ? 0.35 : e.legacy_only ? 0.45 : lead ? 0.95 : 0.65,
+                cursor: 'pointer',
+                opacity: busy ? 0.35 : lead ? 0.95 : 0.65,
               }}
             >
               {lead && <span style={{ marginRight: '0.3rem' }}>✦</span>}

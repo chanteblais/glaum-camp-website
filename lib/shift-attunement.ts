@@ -41,18 +41,18 @@ type ReqRow = {
 }
 
 export async function getMemberShiftState(clerkUserId: string): Promise<MemberShiftState> {
-  const [signupsRes, legacyRes, groupRes] = await Promise.all([
-    // Many-to-many holds (the redesign's table; 045 backfilled the legacy single).
+  const [signupsRes, roleRes, groupRes] = await Promise.all([
+    // Held shifts (member_shift_signups — the single source since 065).
     // occurrence_date names each held night — every night of a recurring shift
     // counts its own hours (it's a regular shift).
     supabaseAdmin
       .from('member_shift_signups')
       .select('schedule_event_id, occurrence_date')
       .eq('clerk_user_id', clerkUserId),
-    // Legacy single signup + the member's role (which may carry a requirement).
+    // The member's role (which may carry a requirement).
     supabaseAdmin
       .from('camp_signups')
-      .select('schedule_event_id, role_id, role_approval_status, roles(required_shift_type_id, required_shift_hours, shift_types:required_shift_type_id(name))')
+      .select('role_id, role_approval_status, roles(required_shift_type_id, required_shift_hours, shift_types:required_shift_type_id(name))')
       .eq('clerk_user_id', clerkUserId)
       .maybeSingle(),
     // Groups the member belongs to, with their optional requirement.
@@ -62,16 +62,12 @@ export async function getMemberShiftState(clerkUserId: string): Promise<MemberSh
       .eq('clerk_user_id', clerkUserId),
   ])
 
-  // ── Hours held: union of many-to-many + legacy single signup ──────────────
+  // ── Hours held ─────────────────────────────────────────────────────────────
   // Held OCCURRENCES, keyed (event, night). A recurring shift held for 2 nights
-  // is 2 occurrences = 2× hours. The legacy single hold is the null occurrence,
-  // deduped against a matching many-to-many row (045 backfill overlap).
+  // is 2 occurrences = 2× hours.
   const heldOcc = new Map<string, string>() // `${eventId}|${date??''}` → eventId
   for (const r of signupsRes.data ?? []) {
     if (r.schedule_event_id) heldOcc.set(`${r.schedule_event_id}|${(r.occurrence_date as string | null) ?? ''}`, r.schedule_event_id)
-  }
-  if (legacyRes.data?.schedule_event_id) {
-    heldOcc.set(`${legacyRes.data.schedule_event_id}|`, legacyRes.data.schedule_event_id)
   }
   const eventIds = new Set(Array.from(heldOcc.values()))
 
@@ -118,8 +114,8 @@ export async function getMemberShiftState(clerkUserId: string): Promise<MemberSh
     addReq(gm.groups as unknown as ReqRow, `group-${(gm.groups as unknown as { id?: string })?.id ?? 'unknown'}`)
   }
   // Role requirement only counts once the role is actually held (not pending).
-  if (legacyRes.data?.role_id && legacyRes.data.role_approval_status !== 'pending') {
-    addReq(legacyRes.data.roles as unknown as ReqRow, `role-${legacyRes.data.role_id}`)
+  if (roleRes.data?.role_id && roleRes.data.role_approval_status !== 'pending') {
+    addReq(roleRes.data.roles as unknown as ReqRow, `role-${roleRes.data.role_id}`)
   }
 
   const derivedShiftRequirements: DerivedShiftRequirement[] = Array.from(byType.entries()).map(
