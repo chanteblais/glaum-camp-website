@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabaseResizedUrl } from '@/lib/supabase-image'
-import { IconImage } from '@/components/IconImage'
+import { IconImage, ROUND_FILL } from '@/components/IconImage'
 import type { MemberOption } from './page'
 
 type Conversation = {
@@ -89,7 +89,7 @@ function Avatar({ avatarUrl, displayName, size = 44, icon, iconImage }: { avatar
     }}>
       {iconImage ? (
         // Group with uploaded icon art.
-        <IconImage src={iconImage} size="100%" fill={0.85} />
+        <IconImage src={iconImage} size="100%" fill={ROUND_FILL} />
       ) : icon !== undefined ? (
         // Group: show its icon glyph (falls back to ✦).
         <span aria-hidden="true" style={{ fontSize: size * 0.45 }}>{icon || '✦'}</span>
@@ -278,7 +278,7 @@ function FindGroupModal({ onClose, onJoined }: { onClose: () => void; onJoined: 
               <div key={g.id} role="listitem" style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', padding: '0.75rem 1.25rem', borderBottom: '1px solid rgba(200,168,72,0.06)' }}>
                 <div style={{ width: 36, height: 36, borderRadius: '50%', flexShrink: 0, border: '1px solid rgba(111,73,31,0.7)', background: 'rgba(200,168,72,0.08)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>
                   {g.icon_image
-                    ? <IconImage src={g.icon_image} size="100%" fill={0.85} />
+                    ? <IconImage src={g.icon_image} size="100%" fill={ROUND_FILL} />
                     : <span aria-hidden="true">{g.icon || '✦'}</span>}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
