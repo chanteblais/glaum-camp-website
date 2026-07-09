@@ -1,5 +1,5 @@
 import { auth } from '@clerk/nextjs/server'
-import { IconImage } from '@/components/IconImage'
+import { IconImage, ROUND_FILL } from '@/components/IconImage'
 import { redirect, notFound } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { Header } from '@/components/Header'
@@ -387,7 +387,7 @@ function IconMedallion({ icon, size = 44 }: { icon: string; size?: number }) {
       border: '1.5px solid #C07C26', fontSize: size >= 74 ? '1.85rem' : size >= 64 ? '1.55rem' : size >= 52 ? '1.3rem' : '1.1rem',
     }}>
       {isImageIcon(icon)
-        ? /* eslint-disable-next-line @next/next/no-img-element */ <IconImage src={icon} size="100%" fill={0.75} />
+        ? /* eslint-disable-next-line @next/next/no-img-element */ <IconImage src={icon} size="100%" fill={ROUND_FILL} />
         : icon}
     </span>
   )

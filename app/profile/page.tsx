@@ -1,5 +1,5 @@
 import { auth, currentUser } from '@clerk/nextjs/server'
-import { IconImage } from '@/components/IconImage'
+import { IconImage, ROUND_FILL } from '@/components/IconImage'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { RememberSignedIn } from '@/components/RememberSignedIn'
@@ -324,7 +324,7 @@ export default async function ProfilePage() {
           {roleInfo?.departments?.icon && !isImageIcon(roleInfo.departments.icon)
             ? <span style={{ fontSize: '2.1rem', lineHeight: 1 }}>{roleInfo.departments.icon}</span>
             // eslint-disable-next-line @next/next/no-img-element
-            : <IconImage src={isImageIcon(roleInfo?.departments?.icon) ? roleInfo!.departments!.icon! : '/handicon.png'} size="92%" fill={0.8} opacity={0.92} />}
+            : <IconImage src={isImageIcon(roleInfo?.departments?.icon) ? roleInfo!.departments!.icon! : '/handicon.png'} size="100%" fill={ROUND_FILL} opacity={0.92} />}
         </div>
       </div>
       <p style={{ fontSize: '0.64rem', letterSpacing: '0.34em', textTransform: 'uppercase', color: '#D239F8', marginBottom: '0.35rem', opacity: 0.85 }}>
