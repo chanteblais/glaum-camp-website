@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, type CSSProperties } from 'react'
-import { IconImage } from '@/components/IconImage'
+import { IconImage, ROUND_FILL } from '@/components/IconImage'
 import { SuggestRoleModal } from './SuggestRoleModal'
 import { isImageIcon } from '@/lib/icon-src'
 import { roleSlug } from '@/lib/role-slug'
@@ -189,7 +189,7 @@ function CurrentSignupCards({
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 {dept?.icon && (isImageIcon(dept.icon)
-                  ? <IconImage src={dept.icon} size="92%" fill={0.8} opacity={0.92} />
+                  ? <IconImage src={dept.icon} size="100%" fill={ROUND_FILL} opacity={0.92} />
                   : <span style={{ fontSize: '1.25rem', lineHeight: 1 }}>{dept?.icon ?? '✦'}</span>)}
               </div>
               <div style={{ minWidth: 0 }}>
@@ -643,7 +643,7 @@ function RolePicker({
               <span key={dept.id} className="role-seal">
                 <span className="role-seal-ring">
                   {dept.icon && isImageIcon(dept.icon)
-                    ? <IconImage src={dept.icon} size="92%" fill={0.8} opacity={0.92} />
+                    ? <IconImage src={dept.icon} size="100%" fill={ROUND_FILL} opacity={0.92} />
                     : <span className="role-seal-emoji">{dept.icon ?? '✦'}</span>}
                 </span>
                 <span style={{ fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.6, lineHeight: 1.3 }}>
