@@ -10,10 +10,10 @@
 // in from the other side of the airwaves. Client component so times and day
 // groupings read in the member's own clock; posts arrive server-fetched.
 
-import { useCallback, useMemo, type ReactNode } from 'react'
+import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { IconImage } from '@/components/IconImage'
 import { RadioMessage } from '@/components/RadioMessage'
-import type { RadioEventRow } from '@/lib/radio'
+import { RADIO_KIND_META, type RadioEventRow, type RadioKind } from '@/lib/radio'
 
 // The roster the feed needs to turn "@Name" into a profile-linked pill — the
 // same name-based match the post route uses to decide who got notified.
@@ -226,6 +226,13 @@ const FEED_CSS = `
   .radio-row-clock { font-size: 0.72rem; padding-top: 0.35rem; }
   .radio-day-section { margin-bottom: 1.5rem; }
   .radio-signoff { font-size: 0.85rem; margin: 2.5rem 0 0; }
+  /* Filter row — understated text chips, not pill buttons: a thin gold
+     underline marks the active kind, echoing the nav's active/dim contrast.
+     flex-wrap (not overflow-x scroll) so every kind stays reachable on
+     phones — the day-chip rail learned this lesson the hard way. */
+  .radio-filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 1.1rem; margin: 0 0 1.75rem; padding-bottom: 0.85rem; border-bottom: 1px solid rgba(200,168,72,0.12); }
+  .radio-filter-chip { background: none; border: none; border-bottom: 2px solid transparent; padding: 0.15rem 0.05rem; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; font-family: inherit; cursor: pointer; color: rgba(243,237,230,0.4); }
+  .radio-filter-chip.active { color: #C8A848; border-bottom-color: rgba(200,168,72,0.6); }
   @media (max-width: 640px) {
     .radio-row { padding: 0.65rem 0.05rem; gap: 0.65rem; }
     .radio-row-emblem { width: 1.7rem; font-size: 1.15rem; }
@@ -235,8 +242,36 @@ const FEED_CSS = `
     .radio-row-clock { font-size: 0.58rem; padding-top: 0.3rem; }
     .radio-day-section { margin-bottom: 1.1rem; }
     .radio-signoff { font-size: 0.72rem; margin: 1.75rem 0 0; }
+    .radio-filter-row { gap: 0.3rem 0.7rem; margin-bottom: 1.2rem; padding-bottom: 0.65rem; }
+    .radio-filter-chip { font-size: 0.6rem; }
   }
 `
+
+const KIND_FILTERS = Object.entries(RADIO_KIND_META) as [RadioKind, { emoji: string; label: string }][]
+
+function RadioFilterRow({ value, onChange }: { value: 'all' | RadioKind; onChange: (v: 'all' | RadioKind) => void }) {
+  return (
+    <div className="radio-filter-row" role="group" aria-label="Filter the feed by kind">
+      <button
+        type="button"
+        className={`radio-filter-chip${value === 'all' ? ' active' : ''}`}
+        onClick={() => onChange('all')}
+      >
+        All
+      </button>
+      {KIND_FILTERS.map(([kind, meta]) => (
+        <button
+          key={kind}
+          type="button"
+          className={`radio-filter-chip${value === kind ? ' active' : ''}`}
+          onClick={() => onChange(kind)}
+        >
+          <span aria-hidden>{meta.emoji}</span> {meta.label}
+        </button>
+      ))}
+    </div>
+  )
+}
 
 export function RadioFeed({ events, members = [], currentUserId = null }: {
   events: RadioEventRow[]
@@ -244,6 +279,7 @@ export function RadioFeed({ events, members = [], currentUserId = null }: {
   currentUserId?: string | null
 }) {
   const renderMentions = useMentionRenderer(members, currentUserId)
+  const [filter, setFilter] = useState<'all' | RadioKind>('all')
 
   if (events.length === 0) {
     return (
@@ -253,9 +289,13 @@ export function RadioFeed({ events, members = [], currentUserId = null }: {
     )
   }
 
+  // Client-side filter over the already-fetched feed — getRadioFeed() loads
+  // the full latest-60 in one shot, so there's no pagination to coordinate with.
+  const filtered = filter === 'all' ? events : events.filter(e => e.kind === filter)
+
   // Group into day sections, newest first (posts already arrive sorted).
   const sections: { label: string; items: RadioEventRow[] }[] = []
-  for (const e of events) {
+  for (const e of filtered) {
     const label = dayLabel(e.created_at)
     const last = sections[sections.length - 1]
     if (last && last.label === label) last.items.push(e)
@@ -265,33 +305,41 @@ export function RadioFeed({ events, members = [], currentUserId = null }: {
   return (
     <div>
       <style dangerouslySetInnerHTML={{ __html: FEED_CSS }} />
-      {sections.map(section => (
-        <section key={section.label} className="radio-day-section">
-          <h2
-            style={{
-              fontSize: '0.72rem',
-              letterSpacing: '0.2em',
-              textTransform: 'uppercase',
-              color: '#C8A848',
-              opacity: 0.8,
-              margin: '0 0 0.25rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.85rem',
-            }}
-          >
-            {section.label}
-            <span aria-hidden style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(200,168,72,0.35), rgba(200,168,72,0.08))' }} />
-            <span aria-hidden style={{ color: '#C8A848', opacity: 0.7, fontSize: '0.8rem' }}>✦</span>
-          </h2>
+      <RadioFilterRow value={filter} onChange={setFilter} />
 
-          <div>
-            {section.items.map((e, i) => (
-              <RadioRow key={e.id} e={e} last={i === section.items.length - 1} renderMentions={renderMentions} />
-            ))}
-          </div>
-        </section>
-      ))}
+      {filtered.length === 0 ? (
+        <p style={{ textAlign: 'center', opacity: 0.4, fontSize: '0.85rem', padding: '2rem 0' }}>
+          No {RADIO_KIND_META[filter as RadioKind]?.label.toLowerCase() ?? 'moments'} yet.
+        </p>
+      ) : (
+        sections.map(section => (
+          <section key={section.label} className="radio-day-section">
+            <h2
+              style={{
+                fontSize: '0.72rem',
+                letterSpacing: '0.2em',
+                textTransform: 'uppercase',
+                color: '#C8A848',
+                opacity: 0.8,
+                margin: '0 0 0.25rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.85rem',
+              }}
+            >
+              {section.label}
+              <span aria-hidden style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(200,168,72,0.35), rgba(200,168,72,0.08))' }} />
+              <span aria-hidden style={{ color: '#C8A848', opacity: 0.7, fontSize: '0.8rem' }}>✦</span>
+            </h2>
+
+            <div>
+              {section.items.map((e, i) => (
+                <RadioRow key={e.id} e={e} last={i === section.items.length - 1} renderMentions={renderMentions} />
+              ))}
+            </div>
+          </section>
+        ))
+      )}
 
       {/* Sign-off */}
       <p

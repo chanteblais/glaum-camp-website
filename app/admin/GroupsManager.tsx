@@ -35,6 +35,7 @@ type Collection = {
 
 type RosterMember = {
   clerk_user_id: string
+  application_id: string | null
   source: string
   first_name: string | null
   last_name: string | null
@@ -203,7 +204,7 @@ function Roster({ groupId, members }: { groupId: string; members: AssignableMemb
     })
     if (res.ok) {
       setRoster(prev => [...(prev ?? []), {
-        clerk_user_id: m.clerk_user_id, source: 'admin',
+        clerk_user_id: m.clerk_user_id, application_id: null, source: 'admin',
         first_name: m.displayName, last_name: null, preferred_name: null, email: m.email, status: 'approved',
       }])
       setQuery('')
@@ -231,7 +232,16 @@ function Roster({ groupId, members }: { groupId: string; members: AssignableMemb
             return (
               <div key={m.clerk_user_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', padding: '0.5rem 0.75rem', borderRadius: '0.5rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(200,168,72,0.08)' }}>
                 <div style={{ minWidth: 0 }}>
-                  <p style={{ fontSize: '0.85rem', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</p>
+                  {m.application_id ? (
+                    <a
+                      href={`/admin/${m.application_id}`}
+                      style={{ fontSize: '0.85rem', margin: 0, color: GOLD, opacity: 0.75, textDecoration: 'none', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                    >
+                      {name}
+                    </a>
+                  ) : (
+                    <p style={{ fontSize: '0.85rem', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</p>
+                  )}
                   {m.email && <p style={{ fontSize: '0.7rem', opacity: 0.4, margin: 0 }}>{m.email}</p>}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>

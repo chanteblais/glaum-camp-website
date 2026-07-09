@@ -108,7 +108,13 @@ Two things ride on a post:
 ## Surfaces
 
 - **`/radio`** — members-only. Hero + stats band → composer → Now/Up-next
-  strip → the feed (day-grouped rows, newest first, latest 60).
+  strip → a kind filter row (All + one chip per kind, understated text with a
+  thin gold underline on the active kind, not pill buttons) → the feed
+  (day-grouped rows, newest first, latest 60). The filter is client-side over
+  the already-fetched 60 (`RadioFeed.tsx`, shipped 2026-07-08) — no new fetch,
+  since the feed already loads everything in one shot. Kind labels/emoji come
+  from `RADIO_KIND_META` (`lib/radio.ts`), the one place both the filter and
+  any future UI should read them from.
 - **Now / Up next strip** — derived at read time, never stored: the camp-day
   welcome ("Day 2 of camp") while today is inside
   `config_event_start_date…end_date`, plus what's happening now and the next
@@ -151,7 +157,6 @@ notify pattern). Default off.
 - Rule-derived distinction earns (daily diff job on the cron)
 - "Still needed" nudges ("🪑 Decor still needs two rugs") and event-start
   posts as stored moments (the strip covers "now" live)
-- Kind filters on `/radio`
 - Optional push for flagged broadcasts (post-PWA-notifications decision)
 
 ## Radio voices vs Shoutouts (decided 2026-07-03: they stay separate)

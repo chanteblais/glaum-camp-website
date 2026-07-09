@@ -106,7 +106,7 @@ export function MembersDropdown({ members }: { members: Member[] }) {
                   }}
                 >
                   <div>
-                    <p style={{ fontSize: '0.85rem', margin: 0, opacity: 0.9 }}>{m.displayName}</p>
+                    <a href={`/admin/${m.id}`} style={{ fontSize: '0.85rem', margin: 0, color: '#C8A848', opacity: 0.85, textDecoration: 'none', display: 'block' }}>{m.displayName}</a>
                     <p style={{ fontSize: '0.72rem', margin: 0, opacity: 0.4 }}>{m.email}</p>
                   </div>
                   <div style={{ display: 'flex', gap: '0.35rem', flexShrink: 0 }}>

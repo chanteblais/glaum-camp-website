@@ -1,5 +1,5 @@
 import { supabaseAdmin } from './supabase'
-import { memberDisplayNames } from './member-names'
+import { memberDisplayNames, applicationIdsByClerkId } from './member-names'
 import { fetchShiftHolds } from './shift-signups'
 import type { ScheduleEvent, ShiftTypeOption, RosterEntry } from '@/app/admin/ScheduleManager'
 import type { LeadUpEvent } from '@/app/admin/LeadUpGatheringsManager'
@@ -69,13 +69,17 @@ export async function getAdminRosters(): Promise<Record<string, RosterEntry[]>> 
   }
 
   const allIds = Array.from(byEvent.values()).flatMap(h => Array.from(h.values()).map(v => v.clerk_user_id))
-  const names = await memberDisplayNames(allIds)
+  const [names, applicationIds] = await Promise.all([
+    memberDisplayNames(allIds),
+    applicationIdsByClerkId(allIds),
+  ])
 
   const rosters: Record<string, RosterEntry[]> = {}
   byEvent.forEach((holders, eventId) => {
     rosters[eventId] = Array.from(holders.values())
       .map(h => ({
         clerk_user_id: h.clerk_user_id,
+        application_id: applicationIds[h.clerk_user_id] ?? null,
         name: names[h.clerk_user_id] ?? 'Unknown member',
         role: h.role,
         legacy_only: h.legacy_only,

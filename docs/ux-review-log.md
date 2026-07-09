@@ -7,6 +7,38 @@ Newest review at the top. Fixes are only applied once agreed.
 
 ---
 
+## A5 second half — 2026-07-08 (`feat/roster-links-radio-filters`)
+
+**Status: fixed.** Member names across the admin console now link to their
+`/admin/[id]` dossier, matching the gold/subtle style already used by
+`VolunteersSection`'s "View full application →" link. `/admin/[id]` keys on
+`applications.id`, not `clerk_user_id` or `members.id` — surfaces that only
+had a `clerk_user_id` needed a small join added to thread the id through:
+
+- **Group rosters** (`GroupsManager.tsx` `Roster`) — `GET
+  /api/admin/groups/[id]/members` now also selects `applications.id` and
+  returns it as `application_id`; the roster name is a link when present.
+- **Shift rosters** (`ScheduleManager.tsx` `ShiftRosterLine`) — each holder
+  chip is already the lead-toggle button, so a small ↗ affordance was added
+  beside the name instead of overloading the click handler. `getAdminRosters`
+  (`lib/admin-program-data.ts`) resolves `application_id` via a new shared
+  helper, `applicationIdsByClerkId` (`lib/member-names.ts`), alongside the
+  existing `memberDisplayNames`.
+- **Overview** (`MemberPills`, `MembersDropdown`) — the `id` was already
+  selected by the page's `applications` query; this was UI-only.
+- ~~Shared Resources claimants~~ — obsolete before it landed: the admin
+  resources console (`ResourcesManager.tsx`) was removed the same day when
+  Shared Resources pivoted to member-owned authoring on `/participate`, so
+  there is no admin claimant surface to link from.
+
+Not covered this round (found during the sweep, out of the four listed
+surfaces — flagged for a follow-up pass if it still bothers her):
+`AdminsManager`/`PollManagersManager` (Configure) name rows, and the
+`RoleRequestsSection`/`RoleSuggestionsSection` applicant names, which need a
+similar small join added at their data source.
+
+---
+
 ## Review — 2026-07-03 (mobile pass: full site at ~390px, fixes applied same day on `ux/mobile-overflow`)
 
 Method: browser window clamps at 512px, so true phone width was tested via a
@@ -107,7 +139,8 @@ Chanté asked for the handoff brief's work to begin. Tier A shipped this round
 
 **Deferred to next round:** A4 (sticky scroll-spy section sidebar), A5's second half
 (member names elsewhere linking consistently to `/admin/[id]` — rosters need ids
-plumbed), and all of Tier B (queue mode first).
+plumbed — **fixed 2026-07-08**, see "A5 second half" above), and all of Tier B
+(queue mode first).
 
 ---
 
