@@ -82,7 +82,7 @@ export default async function MemberPage({ params }: { params: { id: string } })
     const { data: volunteer } = isUuid
       ? await supabaseAdmin
           .from('volunteers')
-          .select('id, first_name, preferred_name, pronouns, avatar_url, submitted_at')
+          .select('id, first_name, preferred_name, pronouns, avatar_url, created_at')
           .eq('status', 'active')
           .eq('id', params.id)
           .maybeSingle()
@@ -465,10 +465,10 @@ function CalendarGlyph() {
 // (portrait, name, pronouns), with the shared pill relabelled VOLUNTEER.
 // Volunteers carry no roles/groups/distinctions, so the page is the hero alone.
 function VolunteerProfile({ volunteer }: {
-  volunteer: { id: string; first_name: string | null; preferred_name: string | null; pronouns: string | null; avatar_url: string | null; submitted_at: string | null }
+  volunteer: { id: string; first_name: string | null; preferred_name: string | null; pronouns: string | null; avatar_url: string | null; created_at: string | null }
 }) {
   const displayName = volunteer.preferred_name || volunteer.first_name || 'Volunteer'
-  const sinceYear = volunteer.submitted_at ? new Date(volunteer.submitted_at).getFullYear() : null
+  const sinceYear = volunteer.created_at ? new Date(volunteer.created_at).getFullYear() : null
 
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflow: 'hidden' }}>

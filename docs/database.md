@@ -121,14 +121,17 @@ One row per outside volunteer (non-member who signs up to help).
 | Column | Type | Notes |
 |---|---|---|
 | `id` | UUID PK | |
-| `submitted_at` | TIMESTAMPTZ | |
+| `created_at` | TIMESTAMPTZ | ⚠️ NOT `submitted_at` (that's `applications`) — a wrong row here caused the 2026-07-09 volunteer-profile 404 |
 | `first_name` | TEXT NOT NULL | Max 50 chars |
 | `last_name` | TEXT NOT NULL | Max 50 chars |
 | `preferred_name` | TEXT | |
 | `pronouns` | TEXT | |
 | `email` | TEXT NOT NULL | |
 | `phone` | TEXT NOT NULL | |
+| `avatar_url` | TEXT | Written by `/api/profile/avatar` for signed-in volunteers; shown on `/members` + the volunteer profile |
 | `signup_intent` | TEXT[] | What they want to help with |
+| `days_available` / `preferred_times` / `shift_interests` / `role_interests` | TEXT[] | Availability + interest signals from the signup form (surfaced in Admin → Volunteers and the volunteer's own `/profile`) |
+| `other_notes` / `specific_interests` / `special_skills` / `brings_to_glaum` / `why_contribute` / `familiar_with_glaum` | TEXT | Free-text signup answers |
 | `status` | TEXT | `pending` / `active` / `cancelled` / `removed` |
 | `clerk_user_id` | TEXT | |
 | `dues_paid_at` / `dues_paid_by` / `dues_note` | TIMESTAMPTZ / TEXT / TEXT | Migration `069`. Camp-dues state when the dues audience includes volunteers (`config_dues`). **Admin-tracked only** — volunteers have no self-serve dues surface, so there's no `dues_reported_at` counterpart. Mirrors the member dues columns (`067`). |
