@@ -1,5 +1,6 @@
 import { supabaseAdmin } from './supabase'
 import { memberDisplayNames } from './member-names'
+import { fetchShiftHolds } from './shift-signups'
 import type { ScheduleEvent, ShiftTypeOption, RosterEntry } from '@/app/admin/ScheduleManager'
 import type { LeadUpEvent } from '@/app/admin/LeadUpGatheringsManager'
 import type { AdminRadioEvent } from '@/app/admin/RadioManager'
@@ -36,15 +37,13 @@ export async function getAdminShiftTypes(): Promise<ShiftTypeRow[]> {
 // Who holds each shift, for the admin schedule editor's per-event roster.
 // Holds = member_shift_signups (carries the lead role) ∪ the legacy
 // camp_signups.schedule_event_id (members only), deduped per (member, event) —
-// the same union as fetchAllHolds in app/api/shift-signups/route.ts, so the
-// admin count always agrees with the member-facing "N signed up".
+// the query is shared with the Overview shift-hours ledger (lib/shift-signups.ts
+// fetchShiftHolds, also the union fetchAllHolds in app/api/shift-signups/route.ts
+// mirrors), so the admin count always agrees with the member-facing "N signed up".
 // legacy_only marks holds with no member_shift_signups row: set_shift_role
 // (PATCH /api/admin/signups/[userId]) can't promote those.
 export async function getAdminRosters(): Promise<Record<string, RosterEntry[]>> {
-  const [{ data: many }, { data: legacy }] = await Promise.all([
-    supabaseAdmin.from('member_shift_signups').select('clerk_user_id, schedule_event_id, occurrence_date, role'),
-    supabaseAdmin.from('camp_signups').select('clerk_user_id, schedule_event_id').not('schedule_event_id', 'is', null),
-  ])
+  const { many, legacy } = await fetchShiftHolds()
 
   // Each night of a recurring shift is its own roster: hold identity is
   // (event, occurrence, member). Rosters stay keyed by event; the entry carries

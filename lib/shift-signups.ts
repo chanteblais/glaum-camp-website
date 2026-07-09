@@ -18,3 +18,22 @@ export async function getShiftEventByUser(): Promise<Record<string, string | nul
   }
   return map
 }
+
+export type ShiftHoldRow = { clerk_user_id: string; schedule_event_id: string; occurrence_date: string | null; role: string | null }
+export type LegacyShiftHoldRow = { clerk_user_id: string; schedule_event_id: string }
+
+// Raw hold rows from both signup tables — the same two queries the admin
+// Overview (shift-hours ledger) and Manage (per-shift roster) each used to run
+// separately. Callers build their own grouping on top (occurrence maps, role
+// display, etc.); this just guarantees the query + the "which rows count as a
+// hold" filter (camp_signups rows with no event don't) are defined once.
+export async function fetchShiftHolds(): Promise<{ many: ShiftHoldRow[]; legacy: LegacyShiftHoldRow[] }> {
+  const [{ data: many }, { data: legacy }] = await Promise.all([
+    supabaseAdmin.from('member_shift_signups').select('clerk_user_id, schedule_event_id, occurrence_date, role'),
+    supabaseAdmin.from('camp_signups').select('clerk_user_id, schedule_event_id').not('schedule_event_id', 'is', null),
+  ])
+  return {
+    many: (many ?? []) as ShiftHoldRow[],
+    legacy: (legacy ?? []) as LegacyShiftHoldRow[],
+  }
+}

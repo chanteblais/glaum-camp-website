@@ -2,6 +2,8 @@ import { supabaseAdmin } from './supabase'
 import { shiftDurationHours } from './shift-hours'
 import { parseAttunementTasks } from './site-config'
 import { eventRangeDays, shiftOccurrenceCount, shiftOccurrenceDates } from './shift-occurrences'
+import { fetchShiftHolds } from './shift-signups'
+import { getSuspendedClerkUserIds, isSuspended } from './admin-counts'
 
 // Community-wide shift-hours rollup for the admin Overview, built from shift
 // events' real durations × member_shift_signups ∪ the legacy camp_signups
@@ -16,10 +18,14 @@ import { eventRangeDays, shiftOccurrenceCount, shiftOccurrenceDates } from './sh
 //
 // The section is framed as the organizer's supply-vs-demand ledger:
 //   PROMISED (supply) — what members collectively owe by requirement: the
-//     universal attunement 'shift' tasks (every approved member) merged with
-//     group/role requirements (required_shift_type_id + required_shift_hours),
-//     max per type per member, mirroring attunement's rule (being in two
-//     things that both want teardown means the bigger ask, not both).
+//     universal attunement 'shift' tasks (every approved, non-suspended member)
+//     merged with group/role requirements (required_shift_type_id +
+//     required_shift_hours), max per type per member, mirroring attunement's
+//     rule (being in two things that both want teardown means the bigger ask,
+//     not both). Suspended members are excluded — same rule as the attunement
+//     nudge (lib/attunement-nudge.ts) and Overview's other participation
+//     counts (lib/admin-counts.ts); a released commitment shouldn't still
+//     read as "owed" here (bug fixed in the Tier B4 counts unification).
 //   TO FILL (demand) — spot-hours the schedule opens: occurrences × duration
 //     × capacity, counted ONLY for shifts with a set capacity (an uncapped
 //     shift has no defined demand, so it's reported as a count, never hours).
@@ -47,7 +53,7 @@ export type ShiftHoursOverview = {
   totalFilledHours: number
   totalSignups: number
   memberCount: number // distinct members holding ≥1 shift
-  approvedMemberCount: number // approved members the promised math ranges over
+  approvedMemberCount: number // approved, non-suspended members the promised math ranges over
   slotCount: number
   cappedSlots: number
   emptySlots: number
@@ -58,10 +64,10 @@ export async function getShiftHoursOverview(): Promise<ShiftHoursOverview> {
   const [
     { data: shiftTypes },
     { data: events },
-    { data: signups },
-    { data: legacy },
+    { many: signups, legacy },
     { data: configRows },
     { data: approvedRows },
+    suspendedClerkIds,
     { data: groupRows },
     { data: groupMemberRows },
     { data: roleRows },
@@ -72,16 +78,16 @@ export async function getShiftHoursOverview(): Promise<ShiftHoursOverview> {
       .from('schedule_events')
       .select('id, shift_type_id, start_time, end_time, capacity, event_date, is_recurring, recurrence_days')
       .eq('participation_type', 'shift'),
-    supabaseAdmin.from('member_shift_signups').select('clerk_user_id, schedule_event_id, occurrence_date'),
-    supabaseAdmin
-      .from('camp_signups')
-      .select('clerk_user_id, schedule_event_id')
-      .not('schedule_event_id', 'is', null),
+    // Shared with the Manage-side roster (lib/admin-program-data.ts
+    // getAdminRosters) so "who holds this shift" can never disagree.
+    fetchShiftHolds(),
     supabaseAdmin
       .from('page_content')
       .select('key, value')
       .in('key', ['config_event_start_date', 'config_event_end_date', 'config_attunement_tasks']),
     supabaseAdmin.from('applications').select('clerk_user_id').eq('status', 'approved').not('clerk_user_id', 'is', null),
+    // Shared with Manage + Overview's other counts (lib/admin-counts.ts).
+    getSuspendedClerkUserIds(),
     supabaseAdmin.from('groups').select('id, required_shift_type_id, required_shift_hours').not('required_shift_type_id', 'is', null),
     supabaseAdmin.from('group_members').select('clerk_user_id, group_id'),
     supabaseAdmin.from('roles').select('id, required_shift_type_id, required_shift_hours').not('required_shift_type_id', 'is', null),
@@ -103,8 +109,8 @@ export async function getShiftHoursOverview(): Promise<ShiftHoursOverview> {
   // into the many-to-many table, so overlap is expected.
   const occKey = (eventId: string, date: string | null) => `${eventId}::${date ?? ''}`
   const holdersByOcc = new Map<string, Set<string>>()
-  for (const s of [...(signups ?? []).map(r => ({ ...r, occurrence_date: r.occurrence_date as string | null })),
-                   ...(legacy ?? []).map(r => ({ ...r, occurrence_date: null as string | null }))]) {
+  for (const s of [...signups.map(r => ({ ...r, occurrence_date: r.occurrence_date as string | null })),
+                   ...legacy.map(r => ({ ...r, occurrence_date: null as string | null }))]) {
     if (!s.schedule_event_id || !eventById.has(s.schedule_event_id)) continue
     const key = occKey(s.schedule_event_id, s.occurrence_date)
     const set = holdersByOcc.get(key) ?? new Set<string>()
@@ -183,7 +189,14 @@ export async function getShiftHoursOverview(): Promise<ShiftHoursOverview> {
     if (cs.role_approval_status !== 'pending') roleByUser.set(cs.clerk_user_id, cs.role_id as string)
   }
 
-  for (const a of approvedRows ?? []) {
+  // Suspended members have released every commitment (063) — they owe nothing
+  // while paused, same rule as the attunement nudge. Bug fix: this used to
+  // range over every approved member regardless of suspension, so a paused
+  // member's requirement still inflated "Hours Promised" even though the
+  // Participation section above already excluded them.
+  const promisedRows = (approvedRows ?? []).filter(a => !isSuspended(a.clerk_user_id, suspendedClerkIds))
+
+  for (const a of promisedRows) {
     const userId = a.clerk_user_id as string
     const owed = new Map(universalOwed)
     const raise = (r: Req | undefined | null) => {
@@ -223,7 +236,7 @@ export async function getShiftHoursOverview(): Promise<ShiftHoursOverview> {
     totalFilledHours: round(types.reduce((a, t) => a + t.filledHours, 0)),
     totalSignups: types.reduce((a, t) => a + t.signupCount, 0),
     memberCount: members.size,
-    approvedMemberCount: (approvedRows ?? []).length,
+    approvedMemberCount: promisedRows.length,
     slotCount: types.reduce((a, t) => a + t.slotCount, 0),
     cappedSlots: types.reduce((a, t) => a + t.cappedSlots, 0),
     emptySlots: types.reduce((a, t) => a + t.emptySlots, 0),

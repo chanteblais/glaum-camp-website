@@ -8,6 +8,7 @@ import { AdminNav } from '@/app/admin/AdminNav'
 import { MembersDropdown } from './MembersDropdown'
 import { getGroupNamesByUser } from '@/lib/groups'
 import { getShiftEventByUser } from '@/lib/shift-signups'
+import { getSuspendedClerkUserIds, isSuspended } from '@/lib/admin-counts'
 import { getShiftHoursOverview } from '@/lib/shift-hours-overview'
 import { shiftHue } from '@/lib/shift-colors'
 import { getAttentionItems, getAdminRunway } from '@/lib/admin-attention'
@@ -68,7 +69,7 @@ export default async function OverviewPage() {
     groupNamesByUser,
     { data: groupRows },
     { data: applications },
-    { data: suspendedRows },
+    suspendedClerkIds,
     { data: signups },
     { data: volunteers },
     { data: notifications },
@@ -87,12 +88,9 @@ export default async function OverviewPage() {
       .order('submitted_at', { ascending: false }),
     // Suspended members (migration 063) — excluded from every participation
     // count below and surfaced in their own box, so paused commitments don't
-    // muddy the organizer's numbers.
-    supabaseAdmin
-      .from('members')
-      .select('clerk_user_id')
-      .eq('status', 'approved')
-      .not('suspended_at', 'is', null),
+    // muddy the organizer's numbers. Shared with Manage (lib/admin-counts.ts)
+    // so "who is suspended" can never drift between tabs.
+    getSuspendedClerkUserIds(),
     supabaseAdmin
       .from('camp_signups')
       .select('clerk_user_id, role_id, role_approval_status'),
@@ -118,12 +116,8 @@ export default async function OverviewPage() {
   const all = applications ?? []
   // Suspended members are approved but paused — kept out of the participation
   // math and shown in their own box (migration 063). Matched by clerk_user_id.
-  const suspendedClerkIds = new Set(
-    (suspendedRows ?? []).map(r => r.clerk_user_id).filter((id): id is string => !!id)
-  )
-  const isSuspended = (a: { clerk_user_id?: string | null }) => !!a.clerk_user_id && suspendedClerkIds.has(a.clerk_user_id)
   const approvedAll = all.filter(a => a.status === 'approved')
-  const approved = approvedAll.filter(a => !isSuspended(a))
+  const approved = approvedAll.filter(a => !isSuspended(a.clerk_user_id, suspendedClerkIds))
   const suspendedCount = approvedAll.length - approved.length
   const pending = all.filter(a => a.status === 'pending')
   const activeVolunteers = volunteers ?? []
