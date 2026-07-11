@@ -645,7 +645,9 @@ export function ScheduleManager({ rangeStart, rangeEnd, initialEvents, initialSh
   rangeEnd?: string
   // Server-rendered pages pass these (docs/architecture.md → Auth → "Server-
   // rendered section data") so the manager paints populated; the mount fetches
-  // below run only when a prop is absent. The API routes stay the refresh path.
+  // below run only when a prop is absent — except shift types, which always
+  // refresh (they're authored on another tab, so the prop can be stale).
+  // The API routes stay the refresh path.
   initialEvents?: ScheduleEvent[]
   initialShiftTypes?: ShiftTypeOption[]
   initialRosters?: Record<string, RosterEntry[]>
@@ -694,13 +696,20 @@ export function ScheduleManager({ rangeStart, rangeEnd, initialEvents, initialSh
 
   useEffect(() => { if (initialEvents === undefined) load() }, [])
 
-  useEffect(() => {
-    if (initialShiftTypes !== undefined) return
+  // Shift types are authored on a different tab (Configure), so the
+  // server-rendered list can be stale — Next's router cache prefetches this
+  // page before the type is added. Always refetch: on mount (silent refresh
+  // behind the server-rendered first paint) and again whenever the add/edit
+  // modal opens, so the dropdown is fresh at the moment it's used. A failed
+  // refresh keeps whatever list we already have.
+  const refreshShiftTypes = () => {
     fetch('/api/admin/shift-types')
       .then(r => r.json())
       .then(d => setShiftTypes((d.shiftTypes ?? []).map((t: ShiftTypeOption) => ({ id: t.id, name: t.name }))))
-      .catch(() => setShiftTypes([]))
-  }, [])
+      .catch(() => {})
+  }
+  useEffect(() => { refreshShiftTypes() }, [])
+  useEffect(() => { if (modal) refreshShiftTypes() }, [modal !== null])
 
   useEffect(() => {
     if (initialRosters !== undefined) return
