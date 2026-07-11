@@ -190,7 +190,8 @@ Harmless to leave; mildly confusing to future debugging if kept.
 ### Content note
 
 - Form field label "Space Requrements" (member-facing, apply form) — typo for
-  "Space Requirements"; fix in the Application Builder (labels rename safely).
+  "Space Requirements". **Fixed 2026-07-11** — renamed in the prod Application
+  Builder (What If Plans section); label edits rename safely.
 
 ---
 
