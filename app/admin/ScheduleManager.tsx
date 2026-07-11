@@ -675,6 +675,9 @@ export function ScheduleManager({ rangeStart, rangeEnd, initialEvents, initialSh
   const [saving, setSaving] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
   const [moveError, setMoveError] = useState<string | null>(null)
+  // Row-action failures (delete / visibility toggle) outside the modal — the
+  // modal shows modalError, the week grid shows moveError.
+  const [actionError, setActionError] = useState<string | null>(null)
   const draggedId = useRef<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({})
@@ -772,7 +775,16 @@ export function ScheduleManager({ rangeStart, rangeEnd, initialEvents, initialSh
       danger: true,
     })
     if (!ok) return false
-    await fetch(`/api/admin/schedule/${id}`, { method: 'DELETE' })
+    setActionError(null)
+    const res = await fetch(`/api/admin/schedule/${id}`, { method: 'DELETE' }).catch(() => null)
+    if (!res?.ok) {
+      const data = res ? await res.json().catch(() => ({})) : {}
+      const msg = data.error ?? 'Something went wrong — the event was not deleted.'
+      // Deleting from the edit modal keeps it open, so the error belongs there.
+      if (modal) setModalError(msg)
+      else setActionError(msg)
+      return false
+    }
     setEvents((prev) => prev.filter((e) => e.id !== id))
     return true
   }
@@ -802,10 +814,16 @@ export function ScheduleManager({ rangeStart, rangeEnd, initialEvents, initialSh
   }
 
   const handleToggleVisible = async (event: ScheduleEvent) => {
-    await fetch(`/api/admin/schedule/${event.id}`, {
+    setActionError(null)
+    const res = await fetch(`/api/admin/schedule/${event.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ visible: !event.visible }),
-    })
+    }).catch(() => null)
+    if (!res?.ok) {
+      const data = res ? await res.json().catch(() => ({})) : {}
+      setActionError(data.error ?? 'Something went wrong — visibility was not changed.')
+      return
+    }
     setEvents((prev) => prev.map((e) => e.id === event.id ? { ...e, visible: !e.visible } : e))
   }
 
@@ -956,6 +974,10 @@ export function ScheduleManager({ rangeStart, rangeEnd, initialEvents, initialSh
           </button>
         </div>
       </div>
+
+      {actionError && (
+        <p style={{ color: '#ff8a8a', fontSize: '0.78rem', margin: '0 0 0.85rem' }}>{actionError}</p>
+      )}
 
       {/* Week view — day columns × hour axis; click empty slot to add there,
           drag a block to move it to a new time/day */}

@@ -4,6 +4,37 @@ Running record of QA sweeps: what was tested, what was fixed, and — most
 useful for the next tester — what is *known and deliberate* so it doesn't get
 re-reported, plus where the remaining risk lives. Newest sweep first.
 
+## Fix 2026-07-10 — admin delete/toggle silent failures (branch `fix/silent-admin-errors`)
+
+Companion to `fix/volunteer-action-errors` (same day): its "known and
+deliberate" note flagged the same discarded-`await fetch` shape in three more
+admin managers. This branch closes them all — six handlers across
+`ScheduleManager`, `AnnouncementsManager`, and `LeadUpGatheringsManager`.
+
+### Fixed
+
+- **Schedule event delete + visibility toggle**, **announcement delete +
+  visibility toggle**, and **lead-up gathering delete + visibility toggle**
+  now check the response (`.catch(() => null)` + `!res?.ok`, so network
+  errors count too) and show the API's `error` (or a fallback) as an inline
+  red line — a new `actionError` above the list/grid in each manager, in the
+  `moveError` / `MemberSignupCard` style. The optimistic local-state update
+  only runs on success, so a failed delete no longer vanishes the row and a
+  failed toggle no longer flips the dot.
+- **Schedule delete routes the error to where the click happened**: the edit
+  modal is the only delete path from the week grid and stays open on failure,
+  so a failure there lands in the modal's existing `modalError`; a list-row ✕
+  uses the page-level `actionError` banner.
+
+### Known and deliberate
+
+- These six were the audit's full list; the managers' create/edit (modal)
+  paths already surfaced errors via `modalError`, and drag-move via
+  `moveError`.
+- `ScheduleManager`'s recurring-rows drag-reorder (`handleDropRecurring`)
+  still fire-and-forgets its `sort_order` PATCHes — lowest-stakes write in
+  the file (pure ordering, self-heals on next reorder), left as is.
+
 ## Fix 2026-07-10 — volunteer approve/decline silent failures (branch `fix/volunteer-action-errors`)
 
 Prompted by a real prod incident (2026-07-10): an admin approved a volunteer,
@@ -28,7 +59,8 @@ had failed and nothing said so.
 
 - The same discarded-`await fetch` shape still exists in ScheduleManager,
   AnnouncementsManager, and LeadUpGatheringsManager (delete/update handlers) —
-  spun off as its own task rather than folded into this fix.
+  spun off as its own task rather than folded into this fix. *(Closed the
+  same day by `fix/silent-admin-errors`, above.)*
 
 ## Sweep 2026-07-08 — apply-wizard QA fixes (branch `fix/apply-wizard-qa`)
 
