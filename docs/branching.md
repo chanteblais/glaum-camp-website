@@ -87,6 +87,27 @@ Rules:
    view of main: keep that worktree **detached** (`git fetch && git checkout
    --detach origin/main` to refresh) — never park the branch itself.
 
+## Commit guards (pre-commit hook, added 2026-07-11)
+
+A versioned hook at `.githooks/pre-commit` (active via `core.hooksPath =
+.githooks`, already set in this checkout; a **fresh clone** must run
+`git config core.hooksPath .githooks` once — worktrees inherit it and carry
+their own checkout of the hook). It enforces two things:
+
+1. **No `.claude/` bookkeeping in commits** (only `launch.json` is allowed —
+   everything else in `.claude/` is also gitignored). Session/routine state
+   (worktrees, the qa-sentry bookmark) must never be sweepable.
+2. **No direct commits to `main`.** This is the crossed-session tripwire: a
+   session that thinks it's in another repo (glaum-ca!) lands here on `main`
+   and stops loudly instead of committing. Normal `--no-ff` merges to `main`
+   are unaffected (they don't run `pre-commit`). A deliberate rule-5 tiny
+   tweak overrides with `GLAUM_ALLOW_MAIN=1 git commit …`.
+
+Motivating incidents: the 2026-07-08 `git add -A` sweep (above) and 2026-07-10,
+when a glaum-ca session committed here with a crossed cwd — the commit captured
+the then-untracked qa-sentry bookmark and shipped it to `main` under a glaum.ca
+commit message. (`git commit --no-verify` bypasses hooks; don't.)
+
 ## Claude sessions
 
 **Every session branches before its first edit.** As soon as a session knows it
@@ -116,7 +137,8 @@ with `--no-ff` after verification (tsc + click-through), delete the branch, and
   leave the push to Chante.
 
 Rule-5 tiny tweaks (log updates, one-line doc fixes) may still go straight to
-`main`.
+`main` — the pre-commit guard asks for `GLAUM_ALLOW_MAIN=1` on those so a
+crossed session can't do it by accident.
 
 ## Day-to-day cheat sheet
 

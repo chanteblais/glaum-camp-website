@@ -1,0 +1,40 @@
+#!/bin/sh
+# Guards against crossed-session commits (see docs/branching.md → Commit guards).
+#
+# Two real incidents motivated this:
+#   2026-07-08 — a foreign `git add -A` on shared main swept in gitlink junk.
+#   2026-07-10 — a glaum-ca session committed here with a crossed cwd; the only
+#                content it found was .claude/qa-sentry-last-sha, which shipped
+#                to main under a glaum.ca commit message.
+#
+# Active because core.hooksPath = .githooks (set once per clone:
+#   git config core.hooksPath .githooks
+# ). Worktrees share the config and carry their own checkout of this file.
+
+# 1. Never commit .claude/ session/routine bookkeeping (launch.json excepted).
+#    It's gitignored too — this catches force-adds and historical stragglers.
+#    Deletions are allowed (removing a straggler IS the cleanup direction).
+staged_claude=$(git diff --cached --name-only --diff-filter=d | grep '^\.claude/' | grep -v '^\.claude/launch\.json$')
+if [ -n "$staged_claude" ]; then
+  echo "✗ Commit includes .claude/ session bookkeeping — almost certainly swept in by accident:" >&2
+  echo "$staged_claude" | sed 's/^/    /' >&2
+  echo "  Unstage with: git restore --staged .claude/" >&2
+  exit 1
+fi
+
+# 2. No direct commits to main (main = deployable; work happens on branches —
+#    docs/branching.md). This is the crossed-session tripwire: a session that
+#    thinks it's in another repo lands here on main and stops loudly.
+#    Deliberate tiny tweaks: GLAUM_ALLOW_MAIN=1 git commit …
+#    (--no-ff merges to main use the pre-merge-commit hook path, not this one,
+#    so the normal merge flow is unaffected.)
+branch=$(git symbolic-ref --quiet --short HEAD)
+if [ "$branch" = "main" ] && [ -z "$GLAUM_ALLOW_MAIN" ]; then
+  echo "✗ Direct commit to main in glaum-camp-website blocked." >&2
+  echo "  Working on another project (glaum-ca?) — then your cwd is crossed: this is the CAMP repo." >&2
+  echo "  Meant to commit here? Use a branch (docs/branching.md), or for a deliberate tiny tweak:" >&2
+  echo "    GLAUM_ALLOW_MAIN=1 git commit …" >&2
+  exit 1
+fi
+
+exit 0
