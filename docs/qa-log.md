@@ -4,6 +4,32 @@ Running record of QA sweeps: what was tested, what was fixed, and — most
 useful for the next tester — what is *known and deliberate* so it doesn't get
 re-reported, plus where the remaining risk lives. Newest sweep first.
 
+## Fix 2026-07-10 — volunteer approve/decline silent failures (branch `fix/volunteer-action-errors`)
+
+Prompted by a real prod incident (2026-07-10): an admin approved a volunteer,
+the page refreshed, and the row silently stayed pending — the approve API call
+had failed and nothing said so.
+
+### Fixed
+
+- **Volunteer approve/decline/remove now surface failures** — all three
+  handlers in `VolunteersSection` (pending-row Approve + Decline, Helping
+  Hands Remove) check the response (`.catch(() => null)` + `!res?.ok`, so
+  network errors count too), show the API's `error` (or a fallback) as an
+  inline red line above the action buttons — the `MemberSignupCard` pattern —
+  and reset the busy flag so the button is usable again. `router.refresh()`
+  only fires on success.
+- **Volunteer approve route no longer 500s on a committed approval** — the
+  Clerk `getUser` in the notify block is now try/caught (mirroring the member
+  approve route), so a deleted/unknown Clerk account degrades to a skipped
+  email instead of reporting failure for an approval that already landed.
+
+### Known and deliberate
+
+- The same discarded-`await fetch` shape still exists in ScheduleManager,
+  AnnouncementsManager, and LeadUpGatheringsManager (delete/update handlers) —
+  spun off as its own task rather than folded into this fix.
+
 ## Sweep 2026-07-08 — apply-wizard QA fixes (branch `fix/apply-wizard-qa`)
 
 Three items pulled off the 2026-07-03 "still open" list.

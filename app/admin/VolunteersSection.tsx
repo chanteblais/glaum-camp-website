@@ -168,6 +168,7 @@ function PendingVolunteerRow({ volunteer }: { volunteer: Volunteer }) {
   const [expanded, setExpanded] = useState(false)
   const [approving, setApproving] = useState(false)
   const [removing, setRemoving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const { confirm, confirmDialog } = useConfirm()
 
@@ -176,7 +177,14 @@ function PendingVolunteerRow({ volunteer }: { volunteer: Volunteer }) {
 
   const handleApprove = async () => {
     setApproving(true)
-    await fetch(`/api/admin/volunteer/${volunteer.id}/approve`, { method: 'POST' })
+    setError(null)
+    const res = await fetch(`/api/admin/volunteer/${volunteer.id}/approve`, { method: 'POST' }).catch(() => null)
+    if (!res?.ok) {
+      const data = res ? await res.json().catch(() => ({})) : {}
+      setError(data.error ?? 'Something went wrong — they are still pending.')
+      setApproving(false)
+      return
+    }
     router.refresh()
   }
 
@@ -189,7 +197,14 @@ function PendingVolunteerRow({ volunteer }: { volunteer: Volunteer }) {
     })
     if (!ok) return
     setRemoving(true)
-    await fetch(`/api/admin/volunteer/${volunteer.id}`, { method: 'DELETE' })
+    setError(null)
+    const res = await fetch(`/api/admin/volunteer/${volunteer.id}`, { method: 'DELETE' }).catch(() => null)
+    if (!res?.ok) {
+      const data = res ? await res.json().catch(() => ({})) : {}
+      setError(data.error ?? 'Something went wrong — they are still pending.')
+      setRemoving(false)
+      return
+    }
     router.refresh()
   }
 
@@ -258,6 +273,7 @@ function PendingVolunteerRow({ volunteer }: { volunteer: Volunteer }) {
             )}
           </div>
 
+          {error && <p style={{ color: '#ff8a8a', fontSize: '0.8rem', textAlign: 'right', marginBottom: '0.75rem' }}>{error}</p>}
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
             <button
               onClick={handleRemove}
@@ -287,6 +303,7 @@ function PendingVolunteerRow({ volunteer }: { volunteer: Volunteer }) {
 function VolunteerRow({ volunteer }: { volunteer: Volunteer }) {
   const [expanded, setExpanded] = useState(false)
   const [removing, setRemoving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const { confirm, confirmDialog } = useConfirm()
 
@@ -298,7 +315,14 @@ function VolunteerRow({ volunteer }: { volunteer: Volunteer }) {
     })
     if (!ok) return
     setRemoving(true)
-    await fetch(`/api/admin/volunteer/${volunteer.id}`, { method: 'DELETE' })
+    setError(null)
+    const res = await fetch(`/api/admin/volunteer/${volunteer.id}`, { method: 'DELETE' }).catch(() => null)
+    if (!res?.ok) {
+      const data = res ? await res.json().catch(() => ({})) : {}
+      setError(data.error ?? 'Something went wrong — they were not removed.')
+      setRemoving(false)
+      return
+    }
     router.refresh()
   }
 
@@ -387,6 +411,7 @@ function VolunteerRow({ volunteer }: { volunteer: Volunteer }) {
               <p style={{ fontSize: '0.85rem', opacity: 0.75, lineHeight: 1.6 }}>{volunteer.other_notes}</p>
             </div>
           )}
+          {error && <p style={{ color: '#ff8a8a', fontSize: '0.8rem', textAlign: 'right', marginBottom: '0.75rem' }}>{error}</p>}
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button
               onClick={handleRemove}
