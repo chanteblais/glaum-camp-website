@@ -39,7 +39,7 @@ type WeekViewEvent = {
   recurrence_days: string[] | null
 }
 
-type RosterEntry = { role: 'member' | 'lead' }
+type RosterEntry = { role: 'member' | 'lead'; occurrence_date: string | null }
 
 const PX_PER_HOUR = 56
 const GOLD = '#C8A848'
@@ -221,16 +221,21 @@ export function ScheduleWeekView({ events, days, shiftTypes, rosters, onEdit, on
     onPointerCancel: () => { dragRef.current = null; setDrag(null) },
   })
 
-  const block = (ev: WeekViewEvent, ghost: boolean, lane = 0, lanes = 1) => {
+  const block = (ev: WeekViewEvent, ghost: boolean, dayIso: string, lane = 0, lanes = 1) => {
     const { start, end } = eventMinutes(ev)
     if (start == null) return null
     const h = hue(ev, shiftIndex)
     const top = ((start / 60) - START_HOUR) * PX_PER_HOUR
     const endMin = end ?? start + 45
     const height = Math.max((Math.min(endMin, END_HOUR * 60) - start) / 60 * PX_PER_HOUR, 26)
-    const roster = rosters[ev.id]
-    const n = roster?.length ?? 0
-    const noLead = ev.participation_type === 'shift' && ev.needs_lead && n > 0 && !roster?.some(r => r.role === 'lead')
+    // Each night of a recurring shift is its own regular shift — count only the
+    // holds on this column's night (non-recurring holds carry occurrence NULL),
+    // matching how the member-facing picker keys holds (lib/participate-data.ts).
+    const roster = (rosters[ev.id] ?? []).filter(r =>
+      ev.is_recurring ? r.occurrence_date === dayIso : r.occurrence_date == null,
+    )
+    const n = roster.length
+    const noLead = ev.participation_type === 'shift' && ev.needs_lead && n > 0 && !roster.some(r => r.role === 'lead')
     const width = 100 / lanes
     const beingDragged = !ghost && drag?.id === ev.id
     return (
@@ -340,8 +345,8 @@ export function ScheduleWeekView({ events, days, shiftTypes, rosters, onEdit, on
                     ))}
                     {/* Recurring — ghosted context in each column the event repeats on
                         (recurrence_days NULL = every day) */}
-                    {recurring.filter(ev => !ev.recurrence_days || ev.recurrence_days.includes(day.iso)).map(ev => block(ev, true))}
-                    {dayEvents.map(({ e }) => block(e, false, lanes[e.id]?.lane ?? 0, lanes[e.id]?.lanes ?? 1))}
+                    {recurring.filter(ev => !ev.recurrence_days || ev.recurrence_days.includes(day.iso)).map(ev => block(ev, true, day.iso))}
+                    {dayEvents.map(({ e }) => block(e, false, day.iso, lanes[e.id]?.lane ?? 0, lanes[e.id]?.lanes ?? 1))}
                     {/* Drag preview — the block's landing spot, live times in the corner */}
                     {drag && drag.dayIdx === dayIdx && (() => {
                       const ev = dated.find(e => e.id === drag.id)
