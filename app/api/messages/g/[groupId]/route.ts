@@ -6,6 +6,8 @@ import {
   getOrCreateGroupConversation,
   isGroupMember,
   markConversationRead,
+  visibleToFilter,
+  SYSTEM_SENDER,
 } from '@/lib/conversations'
 import { getApprovedMember } from '@/lib/members'
 import { getNotificationPreferences } from '@/lib/notification-prefs'
@@ -45,6 +47,9 @@ export async function GET(_req: Request, { params }: { params: { groupId: string
     .from('messages')
     .select('id, sender_clerk_id, body, created_at, sender_name, parent_message_id')
     .eq('conversation_id', convId)
+    // Ordinary messages plus MY private system notes (the group welcome) —
+    // other members' welcome notes stay invisible.
+    .or(visibleToFilter(userId))
     .order('created_at', { ascending: true })
 
   if (error) {
@@ -114,15 +119,17 @@ export async function POST(req: Request, { params }: { params: { groupId: string
   const convId = existingConvId ?? await getOrCreateGroupConversation(params.groupId)
 
   // Replies are one level deep: a parent must be a top-level message in this
-  // conversation (you can't reply to a reply).
+  // conversation (you can't reply to a reply). System notes (the private
+  // welcome) can't be replied to either — a reply would be public while its
+  // parent is invisible to everyone else.
   let parent_message_id: string | null = null
   if (parentMessageId) {
     const { data: parent } = await supabaseAdmin
       .from('messages')
-      .select('id, conversation_id, parent_message_id')
+      .select('id, conversation_id, parent_message_id, sender_clerk_id')
       .eq('id', parentMessageId)
       .maybeSingle()
-    if (!parent || parent.conversation_id !== convId || parent.parent_message_id !== null) {
+    if (!parent || parent.conversation_id !== convId || parent.parent_message_id !== null || parent.sender_clerk_id === SYSTEM_SENDER) {
       return NextResponse.json({ error: 'Invalid parent message' }, { status: 400 })
     }
     parent_message_id = parentMessageId

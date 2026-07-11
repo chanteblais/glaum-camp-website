@@ -429,17 +429,18 @@ Messages in both **direct (1:1)** and **group** threads. Originally 1:1 only (mi
 |---|---|---|
 | `id` | UUID PK | Auto-generated |
 | `conversation_id` | UUID FK → `conversations.id` ON DELETE CASCADE | The thread this message belongs to. Added in `033`; backfilled for existing DMs. |
-| `sender_clerk_id` | TEXT NOT NULL | Sender's Clerk user ID |
+| `sender_clerk_id` | TEXT NOT NULL | Sender's Clerk user ID. **`'system'`** (sentinel, `SYSTEM_SENDER` in `lib/conversations.ts`) marks a system-authored note — currently the per-member group welcome (`071`). |
 | `recipient_clerk_id` | TEXT | The other party in a **direct** message. **Now nullable** (`033`) — NULL for group messages. Vestigial; kept for legacy DM reads, dropped in a later cleanup. |
 | `parent_message_id` | UUID FK → `messages.id` ON DELETE CASCADE | Reply support (`033`). NULL = top-level; set = a reply in that message's thread. **One level only** — replies can't have replies (enforced in the group POST route). Used by group threads. |
 | `body` | TEXT NOT NULL | Message content. Max 2,000 chars (DB-enforced CHECK) |
 | `sender_name` | TEXT | Snapshot of the sender's display name (`preferred_name`/`first_name`) at send time. Added in migration `032`. Lets a thread keep a readable name after the sender's application is deleted; used as a fallback by the inbox + thread when no profile resolves. |
 | `read_at` | TIMESTAMPTZ | **DM-era column.** Per-message read flag for 1:1. Read state is now tracked per-participant on `conversation_participants.last_read_at` (groups can't use a single row-level flag); the DM thread derives `read`/`read_at` from the recipient's `last_read_at`. |
 | `created_at` | TIMESTAMPTZ NOT NULL | Defaults to NOW() |
+| `visible_to` | TEXT | **Per-member visibility** (`071`). NULL = a normal message every participant sees; set to a clerk id = a **private system note** only that member sees — used for the group **welcome note** ("Welcome to X! ✦ …", inserted on every `group_members` add + backfilled for existing memberships, deleted again on removal so a re-add re-welcomes). Every member-facing message reader filters via `visibleToFilter()` in `lib/conversations.ts` (thread GET, inbox summaries, unread count). |
 
-Indexed on `(conversation_id, created_at)`, plus the original `(recipient_clerk_id, …)` / `(sender_clerk_id, …)` indexes.
+Indexed on `(conversation_id, created_at)`, plus the original `(recipient_clerk_id, …)` / `(sender_clerk_id, …)` indexes, plus a partial index on `visible_to` (`071`).
 
-**Privacy:** direct messages are private to the two parties; group messages are visible to group members only. Admins have no special read access. No FK to `applications` — join in JS using `clerk_user_id`.
+**Privacy:** direct messages are private to the two parties; group messages are visible to group members only (and `visible_to` notes to their addressee only). Admins have no special read access. No FK to `applications` — join in JS using `clerk_user_id`.
 
 ---
 
@@ -611,6 +612,7 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `068_dues_self_report.sql` | **Dues self-report.** Adds `members.dues_reported_at`: a member marks that they've sent their e-transfer (`/api/dues/report`), creating an "awaiting review" state the admin confirms (→ `dues_paid_at`) or dismisses. Self-report counts as done for the member's attunement checklist so they aren't nudged after paying. Additive + idempotent, non-destructive. *(Was 066 on the branch.)* |
 | `069_volunteer_dues.sql` | **Volunteer dues (audience option).** Adds `dues_paid_at` / `dues_paid_by` / `dues_note` to `volunteers`, so `config_dues.audience` can include volunteers (admin-tracked only — no self-report/attunement surface). Mirrors the member dues columns. Additive + idempotent, non-destructive. *(Was 067 on the branch.)* |
 | `070_resource_list_dashboard.sql` | **Member-owned resources: dashboard opt-in.** Adds `resource_lists.show_on_dashboard` (BOOL NOT NULL DEFAULT false). The home "Bring Something" widget renders a compact row per list, but only for lists a member has opted in (default off, toggled in the list editor on `/participate`). Distinct from `visible` (participate board). Additive + idempotent, non-destructive. *(Numbered 070 — next free after main's 066–069; `065` stays reserved by the in-flight shifts-legacy-drop branch.)* |
+| `071_group_welcome.sql` | **Per-member group welcome notes.** Adds `messages.visible_to` (TEXT, NULL = normal message; set = private system note only that member sees) + partial index; inserts any missing group conversations; **backfills one private welcome note per existing group membership** so every current member gets the "you're in this group" unread nudge retroactively. System notes use `sender_clerk_id = 'system'`. Additive + idempotent, non-destructive. **Two-part apply** (file is sectioned): Part A (schema) *before* deploy — the new readers filter on the column; Part B (backfill) *after* deploy — the old code doesn't filter `visible_to`, so earlier backfill would briefly show everyone's welcomes publicly. |
 
 ---
 

@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { sendUserEmail } from '@/lib/send-email'
 import { requireAdmin } from '@/lib/admin-auth'
 import { setMemberStatus } from '@/lib/members'
+import { deleteGroupWelcome } from '@/lib/conversations'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const userId = await requireAdmin()
@@ -70,6 +71,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         .from('group_members')
         .delete()
         .eq('clerk_user_id', application.clerk_user_id),
+      // All their private group welcome notes go with the memberships.
+      deleteGroupWelcome(application.clerk_user_id),
     ])
 
     // Notify the removed member

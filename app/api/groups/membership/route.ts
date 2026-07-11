@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getSelfJoinGroups } from '@/lib/participate-data'
 import { getApprovedMember } from '@/lib/members'
+import { sendGroupWelcome, deleteGroupWelcome } from '@/lib/conversations'
 
 // Member-facing self-service for opt-in groups (e.g. Setup / Teardown / Decor).
 // A group is self-joinable iff its collection has self_join = true. This is a
@@ -72,10 +73,14 @@ export async function POST(req: NextRequest) {
   }
 
   if (joined) {
-    const { error } = await supabaseAdmin
+    const { data: inserted, error } = await supabaseAdmin
       .from('group_members')
       .upsert({ group_id, clerk_user_id: userId, source: 'application' }, { onConflict: 'group_id,clerk_user_id', ignoreDuplicates: true })
+      .select('clerk_user_id')
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    // Fresh membership → private welcome note in the group thread (their unread
+    // badge confirms the join and points them at the thread).
+    if ((inserted ?? []).length > 0) await sendGroupWelcome(group_id, userId)
   } else {
     const { error } = await supabaseAdmin
       .from('group_members')
@@ -83,6 +88,8 @@ export async function POST(req: NextRequest) {
       .eq('group_id', group_id)
       .eq('clerk_user_id', userId)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    // Clear the welcome note so a later re-join welcomes freshly.
+    await deleteGroupWelcome(userId, group_id)
   }
 
   return NextResponse.json({ success: true, joined })
