@@ -1,5 +1,5 @@
 import { supabaseAdmin } from './supabase'
-import { getMyConversations, findDirectConversation } from './conversations'
+import { getMyConversations, findDirectConversation, visibleToFilter } from './conversations'
 
 // Read-side helpers for the messages UI, shared by the API routes and the
 // server pages. The pages call these directly so the inbox / thread renders
@@ -40,11 +40,13 @@ export async function getInboxConversations(userId: string): Promise<InboxConver
 
   // The three lookups only depend on the conversation list — run them together.
   const [msgsRes, groupsRes, profilesRes] = await Promise.all([
-    // All messages across my conversations, newest first.
+    // All messages across my conversations that I may see (ordinary messages
+    // plus my own private welcome notes), newest first.
     supabaseAdmin
       .from('messages')
       .select('conversation_id, sender_clerk_id, body, created_at, sender_name')
       .in('conversation_id', convs.map(c => c.conversationId))
+      .or(visibleToFilter(userId))
       .order('created_at', { ascending: false }),
     // Group names/icons.
     groupIds.length

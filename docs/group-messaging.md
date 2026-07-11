@@ -38,6 +38,15 @@ The shipped build follows this design; a few details were refined during impleme
   **Mute** = excluded from the unread badge (mentions still notify). **email_opt_in** fan-out is
   throttled **per conversation** (only fires when the thread was quiet for the window), so a
   burst yields one nudge, not per-message email — no per-recipient tracking needed.
+- **Welcome note (2026-07-10, migration `071`).** Every `group_members` insert (admin add, self-join
+  via `/participate` or Find-a-group, apply-time `group_select`) also drops a **private system
+  note** into the group thread: `messages.visible_to` = the new member, `sender_clerk_id =
+  'system'`. Only they see it, it lands unread, so the message badge tells them they're in the
+  group — consistent with quiet-by-default (no email, no notification rows, nothing for existing
+  members). All member-facing message readers filter through `visibleToFilter()`; replying to a
+  system note is rejected (its parent would be invisible to everyone else). Removal paths call
+  `deleteGroupWelcome` so a later re-add produces a fresh unread welcome. The migration backfilled
+  a welcome for every existing membership (the retroactive "you're in this group" nudge).
 - Code: `lib/conversations.ts`; `app/api/messages/g/[groupId]/{route,read}`; `app/messages/g/[groupId]/{page,GroupThreadClient}`; inbox changes in `lib/inbox.ts` (summary logic, shared by `app/api/messages/route.ts` and the server-rendered `/messages` page) + `MessagesInboxClient.tsx`; `sendGroupMentionEmail` in `lib/send-email.ts`; `group_mention` link in `UserNotificationBell`.
 
 ## Decisions already made

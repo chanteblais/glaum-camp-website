@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { notifyAdmin } from '@/lib/notify-admin'
 import { upsertMember } from '@/lib/members'
 import { parseProfileFields, storedFields, applicationFields, coerceProfileValue } from '@/lib/profile-fields'
+import { sendGroupWelcome } from '@/lib/conversations'
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth()
@@ -160,10 +161,14 @@ export async function POST(req: NextRequest) {
           .filter(g => allowAll || explicitIds.has(g.id))
           .map(g => ({ group_id: g.id, clerk_user_id: userId, source: 'application' }))
         if (rows.length > 0) {
-          const { error: gmError } = await supabaseAdmin
+          const { data: insertedRows, error: gmError } = await supabaseAdmin
             .from('group_members')
             .upsert(rows, { onConflict: 'group_id,clerk_user_id', ignoreDuplicates: true })
+            .select('group_id')
           if (gmError) console.error('group_members insert error:', gmError)
+          // Private welcome note per fresh membership — sits unread until the
+          // applicant is approved and can open their inbox.
+          await Promise.all((insertedRows ?? []).map(r => sendGroupWelcome(r.group_id, userId)))
         }
       }
     }

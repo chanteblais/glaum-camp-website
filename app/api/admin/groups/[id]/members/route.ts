@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { requireAdmin } from '@/lib/admin-auth'
+import { sendGroupWelcome, deleteGroupWelcome } from '@/lib/conversations'
 
 // GET — roster for a group, enriched with each member's application info.
 // No FK between group_members and applications, so we join in JS by clerk_user_id.
@@ -51,14 +52,20 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const { clerk_user_id } = await req.json()
   if (!clerk_user_id) return NextResponse.json({ error: 'clerk_user_id is required' }, { status: 400 })
 
-  const { error } = await supabaseAdmin
+  const { data: inserted, error } = await supabaseAdmin
     .from('group_members')
     .upsert(
       { group_id: params.id, clerk_user_id, source: 'admin' },
       { onConflict: 'group_id,clerk_user_id', ignoreDuplicates: true },
     )
+    .select('clerk_user_id')
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Fresh membership (not an idempotent re-add) → private welcome note in the
+  // group thread, so the member's unread badge tells them they're in the group.
+  if ((inserted ?? []).length > 0) await sendGroupWelcome(params.id, clerk_user_id)
+
   return NextResponse.json({ success: true })
 }
 
@@ -76,5 +83,9 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     .eq('clerk_user_id', clerkUserId)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Clear the member's private welcome note so a later re-add welcomes freshly.
+  await deleteGroupWelcome(clerkUserId, params.id)
+
   return NextResponse.json({ success: true })
 }

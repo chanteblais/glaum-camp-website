@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { findGroupConversation } from '@/lib/conversations'
+import { findGroupConversation, deleteGroupWelcome } from '@/lib/conversations'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,7 +28,8 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     .eq('clerk_user_id', userId)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Clean up my participant row so read/mute state doesn't linger.
+  // Clean up my participant row so read/mute state doesn't linger, and my
+  // private welcome note so a later re-join welcomes freshly.
   const convId = await findGroupConversation(params.id)
   if (convId) {
     await supabaseAdmin
@@ -37,6 +38,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       .eq('conversation_id', convId)
       .eq('clerk_user_id', userId)
   }
+  await deleteGroupWelcome(userId, params.id)
 
   return NextResponse.json({ success: true })
 }

@@ -90,6 +90,74 @@ export async function getOrCreateGroupConversation(groupId: string): Promise<str
   return data.id
 }
 
+// Sentinel sender for system-authored notes (the per-member group welcome).
+// Not a clerk id, so profile resolution simply finds no profile for it and
+// unread counting treats it like any other-party sender.
+export const SYSTEM_SENDER = 'system'
+
+// PostgREST .or() filter limiting message reads to what this user may see:
+// ordinary messages (visible_to IS NULL) plus their own private system notes.
+// Every message reader that serves a member must apply this (thread GET,
+// inbox summaries, unread count) — requires migration 071.
+export function visibleToFilter(userId: string): string {
+  return `visible_to.is.null,visible_to.eq.${userId}`
+}
+
+// Drop a private welcome note into the group's thread for a newly added member.
+// Only that member sees it (visible_to), and it lands unread, so the message
+// badge makes them aware of the membership — quiet otherwise: no email, no
+// notification rows, invisible to everyone else. Idempotent per (group, member);
+// removal paths delete the note (deleteGroupWelcome) so a re-add re-welcomes.
+// Best-effort: a failure here must never block the membership write it follows.
+// Keep the body in sync with the migration 071 backfill.
+export async function sendGroupWelcome(groupId: string, userId: string): Promise<void> {
+  try {
+    const [{ data: group }, convId] = await Promise.all([
+      supabaseAdmin.from('groups').select('name').eq('id', groupId).maybeSingle(),
+      getOrCreateGroupConversation(groupId),
+    ])
+    if (!group) return
+    const { data: existing } = await supabaseAdmin
+      .from('messages')
+      .select('id')
+      .eq('conversation_id', convId)
+      .eq('sender_clerk_id', SYSTEM_SENDER)
+      .eq('visible_to', userId)
+      .limit(1)
+    if (existing?.length) return
+    await supabaseAdmin.from('messages').insert({
+      conversation_id: convId,
+      sender_clerk_id: SYSTEM_SENDER,
+      sender_name: group.name,
+      body: `Welcome to ${group.name}! ✦ You're a member of this group — this is its message thread.`,
+      visible_to: userId,
+    })
+  } catch (err) {
+    console.error('[group welcome] failed:', err)
+  }
+}
+
+// Remove a member's private welcome note(s) — called by every path that deletes
+// group_members rows, so a later re-add produces a fresh (unread) welcome.
+// Omit groupId to clear across all groups (member removal / rejection).
+export async function deleteGroupWelcome(userId: string, groupId?: string): Promise<void> {
+  try {
+    let query = supabaseAdmin
+      .from('messages')
+      .delete()
+      .eq('sender_clerk_id', SYSTEM_SENDER)
+      .eq('visible_to', userId)
+    if (groupId) {
+      const convId = await findGroupConversation(groupId)
+      if (!convId) return
+      query = query.eq('conversation_id', convId)
+    }
+    await query
+  } catch (err) {
+    console.error('[group welcome] cleanup failed:', err)
+  }
+}
+
 export async function isGroupMember(groupId: string, userId: string): Promise<boolean> {
   const { data } = await supabaseAdmin
     .from('group_members')
@@ -228,6 +296,7 @@ export async function getUnreadCount(userId: string): Promise<number> {
     .select('conversation_id, created_at')
     .in('conversation_id', convs.map(c => c.conversationId))
     .neq('sender_clerk_id', userId)
+    .or(visibleToFilter(userId)) // others' private welcome notes don't count
   if (oldestCursor) query = query.gt('created_at', oldestCursor)
   const { data: msgs } = await query
   if (!msgs?.length) return 0

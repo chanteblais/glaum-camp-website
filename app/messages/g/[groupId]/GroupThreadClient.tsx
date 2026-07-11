@@ -483,6 +483,24 @@ export function GroupThreadClient({ currentUserId, groupId, groupName, groupIcon
         )}
 
         {topLevel.map((msg, i) => {
+          // Private system note (the group welcome). The API only returns these
+          // to the member they address ('system' is the sentinel sender — not a
+          // clerk id; kept literal here so this client bundle doesn't import
+          // server-only lib/conversations). Centered ceremonial note: no bubble,
+          // no avatar, no reply affordance.
+          if (msg.sender_clerk_id === 'system') {
+            return (
+              <div key={msg.id} style={{ textAlign: 'center', margin: '1.4rem 0', padding: '0 1rem' }}>
+                <p style={{ color: '#C8A848', fontSize: '0.88rem', fontStyle: 'italic', lineHeight: 1.55, margin: 0 }}>
+                  {msg.body}
+                </p>
+                <p style={{ fontSize: '0.65rem', opacity: 0.35, margin: '0.3rem 0 0', letterSpacing: '0.05em' }}>
+                  Only visible to you
+                </p>
+              </div>
+            )
+          }
+
           const isMe = msg.sender_clerk_id === currentUserId
           const prev = i > 0 ? topLevel[i - 1] : null
           const showTime = !prev || new Date(msg.created_at).getTime() - new Date(prev.created_at).getTime() > 5 * 60 * 1000

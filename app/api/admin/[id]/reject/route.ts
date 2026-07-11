@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { sendUserEmail } from '@/lib/send-email'
 import { setMemberStatus } from '@/lib/members'
 import { requireAdmin } from '@/lib/admin-auth'
+import { deleteGroupWelcome } from '@/lib/conversations'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const userId = await requireAdmin()
@@ -35,12 +36,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   await setMemberStatus(application?.clerk_user_id ?? null, params.id, 'rejected')
 
   // Revoke apply-time group opt-ins — group_members grants group-thread access
-  // and roster presence, which a rejected applicant shouldn't keep.
+  // and roster presence, which a rejected applicant shouldn't keep. Their
+  // private group welcome notes go with the memberships.
   if (application?.clerk_user_id) {
     await supabaseAdmin
       .from('group_members')
       .delete()
       .eq('clerk_user_id', application.clerk_user_id)
+    await deleteGroupWelcome(application.clerk_user_id)
   }
 
   // Notify the applicant
