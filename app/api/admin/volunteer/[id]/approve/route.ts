@@ -36,8 +36,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       details: {},
     }])
 
-    const clerkUser = await client.users.getUser(volunteer.clerk_user_id)
-    const email = clerkUser.emailAddresses[0]?.emailAddress
+    // A deleted / unknown Clerk account must not turn the (already committed)
+    // approval into a 500 — skip the email instead.
+    let email: string | undefined
+    try {
+      const clerkUser = await client.users.getUser(volunteer.clerk_user_id)
+      email = clerkUser.emailAddresses[0]?.emailAddress
+    } catch {
+      email = undefined
+    }
     if (email) {
       await sendUserEmail(
         email,
