@@ -4,6 +4,29 @@ Running record of QA sweeps: what was tested, what was fixed, and — most
 useful for the next tester — what is *known and deliberate* so it doesn't get
 re-reported, plus where the remaining risk lives. Newest sweep first.
 
+## Fix 2026-07-10 — admin week view counted signups across all nights (branch `fix/weekview-per-night-counts`)
+
+Prompted by a real report (2026-07-10): the participate picker showed the
+Jul 25 Glåüm Salon night shift as "5 of 5 open · needs a lead" while the admin
+week grid showed "1/5 signed up" for the same night — the one hold was actually
+a lead on Jul 23.
+
+### Fixed
+
+- **Week-grid shift blocks now count per night** — `ScheduleWeekView`'s block
+  read `rosters[event.id]` (the whole event's holders, all nights merged), so
+  every night of a recurring shift showed the event-total count. The block now
+  filters the roster to its column's date (`occurrence_date === day.iso` for
+  recurring, `occurrence_date == null` for dated one-offs), matching how holds
+  are keyed everywhere else (`lib/participate-data.ts`). The "✦ no lead" flag
+  reads the same filtered roster, so a lead on one night no longer masks a
+  lead-less other night.
+
+### Known and deliberate
+
+- The list view was already correct — `ShiftRoster` breaks out one line per
+  night with its own count/lead state.
+
 ## Fix 2026-07-10 — volunteer approve/decline silent failures (branch `fix/volunteer-action-errors`)
 
 Prompted by a real prod incident (2026-07-10): an admin approved a volunteer,
