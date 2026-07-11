@@ -8,6 +8,8 @@ Glåüm is the first community on the platform.
 
 > **Sibling track:** [`mobile-companion.md`](./mobile-companion.md) — the future mobile app is "just another client" of the same backend. It needs the same foundation this roadmap builds (API boundary, server-side logic, config over hardcoding); there is no separate mobile workstream.
 
+> **Commercial track:** [`business.md`](./business.md) — the living record of the business-launch conversation: mission/success tiers, the seasonality analysis, market segments beyond burn camps, and pricing directions. This roadmap answers *how* the platform generalizes; that doc answers *for whom and on what terms*.
+
 ---
 
 ## Guiding principles
