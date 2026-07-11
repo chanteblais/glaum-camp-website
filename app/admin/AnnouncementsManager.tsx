@@ -141,6 +141,8 @@ export function AnnouncementsManager() {
   const [modal, setModal] = useState<{ mode: 'add' } | { mode: 'edit'; item: Announcement } | null>(null)
   const [saving, setSaving] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
+  // List-level failures (delete / visibility toggle) — the modal has its own error.
+  const [actionError, setActionError] = useState<string | null>(null)
   const { confirm, confirmDialog } = useConfirm()
 
   const load = async () => {
@@ -190,15 +192,27 @@ export function AnnouncementsManager() {
       danger: true,
     })
     if (!ok) return
-    await fetch(`/api/admin/announcements/${id}`, { method: 'DELETE' })
+    setActionError(null)
+    const res = await fetch(`/api/admin/announcements/${id}`, { method: 'DELETE' }).catch(() => null)
+    if (!res?.ok) {
+      const data = res ? await res.json().catch(() => ({})) : {}
+      setActionError(data.error ?? 'Something went wrong — the announcement was not deleted.')
+      return
+    }
     setItems(prev => prev.filter(a => a.id !== id))
   }
 
   const handleToggleVisible = async (item: Announcement) => {
-    await fetch(`/api/admin/announcements/${item.id}`, {
+    setActionError(null)
+    const res = await fetch(`/api/admin/announcements/${item.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ visible: !item.visible }),
-    })
+    }).catch(() => null)
+    if (!res?.ok) {
+      const data = res ? await res.json().catch(() => ({})) : {}
+      setActionError(data.error ?? 'Something went wrong — visibility was not changed.')
+      return
+    }
     setItems(prev => prev.map(a => a.id === item.id ? { ...a, visible: !a.visible } : a))
   }
 
@@ -218,6 +232,8 @@ export function AnnouncementsManager() {
           + New announcement
         </button>
       </div>
+
+      {actionError && <p style={{ color: '#ff8a8a', fontSize: '0.8rem', margin: '0 0 0.6rem' }}>{actionError}</p>}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         {items.length === 0 && <p style={{ opacity: 0.35, fontStyle: 'italic', fontSize: '0.82rem' }}>No announcements yet.</p>}

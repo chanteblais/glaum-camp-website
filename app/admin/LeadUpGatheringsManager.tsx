@@ -254,6 +254,9 @@ export function LeadUpGatheringsManager({ rangeStart, rangeEnd, initialEvents }:
   const [modalError, setModalError] = useState<string | null>(null)
   const [notifyingId, setNotifyingId] = useState<string | null>(null)
   const [notifyResult, setNotifyResult] = useState<{ id: string; text: string } | null>(null)
+  // List-level failures (delete / visibility toggle) — the modal and notify
+  // flows have their own error surfaces (modalError / notifyResult).
+  const [actionError, setActionError] = useState<string | null>(null)
   const { confirm, confirmDialog } = useConfirm()
 
   const load = async () => {
@@ -318,7 +321,13 @@ export function LeadUpGatheringsManager({ rangeStart, rangeEnd, initialEvents }:
       danger: true,
     })
     if (!ok) return
-    await fetch(`/api/admin/lead-up-events/${id}`, { method: 'DELETE' })
+    setActionError(null)
+    const res = await fetch(`/api/admin/lead-up-events/${id}`, { method: 'DELETE' }).catch(() => null)
+    if (!res?.ok) {
+      const data = res ? await res.json().catch(() => ({})) : {}
+      setActionError(data.error ?? 'Something went wrong — the gathering was not deleted.')
+      return
+    }
     setEvents(prev => prev.filter(e => e.id !== id))
   }
 
@@ -357,10 +366,16 @@ export function LeadUpGatheringsManager({ rangeStart, rangeEnd, initialEvents }:
   }
 
   const handleToggleVisible = async (event: LeadUpEvent) => {
-    await fetch(`/api/admin/lead-up-events/${event.id}`, {
+    setActionError(null)
+    const res = await fetch(`/api/admin/lead-up-events/${event.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ visible: !event.visible }),
-    })
+    }).catch(() => null)
+    if (!res?.ok) {
+      const data = res ? await res.json().catch(() => ({})) : {}
+      setActionError(data.error ?? 'Something went wrong — visibility was not changed.')
+      return
+    }
     setEvents(prev => prev.map(e => e.id === event.id ? { ...e, visible: !e.visible } : e))
   }
 
@@ -395,6 +410,8 @@ export function LeadUpGatheringsManager({ rangeStart, rangeEnd, initialEvents }:
         onAddDate={iso => { setModal({ mode: 'add', date: iso }); setModalError(null) }}
         onEdit={ev => { setModal({ mode: 'edit', event: ev }); setModalError(null) }}
       />
+
+      {actionError && <p style={{ color: '#ff8a8a', fontSize: '0.8rem', margin: '0 0 0.6rem' }}>{actionError}</p>}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         {events.length === 0 && <p style={{ opacity: 0.35, fontStyle: 'italic', fontSize: '0.82rem' }}>No gatherings yet.</p>}
