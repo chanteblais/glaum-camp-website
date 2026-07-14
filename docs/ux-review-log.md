@@ -7,6 +7,67 @@ Newest review at the top. Fixes are only applied once agreed.
 
 ---
 
+## Review — 2026-07-14 (empty-state voice audit — member surfaces)
+
+Scope: a cross-cutting read of every member-surface empty state (radio, messages,
+members, profile tasks/shifts/resources, home teaser, schedule), judged against
+design-philosophy §5 ("Copy carries philosophy too… never corporate") and the
+existing calibration references. Read-only, `origin/main` @ `4ee6d73`. This is a
+*voice*-consistency pass, not a "add jokes everywhere" pass — §5 also says calm is
+a feature and one wink per page is enough. The finding is that the surfaces have
+drifted into two registers, and the flat one reads like a different app.
+
+The app already contains its own calibration references — these get it right:
+
+- Radio feed empty: **"The airwaves are quiet — nothing on the air yet."** + the
+  **"✦ That's all for now. Stay tuned. ✦"** sign-off (`RadioFeed.tsx`).
+- Profile tasks: **"You're all set. Nothing left to do for now."** (`TaskStatus.tsx`).
+- Profile shift (pre-schedule): **"Shift signup will open here once the schedule is
+  set — check back soon."** (`SignupSection.tsx`).
+- Member resource lists: **"Nobody yet — be the first."** (`ResourceCommitments.tsx`).
+- Home digest: **"All quiet — N days to camp."**; schedule teaser: **"The schedule
+  begins Wednesday, July 22."** (both fixed in earlier passes).
+
+Against those, a cluster of member empty states reads as generic UI-kit boilerplate.
+
+### 26. Member empty-state copy has split into two registers · Severity: low-medium · Effort: small · Status: proposed
+
+The laggards, all member-facing:
+
+- `/messages` inbox, no conversations: **"No messages yet."** (bare — the warmer
+  `MessagesInboxClient.tsx` button beneath it, "Start a conversation", already
+  carries the invitation; the sentence above it is dead weight).
+- `/messages` new-message member search, no matches: **"No members found"**
+  (`MessagesInboxClient.tsx`).
+- 1:1 thread: **"No messages yet. Say hello!"** (`ThreadClient.tsx`); group thread:
+  **"No messages yet. Start the conversation!"** (`GroupThreadClient.tsx`) — the
+  "Say hello!" / exclamation-mark register is *casual-generic*, a different voice
+  from the deadpan ceremonial warmth everywhere else (cf. the radio sign-off).
+- `/members`, no approved members: **"No approved members yet."**; after filtering:
+  **"No members match your filters."** (`MembersGrid.tsx`).
+
+None of these are wrong or broken — they're the calm-plain default. The issue is
+that a member moving from Radio (witnessed, gilded, "airwaves are quiet") to
+Messages/Members drops into flat app-speak, and the seam is visible. The fix is
+cheap: bring the laggards to the register the app already models — not a wink on
+each, just the house's straight-faced warmth. It's a copy-only sweep (no layout),
+so effort is small; worth batching with the next Messages or Members touch rather
+than a standalone commit.
+
+### 27. The Many Hands directory earns the reciprocity register most of all · Severity: low · Effort: trivial · Status: proposed
+
+`/members` is the app's hands-territory surface (§2: "the directory, anything a
+member *does* for the whole") — the one place the plainest empty copy sits.
+"No approved members yet." is the true-empty case; "No members match your filters."
+is a no-results-after-filter case (philosophy tolerates plainer there — it's a
+search result, not a threshold moment). But the true-empty line in particular is a
+missed reciprocity beat on the surface named for it. A single warm line in the
+"Many Hands" voice ("The circle's still gathering." / similar — Chante's phrasing)
+would close the gap with `ResourceCommitments`' "Nobody yet — be the first." No
+new wink budget spent; it replaces one flat sentence with one warm one.
+
+---
+
 ## A5 second half — 2026-07-08 (`feat/roster-links-radio-filters`)
 
 **Status: fixed.** Member names across the admin console now link to their
