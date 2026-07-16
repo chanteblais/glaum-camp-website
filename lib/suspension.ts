@@ -1,4 +1,5 @@
 import { supabaseAdmin } from './supabase'
+import { deleteGroupWelcome } from './conversations'
 import type { MemberRecord } from './members'
 
 // Member suspension (migration 063) — shared by the self-serve route
@@ -63,6 +64,12 @@ export async function suspendMember(
       .from('resource_claims')
       .delete({ count: 'exact' })
       .eq('clerk_user_id', member.clerk_user_id),
+    // Their private group welcome notes go with the memberships (same pairing
+    // as the remove/reject flows). Without this, sendGroupWelcome's
+    // per-(group, member) idempotence would find the stale note and skip the
+    // welcome when they're re-added after resuming. Keep last — the entries
+    // above are destructured by position.
+    deleteGroupWelcome(member.clerk_user_id),
   ])
   return {
     roleRemoved: (campSignup.count ?? 0) > 0,
