@@ -19,7 +19,7 @@ Glåüm   Schedule · Radio · Many Hands · Messages · Participate · My Profi
 - `Messages` shows an unread count badge (polled every 30s via `/api/messages/unread` — `useUnreadMessages` in `MessagesNavLink.tsx`)
 - Avatar dropdown: Admin link (admin only) + Sign out
 - Mobile, public/pending visitors: hamburger menu with the same contextual links
-- **Mobile, approved members: bottom tab bar** (`components/MobileTabBar.tsx`, rendered by `HeaderClient` under the JS `<768px` breakpoint) — the *same* member nav list (one product, one IA: `memberNavLinks` drives both renderings), as icon tabs (regal icons via `IconImage`: gathering / raised-hand / envelope / signpost / hand-mirror), active tab marked with the desktop underline's gradient+dot moved to the tab's top edge, Messages badge included. The hamburger stays as overflow only (name, About, Admin, Sign out). Hidden on `/admin` (admin is a web/desktop workspace) and for non-members. The bar injects `body { padding-bottom }` (+ `env(safe-area-inset-bottom)` for the PWA) so page ends and the Footer stay reachable.
+- **Mobile, approved members: bottom tab bar** (`components/MobileTabBar.tsx`, rendered by `HeaderClient` under the JS `<768px` breakpoint) — the *same* member nav list (one product, one IA: `memberNavLinks` drives both renderings), as icon tabs (regal icons via `IconImage`: gathering / raised-hand / envelope / signpost / vintage-radio / hand-mirror), active tab marked with the desktop underline's gradient+dot moved to the tab's top edge, Messages badge included. The hamburger stays as overflow only (name, About, Admin, Sign out). Hidden on `/admin` (admin is a web/desktop workspace) and for non-members. The bar injects `body { padding-bottom }` (+ `env(safe-area-inset-bottom)` for the PWA) so page ends and the Footer stay reachable.
 
 Nav links for non-approved signed-in users (pending/rejected) show the public set — `/apply` is the only meaningful destination for them.
 
@@ -67,7 +67,7 @@ Fixed bottom section (always present):
 
 **Dashboard layout** is stored as `dashboard_layout` JSON in `page_content`:
 ```json
-{ "order": ["announcements","shoutouts","polls","events","spotlight","activity"], "hidden": [], "widths": {} }
+{ "order": ["announcements","resources","shoutouts","polls","events","spotlight","activity"], "hidden": [], "widths": {} }
 ```
 
 Admin-only: **"✎ Edit Page"** floating button (bottom-right). Clicking enters inline edit mode:
@@ -220,7 +220,7 @@ Linked from nav as "Many Hands".
 - **Distinctions:** `CabinetOfDistinctions` (compact) — earned medals, derived.
 - **Profile** + **Skills & Gifts:** public registry fields (see [profile-architecture.md](profile-architecture.md)).
 - Read-only; no editing controls.
-- **Volunteer variant:** a UUID that misses `applications` falls through to `volunteers` (`status = 'active'`; `VolunteerProfile` in the same file). Hero-only page — same portrait/name/pronouns register, "Volunteering since {year}" (from `submitted_at`), a one-line descriptor, and the shared pill relabelled via its `label` prop (`<ApprovedCamperPill label="VOLUNTEER" />`). No roles/groups/distinctions sections (volunteers have none) and no Message button (DM threads are member-keyed).
+- **Volunteer variant:** a UUID that misses `applications` falls through to `volunteers` (`status = 'active'`; `VolunteerProfile` in the same file). Hero-only page — same portrait/name/pronouns register, "Volunteering since {year}" (from `created_at` — `volunteers` has **no** `submitted_at`; assuming it does is what 404'd the page in `bc68877`), a one-line descriptor, and the shared pill relabelled via its `label` prop (`<ApprovedCamperPill label="VOLUNTEER" />`). No roles/groups/distinctions sections (volunteers have none) and no Message button (DM threads are member-keyed).
 
 ---
 
@@ -283,7 +283,7 @@ Deliberately not chat (no threads, no replies) and deliberately **not an audit l
 
 At the top, the **Now / Up next strip** (`RadioNowStrip`) is derived, never stored: the camp-day welcome ("✦ Day 2 of camp") while today is inside the configured event range, plus what's happening now (purple ● pulse line; open-ended events stay "now" for 90 min) and the next thing starting today — from `schedule_events` (visible + on-schedule, `general`/`mandatory` only; shifts are work slots, not atmosphere). The client picks against the member's own clock (their device is at camp; the server is in UTC) and re-checks each minute.
 
-Radio never notifies for *ordinary* posts (Messages interrupt; Radio informs). The deliberate exceptions: an organizer broadcast posted with **"Also alert members"**, a member post with **"Notify everyone"** (both → `radio_broadcast` bell rows, announcement email, "Tune in →"), and **@mentions** (`radio_mention` bell + message-email to the mentioned member). Notify goes through the shared dispatch seam (`lib/notify.ts`), honouring each member's notification preferences; mentioned members get the personal mention rather than also the broadcast. The home dashboard's `activity` widget ("On the Air") teases the latest 6 posts.
+Radio never notifies for *ordinary* posts (Messages interrupt; Radio informs). The deliberate exceptions: an organizer broadcast posted with **"Also alert members"**, a member post containing **`@here`** (which replaced the earlier "Notify everyone" checkbox — Chante 2026-07-08; both → `radio_broadcast` bell rows, announcement email, "Tune in →"), and **@mentions** (`radio_mention` bell + message-email to the mentioned member). Notify goes through the shared dispatch seam (`lib/notify.ts`), honouring each member's notification preferences; mentioned members get the personal mention rather than also the broadcast. The home dashboard's `activity` widget ("On the Air") teases the latest 6 posts.
 
 ---
 

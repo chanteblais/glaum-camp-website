@@ -91,7 +91,7 @@ Both clients consume the same backend APIs. The backend remains the source of tr
 
 ### Where the codebase already stands (assessed 2026-07-03)
 
-- **Member *write* API surface is essentially mobile-ready.** Messages (send/read/unread, DM + group), event RSVPs, lead-up RSVPs, shift signups, resource claims/offers, poll votes, group join/leave, shoutouts, profile fields/avatar — all already exist as API routes.
+- **Member *write* API surface is essentially mobile-ready.** Messages (send/read/unread, DM + group), event RSVPs, lead-up RSVPs, shift signups, resource claims + list/item authoring, poll votes, group join/leave, shoutouts, radio posts, profile fields/avatar — all already exist as API routes.
 - **The gap is member *read* endpoints.** Schedule, dashboard, commitments, and attunement data are fetched inside server components (a deliberate perf choice — see `docs/architecture.md` → Auth standing rules). The logic lives in `lib/` (`participate-data.ts`, `attunement.ts`, `resources.ts`, `conversations.ts`, `groups.ts`, …), so closing the gap later is mechanical: wrap the same functions in `GET` routes. **Do not build this API layer preemptively.**
 - **Business logic is already server-side** (`lib/member-facts.ts`, `lib/distinctions.ts`, etc.).
 - **Auth is a non-issue.** Clerk ships native SDKs; existing routes' `auth()` checks accept native session tokens. Same instance, same users.

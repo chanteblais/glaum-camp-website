@@ -129,9 +129,7 @@ Two things ride on a post:
   section on `/admin` beside Announcements — curating the feed is
   communication work, not programming; re-homed out of Program 2026-07-03) —
   compose broadcasts, toggle the automatic sources, and curate: **any** post
-  can be removed. (The tab is still "Members" on this branch; it renames to
-  "Community" on `feat/community-tab`, which also moves Shared Resources
-  there under Logistics.)
+  can be removed.
 
 ## Data
 
@@ -147,10 +145,19 @@ on. The migration **backfills** one welcome per approved application from
 
 ## Notifications
 
-Radio does not notify — Messages interrupt, Radio informs. The one exception:
-the organizer composer's **"Also alert members"** checkbox (bell + announcement
-email honouring `notification_preferences.email_announcements` — the lead-up
-notify pattern). Default off.
+Radio does not notify for *ordinary* posts — Messages interrupt, Radio informs.
+Three deliberate exceptions, all opt-in at compose time:
+
+- the organizer composer's **"Also alert members"** checkbox (bell + announcement
+  email honouring `notification_preferences.email_announcements` — the lead-up
+  notify pattern). Default off.
+- **`@mention`** — rings the mentioned member's bell + a message-email.
+- **`@here`** — notify-all (bell + announcement email to every member, the post
+  marked 📢), guarded by a confirm step in the composer.
+
+The last two arrived with open mic (2026-07-08) — see "Writing is open" above for
+the full semantics. All three dispatch through `lib/notify.ts`; a mentioned member
+gets the personal mention rather than also the broadcast.
 
 ## Future rounds (explicitly deferred)
 
