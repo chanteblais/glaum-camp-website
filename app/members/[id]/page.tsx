@@ -1,5 +1,6 @@
 import { HandsBackdrop } from '@/components/HandsBackdrop'
 import { auth } from '@clerk/nextjs/server'
+import { EventIcon } from '@/components/EventIcon'
 import { IconImage, ROUND_FILL } from '@/components/IconImage'
 import { redirect, notFound } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
@@ -94,7 +95,7 @@ export default async function MemberPage({ params }: { params: { id: string } })
   // Everything below depends only on the member row: signup with role + dept,
   // group affiliations, the two page_content configs (one keyed read), and the
   // canonical member record.
-  const [{ data: campSignup }, memberGroups, { data: cfgRows }, profileMember] = await Promise.all([
+  const [{ data: campSignup }, memberGroups, { data: cfgRows }, profileMember, { data: shiftRows }] = await Promise.all([
     member.clerk_user_id
       ? supabaseAdmin
           .from('camp_signups')
@@ -109,8 +110,37 @@ export default async function MemberPage({ params }: { params: { id: string } })
       .select('key, value')
       .in('key', ['config_distinctions', 'config_profile_fields']),
     resolveMember((member.clerk_user_id as string | null) ?? null),
+    // Shifts the member holds — same source as their own /profile commitments
+    // card (member_shift_signups), plus the night held + lead offer per row.
+    member.clerk_user_id
+      ? supabaseAdmin
+          .from('member_shift_signups')
+          .select('occurrence_date, role, schedule_events(id, title, day, time, icon_type, event_date)')
+          .eq('clerk_user_id', member.clerk_user_id)
+      : { data: null },
   ])
   const cfgMap: Record<string, string | undefined> = Object.fromEntries((cfgRows ?? []).map(r => [r.key, r.value]))
+
+  // One entry per shift event, carrying every night the member holds (a
+  // recurring shift's nights are independent signups — migration 064) and
+  // whether they've offered to lead any of them.
+  type PublicShift = { id: string; title: string; time: string; icon_type: string; nights: string[]; dayFallback: string; isLead: boolean }
+  const shiftMap = new Map<string, PublicShift>()
+  for (const r of shiftRows ?? []) {
+    const ev = r.schedule_events as unknown as { id?: string; title?: string; day?: string; time?: string; icon_type?: string; event_date?: string | null } | null
+    if (!ev?.id) continue
+    const cur = shiftMap.get(ev.id) ?? {
+      id: ev.id, title: ev.title ?? '', time: ev.time ?? '',
+      icon_type: ev.icon_type ?? 'star', nights: [], dayFallback: ev.day ?? '', isLead: false,
+    }
+    const night = (r.occurrence_date as string | null) ?? ev.event_date ?? null
+    if (night && !cur.nights.includes(night)) cur.nights.push(night)
+    if (r.role === 'lead') cur.isLead = true
+    shiftMap.set(ev.id, cur)
+  }
+  const heldShifts = Array.from(shiftMap.values())
+  heldShifts.forEach(s => s.nights.sort())
+  heldShifts.sort((a, b) => (a.nights[0] ?? '9999').localeCompare(b.nights[0] ?? '9999') || a.title.localeCompare(b.title))
 
   const roleInfo = campSignup?.roles as { name?: string; description?: string | null; purpose?: string | null; departments?: { name?: string; icon?: string; description?: string | null } | null } | null
   const roleApproved = !!campSignup?.role_id && campSignup?.role_approval_status !== 'pending'
@@ -294,6 +324,30 @@ export default async function MemberPage({ params }: { params: { id: string } })
               </div>
             </section>
           )}
+
+          {/* ── Shifts — every shift the member holds, with the night(s) + time ── */}
+          {heldShifts.length > 0 && (
+            <section style={cardStyle()}>
+              <ColHeading title="Shifts" />
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'center', gap: '1.3rem 1.8rem' }}>
+                {heldShifts.map(s => (
+                  <div key={s.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', width: '132px', textAlign: 'center' }}>
+                    <ShiftMedallion icon={s.icon_type} size={76} />
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ fontSize: '0.85rem', color: WARM, fontFamily: 'var(--font-cormorant-garamond), serif', fontWeight: 600, margin: 0 }}>{s.title}</p>
+                      {s.isLead && (
+                        <p style={{ fontSize: '0.6rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: PURPLE, opacity: 0.9, margin: '0.25rem 0 0' }}>✦ Lead</p>
+                      )}
+                      <p style={{ fontSize: '0.7rem', color: ROSE, lineHeight: 1.5, margin: '0.3rem 0 0' }}>
+                        {shiftNightsLabel(s)}
+                        {s.time && <><br />{s.time}</>}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
@@ -404,6 +458,41 @@ function IconMedallion({ icon, size = 44 }: { icon: string; size?: number }) {
         : icon}
     </span>
   )
+}
+
+// Medallion variant for shift icons: `icon_type` is either an image URL (render
+// like every other medallion) or a built-in glyph name that EventIcon draws as
+// a gold stroke icon. Image icons go through IconImage directly — EventIcon's
+// 1.5x image box would overfill the ring (see CommitmentsSection).
+function ShiftMedallion({ icon, size = 76 }: { icon: string; size?: number }) {
+  return (
+    <span aria-hidden style={{
+      width: size, height: size, flexShrink: 0, borderRadius: '50%', overflow: 'hidden',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'radial-gradient(circle at 42% 38%, rgba(200,168,72,0.14), rgba(8,0,18,0.85))',
+      border: '1.5px solid #C07C26',
+    }}>
+      {isImageIcon(icon)
+        ? /* eslint-disable-next-line @next/next/no-img-element */ <IconImage src={icon} size="100%" fill={ROUND_FILL} />
+        : <span style={{ color: GOLD, opacity: 0.75, display: 'flex' }}><EventIcon type={icon} size={Math.round(size * 0.5)} /></span>}
+    </span>
+  )
+}
+
+// The night(s) a shift is held. One night reads long ("Saturday, July 25" —
+// matching the member's own profile card); several read short, joined by ✦
+// ("Fri, Jul 24 ✦ Sat, Jul 25"); an undated shift falls back to its day label.
+function shiftNightsLabel(s: { nights: string[]; dayFallback: string }): string {
+  const fmt = (iso: string, long: boolean) => {
+    const d = new Date(`${iso}T12:00:00`)
+    if (isNaN(d.getTime())) return iso
+    return long
+      ? d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+      : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+  }
+  if (s.nights.length === 0) return s.dayFallback
+  if (s.nights.length === 1) return fmt(s.nights[0], true)
+  return s.nights.map(n => fmt(n, false)).join(' ✦ ')
 }
 
 // Vertical ✦ separator between the side-by-side Department / Primary Role, with
