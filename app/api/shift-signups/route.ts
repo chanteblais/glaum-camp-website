@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { getApprovedMember, memberDisplayName } from '@/lib/members'
+import { getShiftParticipant, participantDisplayName } from '@/lib/members'
 import { getShiftSignupData, fetchAllHolds, countHoldsFor } from '@/lib/participate-data'
 import { eventRangeDays, isValidOccurrence } from '@/lib/shift-occurrences'
 import { getNotificationPreferences } from '@/lib/notification-prefs'
@@ -34,23 +34,26 @@ export async function GET() {
   // response, not what we fetch, so there's no need to serialize on it.
   // Data assembly lives in lib/participate-data.ts, shared with the
   // server-rendered /participate page (this route is the client's refresh path).
-  const [application, data] = await Promise.all([
-    getApprovedMember(userId),
+  const [participant, data] = await Promise.all([
+    getShiftParticipant(userId),
     getShiftSignupData(userId),
   ])
 
-  if (!application) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!participant) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  return NextResponse.json(data)
+  // Hour requirements are a member concept (attunement/groups/roles) — a
+  // volunteer owes nothing, so their picker never shows requirement chips.
+  return NextResponse.json(participant.kind === 'volunteer' ? { ...data, owed: [] } : data)
 }
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const application = await getApprovedMember(userId)
-  if (!application) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  if (application.suspended_at) {
+  const participant = await getShiftParticipant(userId)
+  if (!participant) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  // Suspension is a member state (volunteers are gated by their status instead).
+  if (participant.kind === 'member' && participant.member.suspended_at) {
     return NextResponse.json({ error: 'Your attendance is suspended — resume it on your profile to sign up for shifts.' }, { status: 403 })
   }
 
@@ -124,20 +127,22 @@ export async function POST(req: NextRequest) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     // Confirmation email on a fresh hold (best-effort — never block the signup),
-    // gated by the member's gathering/shift email preference.
+    // gated by the signer's gathering/shift email preference.
     try {
       const prefs = await getNotificationPreferences(userId)
       const nightDate = occurrenceDate ?? (event as { event_date?: string | null }).event_date ?? null
-      if (prefs.email_event_reminders && application.email) {
+      const email = participant.kind === 'member' ? participant.member.email : participant.volunteer.email
+      if (prefs.email_event_reminders && email) {
         await sendSignupConfirmationEmail({
-          to: application.email,
-          recipientName: memberDisplayName(application, userId),
+          to: email,
+          recipientName: participantDisplayName(participant, userId),
           kind: 'shift',
           title: event.title,
           whenText: nightDate
             ? whenText(nightDate, (event as { time?: string | null; start_time?: string | null }).time ?? (event as { start_time?: string | null }).start_time)
             : 'Time to be confirmed',
-          href: '/schedule',
+          // /schedule is member-gated; a volunteer's shifts live on /participate.
+          href: participant.kind === 'volunteer' ? '/participate' : '/schedule',
         })
       }
     } catch (e) {
@@ -146,8 +151,11 @@ export async function POST(req: NextRequest) {
   }
 
   // Admin notification (same shape as the legacy shift_change event). A role
-  // change on an existing signup reads as such, not as a fresh signup.
-  const name = memberDisplayName(application, userId)
+  // change on an existing signup reads as such, not as a fresh signup. A
+  // volunteer's note names them as one and carries no application link.
+  const name = participant.kind === 'volunteer'
+    ? `${participantDisplayName(participant, userId)} (volunteer)`
+    : participantDisplayName(participant, userId)
   const message = existing && role && role !== existing.role
     ? role === 'lead'
       ? `${name} offered to lead "${event.title}"`
@@ -155,7 +163,7 @@ export async function POST(req: NextRequest) {
     : `${name} signed up ${role === 'lead' ? 'to lead' : 'for'} "${event.title}"`
   if (!existing || (role && role !== existing.role)) {
     await supabaseAdmin.from('admin_notifications').insert({
-      application_id: application.id,
+      application_id: participant.kind === 'member' ? participant.member.id : null,
       event_type: 'shift_change',
       message,
       details: { schedule_event_id, occurrence_date: occurrenceDate, shift_title: event.title },
@@ -169,8 +177,8 @@ export async function DELETE(req: NextRequest) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const application = await getApprovedMember(userId)
-  if (!application) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const participant = await getShiftParticipant(userId)
+  if (!participant) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const schedule_event_id = req.nextUrl.searchParams.get('schedule_event_id')
   if (!schedule_event_id) return NextResponse.json({ error: 'schedule_event_id required' }, { status: 400 })

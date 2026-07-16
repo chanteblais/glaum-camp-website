@@ -116,7 +116,7 @@ Manually attributed distinctions — the **exception** to "distinctions are deri
 
 ### `volunteers`
 
-One row per outside volunteer (non-member who signs up to help).
+One row per outside volunteer (non-member who signs up to help). Active volunteers pick shifts self-serve (2026-07-16) — their holds live in `member_shift_signups`, keyed by the same `clerk_user_id`.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -284,7 +284,7 @@ The configurable registry of shift **kinds** (Setup, Teardown, Decor, Service, �
 
 ### `member_shift_signups`
 
-Many-to-many shift holds — a member can sign up for **any number** of shift occurrences. **The single source of shift holds** (the legacy single `camp_signups.schedule_event_id` was dropped by `065`). Written by the member `/api/shift-signups` API (POST/DELETE) and the admin `remove_shift`/`clear_shift`/`set_shift_role` actions. A member's held hours per shift type (summed `shiftDurationHours` of their held occurrences, `lib/shift-attunement.ts`) are what satisfy hour requirements.
+Many-to-many shift holds — a member **or active volunteer** (2026-07-16; same `clerk_user_id` key, no schema change) can sign up for **any number** of shift occurrences. **The single source of shift holds** (the legacy single `camp_signups.schedule_event_id` was dropped by `065`). Written by the `/api/shift-signups` API (POST/DELETE; gated on `getShiftParticipant`) and the admin `remove_shift`/`clear_shift`/`set_shift_role` actions. A member's held hours per shift type (summed `shiftDurationHours` of their held occurrences, `lib/shift-attunement.ts`) are what satisfy hour requirements.
 
 **Per-night model (migration `064`):** recurrence is only an admin authoring convenience — each night of a recurring shift is a regular shift in its own right, signed independently, with its own capacity, roster, hours and lead. A signup names its night via `occurrence_date`. The concrete nights of an event come from `lib/shift-occurrences.ts` (`recurrence_days`, or every day of the configured event range for an "every day" shift).
 

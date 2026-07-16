@@ -83,13 +83,21 @@ export default async function MemberPage({ params }: { params: { id: string } })
     const { data: volunteer } = isUuid
       ? await supabaseAdmin
           .from('volunteers')
-          .select('id, first_name, preferred_name, pronouns, avatar_url, created_at')
+          .select('id, first_name, preferred_name, pronouns, avatar_url, created_at, clerk_user_id')
           .eq('status', 'active')
           .eq('id', params.id)
           .maybeSingle()
       : { data: null }
     if (!volunteer) notFound()
-    return <VolunteerProfile volunteer={volunteer} />
+    // Volunteers hold shifts too (that's the point of volunteering) — the same
+    // registry card the member profile shows.
+    const { data: volShiftRows } = volunteer.clerk_user_id
+      ? await supabaseAdmin
+          .from('member_shift_signups')
+          .select('occurrence_date, role, schedule_events(id, title, day, time, icon_type, event_date)')
+          .eq('clerk_user_id', volunteer.clerk_user_id)
+      : { data: null }
+    return <VolunteerProfile volunteer={volunteer} heldShifts={buildHeldShifts(volShiftRows)} />
   }
 
   // Everything below depends only on the member row: signup with role + dept,
@@ -121,26 +129,7 @@ export default async function MemberPage({ params }: { params: { id: string } })
   ])
   const cfgMap: Record<string, string | undefined> = Object.fromEntries((cfgRows ?? []).map(r => [r.key, r.value]))
 
-  // One entry per shift event, carrying every night the member holds (a
-  // recurring shift's nights are independent signups — migration 064) and
-  // whether they've offered to lead any of them.
-  type PublicShift = { id: string; title: string; time: string; icon_type: string; nights: string[]; dayFallback: string; isLead: boolean }
-  const shiftMap = new Map<string, PublicShift>()
-  for (const r of shiftRows ?? []) {
-    const ev = r.schedule_events as unknown as { id?: string; title?: string; day?: string; time?: string; icon_type?: string; event_date?: string | null } | null
-    if (!ev?.id) continue
-    const cur = shiftMap.get(ev.id) ?? {
-      id: ev.id, title: ev.title ?? '', time: ev.time ?? '',
-      icon_type: ev.icon_type ?? 'star', nights: [], dayFallback: ev.day ?? '', isLead: false,
-    }
-    const night = (r.occurrence_date as string | null) ?? ev.event_date ?? null
-    if (night && !cur.nights.includes(night)) cur.nights.push(night)
-    if (r.role === 'lead') cur.isLead = true
-    shiftMap.set(ev.id, cur)
-  }
-  const heldShifts = Array.from(shiftMap.values())
-  heldShifts.forEach(s => s.nights.sort())
-  heldShifts.sort((a, b) => (a.nights[0] ?? '9999').localeCompare(b.nights[0] ?? '9999') || a.title.localeCompare(b.title))
+  const heldShifts = buildHeldShifts(shiftRows)
 
   const roleInfo = campSignup?.roles as { name?: string; description?: string | null; purpose?: string | null; departments?: { name?: string; icon?: string; description?: string | null } | null } | null
   const roleApproved = !!campSignup?.role_id && campSignup?.role_approval_status !== 'pending'
@@ -326,28 +315,7 @@ export default async function MemberPage({ params }: { params: { id: string } })
           )}
 
           {/* ── Shifts — every shift the member holds, with the night(s) + time ── */}
-          {heldShifts.length > 0 && (
-            <section style={cardStyle()}>
-              <ColHeading title="Shifts" />
-              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'center', gap: '1.3rem 1.8rem' }}>
-                {heldShifts.map(s => (
-                  <div key={s.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', width: '132px', textAlign: 'center' }}>
-                    <ShiftMedallion icon={s.icon_type} size={76} />
-                    <div style={{ minWidth: 0 }}>
-                      <p style={{ fontSize: '0.85rem', color: WARM, fontFamily: 'var(--font-cormorant-garamond), serif', fontWeight: 600, margin: 0 }}>{s.title}</p>
-                      {s.isLead && (
-                        <p style={{ fontSize: '0.6rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: PURPLE, opacity: 0.9, margin: '0.25rem 0 0' }}>✦ Lead</p>
-                      )}
-                      <p style={{ fontSize: '0.7rem', color: ROSE, lineHeight: 1.5, margin: '0.3rem 0 0' }}>
-                        {shiftNightsLabel(s)}
-                        {s.time && <><br />{s.time}</>}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
+          <ShiftsSection shifts={heldShifts} />
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
@@ -479,6 +447,59 @@ function ShiftMedallion({ icon, size = 76 }: { icon: string; size?: number }) {
   )
 }
 
+// One entry per shift event, carrying every night held (a recurring shift's
+// nights are independent signups — migration 064) and whether the holder has
+// offered to lead any of them. Shared by the member and volunteer registers.
+type PublicShift = { id: string; title: string; time: string; icon_type: string; nights: string[]; dayFallback: string; isLead: boolean }
+
+function buildHeldShifts(shiftRows: unknown[] | null): PublicShift[] {
+  const shiftMap = new Map<string, PublicShift>()
+  for (const r of (shiftRows ?? []) as { occurrence_date?: string | null; role?: string | null; schedule_events?: unknown }[]) {
+    const ev = r.schedule_events as { id?: string; title?: string; day?: string; time?: string; icon_type?: string; event_date?: string | null } | null
+    if (!ev?.id) continue
+    const cur = shiftMap.get(ev.id) ?? {
+      id: ev.id, title: ev.title ?? '', time: ev.time ?? '',
+      icon_type: ev.icon_type ?? 'star', nights: [], dayFallback: ev.day ?? '', isLead: false,
+    }
+    const night = (r.occurrence_date as string | null) ?? ev.event_date ?? null
+    if (night && !cur.nights.includes(night)) cur.nights.push(night)
+    if (r.role === 'lead') cur.isLead = true
+    shiftMap.set(ev.id, cur)
+  }
+  const held = Array.from(shiftMap.values())
+  held.forEach(s => s.nights.sort())
+  held.sort((a, b) => (a.nights[0] ?? '9999').localeCompare(b.nights[0] ?? '9999') || a.title.localeCompare(b.title))
+  return held
+}
+
+// The Shifts registry card — medallion, title, night(s) + time, lead marker.
+// Renders nothing when no shifts are held.
+function ShiftsSection({ shifts }: { shifts: PublicShift[] }) {
+  if (shifts.length === 0) return null
+  return (
+    <section style={cardStyle()}>
+      <ColHeading title="Shifts" />
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'center', gap: '1.3rem 1.8rem' }}>
+        {shifts.map(s => (
+          <div key={s.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', width: '132px', textAlign: 'center' }}>
+            <ShiftMedallion icon={s.icon_type} size={76} />
+            <div style={{ minWidth: 0 }}>
+              <p style={{ fontSize: '0.85rem', color: WARM, fontFamily: 'var(--font-cormorant-garamond), serif', fontWeight: 600, margin: 0 }}>{s.title}</p>
+              {s.isLead && (
+                <p style={{ fontSize: '0.6rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: PURPLE, opacity: 0.9, margin: '0.25rem 0 0' }}>✦ Lead</p>
+              )}
+              <p style={{ fontSize: '0.7rem', color: ROSE, lineHeight: 1.5, margin: '0.3rem 0 0' }}>
+                {shiftNightsLabel(s)}
+                {s.time && <><br />{s.time}</>}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 // The night(s) a shift is held. One night reads long ("Saturday, July 25" —
 // matching the member's own profile card); several read short, joined by ✦
 // ("Fri, Jul 24 ✦ Sat, Jul 25"); an undated shift falls back to its day label.
@@ -552,9 +573,11 @@ function CalendarGlyph() {
 
 // Volunteer variant of the public profile — same hero register as a member
 // (portrait, name, pronouns), with the shared pill relabelled VOLUNTEER.
-// Volunteers carry no roles/groups/distinctions, so the page is the hero alone.
-function VolunteerProfile({ volunteer }: {
+// Volunteers carry no roles/groups/distinctions; the page is the hero plus
+// the shifts they hold (their whole contribution register).
+function VolunteerProfile({ volunteer, heldShifts = [] }: {
   volunteer: { id: string; first_name: string | null; preferred_name: string | null; pronouns: string | null; avatar_url: string | null; created_at: string | null }
+  heldShifts?: PublicShift[]
 }) {
   const displayName = volunteer.preferred_name || volunteer.first_name || 'Volunteer'
   const sinceYear = volunteer.created_at ? new Date(volunteer.created_at).getFullYear() : null
@@ -612,6 +635,11 @@ function VolunteerProfile({ volunteer }: {
             </div>
           </div>
         </header>
+
+        {/* ── Shifts — every shift the volunteer holds (their contribution register) ── */}
+        <div style={{ marginTop: '0.85rem' }}>
+          <ShiftsSection shifts={heldShifts} />
+        </div>
       </main>
     </div>
   )

@@ -99,7 +99,7 @@ function shiftDateLabel(s: { event_date: string | null; day: string }): string {
 // ── Current Signup Cards ──────────────────────────────────────────────────────
 
 function CurrentSignupCards({
-  signup, departments, heldShifts, shiftTypes, onOptOut, onCancelShift, onSetLead,
+  signup, departments, heldShifts, shiftTypes, onOptOut, onCancelShift, onSetLead, hideRole = false,
 }: {
   signup: Signup | null
   departments: Department[]
@@ -108,6 +108,8 @@ function CurrentSignupCards({
   onOptOut: () => void
   onCancelShift: (id: string) => Promise<void>
   onSetLead: (id: string, lead: boolean) => Promise<void>
+  /** Volunteers hold shifts but no role — the plaque pair collapses to shifts alone. */
+  hideRole?: boolean
 }) {
   const [roleExpanded, setRoleExpanded] = useState(false)
   const [optingOut, setOptingOut] = useState(false)
@@ -150,13 +152,13 @@ function CurrentSignupCards({
   }
 
   return (
-    <div className="mobile-stack" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '2.5rem' }}>
+    <div className="mobile-stack" style={{ display: 'grid', gridTemplateColumns: hideRole ? '1fr' : '1fr 1fr', gap: '1rem', marginBottom: '2.5rem' }}>
 
       {/* Role card — the member's standing, drawn as an engraved PLAQUE: a
           double rule (border + inset outline) + centered kicker between
           hairlines. A different species from the single-hairline list cards
           below — distinct by construction, not by glow. */}
-      <div style={{
+      {!hideRole && <div style={{
         border: '1px solid rgba(200,168,72,0.35)', borderRadius: '0.85rem',
         outline: '1px solid rgba(200,168,72,0.14)', outlineOffset: '-5px',
         background: '#231132',
@@ -229,7 +231,7 @@ function CurrentSignupCards({
             </div>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Shifts card — the matching plaque in the shift accent; every held
           shift listed, each cancellable. */}
@@ -1160,7 +1162,7 @@ export type SignupInitialData = {
   shifts: { shifts: ShiftSlot[]; owed: OwedReq[]; shiftTypes: ShiftTypeInfo[]; shiftSignupOpen: boolean }
 }
 
-export function SignupSection({ showPickers = true, initialData }: { showPickers?: boolean; initialData?: SignupInitialData }) {
+export function SignupSection({ showPickers = true, initialData, hideRole = false }: { showPickers?: boolean; initialData?: SignupInitialData; hideRole?: boolean }) {
   const [departments, setDepartments] = useState<Department[]>(initialData?.role.departments ?? [])
   const [signup, setSignup] = useState<Signup | null>(initialData?.role.signup ?? null)
   const [shifts, setShifts] = useState<ShiftSlot[]>(initialData?.shifts.shifts ?? [])
@@ -1334,7 +1336,7 @@ export function SignupSection({ showPickers = true, initialData }: { showPickers
   return (
     <div id="role-signup" style={{ marginBottom: '2.5rem' }}>
       {showSuggest && <SuggestRoleModal onClose={() => setShowSuggest(false)} />}
-      <CurrentSignupCards signup={signup} departments={departments} heldShifts={heldShifts} shiftTypes={shiftTypes} onOptOut={handleOptOut} onCancelShift={handleCancelShift} onSetLead={handleSetLeadShift} />
+      <CurrentSignupCards signup={signup} departments={departments} heldShifts={heldShifts} shiftTypes={shiftTypes} onOptOut={handleOptOut} onCancelShift={handleCancelShift} onSetLead={handleSetLeadShift} hideRole={hideRole} />
 
       {showPickers && (<>
         {/* Choose a Role — a full page section, headed like Shifts / Bring
