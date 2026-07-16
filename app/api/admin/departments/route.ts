@@ -3,6 +3,8 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { requireAdmin } from '@/lib/admin-auth'
 
 export async function GET() {
+  if (!(await requireAdmin())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
   const { data, error } = await supabaseAdmin
     .from('departments')
     .select('id, name, description, icon, sort_order')
