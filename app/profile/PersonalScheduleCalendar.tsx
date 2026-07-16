@@ -3,6 +3,7 @@
 import { useId, useState, useEffect } from 'react'
 import { MANDATORY_HUE, shiftHue } from '@/lib/shift-colors'
 import { firstIsoByWeekday, type ScheduleDay } from '@/lib/schedule-days'
+import { displayPlacement } from '@/lib/late-night'
 
 export type PersonalEvent = {
   id: string
@@ -29,25 +30,11 @@ const CREAM = '#F3EAE5'
 const PANEL_BG = 'radial-gradient(circle at 50% 0%, rgba(92, 28, 110, 0.24), rgba(15, 0, 28, 0.94) 46%, rgba(8, 0, 18, 0.98) 100%)'
 const GRID_LINE = 'rgba(200,168,72,0.12)'
 
-function parseMinutes(str: string): number | null {
-  const match = str.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i)
-  if (!match) return null
-  let h = parseInt(match[1])
-  const m = parseInt(match[2])
-  const ap = match[3].toUpperCase()
-  if (ap === 'PM' && h !== 12) h += 12
-  if (ap === 'AM' && h === 12) h = 0
-  return h * 60 + m
-}
-
-function parseEventTimes(timeStr: string | null) {
-  if (!timeStr) return { start: null, end: null }
-  const parts = timeStr.split(/\s*[–—-]\s*/)
-  const start = parseMinutes(parts[0])
-  let end = parts[1] ? parseMinutes(parts[1]) : null
-  // If end is before start (e.g. "9:00 PM – 12:00 AM"), treat it as next-day midnight
-  if (start !== null && end !== null && end < start) end += 24 * 60
-  return { start, end }
+// Times + column via the shared late-night convention (lib/late-night.ts):
+// overnight ends wrap, and an event starting before 6 AM renders past midnight
+// in the PREVIOUS night's column — same placement as the full /schedule grid.
+function place(e: Pick<PersonalEvent, 'time' | 'event_date'>) {
+  return displayPlacement(e.time, e.event_date ?? null)
 }
 
 type EventColors = { border: string; bg: string; time: string; title: string; subtitle: string; label?: string }
@@ -118,7 +105,7 @@ function EventCard({ event, top, height }: { event: PersonalEvent; top: number; 
 function buildTimeWindow(events: PersonalEvent[]) {
   const allMinutes: number[] = []
   events.filter(e => !!e.time).forEach(e => {
-    const { start, end } = parseEventTimes(e.time)
+    const { start, end } = place(e)
     if (start != null) allMinutes.push(start)
     if (end != null) allMinutes.push(end)
   })
@@ -168,7 +155,7 @@ function SingleDayGrid({ dayEvents, allEvents }: { dayEvents: PersonalEvent[]; a
             }} />
           ))}
           {timed.map(ev => {
-            const { start, end } = parseEventTimes(ev.time)
+            const { start, end } = place(ev)
             if (start === null) return null
             const top = ((start / 60) - START_HOUR) * PX_PER_HOUR
             const height = end
@@ -200,7 +187,7 @@ export function PersonalScheduleCalendar({ events, days }: { events: PersonalEve
   const untimed = events.filter(e => !e.time)
   // Undated legacy rows fall back to the first column matching their weekday name.
   const weekdayIso = firstIsoByWeekday(days)
-  const columnIso = (e: PersonalEvent): string | null => e.event_date ?? weekdayIso[e.day] ?? null
+  const columnIso = (e: PersonalEvent): string | null => place(e).displayDate ?? weekdayIso[e.day] ?? null
   const activeDays = days.filter(d => events.some(e => columnIso(e) === d.iso))
   const activeDay = selectedDay ?? activeDays[0]?.iso ?? null
 
@@ -305,7 +292,7 @@ export function PersonalScheduleCalendar({ events, days }: { events: PersonalEve
                     {activeDays.map(day => {
                       const dayEvents = timed
                         .filter(e => columnIso(e) === day.iso)
-                        .sort((a, b) => (parseEventTimes(a.time).start ?? 0) - (parseEventTimes(b.time).start ?? 0))
+                        .sort((a, b) => (place(a).start ?? 0) - (place(b).start ?? 0))
                       return (
                         <div key={day.iso}>
                           <div style={{
@@ -330,7 +317,7 @@ export function PersonalScheduleCalendar({ events, days }: { events: PersonalEve
                               }} />
                             ))}
                             {dayEvents.map(ev => {
-                              const { start, end } = parseEventTimes(ev.time)
+                              const { start, end } = place(ev)
                               if (start === null) return null
                               const top = ((start / 60) - START_HOUR) * PX_PER_HOUR
                               const height = end

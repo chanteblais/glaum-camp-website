@@ -7,6 +7,7 @@ import { LoadError } from './LoadError'
 import { isImageIcon } from '@/lib/icon-src'
 import { rangeTo24h } from '@/lib/time-format'
 import { shiftDurationHours, formatShiftRange, parseHHMM, weekdayFromISO } from '@/lib/shift-hours'
+import { LATE_NIGHT_BOUNDARY_MIN, lateNightDisplayDate, addDays } from '@/lib/late-night'
 import { buildScheduleDays, type ScheduleDay } from '@/lib/schedule-days'
 import { ScheduleWeekView } from './ScheduleWeekView'
 import { useConfirm } from '../components/ConfirmDialog'
@@ -70,9 +71,21 @@ function parseStartMinutes(time: string): number {
 // Time orders rows within a day; title breaks ties so the order is stable.
 // Structured start_time wins; the free-text parse only covers legacy rows
 // that haven't been re-saved (or backfilled by migration 054) yet.
-function startMinutes(e: ScheduleEvent): number {
+function rawStartMinutes(e: ScheduleEvent): number {
   return parseHHMM(e.start_time) ?? parseStartMinutes(e.time)
 }
+// Late-night convention (lib/late-night.ts): a start before 6 AM sorts at
+// hour 24+, i.e. at the end of the night it belongs to.
+function startMinutes(e: ScheduleEvent): number {
+  const raw = rawStartMinutes(e)
+  return raw < LATE_NIGHT_BOUNDARY_MIN ? raw + 24 * 60 : raw
+}
+// The day group a dated event lists under — the previous day when it starts
+// before 6 AM (its event_date stays the true morning date).
+function displayIsoOf(e: ScheduleEvent): string | null {
+  return e.event_date ? lateNightDisplayDate(e.event_date, rawStartMinutes(e)) : null
+}
+const isLateNight = (e: ScheduleEvent) => rawStartMinutes(e) < LATE_NIGHT_BOUNDARY_MIN
 function sortByTime(evs: ScheduleEvent[]): ScheduleEvent[] {
   return [...evs].sort((a, b) =>
     startMinutes(a) - startMinutes(b) || a.title.localeCompare(b.title)
@@ -224,6 +237,18 @@ function EventModal({
             {shiftDurationHours(form.start_time, form.end_time) > 0 ? `${shiftDurationHours(form.start_time, form.end_time)}h` : '—'}
           </div>
         </div>
+
+        {/* Late-night convention, said where it matters: the date stays the true
+            morning date, but the event lists/renders as the previous night. */}
+        {(parseHHMM(form.start_time) ?? LATE_NIGHT_BOUNDARY_MIN) < LATE_NIGHT_BOUNDARY_MIN && (
+          <p style={{ fontSize: '0.75rem', color: '#C8A848', opacity: 0.7, lineHeight: 1.5, margin: '-0.4rem 0 1rem' }}>
+            ✦ Before 6:00 AM counts as late night{form.is_recurring
+              ? ' — each picked day means that night, running past midnight.'
+              : form.event_date
+                ? ` — this shows at the end of ${weekdayFromISO(addDays(form.event_date, -1)) ?? 'the previous day'} night; keep the date (${form.event_date}) as the morning it actually happens.`
+                : ' — pick the date of the morning it actually happens; it will show at the end of the previous night.'}
+          </p>
+        )}
 
         {/* Recurring events pick their days here (no single date to pick above).
             All chips lit = every day, incl. days added to the range later. */}
@@ -728,9 +753,11 @@ export function ScheduleManager({ rangeStart, rangeEnd, initialEvents, initialSh
   )
   const recurring = events.filter((e) => e.is_recurring)
 
-  // Same day model as the member calendar: configured range ∪ every event date.
-  const days = buildScheduleDays(dated.map((e) => e.event_date), rangeStart, rangeEnd)
-  const eventsOn = (iso: string) => sortByTime(dated.filter((e) => e.event_date === iso))
+  // Same day model as the member calendar: configured range ∪ every DISPLAY
+  // date (a late-night event groups under the previous night, so its true
+  // morning date must not spawn a day section of its own).
+  const days = buildScheduleDays(dated.map(displayIsoOf), rangeStart, rangeEnd)
+  const eventsOn = (iso: string) => sortByTime(dated.filter((e) => displayIsoOf(e) === iso))
 
   const jumpTo = (key: string) => {
     sectionRefs.current[key]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -1037,7 +1064,13 @@ export function ScheduleManager({ rangeStart, rangeEnd, initialEvents, initialSh
               <p style={{ opacity: 0.25, fontStyle: 'italic', fontSize: '0.78rem', margin: '0 0 0 1rem' }}>Nothing scheduled.</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                {dayEvents.map((ev) => <EventRow key={ev.id} {...rowProps(ev)} />)}
+                {dayEvents.map((ev) => (
+                  <EventRow
+                    key={ev.id}
+                    {...rowProps(ev)}
+                    subLabel={isLateNight(ev) ? `late night · into ${weekdayFromISO(ev.event_date) ?? 'the next morning'}` : undefined}
+                  />
+                ))}
               </div>
             )}
           </div>

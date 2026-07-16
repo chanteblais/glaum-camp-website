@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { EventIcon } from '@/components/EventIcon'
 import { MANDATORY_HUE, shiftHue, generalHue } from '@/lib/shift-colors'
 import { firstIsoByWeekday, type ScheduleDay } from '@/lib/schedule-days'
+import { displayPlacement } from '@/lib/late-night'
 
 type ScheduleEvent = {
   id: string
@@ -51,27 +52,11 @@ function eventTypeStyle(event: ScheduleEvent) {
   return { border: `rgba(${hue.rgb},0.5)`, background: `rgba(${hue.rgb},0.12)`, text: hue.accent }
 }
 
-// Parse the first time in a string like "9:00 PM – 11:00 PM" → minutes from midnight
-function parseMinutes(str: string): number | null {
-  const match = str.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i)
-  if (!match) return null
-  let h = parseInt(match[1])
-  const m = parseInt(match[2])
-  const ap = match[3].toUpperCase()
-  if (ap === 'PM' && h !== 12) h += 12
-  if (ap === 'AM' && h === 12) h = 0
-  return h * 60 + m
-}
-
-function parseEventTimes(timeStr: string | null): { start: number | null; end: number | null } {
-  if (!timeStr) return { start: null, end: null }
-  const parts = timeStr.split(/\s*[–—-]\s*/)
-  const start = parseMinutes(parts[0])
-  let end = parts[1] ? parseMinutes(parts[1]) : null
-  // Overnight events ("11:00 PM – 2:00 AM") wrap past midnight; without this the
-  // early-morning end time stretches the grid's start back to 1 AM.
-  if (start !== null && end !== null && end <= start) end += 24 * 60
-  return { start, end }
+// Times + column via the late-night convention (lib/late-night.ts): overnight
+// ends wrap past midnight, and an event starting before 6 AM renders at hour
+// 24+ in the PREVIOUS night's column — event_date stays the true calendar date.
+function place(e: Pick<ScheduleEvent, 'time' | 'event_date'>) {
+  return displayPlacement(e.time, e.event_date ?? null)
 }
 
 function minutesToTop(minutes: number, startHour: number): number {
@@ -215,12 +200,12 @@ export function ScheduleCalendarClient({ events, days }: { events: ScheduleEvent
 
   // Undated legacy rows fall back to the first column matching their weekday name.
   const weekdayIso = firstIsoByWeekday(days)
-  const columnIso = (e: ScheduleEvent): string | null => e.event_date ?? weekdayIso[e.day] ?? null
+  const columnIso = (e: ScheduleEvent): string | null => place(e).displayDate ?? weekdayIso[e.day] ?? null
 
   const regular = [...events.filter(e => !e.is_recurring)].sort((a, b) => {
     const dateDiff = (columnIso(a) ?? '9999').localeCompare(columnIso(b) ?? '9999')
     if (dateDiff !== 0) return dateDiff
-    return (parseEventTimes(a.time).start ?? 9999) - (parseEventTimes(b.time).start ?? 9999)
+    return (place(a).start ?? 9999) - (place(b).start ?? 9999)
   })
   const recurring = events.filter(e => e.is_recurring)
   // True every-day events keep their card section below the grid; recurring
@@ -233,7 +218,7 @@ export function ScheduleCalendarClient({ events, days }: { events: ScheduleEvent
   // Compute display window from actual event times (+ 30 min padding each side)
   const allMinutes: number[] = []
   ;[...regular, ...onDays].forEach(e => {
-    const { start, end } = parseEventTimes(e.time)
+    const { start, end } = place(e)
     if (start != null) allMinutes.push(start)
     if (end != null) allMinutes.push(end)
   })
@@ -316,7 +301,7 @@ export function ScheduleCalendarClient({ events, days }: { events: ScheduleEvent
                 }} />
               ))}
               {[...regular.filter(e => columnIso(e) === selectedDay), ...recurringOn(selectedDay)].map(ev => {
-                const { start, end } = parseEventTimes(ev.time)
+                const { start, end } = place(ev)
                 if (start === null) return null
                 const top = minutesToTop(start, START_HOUR)
                 const height = end ? minutesToHeight(start, end, START_HOUR, END_HOUR) : Math.max(PX_PER_HOUR * 0.75, 32)
@@ -371,7 +356,7 @@ export function ScheduleCalendarClient({ events, days }: { events: ScheduleEvent
                       }} />
                     ))}
                     {dayEvents.map(ev => {
-                      const { start, end } = parseEventTimes(ev.time)
+                      const { start, end } = place(ev)
                       if (start === null) return null
                       const top = minutesToTop(start, START_HOUR)
                       const height = end ? minutesToHeight(start, end, START_HOUR, END_HOUR) : Math.max(PX_PER_HOUR * 0.75, 32)
@@ -424,10 +409,17 @@ export function ScheduleCalendarClient({ events, days }: { events: ScheduleEvent
             </p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1rem' }}>
-            {regular.filter((card, i, arr) => arr.findIndex(c => c.title === card.title) === i).map(card => (
+            {regular.filter((card, i, arr) => arr.findIndex(c => c.title === card.title) === i).map(card => {
+              // A late-night card is labelled by the night it belongs to
+              // ("Saturday night"), not its true morning date's weekday.
+              const p = place(card)
+              const dayLabel = p.lateNight
+                ? `${days.find(d => d.iso === p.displayDate)?.label ?? card.day} night`
+                : card.day
+              return (
               <div key={card.id} style={{ padding: '1.25rem', border: '1px solid rgba(200,168,72,0.15)', borderRadius: '0.85rem', background: 'rgba(200,168,72,0.03)', display: 'flex', flexDirection: 'column', gap: '0.75rem', boxShadow: card.highlight ? '0 0 18px rgba(200,168,72,0.3), 0 0 40px rgba(200,168,72,0.1)' : undefined }}>
                 <p style={{ fontSize: '0.68rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.85, margin: 0, textAlign: 'center' }}>
-                  {card.day}&nbsp;&nbsp;{card.time}
+                  {dayLabel}&nbsp;&nbsp;{card.time}
                 </p>
                 <div style={{ color: '#C8A848', opacity: 0.55, display: 'flex', justifyContent: 'center', flex: 1, alignItems: 'center' }}>
                   <EventIcon type={card.icon_type} size={card.icon_type.startsWith('http') || card.icon_type.startsWith('/') ? 72 : 38} />
@@ -437,7 +429,8 @@ export function ScheduleCalendarClient({ events, days }: { events: ScheduleEvent
                   {card.detail_desc && <p style={{ fontSize: '0.85rem', lineHeight: 1.65, opacity: 0.6, margin: 0, textAlign: 'center' }}>{card.detail_desc}</p>}
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}

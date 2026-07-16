@@ -19,6 +19,7 @@ import { useRef, useState } from 'react'
 import { MANDATORY_HUE, shiftHue, shiftColorIndexMap, generalHue } from '@/lib/shift-colors'
 import { parseHHMM, formatShiftRange } from '@/lib/shift-hours'
 import { rangeTo24h } from '@/lib/time-format'
+import { lateNightShift, lateNightDisplayDate, addDays } from '@/lib/late-night'
 import type { ScheduleDay } from '@/lib/schedule-days'
 
 // Structural subset of the manager's ScheduleEvent — everything the grid needs.
@@ -53,13 +54,24 @@ function toHHMM(mins: number): string {
 }
 
 // Minutes from midnight, structured times first, legacy free text as fallback.
+// Late-night convention (lib/late-night.ts): a start before 6 AM renders at
+// hour 24+ — in the PREVIOUS night's column for dated events (displayIso).
 function eventMinutes(e: WeekViewEvent): { start: number | null; end: number | null } {
   const legacy = rangeTo24h(e.time)
   const start = parseHHMM(e.start_time) ?? parseHHMM(legacy.start)
   let end = parseHHMM(e.end_time) ?? parseHHMM(legacy.end)
   // Midnight end / overnight: keep the block growing downward, not negative.
   if (start != null && end != null && end <= start) end += 24 * 60
-  return { start, end }
+  const shifted = lateNightShift({ start, end })
+  return { start: shifted.start, end: shifted.end }
+}
+
+// The column a dated event displays in — its own date, or the previous day's
+// column when it starts before 6 AM (event_date stays the true morning date).
+function displayIso(e: WeekViewEvent): string | null {
+  if (!e.event_date) return null
+  const legacy = rangeTo24h(e.time)
+  return lateNightDisplayDate(e.event_date, parseHHMM(e.start_time) ?? parseHHMM(legacy.start))
 }
 
 function hue(e: WeekViewEvent, shiftIndex: Record<string, number>) {
@@ -140,11 +152,14 @@ export function ScheduleWeekView({ events, days, shiftTypes, rosters, onEdit, on
   const HOUR_LABELS = buildHourLabels(START_HOUR, END_HOUR)
 
   // Click an empty slot → add prefilled with the day + nearest half-hour.
+  // A slot past the Midnight line is late night: the stored date is the NEXT
+  // morning (true calendar date); the block still displays in this column.
   const slotClick = (iso: string) => (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
     const mins = START_HOUR * 60 + ((e.clientY - rect.top) / PX_PER_HOUR) * 60
-    const snapped = Math.max(0, Math.min(Math.round(mins / 30) * 30, 24 * 60 - 30)) % (24 * 60)
-    onAddAt(iso, `${String(Math.floor(snapped / 60)).padStart(2, '0')}:${String(snapped % 60).padStart(2, '0')}`)
+    const snapped = Math.max(0, Math.min(Math.round(mins / 30) * 30, END_HOUR * 60 - 30))
+    const clock = snapped % (24 * 60)
+    onAddAt(snapped >= 24 * 60 ? addDays(iso, 1) : iso, `${String(Math.floor(clock / 60)).padStart(2, '0')}:${String(clock % 60).padStart(2, '0')}`)
   }
 
   // Drag-to-reschedule. Pointer events (not HTML5 drag-and-drop) so the block
@@ -179,7 +194,7 @@ export function ScheduleWeekView({ events, days, shiftTypes, rosters, onEdit, on
   const dragHandlers = (ev: WeekViewEvent, startMin: number, endMin: number | null) => ({
     onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => {
       if (e.button !== 0) return
-      const origDayIdx = days.findIndex(d => d.iso === ev.event_date)
+      const origDayIdx = days.findIndex(d => d.iso === displayIso(ev))
       if (origDayIdx === -1) return
       const rect = e.currentTarget.getBoundingClientRect()
       dragRef.current = {
@@ -211,9 +226,12 @@ export function ScheduleWeekView({ events, days, shiftTypes, rosters, onEdit, on
       if (!d.active) return // plain click — the onClick handler opens the editor
       suppressClick.current = true
       if (d.lastDayIdx === d.origDayIdx && d.lastStartMin === d.origStartMin) return
+      // Dropped past the Midnight line = late night of that column: the stored
+      // date is the next morning (the display maps it back to this column).
+      const lateNight = d.lastStartMin >= 24 * 60
       onMove(
         ev.id,
-        days[d.lastDayIdx].iso,
+        lateNight ? addDays(days[d.lastDayIdx].iso, 1) : days[d.lastDayIdx].iso,
         toHHMM(d.lastStartMin),
         d.durMin != null ? toHHMM(d.lastStartMin + d.durMin) : null,
       )
@@ -313,7 +331,7 @@ export function ScheduleWeekView({ events, days, shiftTypes, rosters, onEdit, on
           <div ref={colsRef} style={{ flex: 1, display: 'grid', gridTemplateColumns: `repeat(${Math.max(days.length, 1)}, 1fr)`, gap: '0.4rem' }}>
             {days.map((day, dayIdx) => {
               const dayEvents = dated
-                .filter(e => e.event_date === day.iso)
+                .filter(e => displayIso(e) === day.iso)
                 .map(e => ({ e, m: eventMinutes(e) }))
                 .filter((x): x is { e: WeekViewEvent; m: { start: number; end: number | null } } => x.m.start != null)
               const lanes = layoutLanes(dayEvents.map(({ e, m }) => ({ id: e.id, start: m.start, end: m.end ?? m.start + 45 })))

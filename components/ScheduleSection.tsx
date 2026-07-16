@@ -2,6 +2,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { ScheduleCalendarClient } from '@/components/ScheduleCalendarClient'
 import { shiftColorIndexMap } from '@/lib/shift-colors'
 import { buildScheduleDays } from '@/lib/schedule-days'
+import { displayPlacement } from '@/lib/late-night'
 export { EventIcon } from '@/components/EventIcon'
 export { ICON_TYPES } from '@/components/EventIcon'
 
@@ -25,10 +26,12 @@ export async function ScheduleSection() {
     shift_color_index: e.shift_type_id != null ? colorIndex[e.shift_type_id] ?? null : null,
   }))
 
-  // Day columns: the configured event range ∪ every date an event carries.
+  // Day columns: the configured event range ∪ every date an event DISPLAYS on
+  // (late-night convention — an after-midnight event belongs to the previous
+  // night's column, so its true morning date must not spawn a column).
   const config = Object.fromEntries((configRows ?? []).map(r => [r.key, r.value]))
   const days = buildScheduleDays(
-    data.filter(e => !e.is_recurring).map(e => e.event_date),
+    data.filter(e => !e.is_recurring).map(e => displayPlacement(e.time, e.event_date).displayDate),
     config['config_event_start_date'],
     config['config_event_end_date'],
   )
