@@ -132,7 +132,7 @@ The form config is read fresh from `page_content` on every load — no caching. 
 
 Collects name, contact info, pronouns, photo, signup intent, days available, and notes. All fields are configurable via the Application Builder. If `config.open === false`, shows a "Volunteer Signup Closed" screen instead.
 
-Volunteers are **self-serve for shifts, admin-coordinated for everything else** (2026-07-16 — picking shifts is the whole point of volunteering). An **active** volunteer signs in and picks shifts on `/participate`, which renders a **shifts-only variant** for them ("Your Shifts" heading, `SignupSection` with `hideRole` — no role picker, no groups, no shared resources, and no owed-hours chips since hour requirements are a member concept). The signup APIs gate on `getShiftParticipant` (approved member **or** active volunteer, `lib/members.ts`); pending/cancelled/removed volunteers still can't sign up. Their entry point is the **"✦ Pick your shifts"** button on their own `/profile` (volunteers get the public nav, not the member nav). The signup-form intents (shift / role / other) and shift interests remain interest *signals* in Admin → Volunteers. Someone who should hold a role (e.g. a pre-event contributor) is admitted as a regular member instead — see the volunteers→members fold planned in [generalizability-log.md](generalizability-log.md).
+Volunteers are **self-serve for shifts, admin-coordinated for everything else** (2026-07-16 — picking shifts is the whole point of volunteering). An **active** volunteer signs in and picks shifts on `/participate`, which renders a **shifts-only variant** for them ("Your Shifts" heading, `SignupSection` with `hideRole` — no role picker, no groups, no shared resources, and no owed-hours chips since hour requirements are a member concept). The signup APIs gate on `getShiftParticipant` (approved member **or** active volunteer, `lib/members.ts`); pending/cancelled/removed volunteers still can't sign up. Their entry point is the **"✦ Pick your shifts"** button on their own `/profile` (volunteers get the public nav, not the member nav). The signup-form intents (shift / role / other) and shift interests remain interest *signals* on the admin rows. A new volunteer signup awaits approval in the admin **Applications** review queue (unified with member applications, tagged Volunteer — see Admin console table); once approved they move to Registered Hands. Someone who should hold a role (e.g. a pre-event contributor) is admitted as a regular member instead — see the volunteers→members fold planned in [generalizability-log.md](generalizability-log.md).
 
 **Admin preview:** `?admin_preview=1` bypasses redirect checks for admins.
 
@@ -303,8 +303,8 @@ Sections are collapsible (`CollapsibleSection`) and **default to collapsed** —
 
 | Category | Section | Component | What it does |
 |---|---|---|---|
-| People | Registered Hands | `VolunteersSection` | Review members + outside volunteers |
-| People | Applications | `ApplicationRow` list | Review + approve/reject applications |
+| People | Registered Hands | `VolunteersSection` | Members + **active** outside volunteers (people already in) |
+| People | Applications | `ApplicationRow` + `PendingVolunteerRow` list | **The one review queue** (2026-07-16): pending member applications and pending volunteer signups in a single date-sorted Pending Review list, each row tagged **Member** (gold) / **Volunteer** (purple); section auto-opens while anything is pending. Approve/decline volunteers inline (expand row); member rows link to the `/admin/[id]` dossier |
 | People | Role Requests | `RoleRequestsSection` | Approve/reject member role claims |
 | People | Role Suggestions | `RoleSuggestionsSection` | Review member-submitted dept/role suggestions |
 | Communication | Announcements | `AnnouncementsManager` | Create/edit/delete member-facing announcements |

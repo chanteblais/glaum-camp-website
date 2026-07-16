@@ -5,7 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { requireAdmin } from '@/lib/admin-auth'
 import { ApplicationRow } from './ApplicationRow'
 import { CollapsibleSection } from './CollapsibleSection'
-import { VolunteersSection } from './VolunteersSection'
+import { VolunteersSection, PendingVolunteerRow } from './VolunteersSection'
 import { NotificationBell } from './NotificationBell'
 import { AdminNav } from './AdminNav'
 import { CategoryHeading } from './CategoryHeading'
@@ -100,6 +100,15 @@ export default async function AdminPage() {
   const activeVolunteerEmails = new Set(volunteers.filter(v => v.status === 'active').map(v => v.email.toLowerCase()))
   const cancelled = all.filter(a => a.status === 'cancelled' && !activeVolunteerEmails.has(a.email.toLowerCase()))
 
+  // ONE review queue: pending member applications + pending volunteer signups,
+  // newest first, each row tagged with what it is (her call 2026-07-16 — a
+  // pending volunteer hiding in the collapsed Registered Hands section is how
+  // Vera went unnoticed).
+  const pendingQueue = [
+    ...pending.map(a => ({ kind: 'member' as const, date: a.submitted_at as string | null, app: a })),
+    ...pendingVolunteers.map(v => ({ kind: 'volunteer' as const, date: v.created_at as string | null, vol: v })),
+  ].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))
+
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, overflowX: 'clip' }}>
 
@@ -136,12 +145,11 @@ export default async function AdminPage() {
             except Applications, which opens itself while reviews are waiting. */}
         <CollapsibleSection
           title="Registered Hands"
-          summary={`${approved.length} members · ${activeVolunteers.length} outside${pendingVolunteers.length > 0 ? ` · ${pendingVolunteers.length} pending` : ''}`}
+          summary={`${approved.length} members · ${activeVolunteers.length} outside`}
           defaultOpen={false}
         >
           <VolunteersSection
             volunteers={activeVolunteers}
-            pendingVolunteers={pendingVolunteers}
             campMembers={approved.map(a => ({
               id: a.id,
               first_name: a.first_name,
@@ -156,30 +164,33 @@ export default async function AdminPage() {
           />
         </CollapsibleSection>
 
-        {/* Application review queue */}
+        {/* Application review queue — member applications AND volunteer
+            signups, one list, each row tagged with what it is. */}
         <CollapsibleSection
           title="Applications"
-          summary={`${pending.length} pending${rejected.length > 0 ? ` · ${rejected.length} not approved` : ''}${cancelled.length > 0 ? ` · ${cancelled.length} cancelled` : ''}`}
-          defaultOpen={pending.length > 0}
+          summary={`${pendingQueue.length} pending${rejected.length > 0 ? ` · ${rejected.length} not approved` : ''}${cancelled.length > 0 ? ` · ${cancelled.length} cancelled` : ''}`}
+          defaultOpen={pendingQueue.length > 0}
         >
-          {pending.length === 0 && rejected.length === 0 && cancelled.length === 0 ? (
+          {pendingQueue.length === 0 && rejected.length === 0 && cancelled.length === 0 ? (
             <p style={{ textAlign: 'center', opacity: 0.4, fontStyle: 'italic' }}>No applications to review.</p>
           ) : (
             <>
-              {pending.length > 0 && (
+              {pendingQueue.length > 0 && (
                 <div style={{ marginBottom: '2rem' }}>
                   <p style={{ fontSize: '0.7rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#D239F8', marginBottom: '1rem' }}>
                     Pending Review
                   </p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    {pending.map(app => <ApplicationRow key={app.id} app={app} showActions />)}
+                    {pendingQueue.map(item => item.kind === 'member'
+                      ? <ApplicationRow key={item.app.id} app={item.app} showActions kindTag />
+                      : <PendingVolunteerRow key={item.vol.id} volunteer={item.vol} />)}
                   </div>
                 </div>
               )}
 
               {rejected.length > 0 && (
                 <div>
-                  {pending.length > 0 && <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.2), transparent)', marginBottom: '2rem' }} />}
+                  {pendingQueue.length > 0 && <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.2), transparent)', marginBottom: '2rem' }} />}
                   <p style={{ fontSize: '0.7rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#F3EDE6', marginBottom: '1rem', opacity: 0.3 }}>
                     Not Approved
                   </p>
