@@ -664,6 +664,34 @@ export default async function ProfilePage() {
 
             <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(210,57,248,0.2), transparent)', marginBottom: '2.5rem' }} />
 
+            {/* Shifts the volunteer holds + the door to picking more. Volunteers
+                get no member nav, so this button IS their route to /participate
+                (shifts-only there). Skipped for approved members-who-also-
+                volunteer — their member commitments card above already shows
+                shifts. Pending volunteers can't sign up yet (active-only gate). */}
+            {volunteer.status === 'active' && application?.status !== 'approved' && (
+              <>
+                {heldShifts.length > 0 && (
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <CommitmentsSection
+                      title="Your Shifts"
+                      hideRole
+                      contributions={[]}
+                      role={null}
+                      dept={null}
+                      shifts={heldShifts}
+                      roleApprovalStatus={null}
+                    />
+                  </div>
+                )}
+                <div style={{ marginBottom: '2.5rem' }}>
+                  <a href="/participate" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 1.25rem', borderRadius: '9999px', border: '1px solid rgba(200,168,72,0.35)', background: 'rgba(200,168,72,0.06)', color: '#C8A848', textDecoration: 'none', fontSize: '0.82rem', letterSpacing: '0.06em' }}>
+                    ✦ {heldShifts.length > 0 ? 'Pick up / change your shifts' : 'Pick your shifts'}
+                  </a>
+                </div>
+              </>
+            )}
+
             <div className="profile-info-grid">
               {volunteer.days_available?.length > 0 && (
                 <div style={{ padding: '1rem 1.25rem', border: '1px solid rgba(200,168,72,0.12)', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.02)', gridColumn: '1 / -1' }}>

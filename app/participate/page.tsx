@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
-import { getApprovedMember } from '@/lib/members'
+import { getApprovedMember, getActiveVolunteer } from '@/lib/members'
 import { requireAdmin } from '@/lib/admin-auth'
 import { getRoleSignupData, getShiftSignupData, getSelfJoinGroups } from '@/lib/participate-data'
 import { getMemberResourceView } from '@/lib/resources'
@@ -27,7 +27,45 @@ export default async function SignupPage() {
     getMemberResourceView(userId),
     requireAdmin(),
   ])
-  if (!member) redirect('/profile')
+  // Not a member — an active volunteer still participates, shifts-only:
+  // volunteers exist to take shifts. No roles, groups, resources, or hour
+  // requirements (those are member concepts); every shift they take is a gift.
+  if (!member) {
+    const volunteer = await getActiveVolunteer(userId)
+    if (!volunteer) redirect('/profile')
+
+    const volunteerInitialData = {
+      role: { signup: null, departments: [], shiftSignupOpen: shiftData.shiftSignupOpen },
+      shifts: { ...shiftData, owed: [] },
+    } as unknown as SignupInitialData
+
+    return (
+      <>
+        <Header />
+        <main style={{ maxWidth: '860px', margin: '0 auto', padding: '6rem 1.5rem 6rem' }}>
+          <a
+            href="/profile"
+            style={{ fontSize: '0.75rem', color: '#C8A848', opacity: 0.6, textDecoration: 'none', letterSpacing: '0.08em', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', marginBottom: '2rem' }}
+          >
+            ← Back to profile
+          </a>
+
+          <div style={{ marginBottom: '2rem' }}>
+            <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', color: '#C8A848', margin: '0 0 0.5rem', letterSpacing: '0.06em' }}>
+              Your Shifts
+            </h1>
+            <p style={{ fontSize: '0.9rem', opacity: 0.55, margin: 0, lineHeight: 1.6 }}>
+              Lend your hands where they're needed — pick the shifts that work for you. You can change your mind anytime.
+            </p>
+          </div>
+
+          <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.25), transparent)', marginBottom: '2rem' }} />
+
+          <SignupSection initialData={volunteerInitialData} hideRole />
+        </main>
+      </>
+    )
+  }
 
   // Shared Resources is member-owned: approved (non-suspended) members author
   // lists and items; deleting a whole list is the one admin-gated action.

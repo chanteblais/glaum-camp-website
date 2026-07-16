@@ -2,7 +2,10 @@
 
 import { AdminActions } from './AdminActions'
 
-export function ApplicationRow({ app, showActions }: { app: any; showActions: boolean }) {
+// `kindTag` marks the row as a member application — set in the Pending Review
+// queue, where member applications and volunteer signups share one list and
+// every row wears its kind (directory tag language).
+export function ApplicationRow({ app, showActions, kindTag = false }: { app: any; showActions: boolean; kindTag?: boolean }) {
   const submitted = new Date(app.submitted_at).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })
 
   return (
@@ -39,6 +42,11 @@ export function ApplicationRow({ app, showActions }: { app: any; showActions: bo
           </p>
           <p style={{ fontSize: '0.8rem', opacity: 0.5 }}>{app.email}</p>
         </div>
+        {kindTag && (
+          <span style={{ fontSize: '0.62rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#C8A848', border: '1px solid rgba(200,168,72,0.35)', background: 'rgba(200,168,72,0.07)', borderRadius: '9999px', padding: '0.18rem 0.6rem', flexShrink: 0 }}>
+            Member
+          </span>
+        )}
         <div style={{ fontSize: '0.8rem', opacity: 0.5, flexShrink: 0 }}>
           {submitted}
         </div>

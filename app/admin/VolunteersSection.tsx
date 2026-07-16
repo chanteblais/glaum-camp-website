@@ -163,8 +163,10 @@ function CampMemberRow({ member }: { member: CampMember }) {
 }
 
 // ── Pending Volunteer Row ───────────────────────────────────────────────────
+// Rendered in the unified Applications review queue (admin page), alongside
+// pending member applications — hence the exported component + Volunteer tag.
 
-function PendingVolunteerRow({ volunteer }: { volunteer: Volunteer }) {
+export function PendingVolunteerRow({ volunteer }: { volunteer: Volunteer }) {
   const [expanded, setExpanded] = useState(false)
   const [approving, setApproving] = useState(false)
   const [removing, setRemoving] = useState(false)
@@ -243,6 +245,11 @@ function PendingVolunteerRow({ volunteer }: { volunteer: Volunteer }) {
           </p>
           <p style={{ fontSize: '0.8rem', opacity: 0.45 }}>{volunteer.email}</p>
         </div>
+        {/* What they are — the queue mixes member applications and volunteer
+            signups, so every row wears its kind (directory tag language). */}
+        <span style={{ fontSize: '0.62rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#D239F8', border: '1px solid rgba(210,57,248,0.35)', background: 'rgba(210,57,248,0.07)', borderRadius: '9999px', padding: '0.18rem 0.6rem', flexShrink: 0 }}>
+          Volunteer
+        </span>
         {volunteer.signup_intent && (
           <span style={{ fontSize: '0.72rem', color: '#D239F8', opacity: 0.7, flexShrink: 0, letterSpacing: '0.06em' }}>
             {INTENT_LABELS[volunteer.signup_intent] ?? volunteer.signup_intent}
@@ -446,14 +453,15 @@ function VolunteerRow({ volunteer }: { volunteer: Volunteer }) {
 
 export function VolunteersSection({
   volunteers,
-  pendingVolunteers,
   campMembers,
 }: {
   volunteers: Volunteer[]
-  pendingVolunteers: Volunteer[]
   campMembers: CampMember[]
 }) {
-  const noOne = campMembers.length === 0 && volunteers.length === 0 && pendingVolunteers.length === 0
+  // Pending volunteer signups live in the Applications review queue (the one
+  // place all pending people appear, each tagged with what they are) — this
+  // section is the registry of people already in.
+  const noOne = campMembers.length === 0 && volunteers.length === 0
 
   if (noOne) {
     return <p style={{ opacity: 0.4, fontStyle: 'italic', fontSize: '0.875rem' }}>No volunteers or camp members yet.</p>
@@ -461,18 +469,6 @@ export function VolunteersSection({
 
   return (
     <div>
-      {pendingVolunteers.length > 0 && (
-        <div style={{ marginBottom: '2rem' }}>
-          <SubHeading>Pending Approval — {pendingVolunteers.length}</SubHeading>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-            {pendingVolunteers.map(v => <PendingVolunteerRow key={v.id} volunteer={v} />)}
-          </div>
-          {(campMembers.length > 0 || volunteers.length > 0) && (
-            <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(210,57,248,0.15), transparent)', marginTop: '2rem' }} />
-          )}
-        </div>
-      )}
-
       {campMembers.length > 0 && (
         <div style={{ marginBottom: volunteers.length > 0 ? '2rem' : 0 }}>
           <SubHeading>Camp Members — {campMembers.length}</SubHeading>

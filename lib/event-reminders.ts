@@ -114,22 +114,42 @@ export async function collectEventReminders(targetDate: string): Promise<Reminde
 
   if (byMember.size === 0) return []
 
-  // Resolve identity + gate on approved & not suspended.
+  // Resolve identity + gate: approved non-suspended members, or active
+  // volunteers (volunteers hold shifts too — migration-free, keyed by the same
+  // clerk_user_id). A member row wins when both exist.
   const ids = Array.from(byMember.keys())
-  const { data: members } = await supabaseAdmin
-    .from('members')
-    .select('clerk_user_id, email, first_name, preferred_name, status, suspended_at')
-    .in('clerk_user_id', ids)
+  const [{ data: members }, { data: volunteers }] = await Promise.all([
+    supabaseAdmin
+      .from('members')
+      .select('clerk_user_id, email, first_name, preferred_name, status, suspended_at')
+      .in('clerk_user_id', ids),
+    supabaseAdmin
+      .from('volunteers')
+      .select('clerk_user_id, email, first_name, preferred_name, status')
+      .in('clerk_user_id', ids),
+  ])
   const memberByClerk = new Map((members ?? []).map(m => [m.clerk_user_id, m]))
+  const volunteerByClerk = new Map((volunteers ?? []).map(v => [v.clerk_user_id, v]))
 
   const out: ReminderRecipient[] = []
   for (const [clerkUserId, items] of Array.from(byMember)) {
     const m = memberByClerk.get(clerkUserId)
-    if (!m || m.status !== 'approved' || m.suspended_at) continue
+    if (m) {
+      if (m.status !== 'approved' || m.suspended_at) continue
+      out.push({
+        clerkUserId,
+        email: m.email ?? null,
+        name: m.preferred_name || m.first_name || 'there',
+        items,
+      })
+      continue
+    }
+    const v = volunteerByClerk.get(clerkUserId)
+    if (!v || v.status !== 'active') continue
     out.push({
       clerkUserId,
-      email: m.email ?? null,
-      name: m.preferred_name || m.first_name || 'there',
+      email: v.email ?? null,
+      name: v.preferred_name || v.first_name || 'there',
       items,
     })
   }

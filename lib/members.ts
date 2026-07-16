@@ -105,6 +105,65 @@ export async function getApprovedMember(clerkUserId: string): Promise<MemberReco
   return member?.status === 'approved' ? member : null
 }
 
+export type VolunteerRecord = {
+  id: string
+  clerk_user_id: string | null
+  email: string | null
+  first_name: string | null
+  last_name: string | null
+  preferred_name: string | null
+  status: string | null
+}
+
+/**
+ * The signed-in user's ACTIVE volunteer row (volunteers sign in with Clerk like
+ * members do, so the indexed clerk_user_id lookup is the only path — a volunteer
+ * without a linked account can't be signed in here). Pending/cancelled/removed
+ * volunteers return null: shift self-serve is an active-volunteer ability, the
+ * same bar the rest of the app uses (directory, dues, own-profile commitments).
+ */
+export async function getActiveVolunteer(clerkUserId: string): Promise<VolunteerRecord | null> {
+  try {
+    const { data } = await supabaseAdmin
+      .from('volunteers')
+      .select('id, clerk_user_id, email, first_name, last_name, preferred_name, status')
+      .eq('clerk_user_id', clerkUserId)
+      .eq('status', 'active')
+      .maybeSingle()
+    return (data as VolunteerRecord | null) ?? null
+  } catch (e) {
+    console.error('[members] getActiveVolunteer failed', e)
+    return null
+  }
+}
+
+// Who may hold shifts: an approved member or an active volunteer. Volunteers
+// exist to take shifts — the signup surfaces gate on this, not on membership.
+export type ShiftParticipant =
+  | { kind: 'member'; member: MemberRecord }
+  | { kind: 'volunteer'; volunteer: VolunteerRecord }
+
+/**
+ * Resolve the signed-in user as a shift participant: approved member first
+ * (members who also have a stale volunteer row count as members), else active
+ * volunteer, else null.
+ */
+export async function getShiftParticipant(clerkUserId: string): Promise<ShiftParticipant | null> {
+  const member = await getApprovedMember(clerkUserId)
+  if (member) return { kind: 'member', member }
+  const volunteer = await getActiveVolunteer(clerkUserId)
+  return volunteer ? { kind: 'volunteer', volunteer } : null
+}
+
+/** Display name for either kind of participant (mirrors memberDisplayName). */
+export function participantDisplayName(p: ShiftParticipant, fallback: string): string {
+  if (p.kind === 'member') return memberDisplayName(p.member, fallback)
+  const v = p.volunteer
+  if (v.preferred_name) return v.preferred_name
+  if (v.first_name && v.last_name) return `${v.first_name} ${v.last_name}`
+  return v.first_name ?? fallback
+}
+
 /** Human-readable name for notifications: preferred, else "First Last", else the fallback. */
 export function memberDisplayName(member: MemberRecord, fallback: string): string {
   if (member.preferred_name) return member.preferred_name
