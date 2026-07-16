@@ -49,6 +49,13 @@ const DAY_ORDER: Record<string, number> = {
   Wednesday: 0, Thursday: 1, Friday: 2, Saturday: 3, Sunday: 4, Monday: 5, Tuesday: 6,
 }
 
+// "Jul 24" from an ISO occurrence date (roster night labels, recurrence chips,
+// and the destroyed-signups warnings all speak the same date language).
+const fmtNight = (iso: string) => {
+  const d = new Date(`${iso}T12:00:00`)
+  return isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
 // Parse a time string like "7:00 PM" or "7:00 PM – 10:00 PM" to minutes since midnight
 function parseStartMinutes(time: string): number {
   if (!time) return 9999
@@ -590,9 +597,7 @@ function ShiftRoster({ event, entries, busyKey, error, onToggleLead }: {
       {nights.map(night => {
         const lineEntries = entries.filter(e => (e.occurrence_date ?? '') === night)
         if (event.is_recurring && lineEntries.length === 0) return null
-        const label = event.is_recurring && night
-          ? (() => { const d = new Date(`${night}T12:00:00`); return isNaN(d.getTime()) ? night : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) })()
-          : null
+        const label = event.is_recurring && night ? fmtNight(night) : null
         return (
           <ShiftRosterLine
             key={night || 'single'}
@@ -714,13 +719,16 @@ export function ScheduleManager({ rangeStart, rangeEnd, initialEvents, initialSh
   useEffect(() => { refreshShiftTypes() }, [])
   useEffect(() => { if (modal) refreshShiftTypes() }, [modal !== null])
 
-  useEffect(() => {
-    if (initialRosters !== undefined) return
+  // Rosters also refresh after a save that trimmed a recurring event's nights —
+  // the PATCH deletes those nights' signups server-side, so the local copy is
+  // stale the moment the save lands.
+  const refreshRosters = () => {
     fetch('/api/admin/schedule/rosters')
       .then(r => r.json())
       .then(d => setRosters(d.rosters ?? {}))
-      .catch(() => setRosters({}))
-  }, [])
+      .catch(() => {})
+  }
+  useEffect(() => { if (initialRosters === undefined) refreshRosters() }, [])
 
   const dated = events.filter((e) => !e.is_recurring && e.event_date)
   const undated = [...events.filter((e) => !e.is_recurring && !e.event_date)].sort(
@@ -737,6 +745,28 @@ export function ScheduleManager({ rangeStart, rangeEnd, initialEvents, initialSh
   }
 
   const handleSave = async (form: Omit<ScheduleEvent, 'id' | 'sort_order'>) => {
+    // Unchecking a repeat-day chip removes that night — and the PATCH below
+    // deletes that night's signups server-side (they're occurrence_date-keyed;
+    // nothing else cleans them up). Never silently: count what the roster
+    // holds on the dropped nights and get an informed confirm first.
+    if (modal?.mode === 'edit' && form.is_recurring && form.recurrence_days != null) {
+      const keep = new Set(form.recurrence_days)
+      const gone = (rosters[modal.event.id] ?? []).filter(e => e.occurrence_date && !keep.has(e.occurrence_date))
+      if (gone.length > 0) {
+        const nights = Array.from(new Set(gone.map(e => e.occurrence_date as string))).sort()
+        const s = gone.length === 1 ? '' : 's'
+        const ok = await confirm({
+          eyebrow: 'Signups will be deleted',
+          title: nights.length === 1
+            ? `Remove the ${fmtNight(nights[0])} night?`
+            : `Remove ${nights.length} nights?`,
+          body: `${gone.length} signup${s} on ${nights.map(fmtNight).join(' · ')} will be permanently deleted when you save — those members lose their spot${s} and are not notified. Signups on the remaining nights are kept.`,
+          confirmLabel: `Remove and delete ${gone.length} signup${s}`,
+          danger: true,
+        })
+        if (!ok) return
+      }
+    }
     setSaving(true)
     setModalError(null)
     // The display `time` derives from structured start/end for every event —
@@ -757,6 +787,7 @@ export function ScheduleManager({ rangeStart, rangeEnd, initialEvents, initialSh
       }
       if (!res.ok) { const d = await res.json(); throw new Error(d.error) }
       await load()
+      refreshRosters()
       setModal(null)
     } catch (e: unknown) {
       setModalError(e instanceof Error ? e.message : 'Something went wrong')
@@ -769,11 +800,27 @@ export function ScheduleManager({ rangeStart, rangeEnd, initialEvents, initialSh
   // whether to close (a cancelled confirm keeps it open).
   const handleDelete = async (id: string): Promise<boolean> => {
     const ev = events.find(e => e.id === id)
-    const ok = await confirm({
-      title: `Delete ${ev ? `“${ev.title}”` : 'this event'}?`,
-      confirmLabel: 'Delete event',
-      danger: true,
-    })
+    // member_shift_signups cascades on event delete — deleting a shift event
+    // destroys every night's signups with it. The confirm must say how much is
+    // at stake (2026-07-16 incident: a whole recurring shift deleted to remove
+    // one night, all signups gone without warning).
+    const held = rosters[id] ?? []
+    const n = held.length
+    const nightCount = new Set(held.filter(e => e.occurrence_date).map(e => e.occurrence_date)).size
+    const s = n === 1 ? '' : 's'
+    const ok = await confirm(n === 0
+      ? {
+          title: `Delete ${ev ? `“${ev.title}”` : 'this event'}?`,
+          confirmLabel: 'Delete event',
+          danger: true,
+        }
+      : {
+          eyebrow: 'Signups will be destroyed',
+          title: `Delete ${ev ? `“${ev.title}”` : 'this event'} and its ${n} signup${s}?`,
+          body: `This permanently deletes the event AND all ${n} signup${s}${nightCount > 1 ? ` across ${nightCount} nights` : ''} — those members lose their spot${s} and are not notified. ${ev?.is_recurring ? 'To drop a single night instead, keep the event and uncheck that day in Edit → Repeats on.' : 'There is no undo.'}`,
+          confirmLabel: `Delete event + ${n} signup${s}`,
+          danger: true,
+        })
     if (!ok) return false
     setActionError(null)
     const res = await fetch(`/api/admin/schedule/${id}`, { method: 'DELETE' }).catch(() => null)
@@ -786,6 +833,7 @@ export function ScheduleManager({ rangeStart, rangeEnd, initialEvents, initialSh
       return false
     }
     setEvents((prev) => prev.filter((e) => e.id !== id))
+    setRosters((prev) => { const { [id]: _gone, ...rest } = prev; return rest })
     return true
   }
 
@@ -903,10 +951,7 @@ export function ScheduleManager({ rangeStart, rangeEnd, initialEvents, initialSh
   // "Every day" or the picked dates ("Jul 22 · Jul 24") under a recurring row.
   const recurrenceLabel = (ev: ScheduleEvent) => ev.recurrence_days == null
     ? 'Every day'
-    : [...ev.recurrence_days].sort().map(iso => {
-        const d = new Date(`${iso}T12:00:00`)
-        return isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      }).join(' · ') || 'No days selected'
+    : [...ev.recurrence_days].sort().map(fmtNight).join(' · ') || 'No days selected'
 
   const rowProps = (ev: ScheduleEvent) => ({
     event: ev,

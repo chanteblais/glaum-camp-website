@@ -12,6 +12,11 @@ Recurrence (`is_recurring` + `recurrence_days`) is **purely an admin authoring c
 
 Supersedes the old "a shift is a `schedule_events` row with a capacity" model.
 
+**Signup-destruction guards (2026-07-16, no migration).** `member_shift_signups.schedule_event_id` is `ON DELETE CASCADE` (045), so deleting an event destroys every night's signups — which is exactly what happened when a whole recurring shift was deleted just to remove one night. Two guards in the schedule admin:
+
+- **Counted delete confirm** — `ScheduleManager.handleDelete` (list-row ✕ and the edit modal's Delete alike) counts the event's signups from the already-loaded rosters and, when > 0, escalates the confirm: "Delete *Glåüm Salon* and its 7 signups?" with the per-night spread ("across 3 nights"), an explicit no-notification warning, and — for recurring events — a pointer to the right tool ("to drop a single night, uncheck that day in Edit → Repeats on").
+- **Per-night removal = uncheck the day chip, with cleanup.** Unchecking a "Repeats on" chip removes that night; its `occurrence_date`-keyed signups are now deleted with it, server-side in `PATCH /api/admin/schedule/[id]`: whenever the saved row holds a materialised `recurrence_days` subset, signups whose `occurrence_date` is not in the subset are deleted (going back to "every day" = NULL removes nothing). The client warns first with the exact count and nights before saving, and refreshes rosters after. Before this, a trimmed night kept phantom signups that hours/rosters/reminders still counted.
+
 **One-liner:** Separate the *program* (what's happening) from *shifts* (where you're needed) and *mandatory events* (everyone attends), model shift kinds as configurable **categories** instead of hardcoded Setup/Teardown/Decor/Volunteer, and let attunement **reflect** shift requirements rather than re-declare them.
 
 ---

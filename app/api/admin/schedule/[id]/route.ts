@@ -46,6 +46,37 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Removing a night from a recurring event must also remove that night's
+  // signups — member_shift_signups rows are occurrence_date-keyed and the
+  // ON DELETE CASCADE only covers whole-event deletes, so a trimmed night
+  // would otherwise keep phantom signups (counted by hours/rosters/reminders)
+  // for a night that no longer exists. Only runs when the saved row holds a
+  // materialised day subset; going back to "every day" (NULL) removes nothing.
+  // The admin UI confirms the count before sending this PATCH.
+  if ('recurrence_days' in body && data?.is_recurring && Array.isArray(data.recurrence_days) && data.recurrence_days.length > 0) {
+    const keep = new Set<string>(data.recurrence_days)
+    const { data: signups, error: signupsError } = await supabaseAdmin
+      .from('member_shift_signups')
+      .select('id, occurrence_date')
+      .eq('schedule_event_id', params.id)
+    if (signupsError) {
+      return NextResponse.json({ error: `The event was saved, but checking the removed nights' signups failed: ${signupsError.message}. Re-save to retry.` }, { status: 500 })
+    }
+    const staleIds = (signups ?? [])
+      .filter(s => s.occurrence_date && !keep.has(s.occurrence_date))
+      .map(s => s.id)
+    if (staleIds.length > 0) {
+      const { error: cleanupError } = await supabaseAdmin
+        .from('member_shift_signups')
+        .delete()
+        .in('id', staleIds)
+      if (cleanupError) {
+        return NextResponse.json({ error: `The event was saved, but deleting the removed nights' ${staleIds.length} signup(s) failed: ${cleanupError.message}. Re-save to retry.` }, { status: 500 })
+      }
+    }
+  }
+
   return NextResponse.json({ event: data })
 }
 

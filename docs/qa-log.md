@@ -4,6 +4,42 @@ Running record of QA sweeps: what was tested, what was fixed, and — most
 useful for the next tester — what is *known and deliberate* so it doesn't get
 re-reported, plus where the remaining risk lives. Newest sweep first.
 
+## Fix 2026-07-16 — deleting a schedule event silently destroyed all its signups (branch `fix/delete-signup-guards`)
+
+Prompted by a real incident (2026-07-16): to delete ONE night (Friday) of the
+recurring Glåüm Salon night shift, the whole `schedule_events` row was deleted —
+the only delete on offer — and `member_shift_signups`' ON DELETE CASCADE (045)
+took every night's signups with it, without warning.
+
+### Fixed
+
+- **Delete confirm now counts the signups at stake** — `ScheduleManager`'s
+  delete (list-row ✕ and the edit modal's Delete button) reads the event's
+  roster and, when signups exist, escalates: signup count in title and confirm
+  button, per-night spread for recurring events, an explicit "members lose
+  their spot and are not notified", and — on recurring events — a pointer to
+  unchecking the day chip when only one night should go.
+- **Unchecking a "Repeats on" day chip now cleans up that night's signups** —
+  previously the night disappeared from the schedule but its
+  `occurrence_date`-keyed signups lived on as phantoms (still counted by
+  rosters, hours, reminders). Now the modal confirms with the exact count +
+  nights before saving, and `PATCH /api/admin/schedule/[id]` deletes signups
+  outside the saved `recurrence_days` subset server-side.
+
+### Known and deliberate
+
+- Reverting a recurring event to "every day" (`recurrence_days` NULL) never
+  deletes signups — it only ever *adds* nights, and the every-day night list
+  depends on the configured event range, which isn't safe to treat as a
+  deletion boundary.
+- The per-night cleanup runs on any edit-modal save of a recurring event with
+  picked days (not just chip changes) — it's self-healing for stale phantom
+  rows, and a no-op when nothing is orphaned.
+- The counted confirm depends on the client's roster snapshot (loaded with the
+  page, refreshed after saves); a signup landing in the seconds between page
+  load and delete can be under-counted. Accepted — the server cascade is the
+  same either way, and the roster is fresh in practice.
+
 ## Fix 2026-07-10 — admin week view counted signups across all nights (branch `fix/weekview-per-night-counts`)
 
 Prompted by a real report (2026-07-10): the participate picker showed the
