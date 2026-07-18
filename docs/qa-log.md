@@ -26,12 +26,29 @@ took every night's signups with it, without warning.
   nights before saving, and `PATCH /api/admin/schedule/[id]` deletes signups
   outside the saved `recurrence_days` subset server-side.
 
+Follow-up (same day, same branch): **all-nights-or-just-one prompts** on
+recurring events. Delete first asks *which* (night chooser with per-night
+signup counts → trim path, or the whole event → cascade confirm); saving field
+edits asks "All nights, or just one?" — a single night is split into its own
+one-off event with the edits, its signups moved along (`split_night` in the
+schedule PATCH). New generic `useChoice` dialog in `ConfirmDialog.tsx`.
+
 ### Known and deliberate
 
 - Reverting a recurring event to "every day" (`recurrence_days` NULL) never
   deletes signups — it only ever *adds* nights, and the every-day night list
   depends on the configured event range, which isn't safe to treat as a
   deletion boundary.
+- The all-or-one save prompt only appears when day chips are untouched — chip
+  edits are series-level by nature and take the trim path; mixing both in one
+  save applies field changes to all nights.
+- Splitting a night whose reminder was already sent under the series' event id
+  can remind that night twice (the ledger doesn't follow the new id). Rare and
+  harmless — the reminder is still accurate.
+- Single-night series and every-day series with no configured event range skip
+  the choosers (there is no meaningful "just one"); the split action also
+  rejects server-side in the no-range case with a pointer to Configure →
+  Event Dates.
 - The per-night cleanup runs on any edit-modal save of a recurring event with
   picked days (not just chip changes) — it's self-healing for stale phantom
   rows, and a no-op when nothing is orphaned.
