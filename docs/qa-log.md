@@ -4,6 +4,41 @@ Running record of QA sweeps: what was tested, what was fixed, and — most
 useful for the next tester — what is *known and deliberate* so it doesn't get
 re-reported, plus where the remaining risk lives. Newest sweep first.
 
+## Sentry 2026-07-19 — nightly review of `fix/delete-signup-guards` (4ebb7d2)
+
+Automated review of the three commits new on `main` since the last sentry
+(`5a924ca`, `fa2a122`, `4ebb7d2`). Route gating, house rules (no inline
+`<style>`, ~380px handling in the new `ChoiceDialog`), and same-commit docs all
+check out. Two edge findings, neither reachable in the normal flow.
+
+### Found — not yet fixed
+
+- **The "remove one night" confirm can under-count what the save deletes.**
+  `removeNight` (`app/admin/ScheduleManager.tsx:864`) counts only the target
+  night's signups, but the PATCH it sends deletes *every* signup whose
+  `occurrence_date` falls outside the new `recurrence_days` set
+  (`app/api/admin/schedule/[id]/route.ts:142`). On an "every day" event those
+  two disagree whenever a signup sits outside the currently configured event
+  range — e.g. the range was narrowed in Configure → Event Dates after the
+  signup was taken (`/api/shift-signups` validates against the range at signup
+  time, not afterwards). Removing any one night then also destroys those
+  out-of-range signups, unannounced. The edit-modal save path is fine: it
+  computes its count from the same keep-set the server uses. Fix would be to
+  count with the keep-set in `removeNight` too. (Note the qa-log entry below
+  calls this cleanup "self-healing for stale phantom rows" — that is the
+  deliberate part; the silent count is the gap.)
+- **`recurrence_days = []` is read as "no nights" by the split, but as "every
+  day" everywhere else.** `splitNight` computes
+  `remaining = (row.recurrence_days ?? rangeDays)`
+  (`app/api/admin/schedule/[id]/route.ts:65`), so an empty array stays empty and
+  the series is deleted outright — while `shiftOccurrenceDates` treats `[]` as
+  the full range, which is also why `isValidOccurrence` at line 31 lets the
+  night through in the first place. Not reachable from the admin UI (`nightsOf`
+  returns `[]` for such a row, so no chooser is offered) — it needs a
+  hand-crafted PATCH from an admin, hence low severity. A
+  `?? `→`length ? … : rangeDays` normalization would close it, and would match
+  the "No days selected" state the manager already renders.
+
 ## Fix 2026-07-16 — deleting a schedule event silently destroyed all its signups (branch `fix/delete-signup-guards`)
 
 Prompted by a real incident (2026-07-16): to delete ONE night (Friday) of the
