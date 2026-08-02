@@ -4,6 +4,8 @@ import { getOrCreateGroupConversation } from '@/lib/conversations'
 import { requireAdmin } from '@/lib/admin-auth'
 
 export async function GET() {
+  if (!(await requireAdmin())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
   const { data: groups, error } = await supabaseAdmin
     .from('groups')
     .select('id, name, description, icon, icon_image, apply_selectable, sort_order, join_policy, visibility, collection_id, required_shift_type_id, required_shift_hours')

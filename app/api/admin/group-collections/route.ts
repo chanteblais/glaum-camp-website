@@ -5,6 +5,8 @@ import { requireAdmin } from '@/lib/admin-auth'
 // Group Collections — the configurable container above leaf `groups`.
 // See migration 042 + lib/group-collections.ts.
 export async function GET() {
+  if (!(await requireAdmin())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
   const { data, error } = await supabaseAdmin
     .from('group_collections')
     .select('id, name, description, selection, show_on_profile, self_join, sort_order')

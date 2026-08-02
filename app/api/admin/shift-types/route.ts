@@ -8,6 +8,8 @@ import { getAdminShiftTypes } from '@/lib/admin-program-data'
 // or on attunement tasks (universal), never on the type itself.
 
 export async function GET() {
+  if (!(await requireAdmin())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
   try {
     return NextResponse.json({ shiftTypes: await getAdminShiftTypes() })
   } catch (e) {
