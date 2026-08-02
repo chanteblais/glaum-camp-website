@@ -86,6 +86,7 @@ Sign-out flow:
 | Route | Method | Purpose |
 |---|---|---|
 | `/api/apply` | POST | Submit application |
+| `/api/apply/file` | POST | Upload an attachment for an admin-added **File upload** application field (multipart `file` → public `application-files` bucket under `{userId}/`; returns `{ url, name }`). Type allow-list + 10 MB cap. Gate is **any signed-in Clerk user** (not just applicants) and there's no cleanup path — see the gate note below the tables. |
 | `/api/volunteer` | POST | Submit volunteer signup |
 | `/api/signup` | GET/POST | Fetch departments/roles + upsert member **role** selection. Sets `role_approval_status = 'pending'` for roles with `requires_approval = true`. (Shift halves are legacy — shifts moved to `/api/shift-signups`.) |
 | `/api/shift-signups` | GET/POST/DELETE | **Multi-shift signup** (shifts redesign): GET slots + owed hour requirements (incl. `lead_names`/`held_role`), POST sign up for a slot (capacity + signup-open enforced, admin notified; optional `role: 'member'\|'lead'` — omitted keeps the existing role), DELETE cancel. Backed by `member_shift_signups` (the single source of shift holds since `065`). Gated on `getShiftParticipant` — **approved member or active volunteer** (2026-07-16; volunteers pick shifts self-serve). A volunteer's GET strips `owed` (member attunement concept); their admin bell note reads "… (volunteer)" with no application link. |
@@ -97,6 +98,8 @@ Sign-out flow:
 | `/api/resources/items` | POST | Add an item: `{ list_id, name, note, quantity_needed?, bring? }`. Blank `quantity_needed` → open offer (NULL); else a tracked need (clamped 1–99). `offered_by` = caller; `bring` (default true) seeds the ×1 claim + fires the `contribution` radio moment. Visible lists only. **Approved, non-suspended members.** (Absorbed the former `/api/resources/offers`.) |
 | `/api/resources/items/[id]` | PATCH / DELETE | Edit `{ name, note, quantity_needed }` or delete an item (claims cascade) — **wiki-open** to any approved member. |
 | `/api/profile/application` | PATCH | Update profile fields |
+| `/api/profile/fields` | GET/PATCH | The **Profile Fields registry** surface: GET returns the fields the member may see/edit (`page_content.config_profile_fields`) + their current values; PATCH writes `member_profiles.values` for `memberEditable` keys **only**, and records catch-up dismissals (`__dismiss`). Resolves via `resolveMember` (404 with no member row). Migration `037` |
+| `/api/profile/notifications` | GET/PATCH | Read / upsert the caller's five email preferences (`notification_preferences`, keyed by `clerk_user_id`). Powers `/profile#notifications`. Any signed-in user — no member row required |
 | `/api/profile/avatar` | POST | Upload avatar to Supabase Storage |
 | `/api/profile/cancel` | POST | Cancel own application (reason required; mirrors `cancelled` onto `members.status` and releases the member's role + shift slots — `camp_signups` and `member_shift_signups` — same cleanup as the admin remove flow) |
 | `/api/profile/suspend` | POST | Suspend / resume own attendance: `{ suspended: boolean, note? }`. Suspending sets `members.suspended_at` and releases **all** commitments — role, groups, shifts, resource claims (`lib/suspension.ts`); resuming lifts the flag (nothing restored). Notifies admins. **Approved members only.** Migration `063` |
@@ -104,7 +107,11 @@ Sign-out flow:
 | `/api/admin/dues/[memberId]` | POST | Admin mark camp dues paid / unpaid (by **row id**): `{ paid: boolean, note?, entity?: 'member'\|'volunteer' }`. `paid:true` confirms (sets `dues_paid_at` / `dues_paid_by` / `dues_note`); `paid:false` resets to owed (for members also clears `dues_reported_at`). `entity` routes to `members` (default) or `volunteers`. Powers the dues tracker (Community → Camp Dues) and the member-detail control; drives the `dues` attunement requirement. **Admin only.** Migrations `067`–`069` |
 | `/api/dues/report` | POST | Member **self-report** dues paid: `{ reported: boolean }`. Sets/clears own `members.dues_reported_at` (no-op once an admin has confirmed `dues_paid_at`); reporting notifies admins (`dues_reported`). **Approved members only.** Migration `068` |
 | `/api/role-suggestions` | POST | Submit a dept/role suggestion |
-| `/api/radio` | POST | Member `voice` radio post (`{ message }` ≤200 chars). **Approved members only; currently UI-less** — writing on `/radio` is broadcasters-only per the 2026-07-03 mockup; this route is reserved for member moments returning. Feed reads are server-rendered (`/radio`, home teaser). See [radio.md](radio.md) |
+| `/api/radio` | POST | Member `voice` radio post (`{ message }` ≤280 chars). **Approved members only.** Backs the on-page `/radio` composer (`RadioComposer.tsx`) — **writing is open** since 2026-07-08 (reversing the 2026-07-03 broadcasters-only gate). Parses `@mention` (bell + email to the mentioned member) and `@here` (notify-all — bell + email to every member, post marked 📢, confirm-gated in the composer); mentioned members are reached once. Admin kill-switch: `config_radio.voice` ("Member voices"), which rejects with "Member posts are currently off". Feed reads are server-rendered (`/radio`, home teaser). See [radio.md](radio.md) |
+| `/api/lead-up-events` | GET | Visible lead-up gatherings + RSVP counts + my own RSVP flag (`lib/lead-up.ts` `getMemberLeadUpEvents`) — the client refresh path for the server-rendered `/schedule` section. **Approved members only.** See [lead-up-gatherings.md](lead-up-gatherings.md) |
+| `/api/lead-up-events/[id]/rsvp` | POST | RSVP to a gathering: `{ rsvp?: boolean }` (**omitted = toggle**). Writes `lead_up_event_rsvps`, returns `{ rsvped, count }`; a fresh RSVP sends the confirmation email. **Approved members only.** Migration `066` |
+| `/api/schedule/[id]/rsvp` | GET/POST | RSVP to a visible at-camp event: GET `{ rsvped, count }`; POST `{ rsvp?: boolean }` (**omitted = toggle**) writes `event_rsvps`. No email. POST is approved-members-only; GET only requires a session. Migration `028` |
+| `/api/polls/[id]/vote` | POST | Vote in a visible, unexpired poll: `{ option_indexes: number[] }` (or legacy `{ option_index }`). Replaces my own `poll_votes` rows (delete-then-insert); returns `{ counts, userVotes }`. Indexes are validated against the poll's options — an out-of-range index would inflate the counts array sent to every client. **Approved members only.** |
 | `/api/shoutouts` | GET/POST | List visible shoutouts / post one (approved members) |
 | `/api/shoutouts/[id]` | DELETE | Delete a shoutout (author or admin only) |
 | `/api/notifications` | GET/PATCH | Fetch + mark-read user notifications |
@@ -122,6 +129,9 @@ Sign-out flow:
 | `/api/nav-auth` | GET | Lightweight auth check for nav (returns `isSignedIn`, `isApproved`, name, email, avatarUrl) |
 | `/api/sign-out` | GET | Revoke Clerk sessions (verified identity) + clear session cookies |
 | `/api/badge` | GET | Generate role badge PNG (OG image) |
+| `/api/debug-auth` | GET | Echoes the **caller's own** `userId` / `sessionId` / `sessionClaims` / Clerk `publicMetadata`. Read-only and self-scoped (an unauthenticated caller gets nulls), but it is **not env-gated** and ships in production — a dev-only introspection helper with no reason to be live. |
+
+**Gate notes (member-facing).** `/api/shift-signups` refuses suspended members (`suspended_at` → 403), but the **RSVP and poll-vote routes deliberately don't** — suspension releases commitments and blocks new ones, while RSVPs and votes stay open (read-access semantics; see `lib/suspension.ts`). Don't assume the shift-signup gate is universal. Note also that `/api/lead-up-events`, `/api/lead-up-events/[id]/rsvp` and `/api/schedule/[id]/rsvp` hand-roll their own `members.status = 'approved'` query instead of calling `getApprovedMember` — same semantics, but it's why they never see `suspended_at`. New member-facing routes should use `getApprovedMember`.
 
 ### Admin-only
 
@@ -129,6 +139,7 @@ Sign-out flow:
 |---|---|---|
 | `/api/admin/[id]/approve` | POST | Approve application (sets status, in-app notification, approval email). Returns `emailWarning` when the email send fails so the admin UI can surface it — the approval itself still succeeds. |
 | `/api/admin/[id]/reject` | POST | Reject application |
+| `/api/admin/[id]/remove` | POST | Remove a member: `{ reason? }`. Soft-cancels the application (`status='cancelled'` + reason/timestamps), mirrors onto `members` (`setMemberStatus`), and releases every commitment — `camp_signups`, `member_shift_signups`, `group_members` (+ their group welcome notes). Bells + emails the member; returns `emailWarning` when that send fails (**the removal is already committed** — the warning is the only signal). |
 | `/api/admin/departments` | GET/POST | List / create departments |
 | `/api/admin/departments/[id]` | PATCH/DELETE | Update / delete department |
 | `/api/admin/roles` | GET/POST | List / create roles |
@@ -137,6 +148,13 @@ Sign-out flow:
 | `/api/admin/groups/[id]` | PATCH/DELETE | Update / delete group |
 | `/api/admin/groups/[id]/members` | GET/POST/DELETE | Group roster / add member / remove member (`?clerk_user_id=`) |
 | `/api/admin/groups/[id]/icon` | POST/DELETE | Upload / clear a group's icon image (`group-badges` bucket, `groups/` prefix; sets `groups.icon_image`). Mirrors the avatar route. |
+| `/api/admin/group-collections` | GET/POST | List collections (by `sort_order`) / create one: `{ name, description?, selection?: 'single'\|'multi', show_on_profile?, self_join?, sort_order? }`. Migration `042`. |
+| `/api/admin/group-collections/[id]` | PATCH/DELETE | Update a collection (same fields) / delete it — **refused (400) while any `groups.collection_id` still points at it**. |
+| `/api/admin/lead-up-events` | GET/POST | List all gatherings + RSVP counts (`getAdminLeadUpEvents`) / create one (`{ title, description?, event_date?, start_time?, end_time?, location?, link?, host?, image_url?, visible? }`, appended to `sort_order`). See [lead-up-gatherings.md](lead-up-gatherings.md) |
+| `/api/admin/lead-up-events/[id]` | PATCH/DELETE | Update (allow-listed fields + `sort_order`) / hard-delete a gathering |
+| `/api/admin/lead-up-events/[id]/notify` | POST | Broadcast a **visible** gathering to every approved member: bell rows for all with a Clerk id + `sendLeadUpGatheringEmail` to everyone who hasn't set `email_announcements = false`; stamps `notified_at`. 400s if the gathering is hidden. **Re-sendable** (no dedupe ledger). Migration `040` |
+| `/api/admin/lead-up-events/image` | POST/DELETE | Upload (multipart `image`; PNG/JPG/WebP, ≤5 MB → `lead-up-images` bucket, returns `{ url }`) / delete by `{ url }`. Migration `041` |
+| `/api/admin/members/[memberId]/distinctions` | POST/DELETE | Grant a distinction by hand (`{ distinctionId, note? }` → `member_distinctions`; also posts an `achievement` radio moment linking the member) / revoke (`?distinctionId=`, no radio post). The manual half of the derived-distinctions model. Migration `038` |
 | _(Shared Resources has no admin routes — member-owned on `/participate` since 2026-07-08; see the `/api/resources/*` rows above.)_ | | |
 | `/api/admin/distinctions/[id]/icon` | POST | Upload distinction medal art (`group-badges` bucket, `distinctions/` prefix; returns URL, stored in `config_distinctions`). Used by the shared `AssetImagePicker`. |
 | `/api/admin/departments/[id]/icon` | POST | Upload a department icon (`group-badges` bucket, `departments/` prefix; returns URL, stored in `departments.icon`). `[id]` is the row id or a client-generated key for not-yet-saved departments. |
@@ -144,7 +162,8 @@ Sign-out flow:
 | `/api/admin/schedule/[id]` | PATCH/DELETE | Update / delete event |
 | `/api/admin/schedule/icon` | POST | Upload custom event icon |
 | `/api/admin/schedule/rosters` | GET | Per-event shift rosters for the schedule editor (`member_shift_signups`; names + lead role, per occurrence) |
-| `/api/admin/shift-types` | GET/POST | List / create shift types (the configurable registry; `/[id]` PATCH/DELETE to edit) |
+| `/api/admin/shift-types` | GET/POST | List / create shift types (the configurable registry — see [shifts-redesign.md](shifts-redesign.md)) |
+| `/api/admin/shift-types/[id]` | PATCH/DELETE | Update / delete a shift type. Migration `046` |
 | `/api/admin/signups/[userId]` | GET/PATCH | View / manage member signups |
 | `/api/admin/role-requests` | GET | List pending role requests |
 | `/api/admin/role-requests/[userId]` | PATCH | Approve / reject role request |
@@ -157,9 +176,15 @@ Sign-out flow:
 | `/api/admin/announcements` | GET/POST | List visible announcements / create new |
 | `/api/admin/announcements/all` | GET | List all announcements including hidden (admin only) |
 | `/api/admin/announcements/[id]` | PATCH/DELETE | Update / delete announcement |
-| `/api/admin/radio` | GET/POST | Recent radio posts (manager list, same assembly the Program tab server-renders) / post an organizer broadcast `{ message, detail?, icon?, notify? }` — also the target of the /radio on-page composer; optional `notify` = bell + announcement email (lead-up notify pattern). See [radio.md](radio.md) |
+| `/api/admin/radio` | GET/POST | Recent radio posts (manager list, same assembly the Program tab server-renders) / post an organizer `broadcast` `{ message, detail?, icon?, notify? }` from the Admin console; optional `notify` = bell + announcement email (lead-up notify pattern). *(The `/radio` on-page composer targets `/api/radio`, not this route.)* See [radio.md](radio.md) |
 | `/api/admin/radio/[id]` | DELETE | Remove a radio post (feed curation, any kind) |
 | `/api/admin/page-content` | GET/PATCH | Read / upsert any `page_content` row — used for homepage copy (`home_*`) and form configs (`config_member_form`, `config_volunteer_form`) |
+| `/api/admin/polls` | GET/POST | List all polls / create one (`{ question, options, visible?, allow_multiple?, expires_at? }`). **Gated by `requirePollManager`, not `requireAdmin`** — admins *or* members with Clerk `publicMetadata.canManagePolls`. The only admin-namespaced routes a non-admin can reach. |
+| `/api/admin/polls/[id]` | PATCH/DELETE | Update / delete a poll. Also `requirePollManager`. |
+| `/api/admin/set-admin` | POST | Grant / revoke admin: `{ targetUserId, grant: boolean }` → Clerk `publicMetadata.role = 'admin' \| null`. **Refuses self-demotion.** Takes effect on the target's next token refresh (~60s — the `requireAdmin` claim fast path). |
+| `/api/admin/set-poll-manager` | POST | Grant / revoke the poll-manager capability: `{ targetUserId, grant: boolean }` → `publicMetadata.canManagePolls = true \| null` (shallow merge — preserves `role`). |
+| `/api/admin/debug` | GET | Read-only dump of every `applications` row (`id, email, status, submitted_at`) + count + the raw Supabase error. Dev helper; **not env-gated**, but properly admin-gated. |
+| `/api/admin/debug/reset-user` | POST | ⚠️ **Destructive dev helper.** `{ email }` → permanently deletes that user's `camp_signups`, `user_notifications`, `role_suggestions` and their `applications` row. No confirmation, no dry-run, not env-gated. Unlike `/api/admin/[id]/remove` it leaves `members` / `member_shift_signups` / `group_members` behind, so it can strand a member row whose application is gone. Prefer the remove route for real members. |
 
 ### Cron (Vercel Cron)
 

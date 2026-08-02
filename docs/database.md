@@ -548,7 +548,8 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 
 | File | What it adds |
 |---|---|
-| `004_roles_shifts.sql` | `roles`, `shifts` tables |
+| `profile-updates.sql` | **Unnumbered — predates the numbering scheme.** `cancel_reason` / `cancelled_at` / `profile_updated_at` on `applications` (profile edits + self-cancellation) + the `admin_notifications` table & unread index. Long applied; kept for provenance. Additive + idempotent. |
+| `004_roles_shifts.sql` | `roles`, `shifts` tables *(the `shifts` table was dropped by `065`)* |
 | `005_departments.sql` | `departments` table |
 | `006_role_detail_fields.sql` | Role description, capacity |
 | `007_shift_date.sql` | Date field on shifts |
@@ -563,6 +564,7 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `016_schedule_contribution_type.sql` | `contribution_type` on schedule events |
 | `017_role_suggestions.sql` | `role_suggestions` table, `user_notifications` table |
 | `018_page_content.sql` | `page_content` table |
+| `018_wizard_fields.sql` | Application wizard v2 fields: `find_at_camp` + `department_interests TEXT[]` on `applications`. *(Shares the `018` number with `page_content` — a historical collision; both are applied, order between them doesn't matter.)* |
 | `019_schedule_event_date.sql` | `event_date DATE` on `schedule_events` |
 | `020_announcements.sql` | `announcements` table |
 | `021_event_category.sql` | `event_category TEXT` on `schedule_events` (default `'at_camp'`) |
@@ -580,6 +582,9 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 | `033_conversations.sql` | **Group messaging.** Adds `conversations` + `conversation_participants` tables; `messages.conversation_id` + `parent_message_id` (and makes `recipient_clerk_id` nullable); group governance columns (`join_policy`/`visibility` on `groups`, `role` on `group_members`). Backfills a conversation per group and per existing DM pair (preserving read state). Additive + idempotent; **must be applied** before group messaging works. |
 | `034_group_badge_image.sql` | `badge_image` column on `groups` (later renamed to `icon_image` by `035`) + public `group-badges` storage bucket and read policy. Additive + idempotent. |
 | `035_rename_group_badge_to_icon.sql` | Renames `groups.badge_image` → `groups.icon_image` (the per-group uploaded image, now called an "icon" in the UI/code; the emoji field stays `groups.icon`). Data preserved; bucket keeps its `group-badges` name. **Must be applied** — the profile + Groups admin select `icon_image`. |
+| `036_public_profile_fields.sql` | **Curated public-profile fields.** `public_bio` + `public_skills` on `applications` — the About paragraph + Skills & Gifts chips on `/members/[id]`. Deliberately separate from the application answers (`about_you` / `special_skills`), which stay admin-only: members curate what the directory shows. Additive + idempotent. |
+| `037_members_and_profiles.sql` | **`members` + `member_profiles`** (Phase 1 of profile-as-source-of-truth — see [profile-architecture.md](profile-architecture.md)). Splits the two roles `applications` played: `members` = canonical identity (one row per person, `clerk_user_id` the stable join key, `status` the membership gate); `member_profiles` = configurable profile values (1:1, keyed by `page_content.config_profile_fields` keys). Backfills one member per distinct person (by `clerk_user_id`, else `lower(email)`) from the most recent application. Additive + idempotent. |
+| `038_member_distinctions.sql` | **Manually attributed distinctions** — the exception to "distinctions are derived, never stored". `member_distinctions` records distinctions an admin grants by hand (honorary / one-off / overrides); `evaluateDistinctions` **unions** these with the rule-derived ones (a rule with no conditions is "manual only"). Read via `lib/distinction-awards.ts`. Additive + idempotent. |
 | `039_lead_up_gatherings.sql` | **Lead-Up Gatherings.** Adds `lead_up_events` + `lead_up_event_rsvps` tables — real-dated planning sessions on the runway to the event, separate from `schedule_events`. Additive + idempotent; **must be applied** before the feature works. See [`lead-up-gatherings.md`](./lead-up-gatherings.md). |
 | `040_lead_up_notified.sql` | `notified_at TIMESTAMPTZ` on `lead_up_events` — tracks the "Notify members" broadcast. Additive + idempotent. |
 | `041_lead_up_image.sql` | `image_url TEXT` on `lead_up_events` + public `lead-up-images` storage bucket & read policy. Additive + idempotent; **must be applied** (or create the bucket manually) before image upload works. |

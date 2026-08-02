@@ -18,8 +18,11 @@ The shipped build follows this design; a few details were refined during impleme
 - **Group membership is derived from `group_members`, not synced into participants.** Rather than
   keeping `conversation_participants` in lockstep on every membership change, the inbox/unread
   derive "which groups am I in" from `group_members` (source of truth), and a participant row is
-  created **lazily** on first read/post to hold `last_read_at`. Net effect: adding/removing a
-  group member needs no messaging wiring — only group *creation* makes the conversation.
+  created **lazily** on first read/post to hold `last_read_at`. Net effect on the *participants*
+  table: adding/removing a group member never has to touch it — only group *creation* makes the
+  conversation. **⚠️ This is no longer true of messaging wiring in general.** Since the welcome
+  notes (migration `071`, below), every path that adds a `group_members` row must call
+  `sendGroupWelcome`, and every path that deletes one must call `deleteGroupWelcome`.
   Thread read/post additionally gates on `members.status === 'approved'` (QA sweep 2026-07-03:
   a `group_members` row lingering past a removal/rejection must not keep granting access;
   remove/reject now also delete those rows).
@@ -130,7 +133,19 @@ CREATE INDEX cp_user_idx ON conversation_participants (clerk_user_id);
 ALTER TABLE messages ADD COLUMN conversation_id   UUID REFERENCES conversations(id) ON DELETE CASCADE;
 ALTER TABLE messages ADD COLUMN parent_message_id UUID REFERENCES messages(id) ON DELETE CASCADE; -- null = top-level
 CREATE INDEX messages_conversation_idx ON messages (conversation_id, created_at);
+
+-- Migration 071 — private per-member system notes (the group welcome note).
+-- NULL = a normal message everyone in the thread sees; set = visible only to that member.
+ALTER TABLE messages ADD COLUMN visible_to TEXT;
+CREATE INDEX messages_visible_to_idx ON messages (visible_to) WHERE visible_to IS NOT NULL;
 ```
+
+⚠️ **`visible_to` is a read-filter obligation, not just a column.** Any new reader of `messages`
+must apply `visibleToFilter()` (`lib/conversations.ts`) or it will leak every member's private
+welcome notes into the thread. The existing group readers already do
+(`app/api/messages/g/[groupId]/route.ts`, `lib/conversations.ts`, `lib/inbox.ts`); the DM readers
+are safe only because they scope by `recipient_clerk_id`, which system notes never carry.
+System notes use `sender_clerk_id = 'system'` (`SYSTEM_SENDER`).
 
 `recipient_clerk_id` becomes nullable / vestigial after backfill (it's meaningless for group
 messages). Keep it for now to avoid a destructive change; drop it in a later cleanup migration
