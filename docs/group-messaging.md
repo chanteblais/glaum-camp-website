@@ -47,9 +47,16 @@ The shipped build follows this design; a few details were refined during impleme
   'system'`. Only they see it, it lands unread, so the message badge tells them they're in the
   group — consistent with quiet-by-default (no email, no notification rows, nothing for existing
   members). All member-facing message readers filter through `visibleToFilter()`; replying to a
-  system note is rejected (its parent would be invisible to everyone else). Removal paths call
-  `deleteGroupWelcome` so a later re-add produces a fresh unread welcome. The migration backfilled
+  system note is rejected (its parent would be invisible to everyone else). The migration backfilled
   a welcome for every existing membership (the retroactive "you're in this group" nudge).
+- **Every path that deletes `group_members` rows must call `deleteGroupWelcome`** — otherwise the
+  stale note survives, `sendGroupWelcome`'s per-(group, member) idempotence finds it, and the
+  re-add is silently welcome-less. The paths, all paired: admin remove from group
+  (`/api/admin/groups/[id]/members`), self-leave (`/api/groups/[id]/leave`,
+  `/api/groups/membership`), rejection + removal (`/api/admin/[id]/{reject,remove}`), and
+  **member suspension** (`lib/suspension.ts` — which releases *all* groups at once, so it uses the
+  all-groups form `deleteGroupWelcome(userId)` with no `groupId`). Suspension was missed when `071`
+  shipped and fixed 2026-07-16; a suspend → resume → re-add cycle produced no fresh welcome.
 - Code: `lib/conversations.ts`; `app/api/messages/g/[groupId]/{route,read}`; `app/messages/g/[groupId]/{page,GroupThreadClient}`; inbox changes in `lib/inbox.ts` (summary logic, shared by `app/api/messages/route.ts` and the server-rendered `/messages` page) + `MessagesInboxClient.tsx`; `sendGroupMentionEmail` in `lib/send-email.ts`; `group_mention` link in `UserNotificationBell`.
 
 ## Decisions already made

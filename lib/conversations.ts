@@ -137,9 +137,10 @@ export async function sendGroupWelcome(groupId: string, userId: string): Promise
   }
 }
 
-// Remove a member's private welcome note(s) — called by every path that deletes
-// group_members rows, so a later re-add produces a fresh (unread) welcome.
-// Omit groupId to clear across all groups (member removal / rejection).
+// Remove a member's private welcome note(s) — every path that deletes
+// group_members rows must call this, or sendGroupWelcome's idempotence finds the
+// stale note and the re-add is silently welcome-less. Omit groupId to clear
+// across all groups (member removal / rejection / suspension).
 export async function deleteGroupWelcome(userId: string, groupId?: string): Promise<void> {
   try {
     let query = supabaseAdmin
