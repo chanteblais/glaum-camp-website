@@ -4,6 +4,39 @@ Running record of QA sweeps: what was tested, what was fixed, and — most
 useful for the next tester — what is *known and deliberate* so it doesn't get
 re-reported, plus where the remaining risk lives. Newest sweep first.
 
+## Sentry 2026-07-17 — volunteer shift-reminder emails link to the member-gated `/schedule`
+
+Nightly QA sentry over the 5 commits merged 2026-07-16 for volunteer shifts
+(`a468ee4` and below). One confirmed finding; the rest of the feature checked
+out (shift signup POST/DELETE, `/participate` shifts-only variant, public
+Shifts medallion card, unified Pending Review queue, `memberDisplayNames`
+volunteer fallback, `member_shift_signups.clerk_user_id` has no FK so a
+volunteer id inserts cleanly).
+
+### Confirmed — needs a fix
+
+- **Reminder emails send active volunteers to a page they can't open.**
+  `feat/volunteer-shifts` added volunteers to `collectEventReminders`
+  (`lib/event-reminders.ts` — an active volunteer holding a shift on the target
+  night now becomes a `ReminderRecipient`), but the shift item's `href` is
+  hardcoded `'/schedule'` (`lib/event-reminders.ts:107`) and the reminder
+  email's footer "View your schedule ✦" button is a hardcoded
+  `${APP_URL}/schedule` (`lib/send-email.ts:334`) — neither is recipient-kind
+  aware. `/schedule` redirects any non-approved user to `/profile`
+  (`app/schedule/page.tsx:26`), so a volunteer who self-serves a shift and gets
+  a day-before / morning-of reminder taps through to a bounce, not their shift.
+  The **confirmation** email in the signup POST *was* made volunteer-aware
+  (`href: participant.kind === 'volunteer' ? '/participate' : '/schedule'`,
+  `app/api/shift-signups/route.ts`), and this commit's own docs claim the same
+  for reminders — features.md: *"Reminder + confirmation emails resolve
+  volunteers too … the volunteer's links point at `/participate` since
+  `/schedule` is member-gated."* The reminder path just wasn't updated to match.
+  Fix: thread the recipient kind through `ReminderRecipient` (or resolve it in
+  the cron loop) and point volunteers' item links + footer button at
+  `/participate`, mirroring the confirmation email. Landing on `/profile` isn't
+  catastrophic (it now carries the "✦ Pick / change your shifts" entry point),
+  but it contradicts the shipped docs and the member experience.
+
 ## Fix 2026-07-16 — deleting a schedule event silently destroyed all its signups (branch `fix/delete-signup-guards`)
 
 Prompted by a real incident (2026-07-16): to delete ONE night (Friday) of the
