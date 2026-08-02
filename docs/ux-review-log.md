@@ -7,6 +7,75 @@ Newest review at the top. Fixes are only applied once agreed.
 
 ---
 
+## Review — 2026-07-20 (the new volunteer-shifts surfaces: unified Pending Review queue + volunteer self-serve `/participate`, `/profile`)
+
+Scope: the volunteer-shifts work that landed 2026-07-16 (`a468ee4`) — the unified
+Pending Review queue on Admin → Community (member applications + volunteer signups
+in one list) and the volunteer's own self-serve shift surfaces (`/participate`
+shifts-only, `/profile` "Your Shifts"). Read-only, against `origin/main`. This is
+the first pass over these surfaces; they read well overall (the tag language on the
+queue is a clean solution to the "Vera hid in a collapsed section" problem, and the
+`hideRole` plaque collapse on the volunteer profile is tidy). Three seams below.
+
+### 28. The unified Pending Review queue is two different UIs stacked in one list · Severity: medium (cohesion) · Effort: small–medium · Status: proposed
+
+The queue (`app/admin/page.tsx` `pendingQueue`) interleaves member applications and
+volunteer signups, newest-first, each tagged Member/Volunteer — the right call. But
+the two row types are built from unrelated components and behave nothing alike, so
+scanning the list means switching mental models row to row:
+
+- **Interaction model differs.** A member row (`ApplicationRow`) is a *link* — the
+  whole card navigates to `/admin/[id]` — with Approve/**Reject** always visible in
+  an `AdminActions` cluster beside it. A volunteer row (`PendingVolunteerRow`) is an
+  *expander* — clicking it opens an inline panel, and Approve/**Decline** live hidden
+  inside that panel. So in the same list, one row type acts on one click and the other
+  needs a click-to-expand-then-act. (Structural cause: members have a dossier page,
+  volunteers don't — but the queue doesn't have to expose that difference as two
+  interaction grammars.)
+- **Destructive guard is inconsistent, and backwards.** Declining a volunteer pops a
+  confirm dialog (`useConfirm`, `danger`); **rejecting a member application fires
+  immediately with no confirmation** (`AdminActions.handleReject` → straight to the
+  reject endpoint, which emails the applicant). The higher-stakes, harder-to-walk-back
+  action — sending a person a rejection — is the *unguarded* one, right next to the
+  guarded lighter one. At minimum member Reject should confirm too.
+- **Verb split.** "Reject" (member) vs "Decline" (volunteer) for the same gesture in
+  one queue. Defensible on its own, but combined with the two points above it reads as
+  drift, not deliberate register.
+
+Cheapest coherent fix: give member Reject a confirm dialog (closes the sharpest
+gap on its own), and — when next touched — align the two rows on one affordance
+(either both expand-to-act, or both show actions inline), so the queue reads as one
+list of one kind of thing-to-do.
+
+### 29. A volunteer landing on `/participate` before shifts exist hits a promise-with-no-payoff dead end · Severity: medium (empty state) · Effort: small · Status: proposed
+
+`/participate` is the *entire* participation surface for a volunteer (no roles,
+groups, or resources — shifts only). The page (`app/participate/page.tsx`) heads it
+"Your Shifts / Lend your hands where they're needed — pick the shifts that work for
+you. You can change your mind anytime," then renders `SignupSection hideRole`. But
+the shift picker *and its closed-state explanation* are both gated behind
+`shifts.length > 0` (`SignupSection.tsx:1387`). When no shift occurrences exist yet
+(pre-schedule) the volunteer sees: the inviting heading, a "None yet" card, and
+nothing else — no picker, no "signup opens once the schedule is set" note, no
+onward action. The copy actively promises shifts to pick that aren't on the page.
+Members are cushioned (the rest of `/participate` still has content); for a volunteer
+this is a blank surface that contradicts its own header. Fix: when
+`shifts.length === 0`, show the same "Shift times aren't confirmed yet — check back
+soon" reassurance the closed-but-populated state already uses, so the volunteer's one
+page always explains itself.
+
+### 30. The volunteer `/participate` view says "Your Shifts" twice, inches apart · Severity: low (visual seam) · Effort: trivial · Status: proposed
+
+On the volunteer participate view the page `h1` is "Your Shifts"
+(`app/participate/page.tsx`), and the very next element — the `CurrentSignupCards`
+shift plaque — carries its own kicker "✦ Your Shifts ✦" (`SignupSection.tsx:249`).
+Two identical titles stacked with only a hairline divider between them. Fine on
+`/profile` (where the plaque sits under a different page title) and on a member's
+`/participate` (where it's one card among many), but on the volunteer's shifts-only
+page the repetition is bare. Either drop the page `h1` to a subtitle-only intro, or
+retitle the volunteer page header (e.g. "Lend a Hand") so the plaque's "Your Shifts"
+isn't an echo.
+
 ## Review — 2026-07-14 (empty-state voice audit — member surfaces)
 
 Scope: a cross-cutting read of every member-surface empty state (radio, messages,
