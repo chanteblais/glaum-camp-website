@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase'
 import { shiftColorIndexMap } from '@/lib/shift-colors'
 import { buildScheduleDays } from '@/lib/schedule-days'
+import { displayPlacement } from '@/lib/late-night'
 import { PersonalScheduleCalendar, type PersonalEvent } from './PersonalScheduleCalendar'
 
 type Props = {
@@ -67,9 +68,12 @@ export async function PersonalSchedule({ userId }: Props) {
 
   if (events.length === 0) return null
 
-  // Day columns from the member's events' real dates (only days they have
-  // something on) — replaces the hardcoded July DAY_META list.
-  const days = buildScheduleDays(events.map(e => (e as { event_date?: string | null }).event_date))
+  // Day columns from the member's events' DISPLAY dates (only days they have
+  // something on) — an after-midnight event columns under the previous night
+  // (lib/late-night.ts), so its true morning date must not spawn a column.
+  const days = buildScheduleDays(events.map(e =>
+    displayPlacement(e.time, (e as { event_date?: string | null }).event_date ?? null).displayDate,
+  ))
 
   return (
     <div style={{ marginBottom: '2.5rem' }}>
