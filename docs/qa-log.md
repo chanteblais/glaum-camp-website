@@ -280,6 +280,11 @@ keys, dangling bindings).
   `gatheringsAttended` backfilled from `custom_answers` (registry-coerced), and
   the 4 dead `cf_*` keys left by a pre-Phase-3 seeding path stripped from the
   8 older profiles (that data is fully duplicated on the application rows).
+  **Executed in prod 2026-08-02** (script regenerated — the original lived in a
+  session scratchpad): by then only 2 of the 4 still lacked rows (Andy + Michael
+  Frank, first-year answer → `gatheringsAttended: []`; the other two had
+  self-filled via the profile catch-up banner), and the 4 dead keys were
+  stripped from all 8 profiles — verified zero `cf_*` keys remain.
 
 ### Known & deliberate — don't re-report
 
