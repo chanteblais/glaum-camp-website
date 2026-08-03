@@ -17,7 +17,7 @@ the first pass over these surfaces; they read well overall (the tag language on 
 queue is a clean solution to the "Vera hid in a collapsed section" problem, and the
 `hideRole` plaque collapse on the volunteer profile is tidy). Three seams below.
 
-### 28. The unified Pending Review queue is two different UIs stacked in one list · Severity: medium (cohesion) · Effort: small–medium · Status: proposed
+### 28. The unified Pending Review queue is two different UIs stacked in one list · Severity: medium (cohesion) · Effort: small–medium · Status: **fixed 2026-08-02** (`session/2026-08-02-board-queue`)
 
 The queue (`app/admin/page.tsx` `pendingQueue`) interleaves member applications and
 volunteer signups, newest-first, each tagged Member/Volunteer — the right call. But
@@ -47,7 +47,7 @@ gap on its own), and — when next touched — align the two rows on one afforda
 (either both expand-to-act, or both show actions inline), so the queue reads as one
 list of one kind of thing-to-do.
 
-### 29. A volunteer landing on `/participate` before shifts exist hits a promise-with-no-payoff dead end · Severity: medium (empty state) · Effort: small · Status: proposed
+### 29. A volunteer landing on `/participate` before shifts exist hits a promise-with-no-payoff dead end · Severity: medium (empty state) · Effort: small · Status: **fixed 2026-08-02** (`session/2026-08-02-board-queue`)
 
 `/participate` is the *entire* participation surface for a volunteer (no roles,
 groups, or resources — shifts only). The page (`app/participate/page.tsx`) heads it
@@ -64,7 +64,7 @@ this is a blank surface that contradicts its own header. Fix: when
 soon" reassurance the closed-but-populated state already uses, so the volunteer's one
 page always explains itself.
 
-### 30. The volunteer `/participate` view says "Your Shifts" twice, inches apart · Severity: low (visual seam) · Effort: trivial · Status: proposed
+### 30. The volunteer `/participate` view says "Your Shifts" twice, inches apart · Severity: low (visual seam) · Effort: trivial · Status: **fixed 2026-08-02** (`session/2026-08-02-board-queue`)
 
 On the volunteer participate view the page `h1` is "Your Shifts"
 (`app/participate/page.tsx`), and the very next element — the `CurrentSignupCards`
@@ -99,7 +99,7 @@ The app already contains its own calibration references — these get it right:
 
 Against those, a cluster of member empty states reads as generic UI-kit boilerplate.
 
-### 26. Member empty-state copy has split into two registers · Severity: low-medium · Effort: small · Status: proposed
+### 26. Member empty-state copy has split into two registers · Severity: low-medium · Effort: small · Status: **fixed 2026-08-02** (`session/2026-08-02-board-queue`)
 
 The laggards, all member-facing:
 
@@ -123,7 +123,7 @@ each, just the house's straight-faced warmth. It's a copy-only sweep (no layout)
 so effort is small; worth batching with the next Messages or Members touch rather
 than a standalone commit.
 
-### 27. The Many Hands directory earns the reciprocity register most of all · Severity: low · Effort: trivial · Status: proposed
+### 27. The Many Hands directory earns the reciprocity register most of all · Severity: low · Effort: trivial · Status: **fixed 2026-08-02** (`session/2026-08-02-board-queue`)
 
 `/members` is the app's hands-territory surface (§2: "the directory, anything a
 member *does* for the whole") — the one place the plainest empty copy sits.

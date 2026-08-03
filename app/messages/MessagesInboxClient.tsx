@@ -178,7 +178,7 @@ function NewMessageModal({ members, onClose }: { members: MemberOption[]; onClos
         {/* Member list */}
         <div role="list" aria-label="Members" style={{ maxHeight: '340px', overflowY: 'auto' }}>
           {filtered.length === 0 ? (
-            <p role="status" style={{ padding: '1.5rem 1.25rem', fontSize: '0.85rem', opacity: 0.4, fontStyle: 'italic', margin: 0, textAlign: 'center' }}>No members found</p>
+            <p role="status" style={{ padding: '1.5rem 1.25rem', fontSize: '0.85rem', opacity: 0.4, fontStyle: 'italic', margin: 0, textAlign: 'center' }}>No one by that name.</p>
           ) : (
             filtered.map(m => (
               <a
@@ -433,7 +433,7 @@ export function MessagesInboxClient({ currentUserId, members, initialConversatio
       ) : conversations.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '3rem 0' }}>
           <p style={{ fontSize: '0.9rem', opacity: 0.4, fontStyle: 'italic', marginBottom: '1.5rem' }}>
-            No messages yet.
+            All quiet — nothing passed along yet.
           </p>
           <button
             onClick={() => setShowNewMessage(true)}
@@ -493,7 +493,7 @@ export function MessagesInboxClient({ currentUserId, members, initialConversatio
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               }}>
                 {conv.lastMessage == null
-                  ? (conv.kind === 'group' ? 'No messages yet — start the conversation' : '')
+                  ? (conv.kind === 'group' ? 'Nothing said yet — the first word is yours' : '')
                   : `${conv.lastMessageFromMe ? 'You: ' : ''}${conv.lastMessage}`}
               </p>
               {/* Read / unread status */}

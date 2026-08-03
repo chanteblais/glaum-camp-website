@@ -4,6 +4,7 @@ import { EventIcon } from '@/components/EventIcon'
 import { IconImage, ROUND_FILL } from '@/components/IconImage'
 import { redirect, notFound } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
+import { displayPlacement } from '@/lib/late-night'
 import { Header } from '@/components/Header'
 import { supabaseResizedUrl } from '@/lib/supabase-image'
 import { getMemberGroups, type MemberGroup } from '@/lib/groups'
@@ -450,7 +451,7 @@ function ShiftMedallion({ icon, size = 76 }: { icon: string; size?: number }) {
 // One entry per shift event, carrying every night held (a recurring shift's
 // nights are independent signups — migration 064) and whether the holder has
 // offered to lead any of them. Shared by the member and volunteer registers.
-type PublicShift = { id: string; title: string; time: string; icon_type: string; nights: string[]; dayFallback: string; isLead: boolean }
+type PublicShift = { id: string; title: string; time: string; icon_type: string; nights: string[]; dayFallback: string; isLead: boolean; lateNight: boolean }
 
 function buildHeldShifts(shiftRows: unknown[] | null): PublicShift[] {
   const shiftMap = new Map<string, PublicShift>()
@@ -459,9 +460,14 @@ function buildHeldShifts(shiftRows: unknown[] | null): PublicShift[] {
     if (!ev?.id) continue
     const cur = shiftMap.get(ev.id) ?? {
       id: ev.id, title: ev.title ?? '', time: ev.time ?? '',
-      icon_type: ev.icon_type ?? 'star', nights: [], dayFallback: ev.day ?? '', isLead: false,
+      icon_type: ev.icon_type ?? 'star', nights: [], dayFallback: ev.day ?? '', isLead: false, lateNight: false,
     }
-    const night = (r.occurrence_date as string | null) ?? ev.event_date ?? null
+    // Late-night convention (lib/late-night.ts): a shift starting before 6 AM
+    // is listed under the previous night, matching every schedule surface.
+    const trueNight = (r.occurrence_date as string | null) ?? ev.event_date ?? null
+    const placed = trueNight ? displayPlacement(ev.time ?? null, trueNight) : null
+    const night = placed?.displayDate ?? trueNight
+    if (placed?.lateNight) cur.lateNight = true
     if (night && !cur.nights.includes(night)) cur.nights.push(night)
     if (r.role === 'lead') cur.isLead = true
     shiftMap.set(ev.id, cur)
@@ -490,7 +496,7 @@ function ShiftsSection({ shifts }: { shifts: PublicShift[] }) {
               )}
               <p style={{ fontSize: '0.7rem', color: ROSE, lineHeight: 1.5, margin: '0.3rem 0 0' }}>
                 {shiftNightsLabel(s)}
-                {s.time && <><br />{s.time}</>}
+                {s.time && <><br />{s.time}{s.lateNight ? ' · late night' : ''}</>}
               </p>
             </div>
           </div>

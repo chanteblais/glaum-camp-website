@@ -1331,7 +1331,9 @@ export function SignupSection({ showPickers = true, initialData, hideRole = fals
     </div>
   )
 
-  if (!hasRoles && shifts.length === 0) return null
+  // The volunteer variant (hideRole) is that page's ONLY content — it must
+  // always explain itself, so it never bails to nothing (UX 2026-07-20 #29).
+  if (!hasRoles && shifts.length === 0 && !hideRole) return null
 
   return (
     <div id="role-signup" style={{ marginBottom: '2.5rem' }}>
@@ -1416,6 +1418,15 @@ export function SignupSection({ showPickers = true, initialData, hideRole = fals
               </div>
             )}
           </>
+        )}
+
+        {/* No shift occurrences exist yet (pre-schedule). On the volunteer's
+            shifts-only page the header promises shifts to pick — say why there
+            aren't any instead of dead-ending (UX 2026-07-20 #29). */}
+        {hideRole && shifts.length === 0 && (
+          <p style={{ fontSize: '0.9rem', opacity: 0.55, margin: '1.5rem 0 0', lineHeight: 1.6 }}>
+            Shift times aren’t confirmed yet. Shift signup will open here once the schedule is set — check back soon.
+          </p>
         )}
       </>)}
     </div>

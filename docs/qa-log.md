@@ -4,14 +4,14 @@ Running record of QA sweeps: what was tested, what was fixed, and — most
 useful for the next tester — what is *known and deliberate* so it doesn't get
 re-reported, plus where the remaining risk lives. Newest sweep first.
 
-## Sentry 2026-07-19 — nightly review of `fix/delete-signup-guards` (4ebb7d2)
+## Sentry 2026-07-19 — nightly review of `fix/delete-signup-guards` (4ebb7d2) (both fixed 2026-08-02, `session/2026-08-02-board-queue`)
 
 Automated review of the three commits new on `main` since the last sentry
 (`5a924ca`, `fa2a122`, `4ebb7d2`). Route gating, house rules (no inline
 `<style>`, ~380px handling in the new `ChoiceDialog`), and same-commit docs all
 check out. Two edge findings, neither reachable in the normal flow.
 
-### Found — not yet fixed
+### Found — fixed 2026-08-02: `removeNight` now counts with the same keep-set the PATCH deletes by; `splitNight` normalizes `recurrence_days = []` to the range like `shiftOccurrenceDates` does.
 
 - **The "remove one night" confirm can under-count what the save deletes.**
   `removeNight` (`app/admin/ScheduleManager.tsx:864`) counts only the target
@@ -39,7 +39,7 @@ check out. Two edge findings, neither reachable in the normal flow.
   `?? `→`length ? … : rangeDays` normalization would close it, and would match
   the "No days selected" state the manager already renders.
 
-## Sentry 2026-07-17 — volunteer shift-reminder emails link to the member-gated `/schedule`
+## Sentry 2026-07-17 — volunteer shift-reminder emails link to the member-gated `/schedule` (fixed 2026-08-02, `session/2026-08-02-board-queue`)
 
 Nightly QA sentry over the 5 commits merged 2026-07-16 for volunteer shifts
 (`a468ee4` and below). One confirmed finding; the rest of the feature checked
@@ -48,7 +48,7 @@ Shifts medallion card, unified Pending Review queue, `memberDisplayNames`
 volunteer fallback, `member_shift_signups.clerk_user_id` has no FK so a
 volunteer id inserts cleanly).
 
-### Confirmed — needs a fix
+### Confirmed — fixed 2026-08-02: `ReminderRecipient` now carries `kind`; volunteer item links rewrite to `/participate` and the footer button takes a `schedulePath`.
 
 - **Reminder emails send active volunteers to a page they can't open.**
   `feat/volunteer-shifts` added volunteers to `collectEventReminders`
