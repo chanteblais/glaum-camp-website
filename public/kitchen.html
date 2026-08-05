@@ -810,8 +810,12 @@
       if (q <= 0) return; // assigned to nobody, or a zero headcount
       var k = itemKey(it.n, it.unit);
       if (!map[k]) {
+        // sections carried over from the old shape are often already named for
+        // their meal ("Dinner — Proteins"); don't stutter the meal onto those
+        var secLabel = nameKey(sec.name).indexOf(nameKey(meal.label)) === 0
+          ? sec.name : meal.label + ' — ' + sec.name;
         map[k] = { key: k, n: it.n, unit: it.unit, pack: it.pack, note: it.note,
-                   group: meal.label + ' — ' + sec.name, total: 0, parts: [] };
+                   group: secLabel, total: 0, parts: [] };
         order.push(k);
       }
       map[k].total += q;
