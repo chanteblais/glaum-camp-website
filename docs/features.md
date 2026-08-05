@@ -437,11 +437,12 @@ All admin surfaces also carry the **runway strip** inside the sticky `AdminNav`:
 
 `camp.glaum.ca/kitchen.html` — a standalone static page (not a Next route, no auth,
 not linked from anywhere) where the festival caterer plans the week's
-service: per-day menus split by **who eats** (each group — volunteers, production
-artists, or any group you add — carries its own headcount and menu), a shopping
-list that **adds up whichever days you're shopping for** into one trip, and a
-standing **pantry** ledger subtracted once from the combined total. A
-**Finish shop** step writes what was bought and used back into the pantry. Shared state for everyone
+service: per-day **meals** (brunch, dinner, anything added), where each item is
+assigned to the groups that eat it — so a course can go to one group only while
+the rest of the meal feeds everyone — a shopping list that **adds up whichever
+days you're shopping for** into one trip, and a standing **pantry** ledger
+subtracted once from the combined total. A **Finish shop** step at the foot of
+the list writes what was bought and used back into the pantry. Shared state for everyone
 with the URL via the unauthenticated `/api/kitchen-list`
 (`page_content.catering_kitchen_state`). Built for the What If 2026 catering run;
 deliberately quarantined from the member app's conventions. Full spec, security
