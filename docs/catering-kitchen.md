@@ -29,16 +29,33 @@ account and is standing in a warehouse aisle on his phone**:
 One `page_content` row, key `catering_kitchen_state` (v3):
 
 ```
-{ version: 3, usePantry, selected: [dayId],
+{ version: 4, usePantry, selected: [dayId],
   checked: { "<name>|w|c": true },
-  days: [{ id, name, times, v, pa, buffer,
-           groups: [{ id, name, note, items: [{ n, who, unit, per, pack, note }] }] }],
+  days: [{ id, name, times, buffer,
+           menus: [{ id, label, count,
+                     groups: [{ id, name, note, items: [{ n, unit, per, pack, note }] }] }] }],
   pantry: [{ n, qty, unit }] }
 ```
 
+**A day is a set of group menus.** Daniel's sheet is two columns — "Volunteer Menu
+176" and "P+A Menu 241" — so that is the shape: each menu carries who it feeds
+(`label`), how many (`count`), and its own sections and items. Nothing in the code
+knows the words "volunteer" or "PA"; a day can hold any number of group menus, and
+`+ Add group` creates one. This replaced a per-item `who: both|v|pa` tag, which
+computed the same numbers but did not match how a caterer actually writes a menu.
+
+Food served to everyone is duplicated into each menu (the add-item form defaults to
+"add for every group" and mirrors into the same-named section). Duplication is the
+deliberate trade: it matches the paper sheet and keeps each menu readable on its own,
+at the cost of editing a shared item twice. An item that appears in one group's menu
+and not the others is chipped **"not for <group>"**.
+
 **Shape history.** v1 stored per-menu-item `onHand`; v2 replaced that with a
 standing `pantry` array; v3 wrapped the single implicit day in a `days` array and
-moved check-offs to a top-level `checked` map. The page migrates any older shape
+moved check-offs to a top-level `checked` map; v4 split each day into per-group
+menus (`splitByAudience` fans the old `who` tags out into a Volunteers menu and a
+Production artists menu, and strips section notes that described the merged
+arrangement). The page migrates any older shape
 forward on load and re-saves it, so no migration script is needed and old clients
 can't be broken by the new one — the API accepts both `days` and legacy `groups`.
 
@@ -52,8 +69,8 @@ means "this is in the cart," which is a property of the shopping trip, not of a 
   pantry entry with no menu match shows "not on this list" and persists — that's
   the point of a standing ledger.
 
-Quantities: for each selected day, `per × that day's headcount × (1 + that day's
-buffer/100)`; identical names (same unit class) are **summed across days** into one
+Quantities: for each selected day and each group menu on it, `per × that menu's
+count × (1 + that day's buffer/100)`; identical names (same unit class) are **summed across days** into one
 buy row that shows its per-day breakdown. Pantry stock is subtracted **once from the
 combined total**, not per day — subtracting it per day would double-count the same
 sack of rice. Weight math is in ounces internally, displayed in lb (+kg).

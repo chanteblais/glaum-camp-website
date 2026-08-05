@@ -427,14 +427,14 @@
 
   function thursdayGroups() {
     return [
-      { id: 'brunch', name: 'PA Brunch Special — Egg McMuffins', note: 'PA only · one build per person', items: [
+      { id: 'brunch', name: 'PA Brunch Special — Egg McMuffins', note: 'one build per person', items: [
         { n: 'English muffins', who: 'pa', unit: 'pc', per: 1, pack: [12, '12-packs'] },
         { n: 'Eggs', who: 'pa', unit: 'pc', per: 1, pack: [30, '30-flats'] },
         { n: 'Cheddar slices', who: 'pa', unit: 'pc', per: 1, pack: [120, '120-ct packs'] },
         { n: 'Sausage patties', who: 'pa', unit: 'pc', per: 1, pack: [60, '60-ct boxes'] },
         { n: 'Butter', who: 'pa', unit: 'oz', per: 0.15, pack: [16, '1 lb blocks'] }
       ]},
-      { id: 'proteins', name: 'Dinner — Proteins', note: 'raw purchase weight · both menus', items: [
+      { id: 'proteins', name: 'Dinner — Proteins', note: 'raw purchase weight', items: [
         { n: 'Ground beef', who: 'both', unit: 'oz', per: 3, pack: [160, '10 lb chubs'] },
         { n: 'Chicken thighs (for shredding)', who: 'both', unit: 'oz', per: 3 },
         { n: 'Firm tofu', who: 'both', unit: 'oz', per: 1, pack: [16, '1 lb blocks'] },
@@ -452,7 +452,7 @@
         { n: 'Onions (fajita veg)', who: 'both', unit: 'oz', per: 1 },
         { n: 'Cooking oil', who: 'both', unit: 'oz', per: 0.25, pack: [128, 'gallon jugs'] }
       ]},
-      { id: 'bar', name: 'Taco Bar', note: 'tortillas + toppings · both menus unless tagged', items: [
+      { id: 'bar', name: 'Taco Bar', note: 'tortillas + toppings', items: [
         { n: 'Tortillas', who: 'both', unit: 'pc', per: 3, pack: [60, '60-ct packs'] },
         { n: 'Salsa', who: 'both', unit: 'oz', per: 1.5, pack: [106, '#10 cans'] },
         { n: 'Sour cream', who: 'both', unit: 'oz', per: 1, pack: [80, '5 lb tubs'] },
@@ -468,9 +468,39 @@
     ];
   }
 
+  // A day is a set of group menus: who eats, how many of them, and what they get.
+  // Daniel's sheet is literally two columns (Volunteer Menu 176 / P+A Menu 241),
+  // so that's the shape. Nothing here knows the names "volunteer" or "PA" beyond
+  // the seed data — a day can carry any number of group menus.
+  function splitByAudience(groups, vCount, paCount) {
+    function menuFor(label, count, wants) {
+      var out = [];
+      groups.forEach(function (g) {
+        var items = g.items.filter(function (it) { return wants.indexOf(it.who || 'both') > -1; })
+          .map(function (it) {
+            return { n: it.n, unit: it.unit, per: it.per, pack: it.pack, note: it.note };
+          });
+        if (items.length) {
+          // notes written for the single shared menu ("… · both menus", "PA only ·")
+          // describe an arrangement that no longer exists once split per group
+          var note = String(g.note || '')
+            .replace(/\s*·?\s*both menus(?: unless tagged)?/i, '')
+            .replace(/^\s*(?:PA|V) only\s*·?\s*/i, '')
+            .trim();
+          out.push({ id: g.id, name: g.name, note: note, items: items });
+        }
+      });
+      return { id: 'm-' + label.toLowerCase().replace(/[^a-z0-9]+/g, '-'), label: label, count: count, groups: out };
+    }
+    return [
+      menuFor('Volunteers', vCount, ['both', 'v']),
+      menuFor('Production artists', paCount, ['both', 'pa'])
+    ];
+  }
+
   function factory() {
     var s = {
-      version: 3,
+      version: 4,
       usePantry: false,
       pantry: [],
       checked: {},
@@ -478,11 +508,11 @@
       days: [{
         id: 'thu', name: 'Thursday — Taco Night',
         times: 'Brunch 10:00–12:00 · Dinner V 5:00–6:30 / PA 6:00–8:00',
-        v: 176, pa: 241, buffer: 10,
-        groups: thursdayGroups()
+        buffer: 10,
+        menus: splitByAudience(thursdayGroups(), 176, 241)
       }]
     };
-    s.days[0].groups.forEach(function (g) {
+    thursdayGroups().forEach(function (g) {
       g.items.forEach(function (it) {
         s.pantry.push({ n: it.n, qty: 0, unit: it.unit === 'oz' ? 'lb' : 'pc' });
       });
@@ -492,6 +522,7 @@
 
   var state = factory();
   var activeDayId = null;
+  var activeMenuId = null;
   var uid = 1;
   var dirty = false, saving = false, saveTimer = null, lastServerJson = null;
 
@@ -500,7 +531,10 @@
   function assignIds() {
     state.days.forEach(function (d) {
       if (!d.id) d.id = 'day' + (uid++);
-      d.groups.forEach(function (g) { g.items.forEach(function (it) { it.uid = uid++; }); });
+      d.menus.forEach(function (m) {
+        if (!m.id) m.id = 'm' + (uid++);
+        m.groups.forEach(function (g) { g.items.forEach(function (it) { it.uid = uid++; }); });
+      });
     });
     state.pantry.forEach(function (p) { p.uid = uid++; });
   }
@@ -509,10 +543,17 @@
   function migrate(s) {
     if (!s || typeof s !== 'object') return null;
     if (Array.isArray(s.days)) {
-      s.version = 3;
       if (!Array.isArray(s.pantry)) s.pantry = [];
       if (!s.checked || typeof s.checked !== 'object') s.checked = {};
       if (!Array.isArray(s.selected) || !s.selected.length) s.selected = s.days.length ? [s.days[0].id] : [];
+      // v3 days held one shared menu with per-item who tags; v4 splits each day
+      // into one menu per group of eaters, each carrying its own headcount.
+      s.days.forEach(function (d) {
+        if (Array.isArray(d.menus)) return;
+        d.menus = splitByAudience(d.groups || [], d.v || 0, d.pa || 0);
+        delete d.groups; delete d.v; delete d.pa;
+      });
+      s.version = 4;
       return s;
     }
     if (Array.isArray(s.groups)) {
@@ -526,7 +567,7 @@
         });
       });
       return {
-        version: 3,
+        version: 4,
         usePantry: !!(s.usePantry || s.useInventory),
         pantry: Array.isArray(s.pantry) ? s.pantry : [],
         checked: checked,
@@ -534,8 +575,8 @@
         days: [{
           id: 'thu', name: 'Thursday — Taco Night',
           times: 'Brunch 10:00–12:00 · Dinner V 5:00–6:30 / PA 6:00–8:00',
-          v: s.v || 0, pa: s.pa || 0, buffer: typeof s.buffer === 'number' ? s.buffer : 10,
-          groups: s.groups
+          buffer: typeof s.buffer === 'number' ? s.buffer : 10,
+          menus: splitByAudience(s.groups, s.v || 0, s.pa || 0)
         }]
       };
     }
@@ -554,17 +595,19 @@
 
   function payload() {
     return JSON.stringify({
-      version: 3,
+      version: 4,
       usePantry: state.usePantry,
       checked: state.checked,
       selected: state.selected,
       pantry: state.pantry.map(function (p) { return { n: p.n, qty: p.qty, unit: p.unit }; }),
       days: state.days.map(function (d) {
         return {
-          id: d.id, name: d.name, times: d.times, v: d.v, pa: d.pa, buffer: d.buffer,
-          groups: d.groups.map(function (g) {
-            return { id: g.id, name: g.name, note: g.note, items: g.items.map(function (it) {
-              return { n: it.n, who: it.who, unit: it.unit, per: it.per, pack: it.pack, note: it.note };
+          id: d.id, name: d.name, times: d.times, buffer: d.buffer,
+          menus: d.menus.map(function (m) {
+            return { id: m.id, label: m.label, count: m.count, groups: m.groups.map(function (g) {
+              return { id: g.id, name: g.name, note: g.note, items: g.items.map(function (it) {
+                return { n: it.n, unit: it.unit, per: it.per, pack: it.pack, note: it.note };
+              }) };
             }) };
           })
         };
@@ -660,13 +703,21 @@
   function selectedDays() {
     return state.days.filter(function (d) { return state.selected.indexOf(d.id) > -1; });
   }
-  function baseCount(day, who) {
-    if (who === 'v') return day.v;
-    if (who === 'pa') return day.pa;
-    return day.v + day.pa;
+  function dayCovers(day) {
+    return day.menus.reduce(function (a, m) { return a + (m.count || 0); }, 0);
   }
-  function neededFor(day, item) {
-    return item.per * baseCount(day, item.who) * (1 + day.buffer / 100);
+  function neededFor(day, menu, item) {
+    return item.per * (menu.count || 0) * (1 + day.buffer / 100);
+  }
+  // Walk every item of every menu on the given days.
+  function eachItem(days, fn) {
+    days.forEach(function (day) {
+      day.menus.forEach(function (menu) {
+        menu.groups.forEach(function (g) {
+          g.items.forEach(function (it) { fn(day, menu, g, it); });
+        });
+      });
+    });
   }
   function unitsCompatible(u, pu) {
     return (u === 'oz' && pu === 'lb') || (u === 'pc' && pu === 'pc');
@@ -687,20 +738,17 @@
   // Aggregate every selected day's menu into one buy list, summed by name+unit.
   function aggregate() {
     var map = {}, order = [];
-    selectedDays().forEach(function (day) {
-      day.groups.forEach(function (g) {
-        g.items.forEach(function (it) {
-          var k = itemKey(it.n, it.unit);
-          if (!map[k]) {
-            map[k] = { key: k, n: it.n, unit: it.unit, pack: it.pack, note: it.note, group: g.name, total: 0, parts: [] };
-            order.push(k);
-          }
-          var q = neededFor(day, it);
-          map[k].total += q;
-          map[k].parts.push({ day: day.name, qty: q });
-          if (!map[k].pack && it.pack) map[k].pack = it.pack;
-        });
-      });
+    eachItem(selectedDays(), function (day, menu, g, it) {
+      var k = itemKey(it.n, it.unit);
+      if (!map[k]) {
+        map[k] = { key: k, n: it.n, unit: it.unit, pack: it.pack, note: it.note, group: g.name, total: 0, parts: [] };
+        order.push(k);
+      }
+      var q = neededFor(day, menu, it);
+      map[k].total += q;
+      // one line per day+menu so the row can show where the quantity comes from
+      map[k].parts.push({ day: day.name, menu: menu.label, qty: q });
+      if (!map[k].pack && it.pack) map[k].pack = it.pack;
     });
     return order.map(function (k) { return map[k]; });
   }
@@ -716,14 +764,10 @@
   // What the selected days need of a pantry line (null = on no selected menu).
   function listNeedsFor(p) {
     var total = 0, matched = false;
-    selectedDays().forEach(function (day) {
-      day.groups.forEach(function (g) {
-        g.items.forEach(function (it) {
-          if (nameKey(it.n) === nameKey(p.n) && unitsCompatible(it.unit, p.unit)) {
-            matched = true; total += neededFor(day, it);
-          }
-        });
-      });
+    eachItem(selectedDays(), function (day, menu, g, it) {
+      if (nameKey(it.n) === nameKey(p.n) && unitsCompatible(it.unit, p.unit)) {
+        matched = true; total += neededFor(day, menu, it);
+      }
     });
     return matched ? qtyText(p.unit === 'lb' ? 'oz' : 'pc', total) : null;
   }
@@ -757,7 +801,7 @@
 
   function renderSubtitle() {
     var sel = selectedDays();
-    var covers = sel.reduce(function (a, d) { return a + d.v + d.pa; }, 0);
+    var covers = sel.reduce(function (a, d) { return a + dayCovers(d); }, 0);
     if (!sel.length) {
       $subtitle.textContent = 'No days selected — pick at least one on the Shopping list tab.';
       $printNote.textContent = '';
@@ -783,7 +827,7 @@
       b.appendChild(document.createTextNode(d.name));
       var c = document.createElement('span');
       c.className = 'cov';
-      c.textContent = (d.v + d.pa).toLocaleString();
+      c.textContent = dayCovers(d).toLocaleString();
       b.appendChild(c);
       b.addEventListener('click', function () {
         var i = state.selected.indexOf(d.id);
@@ -850,11 +894,15 @@
     name.className = 'item-name';
     name.textContent = agg.n;
     main.appendChild(name);
-    if (agg.parts.length > 1) {
+    if (agg.parts.length > 1 || selectedDays().length > 1) {
       var bd = document.createElement('div');
       bd.className = 'breakdown';
+      // "Thursday Volunteers 38 lb + Thursday PAs 52 lb" — drop the day name when
+      // there's only one day in play, so the groups are what stands out.
+      var multiDay = selectedDays().length > 1;
       bd.textContent = agg.parts.map(function (p) {
-        return p.day.split(' — ')[0] + ' ' + qtyText(agg.unit, p.qty);
+        var who = p.menu;
+        return (multiDay ? p.day.split(' — ')[0] + ' ' : '') + who + ' ' + qtyText(agg.unit, p.qty);
       }).join(' + ');
       main.appendChild(bd);
     }
@@ -892,7 +940,7 @@
       var b = document.createElement('button');
       b.className = 'day' + (d.id === activeDayId ? ' active' : '');
       b.textContent = d.name;
-      b.addEventListener('click', function () { activeDayId = d.id; renderDayPick(); renderDayEditor(); renderMenuGroups(); });
+      b.addEventListener('click', function () { activeDayId = d.id; activeMenuId = null; renderDayPick(); renderDayEditor(); renderMenuGroups(); });
       $daypick.appendChild(b);
     });
     var add = document.createElement('button');
@@ -929,10 +977,12 @@
         id: 'day' + (uid++) + '-' + Date.now().toString(36),
         name: n,
         times: src ? src.times : '',
-        v: src ? src.v : 0, pa: src ? src.pa : 0, buffer: src ? src.buffer : 10,
-        groups: src ? JSON.parse(JSON.stringify(src.groups)) : [
-          { id: 'meal', name: 'Menu', note: '', items: [] },
-          { id: 'other', name: 'Other / Supplies', note: '', items: [] }
+        buffer: src ? src.buffer : 10,
+        menus: src ? JSON.parse(JSON.stringify(src.menus)) : [
+          { id: 'm' + (uid++), label: 'Everyone', count: 0, groups: [
+            { id: 'g' + (uid++), name: 'Menu', note: '', items: [] },
+            { id: 'g' + (uid++), name: 'Other / Supplies', note: '', items: [] }
+          ] }
         ]
       };
       state.days.push(day);
@@ -977,14 +1027,15 @@
 
     var counts = document.createElement('div');
     counts.className = 'counts';
-    counts.appendChild(numField('Volunteers', day.v, function (n) { day.v = n; refreshDayViews(); }));
-    counts.appendChild(numField('Production artists', day.pa, function (n) { day.pa = n; refreshDayViews(); }));
+    day.menus.forEach(function (m) {
+      counts.appendChild(numField(m.label, m.count, function (n) { m.count = n; refreshDayViews(); }));
+    });
     counts.appendChild(numField('Buffer %', day.buffer, function (n) { day.buffer = n; refreshDayViews(); }));
     var cov = document.createElement('p');
     cov.className = 'covers-note';
     cov.appendChild(document.createTextNode('Covers this day: '));
     var cs = document.createElement('strong');
-    cs.textContent = (day.v + day.pa).toLocaleString();
+    cs.textContent = dayCovers(day).toLocaleString();
     cov.appendChild(cs);
     counts.appendChild(cov);
     panel.appendChild(counts);
@@ -1027,11 +1078,59 @@
     return f;
   }
 
+  function activeMenu(day) {
+    var m = null;
+    day.menus.forEach(function (x) { if (x.id === activeMenuId) m = x; });
+    return m || day.menus[0] || null;
+  }
+
   function renderMenuGroups() {
     $menugroups.textContent = '';
     var day = dayById(activeDayId);
     if (!day) return;
-    day.groups.forEach(function (g) { $menugroups.appendChild(renderMenuGroup(day, g)); });
+    var menu = activeMenu(day);
+    if (!menu) return;
+    activeMenuId = menu.id;
+
+    // who this menu feeds — the day's other groups are one click away
+    var picker = document.createElement('div');
+    picker.className = 'daypick menupick no-print';
+    day.menus.forEach(function (m) {
+      var b = document.createElement('button');
+      b.className = 'day' + (m.id === menu.id ? ' active' : '');
+      b.textContent = m.label + ' · ' + (m.count || 0);
+      b.addEventListener('click', function () { activeMenuId = m.id; renderMenuGroups(); });
+      picker.appendChild(b);
+    });
+    var addMenu = document.createElement('button');
+    addMenu.className = 'day add-day';
+    addMenu.textContent = '+ Add group';
+    addMenu.addEventListener('click', function () {
+      var n = prompt('Who is this menu for? (e.g. Crew)');
+      if (!n || !n.trim()) return;
+      var m = { id: 'm' + (uid++), label: n.trim(), count: 0, groups: [{ id: 'g' + (uid++), name: 'Menu', note: '', items: [] }] };
+      day.menus.push(m);
+      activeMenuId = m.id;
+      queueSave(); renderDayEditor(); renderMenuGroups(); renderDayChips(); renderSubtitle();
+    });
+    picker.appendChild(addMenu);
+    if (day.menus.length > 1) {
+      var delMenu = document.createElement('button');
+      delMenu.className = 'day';
+      delMenu.style.color = 'var(--danger)';
+      delMenu.textContent = 'Remove ' + menu.label;
+      delMenu.addEventListener('click', function () {
+        if (!confirm('Remove the "' + menu.label + '" menu from ' + day.name + '? Its items go with it.')) return;
+        day.menus = day.menus.filter(function (x) { return x !== menu; });
+        activeMenuId = day.menus[0] ? day.menus[0].id : null;
+        queueSave(); render();
+      });
+      picker.appendChild(delMenu);
+    }
+    $menugroups.appendChild(picker);
+
+    menu.groups.forEach(function (g) { $menugroups.appendChild(renderMenuGroup(day, menu, g)); });
+
     var addSec = document.createElement('div');
     addSec.className = 'add-row no-print';
     var link = document.createElement('button');
@@ -1039,15 +1138,15 @@
     link.textContent = '+ Add menu section';
     link.addEventListener('click', function () {
       var n = prompt('Section name (e.g. Dinner — Proteins)');
-      if (!n) return;
-      day.groups.push({ id: 'g' + (uid++), name: n.trim(), note: '', items: [] });
+      if (!n || !n.trim()) return;
+      menu.groups.push({ id: 'g' + (uid++), name: n.trim(), note: '', items: [] });
       queueSave(); renderMenuGroups();
     });
     addSec.appendChild(link);
     $menugroups.appendChild(addSec);
   }
 
-  function renderMenuGroup(day, g) {
+  function renderMenuGroup(day, menu, g) {
     var sec = document.createElement('section');
     sec.className = 'group';
     var head = document.createElement('div');
@@ -1065,7 +1164,7 @@
 
     var ul = document.createElement('ul');
     ul.className = 'items';
-    g.items.forEach(function (it) { ul.appendChild(renderMenuItem(day, g, it)); });
+    g.items.forEach(function (it) { ul.appendChild(renderMenuItem(day, menu, g, it)); });
     sec.appendChild(ul);
 
     var addRow = document.createElement('div');
@@ -1073,13 +1172,13 @@
     var addLink = document.createElement('button');
     addLink.className = 'add-link';
     addLink.textContent = '+ Add item';
-    addLink.addEventListener('click', function () { showAddItemForm(day, g, addRow, addLink); });
+    addLink.addEventListener('click', function () { showAddItemForm(day, menu, g, addRow, addLink); });
     addRow.appendChild(addLink);
     sec.appendChild(addRow);
     return sec;
   }
 
-  function renderMenuItem(day, group, item) {
+  function renderMenuItem(day, menu, group, item) {
     var li = document.createElement('li');
     li.className = 'item';
 
@@ -1089,10 +1188,21 @@
     name.className = 'item-name';
     name.textContent = item.n;
     main.appendChild(name);
-    if (item.who && item.who !== 'both') {
+    // Flag food this group gets and the day's other groups don't — the difference
+    // between the menus is the thing worth seeing at a glance. Named, not coded:
+    // "not for Volunteers" says what it means where "only here" did not.
+    var missingFrom = day.menus.filter(function (m) {
+      if (m === menu) return false;
+      return !m.groups.some(function (og) {
+        return og.items.some(function (oi) { return nameKey(oi.n) === nameKey(item.n) && oi.unit === item.unit; });
+      });
+    });
+    if (missingFrom.length) {
       var chip = document.createElement('span');
-      chip.className = 'chip ' + item.who;
-      chip.textContent = item.who === 'v' ? 'V only' : 'PA only';
+      chip.className = 'chip pa';
+      chip.textContent = 'not for ' + missingFrom.map(function (m) { return m.label; }).join(' / ');
+      chip.title = item.n + ' is on this menu only — ' + missingFrom.map(function (m) { return m.label; }).join(' and ')
+        + (missingFrom.length > 1 ? ' do not get it.' : ' does not get it.');
       main.appendChild(chip);
     }
 
@@ -1125,7 +1235,7 @@
     });
 
     function refresh() {
-      var q = neededFor(day, item);
+      var q = neededFor(day, menu, item);
       buy.textContent = qtyText(item.unit, q);
       var bits = [];
       if (item.unit === 'oz' && q > 0) bits.push('≈ ' + fmt((q / LB) * KG, 1) + ' kg');
@@ -1145,40 +1255,59 @@
     return li;
   }
 
-  function showAddItemForm(day, group, container, link) {
+  function showAddItemForm(day, menu, group, container, link) {
     if (container.querySelector('.add-form')) return;
     link.style.display = 'none';
     var form = document.createElement('div');
     form.className = 'add-form';
     var name = document.createElement('input');
     name.type = 'text'; name.placeholder = 'Item name';
-    var who = document.createElement('select');
-    [['both', 'Everyone'], ['v', 'V only'], ['pa', 'PA only']].forEach(function (o) {
-      var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; who.appendChild(op);
-    });
     var unit = document.createElement('select');
     [['oz', 'oz / person'], ['pc', 'pc / person']].forEach(function (o) {
       var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; unit.appendChild(op);
     });
     var per = document.createElement('input');
     per.type = 'number'; per.placeholder = 'per person'; per.min = '0'; per.step = '0.05';
+
+    // most food is served to everyone; the differences are the exception
+    var bothWrap = document.createElement('label');
+    bothWrap.className = 'per-unit';
+    bothWrap.style.display = 'inline-flex';
+    bothWrap.style.alignItems = 'center';
+    bothWrap.style.gap = '5px';
+    var both = document.createElement('input');
+    both.type = 'checkbox';
+    both.checked = day.menus.length > 1;
+    bothWrap.appendChild(both);
+    bothWrap.appendChild(document.createTextNode(
+      day.menus.length > 1 ? 'add for every group this day' : 'add for every group'));
+
     var ok = document.createElement('button');
     ok.className = 'btn-primary btn-sm'; ok.textContent = 'Add';
     var cancel = document.createElement('button');
     cancel.className = 'btn-ghost btn-sm'; cancel.textContent = 'Cancel';
+
     ok.addEventListener('click', function () {
       var n = name.value.trim();
       var p = parseFloat(per.value);
       if (!n || isNaN(p) || p < 0) { name.focus(); return; }
-      group.items.push({ uid: uid++, n: n, who: who.value, unit: unit.value, per: p });
+      var targets = both.checked ? day.menus : [menu];
+      targets.forEach(function (m) {
+        // mirror into the same-named section of each menu, creating it if needed
+        var g = null;
+        m.groups.forEach(function (x) { if (nameKey(x.name) === nameKey(group.name)) g = x; });
+        if (!g) { g = { id: 'g' + (uid++), name: group.name, note: group.note, items: [] }; m.groups.push(g); }
+        var exists = g.items.some(function (x) { return nameKey(x.n) === nameKey(n) && x.unit === unit.value; });
+        if (!exists) g.items.push({ uid: uid++, n: n, unit: unit.value, per: p });
+      });
       if (!pantryFor(n, unit.value)) {
         state.pantry.push({ uid: uid++, n: n, qty: 0, unit: unit.value === 'oz' ? 'lb' : 'pc' });
       }
       queueSave(); renderMenuGroups(); renderShopList(); renderPantry();
     });
     cancel.addEventListener('click', function () { form.remove(); link.style.display = ''; });
-    form.appendChild(name); form.appendChild(who); form.appendChild(unit);
-    form.appendChild(per); form.appendChild(ok); form.appendChild(cancel);
+    form.appendChild(name); form.appendChild(unit); form.appendChild(per);
+    form.appendChild(bothWrap); form.appendChild(ok); form.appendChild(cancel);
     container.appendChild(form);
     name.focus();
   }
