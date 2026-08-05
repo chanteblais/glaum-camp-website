@@ -46,9 +46,9 @@
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
     line-height: 1.45;
   }
-  .wrap { max-width: 860px; margin: 0 auto; padding: 24px 16px 80px; }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 24px 16px 80px; }
 
-  header.masthead { margin-bottom: 20px; }
+  header.masthead { margin-bottom: 14px; }
   .eyebrow {
     font-size: 12px; font-weight: 700; letter-spacing: 0.12em;
     text-transform: uppercase; color: var(--muted); margin: 0 0 4px;
@@ -58,8 +58,8 @@
     margin: 0 0 6px; text-wrap: balance;
     border-bottom: 4px solid var(--ink); padding-bottom: 8px; display: inline-block;
   }
-  .service-times { color: var(--muted); font-size: 14px; margin: 6px 0 0; }
-  .service-times strong { color: var(--ink); }
+  .subtitle { color: var(--muted); font-size: 14px; margin: 6px 0 0; }
+  .subtitle strong { color: var(--ink); }
   .print-only { display: none; }
 
   .syncbar {
@@ -93,6 +93,10 @@
     background: var(--card); border: 1px solid var(--line); border-radius: 6px;
     padding: 14px 16px; margin: 16px 0;
   }
+  .panel-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--muted); margin: 0 0 8px;
+  }
   .counts { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
   .count-field { display: flex; flex-direction: column; gap: 4px; }
   .count-field label {
@@ -108,6 +112,39 @@
   .covers-note { font-size: 13px; color: var(--muted); margin-left: auto; align-self: center; }
   .covers-note strong { color: var(--ink); }
 
+  /* day chips (which days the shopping list covers) */
+  .daychips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .daychip {
+    font-size: 13px; font-weight: 700; border-radius: 999px; padding: 6px 14px;
+    border: 1.5px solid var(--line); background: transparent; color: var(--muted);
+    display: inline-flex; align-items: center; gap: 7px;
+  }
+  .daychip .cov { font-weight: 500; font-size: 11px; opacity: 0.85; }
+  .daychip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
+  /* day picker (menus tab) */
+  .daypick { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .daypick button.day {
+    font-size: 13px; font-weight: 700; border-radius: 5px; padding: 6px 12px;
+    border: 1.5px solid var(--line); background: transparent; color: var(--muted);
+  }
+  .daypick button.day.active { border-color: var(--ink); color: var(--ink); background: var(--card); }
+  .daypick .add-day { border-style: dashed; color: var(--accent); border-color: var(--accent); }
+
+  .dayhead { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 4px; }
+  .dayhead .f { display: flex; flex-direction: column; gap: 4px; }
+  .dayhead label {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .dayhead input {
+    padding: 7px 9px; border: 1.5px solid var(--line); border-radius: 5px;
+    background: var(--ground); color: var(--ink); font-size: 14px;
+  }
+  .dayhead input.name { font-weight: 700; min-width: 220px; }
+  .dayhead input.times { min-width: 260px; }
+  .dayhead .spacer { margin-left: auto; }
+
   .toolbar { display: flex; gap: 10px; flex-wrap: wrap; margin: 18px 0; }
   button {
     font: 600 14px system-ui, sans-serif; cursor: pointer; border-radius: 5px;
@@ -116,7 +153,9 @@
   button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .btn-primary { background: var(--accent); color: var(--accent-ink); }
   .btn-ghost { background: transparent; color: var(--ink); border-color: var(--line); }
-  .btn-ghost:hover, .btn-primary:hover { filter: brightness(1.06); }
+  .btn-danger { background: transparent; color: var(--danger); border-color: var(--line); }
+  .btn-ghost:hover, .btn-primary:hover, .btn-danger:hover { filter: brightness(1.06); }
+  .btn-sm { font-size: 13px; padding: 6px 12px; }
 
   section.group { margin: 26px 0; }
   .group-head {
@@ -130,15 +169,25 @@
   .group-head .group-note { font-size: 13px; color: var(--muted); }
 
   ul.items { list-style: none; margin: 0; padding: 0; }
+
+  /* shopping row (aggregated) */
+  li.buyrow {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) 160px;
+    gap: 10px; align-items: center;
+    padding: 9px 2px; border-bottom: 1px dashed var(--line);
+  }
+  li.buyrow.checked .item-name { text-decoration: line-through; color: var(--muted); }
+  li.buyrow.checked .buy { background: transparent; color: var(--muted); }
+  li.buyrow.covered .buy { background: transparent; color: var(--accent); }
+
+  /* menu row (per day, editable) */
   li.item {
     display: grid;
-    grid-template-columns: 28px minmax(0, 1fr) 126px 150px 28px;
+    grid-template-columns: minmax(0, 1fr) 126px 150px 28px;
     gap: 8px; align-items: center;
     padding: 9px 2px; border-bottom: 1px dashed var(--line);
   }
-  li.item.checked .item-name { text-decoration: line-through; color: var(--muted); }
-  li.item.checked .buy { background: transparent; color: var(--muted); }
-  li.item.covered .buy { background: transparent; color: var(--accent); }
 
   .got { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
   .item-main { min-width: 0; }
@@ -150,6 +199,11 @@
   }
   .chip.v { background: var(--chip-v); }
   .chip.pa { background: var(--chip-pa); }
+  .daytag {
+    display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.06em;
+    text-transform: uppercase; border-radius: 3px; padding: 1px 6px; margin-left: 6px;
+    border: 1px solid var(--line); color: var(--muted); vertical-align: 2px;
+  }
 
   .per-cell { display: flex; align-items: center; gap: 5px; justify-content: flex-end; }
   .per-cell input, .pantry-cell input {
@@ -160,7 +214,6 @@
   }
   .per-cell input:focus-visible, .pantry-cell input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
   .per-unit { font-size: 11px; color: var(--muted); white-space: nowrap; }
-  .per-print { display: none; font-size: 12px; color: var(--muted); }
 
   .buy-cell { text-align: right; }
   .buy {
@@ -168,6 +221,7 @@
     background: var(--hl); padding: 2px 6px; border-radius: 3px; white-space: nowrap;
   }
   .pack-hint { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .breakdown { font-size: 11px; color: var(--muted); margin-top: 2px; }
 
   li.pantry-item {
     display: grid;
@@ -200,23 +254,32 @@
 
   .assumptions { font-size: 13px; color: var(--muted); }
   .assumptions strong { color: var(--ink); }
+  .empty { color: var(--muted); font-size: 14px; padding: 14px 2px; }
 
   footer.colophon { margin-top: 36px; font-size: 12px; color: var(--muted); }
 
-  .view-pantry .shop-only { display: none; }
-  .wrap:not(.view-pantry) .pantry-only { display: none; }
+  .view-menus .shop-only, .view-menus .pantry-only { display: none; }
+  .view-pantry .shop-only, .view-pantry .menus-only { display: none; }
+  .view-shop .menus-only, .view-shop .pantry-only { display: none; }
 
-  @media (max-width: 560px) {
+  @media (max-width: 620px) {
+    li.buyrow {
+      grid-template-columns: 28px minmax(0, 1fr);
+      grid-template-areas: "check main" "check buy";
+      row-gap: 4px;
+    }
+    li.buyrow .got { grid-area: check; }
+    li.buyrow .item-main { grid-area: main; }
+    li.buyrow .buy-cell { grid-area: buy; text-align: left; }
     li.item {
-      grid-template-columns: 28px minmax(0, 1fr) auto;
-      grid-template-areas: "check main del" "check per buy";
+      grid-template-columns: minmax(0, 1fr) auto 28px;
+      grid-template-areas: "main main del" "per buy buy";
       row-gap: 6px;
     }
-    .got { grid-area: check; }
-    .item-main { grid-area: main; }
+    li.item .item-main { grid-area: main; }
     li.item .del { grid-area: del; }
-    .per-cell { grid-area: per; justify-content: flex-start; }
-    .buy-cell { grid-area: buy; }
+    li.item .per-cell { grid-area: per; justify-content: flex-start; }
+    li.item .buy-cell { grid-area: buy; }
     li.pantry-item {
       grid-template-columns: minmax(0, 1fr) auto 28px;
       grid-template-areas: "main main pdel" "need have have";
@@ -226,6 +289,8 @@
     li.pantry-item .del { grid-area: pdel; }
     .need-ref { grid-area: need; align-self: center; }
     .pantry-cell { grid-area: have; }
+    .dayhead input.name, .dayhead input.times { min-width: 0; width: 100%; }
+    .dayhead .f { flex: 1 1 100%; }
   }
 
   @media print {
@@ -235,179 +300,209 @@
     }
     body { background: #fff; }
     .wrap { max-width: none; padding: 0; }
-    .no-print, .toolbar, .del, .add-row, .per-cell input, .per-unit, .tabs, .syncbar { display: none !important; }
-    .pantry-only { display: none !important; }
-    .shop-only, #groups { display: block !important; }
+    .no-print, .toolbar, .del, .add-row, .tabs, .syncbar, .daychips, .panel { display: none !important; }
+    .menus-only, .pantry-only { display: none !important; }
+    .shop-only, #shoplist { display: block !important; }
     .print-only { display: block; font-size: 13px; margin: 4px 0 0; }
-    .per-print { display: inline; }
-    .panel { border: none; padding: 0; }
-    .counts input { border: none; background: none; padding: 0; }
-    li.item { break-inside: avoid; padding: 5px 0; }
-    li.item.checked, li.item.covered { display: none; }
+    li.buyrow { break-inside: avoid; padding: 5px 0; grid-template-columns: 20px 1fr 150px; }
+    li.buyrow.checked, li.buyrow.covered { display: none; }
     .buy { background: none; padding: 0; }
     .got { appearance: none; -webkit-appearance: none; width: 14px; height: 14px; border: 1.5px solid #000; border-radius: 2px; }
     section.group { margin: 18px 0; }
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    * { transition: none !important; }
-  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
 <body>
-<div class="wrap" id="wrap">
+<div class="wrap view-shop" id="wrap">
   <header class="masthead">
     <p class="eyebrow">Festival catering · shared kitchen board</p>
-    <h1 id="day-title">Thursday — Taco Night</h1>
-    <p class="service-times">
-      Brunch <strong>10:00–12:00</strong> (everyone; PA special: Egg McMuffin) ·
-      Dinner <strong>V 5:00–6:30</strong> / <strong>PA 6:00–8:00</strong>
-    </p>
+    <h1>Kitchen Board</h1>
+    <p class="subtitle" id="subtitle">—</p>
     <p class="syncbar no-print" id="syncbar"><span class="dot" id="syncdot"></span><span id="syncmsg">Loading…</span></p>
-    <p class="print-only" id="print-pantry-note" hidden>Pantry stock subtracted — fully stocked items are not listed.</p>
+    <p class="print-only" id="print-note"></p>
   </header>
-
-  <div class="panel">
-    <div class="counts">
-      <div class="count-field">
-        <label for="in-v">Volunteers</label>
-        <input id="in-v" type="number" min="0" step="1">
-      </div>
-      <div class="count-field">
-        <label for="in-pa">Production artists</label>
-        <input id="in-pa" type="number" min="0" step="1">
-      </div>
-      <div class="count-field">
-        <label for="in-buffer">Buffer %</label>
-        <input id="in-buffer" type="number" min="0" step="1">
-      </div>
-      <p class="covers-note">Total covers: <strong id="covers">—</strong></p>
-    </div>
-  </div>
 
   <nav class="tabs no-print" aria-label="Views">
     <button class="tab active" id="tab-shop">Shopping list</button>
+    <button class="tab" id="tab-menus">Menus</button>
     <button class="tab" id="tab-pantry">Pantry</button>
     <button class="inv-toggle" id="btn-pantry-toggle" aria-pressed="false">Subtract pantry: OFF</button>
   </nav>
 
+  <!-- SHOPPING LIST -->
+  <div class="panel shop-only no-print">
+    <p class="panel-label">Shopping for</p>
+    <div class="daychips" id="daychips"></div>
+  </div>
+
   <div class="toolbar no-print shop-only">
     <button class="btn-primary" id="btn-print">Print shopping list</button>
     <button class="btn-ghost" id="btn-uncheck">Clear check-offs</button>
-    <button class="btn-ghost" id="btn-reset">Reset to Daniel's sheet</button>
   </div>
 
   <p class="assumptions no-print shop-only">
-    <strong>How the math works:</strong> each “per person” number is a planning average across
-    the whole group it applies to — skippers and seconds baked in. Quantities for meat are
-    <strong>raw purchase weight</strong>. Edit any number and the buy column updates; the
-    buffer is added on top. With <strong>Subtract pantry</strong> on, the buy column shows
-    what's still needed after pantry stock — fully stocked items read “stocked ✓” and drop
-    off the printout. Check items off as you shop; checked items drop off the printout too.
+    <strong>How the math works:</strong> pick the days you're shopping for above — quantities
+    for every day are added together, so one trip covers them all. Each “per person” number is
+    a planning average across the group it applies to (skippers and seconds baked in); meat is
+    <strong>raw purchase weight</strong>; each day's buffer is added on top. With
+    <strong>Subtract pantry</strong> on, stock is taken off the combined total <em>once</em> —
+    fully covered items read “stocked ✓”. Check items off as you shop; checked and stocked
+    items drop off the printout. Edit portions and menus on the <strong>Menus</strong> tab.
   </p>
 
+  <div id="shoplist" class="shop-only"></div>
+
+  <!-- MENUS -->
+  <div class="panel menus-only no-print">
+    <p class="panel-label">Day</p>
+    <div class="daypick" id="daypick"></div>
+  </div>
+  <div class="menus-only no-print" id="dayeditor"></div>
+  <div id="menugroups" class="menus-only"></div>
+
+  <!-- PANTRY -->
   <p class="assumptions no-print pantry-only">
-    <strong>The pantry is a standing ledger:</strong> it belongs to the kitchen, not to
-    Thursday — future day-lists will draw from the same stock. Enter what's on the shelves
-    (lb for weight, pc for counted items) and add anything Daniel has, whether or not it's
-    on this menu. Pantry stock is matched to shopping items <strong>by name</strong>; flip
-    <strong>Subtract pantry</strong> above to apply it to the list. Amounts here are kept
-    either way.
+    <strong>The pantry is a standing ledger:</strong> it belongs to the kitchen, not to any one
+    day. Enter what's on the shelves (lb for weight, pc for counted items) and add anything
+    Daniel has, whether or not it's on a menu. Stock is matched to menu items <strong>by
+    name</strong> and subtracted once from whatever days you're shopping for. “List needs”
+    below reflects the days selected on the Shopping list tab.
   </p>
-
-  <div id="groups" class="shop-only"></div>
   <div id="pantry-view" class="pantry-only"></div>
 
   <footer class="colophon">
-    Everyone on this page shares one list — edits save automatically and appear for the
-    others within a few seconds. Portions are starting points from standard catering
-    planning ranges; trust Daniel's read of his crowd over the defaults.
+    Everyone on this page shares one board — edits save automatically and reach the others
+    within a few seconds. Portions are starting points from standard catering planning ranges;
+    trust Daniel's read of his crowd over the defaults.
   </footer>
 </div>
 
 <script>
 (function () {
-  var API = '/api/kitchen-list';
-  var LS_KEY = 'catering-kitchen-backup';
+  // ?scope=test on the page URL gives a scratch copy of the board (same page,
+  // separate stored state) so changes can be tried without touching the live one.
+  var SCOPE = /(?:\?|&)scope=test\b/.test(location.search) ? 'test' : 'live';
+  var API = '/api/kitchen-list?scope=' + SCOPE;
+  var LS_KEY = 'catering-kitchen-backup-' + SCOPE;
   var LB = 16, KG = 0.45359237;
 
-  var FACTORY = {
-    version: 2,
-    v: 176, pa: 241, buffer: 10, usePantry: false,
-    pantry: [],
-    groups: [
-      {
-        id: 'brunch', name: 'PA Brunch Special — Egg McMuffins',
-        note: 'PA only · one build per person',
-        items: [
-          { n: 'English muffins', who: 'pa', unit: 'pc', per: 1, pack: [12, '12-packs'] },
-          { n: 'Eggs', who: 'pa', unit: 'pc', per: 1, pack: [30, '30-flats'] },
-          { n: 'Cheddar slices', who: 'pa', unit: 'pc', per: 1, pack: [120, '120-ct packs'] },
-          { n: 'Sausage patties', who: 'pa', unit: 'pc', per: 1, pack: [60, '60-ct boxes'] },
-          { n: 'Butter', who: 'pa', unit: 'oz', per: 0.15, pack: [16, '1 lb blocks'] }
-        ]
-      },
-      {
-        id: 'proteins', name: 'Dinner — Proteins',
-        note: 'raw purchase weight · both menus',
-        items: [
-          { n: 'Ground beef', who: 'both', unit: 'oz', per: 3, pack: [160, '10 lb chubs'] },
-          { n: 'Chicken thighs (for shredding)', who: 'both', unit: 'oz', per: 3 },
-          { n: 'Firm tofu', who: 'both', unit: 'oz', per: 1, pack: [16, '1 lb blocks'] },
-          { n: 'Black beans (canned)', who: 'both', unit: 'oz', per: 1.5, pack: [106, '#10 cans'] },
-          { n: 'Taco seasoning', who: 'both', unit: 'oz', per: 0.2, pack: [24, '24 oz jars'] }
-        ]
-      },
-      {
-        id: 'sides', name: 'Dinner — Sides',
-        note: 'Mexi rice · Caesar · fajita veg',
-        items: [
-          { n: 'Rice (dry)', who: 'both', unit: 'oz', per: 1.5, pack: [800, '50 lb bags'] },
-          { n: 'Tomato sauce (for rice)', who: 'both', unit: 'oz', per: 0.5, pack: [106, '#10 cans'] },
-          { n: 'Romaine', who: 'both', unit: 'oz', per: 2 },
-          { n: 'Caesar dressing', who: 'both', unit: 'oz', per: 0.9, pack: [128, 'gallon jugs'] },
-          { n: 'Croutons', who: 'both', unit: 'oz', per: 0.5, pack: [40, '2.5 lb bags'] },
-          { n: 'Shaved parmesan', who: 'both', unit: 'oz', per: 0.3, pack: [80, '5 lb bags'] },
-          { n: 'Bell peppers (fajita veg)', who: 'both', unit: 'oz', per: 1.5 },
-          { n: 'Onions (fajita veg)', who: 'both', unit: 'oz', per: 1 },
-          { n: 'Cooking oil', who: 'both', unit: 'oz', per: 0.25, pack: [128, 'gallon jugs'] }
-        ]
-      },
-      {
-        id: 'bar', name: 'Taco Bar',
-        note: 'tortillas + toppings · both menus unless tagged',
-        items: [
-          { n: 'Tortillas', who: 'both', unit: 'pc', per: 3, pack: [60, '60-ct packs'] },
-          { n: 'Salsa', who: 'both', unit: 'oz', per: 1.5, pack: [106, '#10 cans'] },
-          { n: 'Sour cream', who: 'both', unit: 'oz', per: 1, pack: [80, '5 lb tubs'] },
-          { n: 'Queso', who: 'both', unit: 'oz', per: 1.5, pack: [106, '#10 cans'] },
-          { n: 'Shredded cheese', who: 'both', unit: 'oz', per: 1, pack: [80, '5 lb bags'] },
-          { n: 'Hot sauce (bottles)', who: 'both', unit: 'pc', per: 0.02, note: '≈ 1 bottle per 50 people' },
-          { n: 'Limes', who: 'both', unit: 'pc', per: 0.25 },
-          { n: 'Cilantro (bunches)', who: 'both', unit: 'pc', per: 0.02, note: '≈ 1 bunch per 50 people' },
-          { n: 'Pickled red onions', who: 'pa', unit: 'oz', per: 0.75, note: 'PA menu Ex 1' },
-          { n: 'Nacho chips', who: 'pa', unit: 'oz', per: 1.5, pack: [32, '2 lb bags'], note: 'PA menu Ex 3' }
-        ]
-      },
+  function thursdayGroups() {
+    return [
+      { id: 'brunch', name: 'PA Brunch Special — Egg McMuffins', note: 'PA only · one build per person', items: [
+        { n: 'English muffins', who: 'pa', unit: 'pc', per: 1, pack: [12, '12-packs'] },
+        { n: 'Eggs', who: 'pa', unit: 'pc', per: 1, pack: [30, '30-flats'] },
+        { n: 'Cheddar slices', who: 'pa', unit: 'pc', per: 1, pack: [120, '120-ct packs'] },
+        { n: 'Sausage patties', who: 'pa', unit: 'pc', per: 1, pack: [60, '60-ct boxes'] },
+        { n: 'Butter', who: 'pa', unit: 'oz', per: 0.15, pack: [16, '1 lb blocks'] }
+      ]},
+      { id: 'proteins', name: 'Dinner — Proteins', note: 'raw purchase weight · both menus', items: [
+        { n: 'Ground beef', who: 'both', unit: 'oz', per: 3, pack: [160, '10 lb chubs'] },
+        { n: 'Chicken thighs (for shredding)', who: 'both', unit: 'oz', per: 3 },
+        { n: 'Firm tofu', who: 'both', unit: 'oz', per: 1, pack: [16, '1 lb blocks'] },
+        { n: 'Black beans (canned)', who: 'both', unit: 'oz', per: 1.5, pack: [106, '#10 cans'] },
+        { n: 'Taco seasoning', who: 'both', unit: 'oz', per: 0.2, pack: [24, '24 oz jars'] }
+      ]},
+      { id: 'sides', name: 'Dinner — Sides', note: 'Mexi rice · Caesar · fajita veg', items: [
+        { n: 'Rice (dry)', who: 'both', unit: 'oz', per: 1.5, pack: [800, '50 lb bags'] },
+        { n: 'Tomato sauce (for rice)', who: 'both', unit: 'oz', per: 0.5, pack: [106, '#10 cans'] },
+        { n: 'Romaine', who: 'both', unit: 'oz', per: 2 },
+        { n: 'Caesar dressing', who: 'both', unit: 'oz', per: 0.9, pack: [128, 'gallon jugs'] },
+        { n: 'Croutons', who: 'both', unit: 'oz', per: 0.5, pack: [40, '2.5 lb bags'] },
+        { n: 'Shaved parmesan', who: 'both', unit: 'oz', per: 0.3, pack: [80, '5 lb bags'] },
+        { n: 'Bell peppers (fajita veg)', who: 'both', unit: 'oz', per: 1.5 },
+        { n: 'Onions (fajita veg)', who: 'both', unit: 'oz', per: 1 },
+        { n: 'Cooking oil', who: 'both', unit: 'oz', per: 0.25, pack: [128, 'gallon jugs'] }
+      ]},
+      { id: 'bar', name: 'Taco Bar', note: 'tortillas + toppings · both menus unless tagged', items: [
+        { n: 'Tortillas', who: 'both', unit: 'pc', per: 3, pack: [60, '60-ct packs'] },
+        { n: 'Salsa', who: 'both', unit: 'oz', per: 1.5, pack: [106, '#10 cans'] },
+        { n: 'Sour cream', who: 'both', unit: 'oz', per: 1, pack: [80, '5 lb tubs'] },
+        { n: 'Queso', who: 'both', unit: 'oz', per: 1.5, pack: [106, '#10 cans'] },
+        { n: 'Shredded cheese', who: 'both', unit: 'oz', per: 1, pack: [80, '5 lb bags'] },
+        { n: 'Hot sauce (bottles)', who: 'both', unit: 'pc', per: 0.02, note: '≈ 1 bottle per 50 people' },
+        { n: 'Limes', who: 'both', unit: 'pc', per: 0.25 },
+        { n: 'Cilantro (bunches)', who: 'both', unit: 'pc', per: 0.02, note: '≈ 1 bunch per 50 people' },
+        { n: 'Pickled red onions', who: 'pa', unit: 'oz', per: 0.75, note: 'PA menu Ex 1' },
+        { n: 'Nacho chips', who: 'pa', unit: 'oz', per: 1.5, pack: [32, '2 lb bags'], note: 'PA menu Ex 3' }
+      ]},
       { id: 'other', name: 'Other / Supplies', note: 'add anything else the run needs', items: [] }
-    ]
-  };
-  FACTORY.groups.forEach(function (g) {
-    g.items.forEach(function (it) {
-      FACTORY.pantry.push({ n: it.n, qty: 0, unit: it.unit === 'oz' ? 'lb' : 'pc' });
+    ];
+  }
+
+  function factory() {
+    var s = {
+      version: 3,
+      usePantry: false,
+      pantry: [],
+      checked: {},
+      selected: ['thu'],
+      days: [{
+        id: 'thu', name: 'Thursday — Taco Night',
+        times: 'Brunch 10:00–12:00 · Dinner V 5:00–6:30 / PA 6:00–8:00',
+        v: 176, pa: 241, buffer: 10,
+        groups: thursdayGroups()
+      }]
+    };
+    s.days[0].groups.forEach(function (g) {
+      g.items.forEach(function (it) {
+        s.pantry.push({ n: it.n, qty: 0, unit: it.unit === 'oz' ? 'lb' : 'pc' });
+      });
     });
-  });
+    return s;
+  }
 
-  var state = JSON.parse(JSON.stringify(FACTORY));
-  var nextId = 1;
-  var dirty = false;          // local edits not yet accepted by the server
-  var saving = false;
-  var saveTimer = null;
-  var lastServerJson = null;  // what we believe the server holds
+  var state = factory();
+  var activeDayId = null;
+  var uid = 1;
+  var dirty = false, saving = false, saveTimer = null, lastServerJson = null;
 
+  function nameKey(n) { return String(n).trim().toLowerCase(); }
+  function itemKey(n, unit) { return nameKey(n) + '|' + (unit === 'oz' ? 'w' : 'c'); }
   function assignIds() {
-    state.groups.forEach(function (g) { g.items.forEach(function (it) { it.id = nextId++; }); });
-    state.pantry.forEach(function (p) { p.id = nextId++; });
+    state.days.forEach(function (d) {
+      if (!d.id) d.id = 'day' + (uid++);
+      d.groups.forEach(function (g) { g.items.forEach(function (it) { it.uid = uid++; }); });
+    });
+    state.pantry.forEach(function (p) { p.uid = uid++; });
+  }
+
+  // ---------- migration ----------
+  function migrate(s) {
+    if (!s || typeof s !== 'object') return null;
+    if (Array.isArray(s.days)) {
+      s.version = 3;
+      if (!Array.isArray(s.pantry)) s.pantry = [];
+      if (!s.checked || typeof s.checked !== 'object') s.checked = {};
+      if (!Array.isArray(s.selected) || !s.selected.length) s.selected = s.days.length ? [s.days[0].id] : [];
+      return s;
+    }
+    if (Array.isArray(s.groups)) {
+      // v1/v2 (single implicit Thursday) → v3
+      var checked = {};
+      s.groups.forEach(function (g) {
+        g.items.forEach(function (it) {
+          if (it.got) checked[itemKey(it.n, it.unit)] = true;
+          delete it.got;
+          if (typeof it.onHand === 'number') delete it.onHand; // v1 remnant
+        });
+      });
+      return {
+        version: 3,
+        usePantry: !!(s.usePantry || s.useInventory),
+        pantry: Array.isArray(s.pantry) ? s.pantry : [],
+        checked: checked,
+        selected: ['thu'],
+        days: [{
+          id: 'thu', name: 'Thursday — Taco Night',
+          times: 'Brunch 10:00–12:00 · Dinner V 5:00–6:30 / PA 6:00–8:00',
+          v: s.v || 0, pa: s.pa || 0, buffer: typeof s.buffer === 'number' ? s.buffer : 10,
+          groups: s.groups
+        }]
+      };
+    }
+    return null;
   }
 
   // ---------- sync ----------
@@ -422,23 +517,25 @@
 
   function payload() {
     return JSON.stringify({
-      version: 2, v: state.v, pa: state.pa, buffer: state.buffer,
+      version: 3,
       usePantry: state.usePantry,
-      groups: state.groups.map(function (g) {
+      checked: state.checked,
+      selected: state.selected,
+      pantry: state.pantry.map(function (p) { return { n: p.n, qty: p.qty, unit: p.unit }; }),
+      days: state.days.map(function (d) {
         return {
-          id: g.id, name: g.name, note: g.note,
-          items: g.items.map(function (it) {
-            return { n: it.n, who: it.who, unit: it.unit, per: it.per, pack: it.pack, note: it.note, got: !!it.got };
+          id: d.id, name: d.name, times: d.times, v: d.v, pa: d.pa, buffer: d.buffer,
+          groups: d.groups.map(function (g) {
+            return { id: g.id, name: g.name, note: g.note, items: g.items.map(function (it) {
+              return { n: it.n, who: it.who, unit: it.unit, per: it.per, pack: it.pack, note: it.note };
+            }) };
           })
         };
-      }),
-      pantry: state.pantry.map(function (p) { return { n: p.n, qty: p.qty, unit: p.unit }; })
+      })
     });
   }
 
-  function cacheLocal(json) {
-    try { localStorage.setItem(LS_KEY, json); } catch (e) { /* private mode */ }
-  }
+  function cacheLocal(j) { try { localStorage.setItem(LS_KEY, j); } catch (e) {} }
 
   function queueSave() {
     dirty = true;
@@ -452,167 +549,464 @@
     if (saving) { saveTimer = setTimeout(doSave, 400); return; }
     saving = true;
     var body = payload();
-    fetch(API, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: '{"state":' + body + '}'
-    }).then(function (r) {
-      saving = false;
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      lastServerJson = body;
-      if (body === payload()) { dirty = false; setStatus('ok', 'Saved — everyone sees this list'); }
-    }).catch(function () {
-      saving = false;
-      setStatus('err', 'Offline — changes are kept on this device and will save when you reconnect');
-    });
+    fetch(API, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: '{"state":' + body + '}' })
+      .then(function (r) {
+        saving = false;
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        lastServerJson = body;
+        if (body === payload()) { dirty = false; setStatus('ok', 'Saved — everyone sees this board'); }
+      })
+      .catch(function () {
+        saving = false;
+        setStatus('err', 'Offline — changes are kept on this device and will save when you reconnect');
+      });
   }
 
   function adoptRemote(remote) {
-    var activeTag = document.activeElement && document.activeElement.tagName;
-    if (activeTag === 'INPUT' || activeTag === 'SELECT') return; // don't yank a field mid-edit
-    state = remote;
-    if (!Array.isArray(state.pantry)) state.pantry = [];
+    var tag = document.activeElement && document.activeElement.tagName;
+    if (tag === 'INPUT' || tag === 'SELECT') return;
+    var m = migrate(remote);
+    if (!m) return;
+    state = m;
+    if (!state.days.some(function (d) { return d.id === activeDayId; })) activeDayId = state.days[0] ? state.days[0].id : null;
     assignIds();
-    var wasPantry = $wrap.classList.contains('view-pantry');
     render();
-    setView(wasPantry);
     setStatus('ok', 'Updated from another device');
   }
 
   function poll() {
     if (dirty || saving) return;
     fetch(API, { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) {
-      if (!d || !d.state || !d.state.groups) return;
+      if (!d || !d.state) return;
       var json = JSON.stringify(d.state);
-      if (json !== lastServerJson && json !== payload()) {
-        lastServerJson = json;
-        adoptRemote(d.state);
-      }
-    }).catch(function () { /* keep working offline */ });
+      if (json !== lastServerJson && json !== payload()) { lastServerJson = json; adoptRemote(d.state); }
+    }).catch(function () {});
   }
 
   function boot() {
     fetch(API, { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) {
-      if (d && d.state && Array.isArray(d.state.groups)) {
-        state = d.state;
-        if (!Array.isArray(state.pantry)) state.pantry = [];
+      var m = d && d.state ? migrate(d.state) : null;
+      if (m) {
+        state = m;
         lastServerJson = JSON.stringify(d.state);
-        assignIds();
-        render();
-        setStatus('ok', 'Shared list — everyone on this page sees the same numbers');
+        activeDayId = state.days[0] ? state.days[0].id : null;
+        assignIds(); render();
+        setStatus('ok', 'Shared board — everyone here sees the same numbers');
+        if (JSON.stringify(d.state) !== payload()) queueSave(); // persist the migrated shape
       } else {
-        // first ever load: seed the server with the factory sheet
-        assignIds();
-        render();
+        activeDayId = state.days[0].id;
+        assignIds(); render();
         setStatus('busy', 'Setting up…');
         queueSave();
       }
     }).catch(function () {
       var cached = null;
-      try { cached = localStorage.getItem(LS_KEY); } catch (e) { /* ignore */ }
-      if (cached) {
-        try { state = JSON.parse(cached); } catch (e) { /* ignore */ }
-      }
-      if (!Array.isArray(state.pantry)) state.pantry = [];
-      assignIds();
-      render();
+      try { cached = localStorage.getItem(LS_KEY); } catch (e) {}
+      if (cached) { var m2 = migrate(JSON.parse(cached)); if (m2) state = m2; }
+      activeDayId = state.days[0] ? state.days[0].id : null;
+      assignIds(); render();
       setStatus('err', "Can't reach the server — showing the last copy saved on this device");
-    }).then(function () {
-      setInterval(poll, 10000);
-    });
+    }).then(function () { setInterval(poll, 10000); });
   }
 
   window.addEventListener('pagehide', function () {
     if (!dirty) return;
-    try { navigator.sendBeacon(API, new Blob(['{"state":' + payload() + '}'], { type: 'application/json' })); } catch (e) { /* ignore */ }
+    try { navigator.sendBeacon(API, new Blob(['{"state":' + payload() + '}'], { type: 'application/json' })); } catch (e) {}
   });
-  document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState === 'visible') poll();
-  });
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') poll(); });
 
   // ---------- math ----------
-  function baseCount(who) {
-    if (who === 'v') return state.v;
-    if (who === 'pa') return state.pa;
-    return state.v + state.pa;
+  function dayById(id) {
+    for (var i = 0; i < state.days.length; i++) if (state.days[i].id === id) return state.days[i];
+    return null;
   }
-  function neededFor(item) {
-    return item.per * baseCount(item.who) * (1 + state.buffer / 100);
+  function selectedDays() {
+    return state.days.filter(function (d) { return state.selected.indexOf(d.id) > -1; });
   }
-  function nameKey(n) { return String(n).trim().toLowerCase(); }
-  function unitsCompatible(itemUnit, pantryUnit) {
-    return (itemUnit === 'oz' && pantryUnit === 'lb') || (itemUnit === 'pc' && pantryUnit === 'pc');
+  function baseCount(day, who) {
+    if (who === 'v') return day.v;
+    if (who === 'pa') return day.pa;
+    return day.v + day.pa;
   }
-  function pantryEntryFor(item) {
+  function neededFor(day, item) {
+    return item.per * baseCount(day, item.who) * (1 + day.buffer / 100);
+  }
+  function unitsCompatible(u, pu) {
+    return (u === 'oz' && pu === 'lb') || (u === 'pc' && pu === 'pc');
+  }
+  function pantryFor(name, unit) {
     for (var i = 0; i < state.pantry.length; i++) {
       var p = state.pantry[i];
-      if (nameKey(p.n) === nameKey(item.n) && unitsCompatible(item.unit, p.unit)) return p;
+      if (nameKey(p.n) === nameKey(name) && unitsCompatible(unit, p.unit)) return p;
     }
     return null;
   }
-  function pantryNative(item) {
-    var p = pantryEntryFor(item);
+  function pantryNative(name, unit) {
+    var p = pantryFor(name, unit);
     if (!p) return 0;
     return p.unit === 'lb' ? (p.qty || 0) * LB : (p.qty || 0);
   }
-  function remainingFor(item) {
-    var n = neededFor(item);
-    return state.usePantry ? Math.max(0, n - pantryNative(item)) : n;
+
+  // Aggregate every selected day's menu into one buy list, summed by name+unit.
+  function aggregate() {
+    var map = {}, order = [];
+    selectedDays().forEach(function (day) {
+      day.groups.forEach(function (g) {
+        g.items.forEach(function (it) {
+          var k = itemKey(it.n, it.unit);
+          if (!map[k]) {
+            map[k] = { key: k, n: it.n, unit: it.unit, pack: it.pack, note: it.note, group: g.name, total: 0, parts: [] };
+            order.push(k);
+          }
+          var q = neededFor(day, it);
+          map[k].total += q;
+          map[k].parts.push({ day: day.name, qty: q });
+          if (!map[k].pack && it.pack) map[k].pack = it.pack;
+        });
+      });
+    });
+    return order.map(function (k) { return map[k]; });
+  }
+  function remaining(agg) {
+    return state.usePantry ? Math.max(0, agg.total - pantryNative(agg.n, agg.unit)) : agg.total;
   }
   function fmt(n, d) { return Number(n.toFixed(d)).toLocaleString(); }
-  function qtyText(item, q) {
-    if (item.unit === 'pc') return fmt(Math.ceil(q), 0) + ' pc';
+  function qtyText(unit, q) {
+    if (unit === 'pc') return fmt(Math.ceil(q), 0) + ' pc';
     var lb = q / LB;
     return (lb >= 20 ? fmt(Math.ceil(lb), 0) : fmt(lb, 1)) + ' lb';
   }
-  function subText(item) {
-    var rem = remainingFor(item);
-    var bits = [];
-    if (item.unit === 'oz' && rem > 0) bits.push('≈ ' + fmt((rem / LB) * KG, 1) + ' kg');
-    if (item.pack && rem > 0) bits.push('≈ ' + Math.ceil(rem / item.pack[0]) + ' × ' + item.pack[1]);
-    var p = pantryEntryFor(item);
-    if (state.usePantry && p && (p.qty || 0) > 0) {
-      bits.push('need ' + qtyText(item, neededFor(item)) + ' − pantry ' + fmt(p.qty, 2) + ' ' + p.unit);
-    }
-    if (item.note) bits.push(item.note);
-    return bits.join(' · ');
-  }
+  // What the selected days need of a pantry line (null = on no selected menu).
   function listNeedsFor(p) {
     var total = 0, matched = false;
-    state.groups.forEach(function (g) {
-      g.items.forEach(function (it) {
-        if (nameKey(it.n) === nameKey(p.n) && unitsCompatible(it.unit, p.unit)) {
-          matched = true; total += neededFor(it);
-        }
+    selectedDays().forEach(function (day) {
+      day.groups.forEach(function (g) {
+        g.items.forEach(function (it) {
+          if (nameKey(it.n) === nameKey(p.n) && unitsCompatible(it.unit, p.unit)) {
+            matched = true; total += neededFor(day, it);
+          }
+        });
       });
     });
-    if (!matched) return null;
-    return p.unit === 'lb'
-      ? (total / LB >= 20 ? fmt(Math.ceil(total / LB), 0) : fmt(total / LB, 1)) + ' lb'
-      : fmt(Math.ceil(total), 0) + ' pc';
+    return matched ? qtyText(p.unit === 'lb' ? 'oz' : 'pc', total) : null;
   }
 
-  // ---------- render ----------
+  // ---------- elements ----------
   var $wrap = document.getElementById('wrap');
-  var $groups = document.getElementById('groups');
+  var $subtitle = document.getElementById('subtitle');
+  var $daychips = document.getElementById('daychips');
+  var $shoplist = document.getElementById('shoplist');
+  var $daypick = document.getElementById('daypick');
+  var $dayeditor = document.getElementById('dayeditor');
+  var $menugroups = document.getElementById('menugroups');
   var $pantryView = document.getElementById('pantry-view');
-  var $v = document.getElementById('in-v');
-  var $pa = document.getElementById('in-pa');
-  var $buffer = document.getElementById('in-buffer');
-  var $covers = document.getElementById('covers');
   var $pantryToggle = document.getElementById('btn-pantry-toggle');
-  var $printPantryNote = document.getElementById('print-pantry-note');
+  var $printNote = document.getElementById('print-note');
 
   function render() {
-    $v.value = state.v; $pa.value = state.pa; $buffer.value = state.buffer;
-    $covers.textContent = (state.v + state.pa).toLocaleString();
-    syncPantryToggle();
-    $groups.textContent = '';
-    state.groups.forEach(function (g) { $groups.appendChild(renderGroup(g)); });
+    renderSubtitle();
+    renderDayChips();
+    renderShopList();
+    renderDayPick();
+    renderDayEditor();
+    renderMenuGroups();
     renderPantry();
+    syncPantryToggle();
   }
 
-  function renderGroup(g) {
+  function renderSubtitle() {
+    var sel = selectedDays();
+    var covers = sel.reduce(function (a, d) { return a + d.v + d.pa; }, 0);
+    if (!sel.length) {
+      $subtitle.textContent = 'No days selected — pick at least one on the Shopping list tab.';
+      $printNote.textContent = '';
+      return;
+    }
+    var names = sel.map(function (d) { return d.name; }).join(' · ');
+    $subtitle.textContent = '';
+    $subtitle.appendChild(document.createTextNode(names + ' — '));
+    var s = document.createElement('strong');
+    s.textContent = covers.toLocaleString() + ' covers';
+    $subtitle.appendChild(s);
+    $subtitle.appendChild(document.createTextNode(sel.length > 1 ? ' across ' + sel.length + ' days' : ''));
+    $printNote.textContent = 'Shopping for: ' + names + (state.usePantry ? ' · pantry stock subtracted' : '');
+  }
+
+  function renderDayChips() {
+    $daychips.textContent = '';
+    state.days.forEach(function (d) {
+      var b = document.createElement('button');
+      var on = state.selected.indexOf(d.id) > -1;
+      b.className = 'daychip' + (on ? ' on' : '');
+      b.setAttribute('aria-pressed', String(on));
+      b.appendChild(document.createTextNode(d.name));
+      var c = document.createElement('span');
+      c.className = 'cov';
+      c.textContent = (d.v + d.pa).toLocaleString();
+      b.appendChild(c);
+      b.addEventListener('click', function () {
+        var i = state.selected.indexOf(d.id);
+        if (i > -1) state.selected.splice(i, 1); else state.selected.push(d.id);
+        queueSave(); render();
+      });
+      $daychips.appendChild(b);
+    });
+  }
+
+  function renderShopList() {
+    $shoplist.textContent = '';
+    var rows = aggregate();
+    if (!rows.length) {
+      var e = document.createElement('p');
+      e.className = 'empty';
+      e.textContent = state.days.length
+        ? 'Nothing to buy — select a day above.'
+        : 'No days yet. Add one on the Menus tab.';
+      $shoplist.appendChild(e);
+      return;
+    }
+    // group the aggregated rows under their (first-seen) menu section
+    var sections = [], byName = {};
+    rows.forEach(function (r) {
+      if (!byName[r.group]) { byName[r.group] = { name: r.group, rows: [] }; sections.push(byName[r.group]); }
+      byName[r.group].rows.push(r);
+    });
+    sections.forEach(function (sec) {
+      var s = document.createElement('section');
+      s.className = 'group';
+      var h = document.createElement('div');
+      h.className = 'group-head';
+      var h2 = document.createElement('h2');
+      h2.textContent = sec.name;
+      h.appendChild(h2);
+      s.appendChild(h);
+      var ul = document.createElement('ul');
+      ul.className = 'items';
+      sec.rows.forEach(function (r) { ul.appendChild(renderBuyRow(r)); });
+      s.appendChild(ul);
+      $shoplist.appendChild(s);
+    });
+  }
+
+  function renderBuyRow(agg) {
+    var li = document.createElement('li');
+    var isChecked = !!state.checked[agg.key];
+    li.className = 'buyrow' + (isChecked ? ' checked' : '');
+
+    var check = document.createElement('input');
+    check.type = 'checkbox'; check.className = 'got';
+    check.checked = isChecked;
+    check.setAttribute('aria-label', 'Got ' + agg.n);
+    check.addEventListener('change', function () {
+      if (check.checked) state.checked[agg.key] = true; else delete state.checked[agg.key];
+      li.classList.toggle('checked', check.checked);
+      queueSave();
+    });
+
+    var main = document.createElement('div');
+    main.className = 'item-main';
+    var name = document.createElement('span');
+    name.className = 'item-name';
+    name.textContent = agg.n;
+    main.appendChild(name);
+    if (agg.parts.length > 1) {
+      var bd = document.createElement('div');
+      bd.className = 'breakdown';
+      bd.textContent = agg.parts.map(function (p) {
+        return p.day.split(' — ')[0] + ' ' + qtyText(agg.unit, p.qty);
+      }).join(' + ');
+      main.appendChild(bd);
+    }
+
+    var buyCell = document.createElement('div');
+    buyCell.className = 'buy-cell';
+    var buy = document.createElement('span');
+    buy.className = 'buy';
+    var hint = document.createElement('span');
+    hint.className = 'pack-hint';
+    buyCell.appendChild(buy); buyCell.appendChild(hint);
+
+    var rem = remaining(agg);
+    var covered = state.usePantry && agg.total > 0 && rem <= 0;
+    li.classList.toggle('covered', covered);
+    buy.textContent = covered ? 'stocked ✓' : qtyText(agg.unit, rem);
+    var bits = [];
+    if (agg.unit === 'oz' && rem > 0) bits.push('≈ ' + fmt((rem / LB) * KG, 1) + ' kg');
+    if (agg.pack && rem > 0) bits.push('≈ ' + Math.ceil(rem / agg.pack[0]) + ' × ' + agg.pack[1]);
+    var p = pantryFor(agg.n, agg.unit);
+    if (state.usePantry && p && (p.qty || 0) > 0) {
+      bits.push('need ' + qtyText(agg.unit, agg.total) + ' − pantry ' + fmt(p.qty, 2) + ' ' + p.unit);
+    }
+    if (agg.note) bits.push(agg.note);
+    hint.textContent = bits.join(' · ');
+
+    li.appendChild(check); li.appendChild(main); li.appendChild(buyCell);
+    return li;
+  }
+
+  // ---------- menus tab ----------
+  function renderDayPick() {
+    $daypick.textContent = '';
+    state.days.forEach(function (d) {
+      var b = document.createElement('button');
+      b.className = 'day' + (d.id === activeDayId ? ' active' : '');
+      b.textContent = d.name;
+      b.addEventListener('click', function () { activeDayId = d.id; renderDayPick(); renderDayEditor(); renderMenuGroups(); });
+      $daypick.appendChild(b);
+    });
+    var add = document.createElement('button');
+    add.className = 'day add-day';
+    add.textContent = '+ Add day';
+    add.addEventListener('click', showAddDayForm);
+    $daypick.appendChild(add);
+  }
+
+  function showAddDayForm() {
+    if ($daypick.querySelector('.add-form')) return;
+    var form = document.createElement('div');
+    form.className = 'add-form';
+    var name = document.createElement('input');
+    name.type = 'text'; name.placeholder = 'Day name (e.g. Friday — Pasta Night)';
+    var copy = document.createElement('select');
+    var blank = document.createElement('option');
+    blank.value = ''; blank.textContent = 'Start blank';
+    copy.appendChild(blank);
+    state.days.forEach(function (d) {
+      var o = document.createElement('option');
+      o.value = d.id; o.textContent = 'Copy ' + d.name;
+      copy.appendChild(o);
+    });
+    var ok = document.createElement('button');
+    ok.className = 'btn-primary btn-sm'; ok.textContent = 'Add day';
+    var cancel = document.createElement('button');
+    cancel.className = 'btn-ghost btn-sm'; cancel.textContent = 'Cancel';
+    ok.addEventListener('click', function () {
+      var n = name.value.trim();
+      if (!n) { name.focus(); return; }
+      var src = copy.value ? dayById(copy.value) : null;
+      var day = {
+        id: 'day' + (uid++) + '-' + Date.now().toString(36),
+        name: n,
+        times: src ? src.times : '',
+        v: src ? src.v : 0, pa: src ? src.pa : 0, buffer: src ? src.buffer : 10,
+        groups: src ? JSON.parse(JSON.stringify(src.groups)) : [
+          { id: 'meal', name: 'Menu', note: '', items: [] },
+          { id: 'other', name: 'Other / Supplies', note: '', items: [] }
+        ]
+      };
+      state.days.push(day);
+      state.selected.push(day.id);
+      activeDayId = day.id;
+      assignIds(); queueSave(); render();
+    });
+    cancel.addEventListener('click', function () { form.remove(); });
+    form.appendChild(name); form.appendChild(copy); form.appendChild(ok); form.appendChild(cancel);
+    $daypick.appendChild(form);
+    name.focus();
+  }
+
+  function renderDayEditor() {
+    $dayeditor.textContent = '';
+    var day = dayById(activeDayId);
+    if (!day) return;
+    var panel = document.createElement('div');
+    panel.className = 'panel';
+
+    var head = document.createElement('div');
+    head.className = 'dayhead';
+    head.appendChild(field('Day name', day.name, 'name', function (v) { day.name = v; renderDayPick(); renderSubtitle(); renderDayChips(); queueSave(); }));
+    head.appendChild(field('Service times', day.times || '', 'times', function (v) { day.times = v; queueSave(); }));
+    var spacer = document.createElement('div');
+    spacer.className = 'spacer';
+    head.appendChild(spacer);
+    if (state.days.length > 1) {
+      var del = document.createElement('button');
+      del.className = 'btn-danger btn-sm';
+      del.textContent = 'Delete day';
+      del.addEventListener('click', function () {
+        if (!confirm('Delete "' + day.name + '" and its whole menu? This affects everyone using this board.')) return;
+        state.days = state.days.filter(function (d) { return d.id !== day.id; });
+        state.selected = state.selected.filter(function (id) { return id !== day.id; });
+        activeDayId = state.days[0] ? state.days[0].id : null;
+        queueSave(); render();
+      });
+      head.appendChild(del);
+    }
+    panel.appendChild(head);
+
+    var counts = document.createElement('div');
+    counts.className = 'counts';
+    counts.appendChild(numField('Volunteers', day.v, function (n) { day.v = n; refreshDayViews(); }));
+    counts.appendChild(numField('Production artists', day.pa, function (n) { day.pa = n; refreshDayViews(); }));
+    counts.appendChild(numField('Buffer %', day.buffer, function (n) { day.buffer = n; refreshDayViews(); }));
+    var cov = document.createElement('p');
+    cov.className = 'covers-note';
+    cov.appendChild(document.createTextNode('Covers this day: '));
+    var cs = document.createElement('strong');
+    cs.textContent = (day.v + day.pa).toLocaleString();
+    cov.appendChild(cs);
+    counts.appendChild(cov);
+    panel.appendChild(counts);
+
+    $dayeditor.appendChild(panel);
+  }
+
+  // Headcounts feed the buy quantities, so the shopping list has to rebuild too.
+  function refreshDayViews() {
+    renderDayChips(); renderSubtitle(); renderMenuGroups(); renderPantry(); renderShopList(); queueSave();
+  }
+
+  function field(label, value, cls, onInput) {
+    var f = document.createElement('div');
+    f.className = 'f';
+    var l = document.createElement('label');
+    l.textContent = label;
+    var i = document.createElement('input');
+    i.type = 'text'; i.value = value; i.className = cls;
+    i.addEventListener('input', function () { onInput(i.value); });
+    var id = 'f' + (uid++);
+    i.id = id; l.setAttribute('for', id);
+    f.appendChild(l); f.appendChild(i);
+    return f;
+  }
+  function numField(label, value, onInput) {
+    var f = document.createElement('div');
+    f.className = 'count-field';
+    var l = document.createElement('label');
+    l.textContent = label;
+    var i = document.createElement('input');
+    i.type = 'number'; i.min = '0'; i.step = '1'; i.value = value;
+    i.addEventListener('input', function () {
+      var n = parseInt(i.value, 10);
+      onInput(isNaN(n) || n < 0 ? 0 : n);
+    });
+    var id = 'n' + (uid++);
+    i.id = id; l.setAttribute('for', id);
+    f.appendChild(l); f.appendChild(i);
+    return f;
+  }
+
+  function renderMenuGroups() {
+    $menugroups.textContent = '';
+    var day = dayById(activeDayId);
+    if (!day) return;
+    day.groups.forEach(function (g) { $menugroups.appendChild(renderMenuGroup(day, g)); });
+    var addSec = document.createElement('div');
+    addSec.className = 'add-row no-print';
+    var link = document.createElement('button');
+    link.className = 'add-link';
+    link.textContent = '+ Add menu section';
+    link.addEventListener('click', function () {
+      var n = prompt('Section name (e.g. Dinner — Proteins)');
+      if (!n) return;
+      day.groups.push({ id: 'g' + (uid++), name: n.trim(), note: '', items: [] });
+      queueSave(); renderMenuGroups();
+    });
+    addSec.appendChild(link);
+    $menugroups.appendChild(addSec);
+  }
+
+  function renderMenuGroup(day, g) {
     var sec = document.createElement('section');
     sec.className = 'group';
     var head = document.createElement('div');
@@ -627,50 +1021,39 @@
       head.appendChild(n);
     }
     sec.appendChild(head);
+
     var ul = document.createElement('ul');
     ul.className = 'items';
-    g.items.forEach(function (it) { ul.appendChild(renderItem(g, it)); });
+    g.items.forEach(function (it) { ul.appendChild(renderMenuItem(day, g, it)); });
     sec.appendChild(ul);
+
     var addRow = document.createElement('div');
     addRow.className = 'add-row no-print';
     var addLink = document.createElement('button');
     addLink.className = 'add-link';
     addLink.textContent = '+ Add item';
-    addLink.addEventListener('click', function () { showAddItemForm(g, addRow, addLink); });
+    addLink.addEventListener('click', function () { showAddItemForm(day, g, addRow, addLink); });
     addRow.appendChild(addLink);
     sec.appendChild(addRow);
     return sec;
   }
 
-  function itemLabel(item, chips) {
+  function renderMenuItem(day, group, item) {
+    var li = document.createElement('li');
+    li.className = 'item';
+
     var main = document.createElement('div');
     main.className = 'item-main';
-    var nameEl = document.createElement('span');
-    nameEl.className = 'item-name';
-    nameEl.textContent = item.n;
-    main.appendChild(nameEl);
-    if (chips && item.who && item.who !== 'both') {
+    var name = document.createElement('span');
+    name.className = 'item-name';
+    name.textContent = item.n;
+    main.appendChild(name);
+    if (item.who && item.who !== 'both') {
       var chip = document.createElement('span');
       chip.className = 'chip ' + item.who;
       chip.textContent = item.who === 'v' ? 'V only' : 'PA only';
       main.appendChild(chip);
     }
-    return main;
-  }
-
-  function renderItem(group, item) {
-    var li = document.createElement('li');
-    li.className = 'item' + (item.got ? ' checked' : '');
-
-    var check = document.createElement('input');
-    check.type = 'checkbox'; check.className = 'got';
-    check.checked = !!item.got;
-    check.setAttribute('aria-label', 'Got ' + item.n);
-    check.addEventListener('change', function () {
-      item.got = check.checked;
-      li.classList.toggle('checked', check.checked);
-      queueSave();
-    });
 
     var perCell = document.createElement('div');
     perCell.className = 'per-cell';
@@ -681,9 +1064,7 @@
     var perUnit = document.createElement('span');
     perUnit.className = 'per-unit';
     perUnit.textContent = item.unit + ' / person';
-    var perPrint = document.createElement('span');
-    perPrint.className = 'per-print';
-    perCell.appendChild(perIn); perCell.appendChild(perUnit); perCell.appendChild(perPrint);
+    perCell.appendChild(perIn); perCell.appendChild(perUnit);
 
     var buyCell = document.createElement('div');
     buyCell.className = 'buy-cell';
@@ -699,32 +1080,69 @@
     del.setAttribute('aria-label', 'Remove ' + item.n);
     del.addEventListener('click', function () {
       group.items = group.items.filter(function (x) { return x !== item; });
-      li.remove();
-      queueSave(); refreshAll();
+      li.remove(); queueSave(); renderShopList(); renderPantry();
     });
 
     function refresh() {
-      var needed = neededFor(item);
-      var rem = remainingFor(item);
-      var covered = state.usePantry && needed > 0 && rem <= 0;
-      li.classList.toggle('covered', covered);
-      buy.textContent = covered ? 'stocked ✓' : qtyText(item, rem);
-      hint.textContent = subText(item);
-      perPrint.textContent = item.per + ' ' + item.unit + '/pp';
+      var q = neededFor(day, item);
+      buy.textContent = qtyText(item.unit, q);
+      var bits = [];
+      if (item.unit === 'oz' && q > 0) bits.push('≈ ' + fmt((q / LB) * KG, 1) + ' kg');
+      if (item.pack && q > 0) bits.push('≈ ' + Math.ceil(q / item.pack[0]) + ' × ' + item.pack[1]);
+      if (item.note) bits.push(item.note);
+      hint.textContent = bits.join(' · ');
     }
     perIn.addEventListener('input', function () {
-      var val = parseFloat(perIn.value);
-      item.per = isNaN(val) || val < 0 ? 0 : val;
-      refreshAll(); queueSave();
+      var v = parseFloat(perIn.value);
+      item.per = isNaN(v) || v < 0 ? 0 : v;
+      refresh(); renderShopList(); renderPantry(); queueSave();
     });
-    li.refresh = refresh;
+    li.refreshRow = refresh;
     refresh();
 
-    li.appendChild(check); li.appendChild(itemLabel(item, true)); li.appendChild(perCell);
-    li.appendChild(buyCell); li.appendChild(del);
+    li.appendChild(main); li.appendChild(perCell); li.appendChild(buyCell); li.appendChild(del);
     return li;
   }
 
+  function showAddItemForm(day, group, container, link) {
+    if (container.querySelector('.add-form')) return;
+    link.style.display = 'none';
+    var form = document.createElement('div');
+    form.className = 'add-form';
+    var name = document.createElement('input');
+    name.type = 'text'; name.placeholder = 'Item name';
+    var who = document.createElement('select');
+    [['both', 'Everyone'], ['v', 'V only'], ['pa', 'PA only']].forEach(function (o) {
+      var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; who.appendChild(op);
+    });
+    var unit = document.createElement('select');
+    [['oz', 'oz / person'], ['pc', 'pc / person']].forEach(function (o) {
+      var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; unit.appendChild(op);
+    });
+    var per = document.createElement('input');
+    per.type = 'number'; per.placeholder = 'per person'; per.min = '0'; per.step = '0.05';
+    var ok = document.createElement('button');
+    ok.className = 'btn-primary btn-sm'; ok.textContent = 'Add';
+    var cancel = document.createElement('button');
+    cancel.className = 'btn-ghost btn-sm'; cancel.textContent = 'Cancel';
+    ok.addEventListener('click', function () {
+      var n = name.value.trim();
+      var p = parseFloat(per.value);
+      if (!n || isNaN(p) || p < 0) { name.focus(); return; }
+      group.items.push({ uid: uid++, n: n, who: who.value, unit: unit.value, per: p });
+      if (!pantryFor(n, unit.value)) {
+        state.pantry.push({ uid: uid++, n: n, qty: 0, unit: unit.value === 'oz' ? 'lb' : 'pc' });
+      }
+      queueSave(); renderMenuGroups(); renderShopList(); renderPantry();
+    });
+    cancel.addEventListener('click', function () { form.remove(); link.style.display = ''; });
+    form.appendChild(name); form.appendChild(who); form.appendChild(unit);
+    form.appendChild(per); form.appendChild(ok); form.appendChild(cancel);
+    container.appendChild(form);
+    name.focus();
+  }
+
+  // ---------- pantry ----------
   function renderPantry() {
     $pantryView.textContent = '';
     var sec = document.createElement('section');
@@ -736,7 +1154,7 @@
     head.appendChild(h2);
     var note = document.createElement('span');
     note.className = 'group-note';
-    note.textContent = 'the kitchen’s ledger · outlives any one day';
+    note.textContent = 'the kitchen’s ledger · shared by every day';
     head.appendChild(note);
     sec.appendChild(head);
 
@@ -760,6 +1178,13 @@
     var li = document.createElement('li');
     li.className = 'pantry-item';
 
+    var main = document.createElement('div');
+    main.className = 'item-main';
+    var name = document.createElement('span');
+    name.className = 'item-name';
+    name.textContent = p.n;
+    main.appendChild(name);
+
     var need = document.createElement('span');
     need.className = 'need-ref';
 
@@ -780,73 +1205,28 @@
     del.setAttribute('aria-label', 'Remove ' + p.n + ' from pantry');
     del.addEventListener('click', function () {
       state.pantry = state.pantry.filter(function (x) { return x !== p; });
-      li.remove();
-      queueSave(); refreshAll();
+      li.remove(); queueSave(); renderShopList();
     });
 
-    function refresh() {
-      var needs = listNeedsFor(p);
-      need.textContent = '';
-      if (needs === null) {
-        need.appendChild(document.createTextNode('not on this list'));
-      } else {
-        need.appendChild(document.createTextNode('list needs '));
-        var s = document.createElement('strong');
-        s.textContent = needs;
-        need.appendChild(s);
-      }
+    var needs = listNeedsFor(p);
+    need.textContent = '';
+    if (needs === null) {
+      need.appendChild(document.createTextNode('not on the selected days'));
+    } else {
+      need.appendChild(document.createTextNode('selected days need '));
+      var s = document.createElement('strong');
+      s.textContent = needs;
+      need.appendChild(s);
     }
+
     qtyIn.addEventListener('input', function () {
-      var val = parseFloat(qtyIn.value);
-      p.qty = isNaN(val) || val < 0 ? 0 : val;
-      refreshAll(); queueSave();
+      var v = parseFloat(qtyIn.value);
+      p.qty = isNaN(v) || v < 0 ? 0 : v;
+      renderShopList(); queueSave();
     });
-    li.refresh = refresh;
-    refresh();
 
-    li.appendChild(itemLabel(p, false)); li.appendChild(need); li.appendChild(cell); li.appendChild(del);
+    li.appendChild(main); li.appendChild(need); li.appendChild(cell); li.appendChild(del);
     return li;
-  }
-
-  function refreshAll() {
-    $covers.textContent = (state.v + state.pa).toLocaleString();
-    var rows = document.querySelectorAll('#groups li.item, #pantry-view li.pantry-item');
-    for (var i = 0; i < rows.length; i++) if (rows[i].refresh) rows[i].refresh();
-  }
-
-  function showAddItemForm(group, container, link) {
-    if (container.querySelector('.add-form')) return;
-    link.style.display = 'none';
-    var form = document.createElement('div');
-    form.className = 'add-form';
-    var name = document.createElement('input');
-    name.type = 'text'; name.placeholder = 'Item name';
-    var who = document.createElement('select');
-    [['both', 'Everyone'], ['v', 'V only'], ['pa', 'PA only']].forEach(function (o) {
-      var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; who.appendChild(op);
-    });
-    var unit = document.createElement('select');
-    [['oz', 'oz / person'], ['pc', 'pc / person']].forEach(function (o) {
-      var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; unit.appendChild(op);
-    });
-    var per = document.createElement('input');
-    per.type = 'number'; per.placeholder = 'per person'; per.min = '0'; per.step = '0.05';
-    var ok = document.createElement('button');
-    ok.className = 'btn-primary'; ok.textContent = 'Add';
-    var cancel = document.createElement('button');
-    cancel.className = 'btn-ghost'; cancel.textContent = 'Cancel';
-    ok.addEventListener('click', function () {
-      var n = name.value.trim();
-      var p = parseFloat(per.value);
-      if (!n || isNaN(p) || p < 0) { name.focus(); return; }
-      group.items.push({ id: nextId++, n: n, who: who.value, unit: unit.value, per: p });
-      queueSave(); render();
-    });
-    cancel.addEventListener('click', function () { form.remove(); link.style.display = ''; });
-    form.appendChild(name); form.appendChild(who); form.appendChild(unit);
-    form.appendChild(per); form.appendChild(ok); form.appendChild(cancel);
-    container.appendChild(form);
-    name.focus();
   }
 
   function showAddPantryForm(container, link) {
@@ -855,7 +1235,7 @@
     var form = document.createElement('div');
     form.className = 'add-form';
     var name = document.createElement('input');
-    name.type = 'text'; name.placeholder = 'Item name (match the list name to link them)';
+    name.type = 'text'; name.placeholder = 'Item name (match a menu name to link them)';
     var unit = document.createElement('select');
     [['lb', 'lb'], ['pc', 'pc']].forEach(function (o) {
       var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; unit.appendChild(op);
@@ -863,15 +1243,15 @@
     var qty = document.createElement('input');
     qty.type = 'number'; qty.placeholder = 'on hand'; qty.min = '0'; qty.step = '0.5';
     var ok = document.createElement('button');
-    ok.className = 'btn-primary'; ok.textContent = 'Add';
+    ok.className = 'btn-primary btn-sm'; ok.textContent = 'Add';
     var cancel = document.createElement('button');
-    cancel.className = 'btn-ghost'; cancel.textContent = 'Cancel';
+    cancel.className = 'btn-ghost btn-sm'; cancel.textContent = 'Cancel';
     ok.addEventListener('click', function () {
       var n = name.value.trim();
       var q = parseFloat(qty.value);
       if (!n) { name.focus(); return; }
-      state.pantry.push({ id: nextId++, n: n, qty: isNaN(q) || q < 0 ? 0 : q, unit: unit.value });
-      queueSave(); render();
+      state.pantry.push({ uid: uid++, n: n, qty: isNaN(q) || q < 0 ? 0 : q, unit: unit.value });
+      queueSave(); renderPantry(); renderShopList();
     });
     cancel.addEventListener('click', function () { form.remove(); link.style.display = ''; });
     form.appendChild(name); form.appendChild(qty); form.appendChild(unit);
@@ -880,49 +1260,34 @@
     name.focus();
   }
 
-  [[$v, 'v'], [$pa, 'pa'], [$buffer, 'buffer']].forEach(function (pair) {
-    pair[0].addEventListener('input', function () {
-      var val = parseInt(pair[0].value, 10);
-      state[pair[1]] = isNaN(val) || val < 0 ? 0 : val;
-      refreshAll(); queueSave();
-    });
-  });
-
+  // ---------- tabs / toggles ----------
   var $tabShop = document.getElementById('tab-shop');
+  var $tabMenus = document.getElementById('tab-menus');
   var $tabPantry = document.getElementById('tab-pantry');
-  function setView(pantry) {
-    $wrap.classList.toggle('view-pantry', pantry);
-    $tabShop.classList.toggle('active', !pantry);
-    $tabPantry.classList.toggle('active', pantry);
+  function setView(v) {
+    $wrap.className = 'wrap view-' + v;
+    $tabShop.classList.toggle('active', v === 'shop');
+    $tabMenus.classList.toggle('active', v === 'menus');
+    $tabPantry.classList.toggle('active', v === 'pantry');
   }
-  $tabShop.addEventListener('click', function () { setView(false); });
-  $tabPantry.addEventListener('click', function () { setView(true); });
+  $tabShop.addEventListener('click', function () { setView('shop'); });
+  $tabMenus.addEventListener('click', function () { setView('menus'); });
+  $tabPantry.addEventListener('click', function () { setView('pantry'); });
 
   function syncPantryToggle() {
     $pantryToggle.textContent = 'Subtract pantry: ' + (state.usePantry ? 'ON' : 'OFF');
     $pantryToggle.setAttribute('aria-pressed', String(state.usePantry));
     $pantryToggle.classList.toggle('on', state.usePantry);
-    $printPantryNote.hidden = !state.usePantry;
   }
   $pantryToggle.addEventListener('click', function () {
     state.usePantry = !state.usePantry;
-    syncPantryToggle(); refreshAll(); queueSave();
+    syncPantryToggle(); renderShopList(); renderSubtitle(); queueSave();
   });
 
   document.getElementById('btn-print').addEventListener('click', function () { window.print(); });
   document.getElementById('btn-uncheck').addEventListener('click', function () {
-    state.groups.forEach(function (g) { g.items.forEach(function (it) { it.got = false; }); });
-    queueSave(); render();
-  });
-  document.getElementById('btn-reset').addEventListener('click', function () {
-    if (!confirm("Reset the menu, headcounts, and check-offs back to Daniel's Thursday sheet? The pantry is kept as-is. This affects everyone using this page.")) return;
-    var keepPantry = state.pantry;
-    var keepUse = state.usePantry;
-    state = JSON.parse(JSON.stringify(FACTORY));
-    state.pantry = keepPantry;
-    state.usePantry = keepUse;
-    assignIds();
-    queueSave(); render();
+    state.checked = {};
+    queueSave(); renderShopList();
   });
 
   boot();
