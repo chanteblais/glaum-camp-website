@@ -241,3 +241,17 @@ eventually new-tenant starter templates. If anything gets built early, it's this
 - Amendment (same day): **landing page carved out of the freeze** — it's app-decoupled and
   grows incrementally as the product develops. Kickoff prerequisites: working name, own
   repo/deployment, staged-data-only screenshot policy (now standing).
+
+### 2026-08-04 — Catering: a possible adjacent segment
+
+- Chante's partner Daniel is catering a festival right now (176 volunteers + 241 production
+  artists on the Thursday alone) and the whole operation runs on spreadsheets and handwritten
+  sheets — she reads this as an additional market gap adjacent to the community-ops product
+  (festivals/events are the same seasonal-community world; camp feeding is already in-domain).
+- First probe built same day: a standalone single-file shopping-list builder (headcounts ×
+  per-person portions → printable buy list) for Daniel's Thursday taco-night service. Lives at
+  `~/Documents/Glaum/catering/` (deliberately outside both existing repos) + published as a
+  private artifact for his phone. Zero commitment to architecture yet.
+- Open question, undecided: fold catering into the app's functionality later vs. stand-alone
+  tool/product. Field test (Daniel actually shopping off it) decides whether the thread is
+  worth pulling.
