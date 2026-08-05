@@ -433,6 +433,17 @@ All admin surfaces also carry the **runway strip** inside the sticky `AdminNav`:
 
 ---
 
+## Kitchen Board (catering) — unlinked
+
+`camp.glaum.ca/kitchen.html` — a standalone static page (not a Next route, no auth,
+not linked from anywhere) where the festival caterer plans a day's service: a
+shopping list computed from headcounts × per-person portions × a buffer, plus a
+standing **pantry** ledger that's subtracted from it. Shared state for everyone
+with the URL via the unauthenticated `/api/kitchen-list`
+(`page_content.catering_kitchen_state`). Built for the What If 2026 catering run;
+deliberately quarantined from the member app's conventions. Full spec, security
+posture, and open threads: [catering-kitchen.md](catering-kitchen.md).
+
 ## Supporting Features
 
 ### Shoutouts
