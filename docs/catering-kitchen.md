@@ -29,33 +29,48 @@ account and is standing in a warehouse aisle on his phone**:
 One `page_content` row, key `catering_kitchen_state` (v3):
 
 ```
-{ version: 4, usePantry, selected: [dayId],
+{ version: 5, usePantry, selected: [dayId],
   checked: { "<name>|w|c": true },
-  days: [{ id, name, times, buffer,
-           menus: [{ id, label, count,
-                     groups: [{ id, name, note, items: [{ n, unit, per, pack, note }] }] }] }],
+  days: [{ id, name, buffer,
+           groups: [{ id, label, count }],          // who is on site, and how many
+           meals:  [{ id, label, times,             // Brunch / Dinner / ...
+                      sections: [{ id, name, note,
+                                   items: [{ n, unit, per, pack, note,
+                                             groupIds: [gid] }] }] }] }],
   pantry: [{ n, qty, unit }] }
 ```
 
-**A day is a set of group menus.** Daniel's sheet is two columns — "Volunteer Menu
-176" and "P+A Menu 241" — so that is the shape: each menu carries who it feeds
-(`label`), how many (`count`), and its own sections and items. Nothing in the code
-knows the words "volunteer" or "PA"; a day can hold any number of group menus, and
-`+ Add group` creates one. This replaced a per-item `who: both|v|pa` tag, which
-computed the same numbers but did not match how a caterer actually writes a menu.
+**A day is meals; an item names who eats it.** The day carries the groups on site
+(`groups`, each with a headcount) and the meals served (`meals` → `sections` →
+`items`). Every item lists the `groupIds` that get it, so one dinner can feed
+everyone while a course inside it — extras, a brunch special — goes to one group
+only, and two groups can take different mains from the same course. Nothing in the
+code knows the words "volunteer" or "PA"; a day holds any number of groups and meals.
 
-Food served to everyone is duplicated into each menu (the add-item form defaults to
-"add for every group" and mirrors into the same-named section). Duplication is the
-deliberate trade: it matches the paper sheet and keeps each menu readable on its own,
-at the cost of editing a shared item twice. An item that appears in one group's menu
-and not the others is chipped **"not for <group>"**.
+An item's quantity is `per × (sum of its groups' headcounts) × (1 + buffer)`, so
+assignment *is* the arithmetic — unassigning a group reduces what gets bought, and an
+item assigned to nobody drops off the shopping list entirely (shown dimmed with
+"nobody assigned" on the Menus tab rather than silently vanishing).
+
+This replaced two earlier shapes: a per-item `who: both|v|pa` tag (v3), then a whole
+separate menu per group (v4). v4 matched Daniel's two-column sheet but forced shared
+food to be duplicated into each menu and edited twice; meals-with-assignment keeps
+one row per real item. Assignment is shown as small toggle chips (`V`, `PA` —
+shortest form that stays unambiguous among that day's groups), and each course has a
+one-click "all of this course → <group> / everyone".
 
 **Shape history.** v1 stored per-menu-item `onHand`; v2 replaced that with a
 standing `pantry` array; v3 wrapped the single implicit day in a `days` array and
 moved check-offs to a top-level `checked` map; v4 split each day into per-group
-menus (`splitByAudience` fans the old `who` tags out into a Volunteers menu and a
-Production artists menu, and strips section notes that described the merged
-arrangement). The page migrates any older shape
+menus; v5 turned that inside out into meals + per-item group assignment.
+
+v4 → v5 (`v4toV5`) merges the per-group menus back into one set of sections,
+recording which groups each item came from; identical name+unit+**per** across menus
+becomes one shared item with several `groupIds`, while a differing `per` stays a
+separate row so nothing is silently averaged away. Sections are filed into meals by
+name (anything containing "brunch"/"breakfast"/"lunch" goes there, everything else to
+Dinner) and the day's single times string is split across them. Verified against a
+copy of the live board: all 50 shopping-list quantities came through identical. The page migrates any older shape
 forward on load and re-saves it, so no migration script is needed and old clients
 can't be broken by the new one — the API accepts both `days` and legacy `groups`.
 
@@ -69,8 +84,8 @@ means "this is in the cart," which is a property of the shopping trip, not of a 
   pantry entry with no menu match shows "not on this list" and persists — that's
   the point of a standing ledger.
 
-Quantities: for each selected day and each group menu on it, `per × that menu's
-count × (1 + that day's buffer/100)`; identical names (same unit class) are **summed across days** into one
+Quantities: for each selected day, every item of every meal at `per × (its assigned
+groups' headcounts) × (1 + that day's buffer/100)`; identical names (same unit class) are **summed across days** into one
 buy row that shows its per-day breakdown. Pantry stock is subtracted **once from the
 combined total**, not per day — subtracting it per day would double-count the same
 sack of rice. Weight math is in ounces internally, displayed in lb (+kg).
