@@ -252,6 +252,36 @@
   .add-form input[type="number"] { width: 74px; padding: 7px 6px; border: 1.5px solid var(--line); border-radius: 5px; background: var(--ground); color: var(--ink); font-size: 14px; text-align: right; }
   .add-form select { padding: 7px 6px; border: 1.5px solid var(--line); border-radius: 5px; background: var(--ground); color: var(--ink); font-size: 13px; }
 
+  /* close-out (finish shop → update pantry) */
+  .closeout {
+    background: var(--card); border: 2px solid var(--accent); border-radius: 6px;
+    padding: 16px; margin: 16px 0;
+  }
+  .closeout h3 { margin: 0 0 4px; font-size: 16px; font-weight: 800; }
+  .closeout .lede { font-size: 13px; color: var(--muted); margin: 0 0 12px; }
+  .co-scroll { overflow-x: auto; }
+  table.co { border-collapse: collapse; width: 100%; font-size: 13px; min-width: 460px; }
+  table.co th {
+    text-align: right; font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase;
+    color: var(--muted); font-weight: 700; padding: 0 6px 6px; white-space: nowrap;
+  }
+  table.co th.l, table.co td.l { text-align: left; }
+  table.co td {
+    text-align: right; padding: 5px 6px; border-top: 1px dashed var(--line);
+    font: 500 13px Menlo, Consolas, monospace; white-space: nowrap;
+  }
+  table.co td.l { font: 600 13px system-ui, sans-serif; }
+  table.co td.res { font-weight: 700; color: var(--accent); }
+  table.co td.res.short { color: var(--danger); }
+  table.co input {
+    width: 74px; text-align: right; font: 600 13px Menlo, Consolas, monospace;
+    padding: 4px 6px; border: 1.5px solid var(--line); border-radius: 4px;
+    background: var(--ground); color: var(--ink);
+  }
+  table.co input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .co-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; align-items: center; }
+  .co-note { font-size: 12px; color: var(--muted); }
+
   .assumptions { font-size: 13px; color: var(--muted); }
   .assumptions strong { color: var(--ink); }
   .empty { color: var(--muted); font-size: 14px; padding: 14px 2px; }
@@ -339,8 +369,11 @@
 
   <div class="toolbar no-print shop-only">
     <button class="btn-primary" id="btn-print">Print shopping list</button>
+    <button class="btn-ghost" id="btn-finish">Finish shop → update pantry</button>
     <button class="btn-ghost" id="btn-uncheck">Clear check-offs</button>
   </div>
+
+  <div class="closeout no-print shop-only" id="closeout" hidden></div>
 
   <p class="assumptions no-print shop-only">
     <strong>How the math works:</strong> pick the days you're shopping for above — quantities
@@ -381,9 +414,13 @@
 
 <script>
 (function () {
-  // ?scope=test on the page URL gives a scratch copy of the board (same page,
-  // separate stored state) so changes can be tried without touching the live one.
-  var SCOPE = /(?:\?|&)scope=test\b/.test(location.search) ? 'test' : 'live';
+  // Which stored board this page reads and writes. Development defaults to the
+  // scratch board: a dev page pointed at production state overwrote the real
+  // board once, and the caterer may be mid-shop on it. Touching live from
+  // localhost now takes an explicit ?scope=live.
+  var IS_DEV = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  var WANTED = (location.search.match(/[?&]scope=(live|test)\b/) || [])[1];
+  var SCOPE = WANTED || (IS_DEV ? 'test' : 'live');
   var API = '/api/kitchen-list?scope=' + SCOPE;
   var LS_KEY = 'catering-kitchen-backup-' + SCOPE;
   var LB = 16, KG = 0.45359237;
@@ -511,7 +548,7 @@
   var $bar = document.getElementById('syncbar');
   function setStatus(kind, text) {
     $dot.className = 'dot' + (kind ? ' ' + kind : '');
-    $msg.textContent = text;
+    $msg.textContent = SCOPE === 'test' ? 'SCRATCH BOARD (not the real one) — ' + text : text;
     $bar.classList.toggle('err', kind === 'err');
   }
 
@@ -704,6 +741,10 @@
   var $printNote = document.getElementById('print-note');
 
   function render() {
+    // A close-out preview holds computed drafts; any rebuild (including a remote
+    // update arriving mid-review) makes them stale, so dismiss it rather than
+    // letting stale numbers be applied to the pantry.
+    if ($closeout && !$closeout.hidden) closeCloseout();
     renderSubtitle();
     renderDayChips();
     renderShopList();
@@ -1282,6 +1323,160 @@
   $pantryToggle.addEventListener('click', function () {
     state.usePantry = !state.usePantry;
     syncPantryToggle(); renderShopList(); renderSubtitle(); queueSave();
+  });
+
+  // ---------- close-out: turn the plan into real pantry stock ----------
+  // pantry_after = pantry_now + what you actually bought − what these days consume.
+  // "Bought" is prefilled from the check-offs (checked = you got it) and stays
+  // editable, because real buying rounds to whole packs and plans change in the aisle.
+  var $closeout = document.getElementById('closeout');
+
+  function pantryDisplayUnit(unit) { return unit === 'oz' ? 'lb' : 'pc'; }
+  function toDisplay(unit, nativeQty) { return unit === 'oz' ? nativeQty / LB : nativeQty; }
+  // Counted things come in whole units; weights to a tenth. Keeps the prefilled
+  // "bought" column enterable rather than showing 1376.1 tortillas. Always rounds
+  // UP — rounding down would leave the row a hair under and report a phantom shortfall.
+  function tidy(unit, q) {
+    return unit === 'pc' ? Math.ceil(q) : Math.ceil(q * 10) / 10;
+  }
+
+  function openCloseout() {
+    var rows = aggregate();
+    if (!rows.length) return;
+    var days = selectedDays();
+    var drafts = rows.map(function (agg) {
+      var pNow = pantryFor(agg.n, agg.unit);
+      return {
+        agg: agg,
+        unit: pantryDisplayUnit(agg.unit),
+        now: pNow ? (pNow.qty || 0) : 0,
+        needed: toDisplay(agg.unit, agg.total),
+        bought: state.checked[agg.key] ? tidy(pantryDisplayUnit(agg.unit), toDisplay(agg.unit, remaining(agg))) : 0
+      };
+    });
+
+    $closeout.textContent = '';
+    $closeout.hidden = false;
+
+    var h = document.createElement('h3');
+    h.textContent = 'Finish the shop';
+    $closeout.appendChild(h);
+
+    var lede = document.createElement('p');
+    lede.className = 'lede';
+    lede.textContent = 'This writes the pantry for real: what you bought goes in, what '
+      + days.map(function (d) { return d.name.split(' — ')[0]; }).join(' + ')
+      + ' uses comes out, and what’s left is your standing stock. '
+      + 'Bought amounts are filled in from what you checked off — correct any of them '
+      + '(you buy whole packs, not exact pounds). Nothing changes until you apply.';
+    $closeout.appendChild(lede);
+
+    var scroll = document.createElement('div');
+    scroll.className = 'co-scroll';
+    var table = document.createElement('table');
+    table.className = 'co';
+    var thead = document.createElement('thead');
+    var trh = document.createElement('tr');
+    ['Item', 'In pantry', 'Bought', 'Used', 'Left after'].forEach(function (label, i) {
+      var th = document.createElement('th');
+      if (i === 0) th.className = 'l';
+      th.textContent = label;
+      trh.appendChild(th);
+    });
+    thead.appendChild(trh);
+    table.appendChild(thead);
+
+    var tbody = document.createElement('tbody');
+    drafts.forEach(function (d) {
+      var tr = document.createElement('tr');
+
+      var tdName = document.createElement('td');
+      tdName.className = 'l';
+      tdName.textContent = d.agg.n;
+      tr.appendChild(tdName);
+
+      var tdNow = document.createElement('td');
+      tdNow.textContent = fmt(d.now, 2) + ' ' + d.unit;
+      tr.appendChild(tdNow);
+
+      var tdBought = document.createElement('td');
+      var input = document.createElement('input');
+      input.type = 'number'; input.min = '0'; input.step = d.unit === 'lb' ? '0.5' : '1';
+      input.value = Number(d.bought.toFixed(2));
+      input.setAttribute('aria-label', d.agg.n + ' bought');
+      tdBought.appendChild(input);
+      tr.appendChild(tdBought);
+
+      var tdUsed = document.createElement('td');
+      tdUsed.textContent = '−' + fmt(d.needed, 2) + ' ' + d.unit;
+      tr.appendChild(tdUsed);
+
+      var tdRes = document.createElement('td');
+      tdRes.className = 'res';
+      function recompute() {
+        var b = parseFloat(input.value);
+        d.bought = isNaN(b) || b < 0 ? 0 : b;
+        var net = d.now + d.bought - d.needed;
+        d.result = Math.max(0, net);
+        tdRes.textContent = fmt(d.result, 2) + ' ' + d.unit;
+        // A zero floor would quietly swallow "you didn't buy enough for this day",
+        // which is exactly what the caterer needs to hear before service.
+        tdRes.classList.toggle('short', net < -0.05);
+        if (net < -0.05) tdRes.textContent += '  (short ' + fmt(-net, 2) + ')';
+      }
+      input.addEventListener('input', recompute);
+      recompute();
+      tr.appendChild(tdRes);
+
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    scroll.appendChild(table);
+    $closeout.appendChild(scroll);
+
+    var actions = document.createElement('div');
+    actions.className = 'co-actions';
+    var apply = document.createElement('button');
+    apply.className = 'btn-primary';
+    apply.textContent = 'Apply to pantry';
+    apply.addEventListener('click', function () { applyCloseout(drafts, days); });
+    var cancel = document.createElement('button');
+    cancel.className = 'btn-ghost';
+    cancel.textContent = 'Cancel';
+    cancel.addEventListener('click', closeCloseout);
+    var note = document.createElement('span');
+    note.className = 'co-note';
+    note.textContent = 'Applying also clears the check-offs and unticks '
+      + (days.length > 1 ? 'those days' : 'that day') + ' — the trip is done.';
+    actions.appendChild(apply); actions.appendChild(cancel); actions.appendChild(note);
+    $closeout.appendChild(actions);
+  }
+
+  function closeCloseout() { $closeout.hidden = true; $closeout.textContent = ''; }
+
+  function applyCloseout(drafts, days) {
+    drafts.forEach(function (d) {
+      var entry = pantryFor(d.agg.n, d.agg.unit);
+      if (!entry) {
+        if (d.result <= 0) return;
+        entry = { uid: uid++, n: d.agg.n, qty: 0, unit: d.unit };
+        state.pantry.push(entry);
+      }
+      entry.qty = Math.round(d.result * 100) / 100;
+    });
+    state.checked = {};
+    var closedIds = days.map(function (d) { return d.id; });
+    state.selected = state.selected.filter(function (id) { return closedIds.indexOf(id) < 0; });
+    closeCloseout();
+    queueSave();
+    render();
+    setStatus('ok', 'Pantry updated — ' + days.map(function (d) { return d.name.split(' — ')[0]; }).join(' + ') + ' closed out');
+  }
+
+  document.getElementById('btn-finish').addEventListener('click', function () {
+    if ($closeout.hidden === false) { closeCloseout(); return; }
+    if (!selectedDays().length) { alert('Pick at least one day first — the close-out works on the days you shopped for.'); return; }
+    openCloseout();
   });
 
   document.getElementById('btn-print').addEventListener('click', function () { window.print(); });

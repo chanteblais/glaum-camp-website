@@ -69,7 +69,12 @@ choose which days a trip covers; the Menus tab edits one day at a time.
 page's `sendBeacon` leave-flush works). `?scope=test` reads/writes a **separate
 scratch row** (`catering_kitchen_state_test`) so changes can be exercised against
 real-shaped data without touching the live board during a service day; the scope
-list is a closed allow-list, so it can't be used to write arbitrary keys. The page saves ~700 ms after an edit,
+list is a closed allow-list, so it can't be used to write arbitrary keys.
+**The page defaults to the scratch board on localhost** and shows a "SCRATCH BOARD"
+banner there — reaching live from dev takes an explicit `?scope=live`. This is not
+theoretical: during development a dev page defaulted to live and overwrote the real
+board with a shape the deployed code couldn't read. The board was still pristine so
+nothing was lost, but had the caterer entered pantry counts they would have gone. The page saves ~700 ms after an edit,
 polls every 10 s, and adopts remote state only when it has no unsaved edits and no
 input is focused (so a poll can't yank a field mid-type). `localStorage` keeps a
 device-local backup for offline; the sync bar states which mode it's in.
@@ -91,12 +96,27 @@ This is the app's **only unauthenticated write endpoint**. Containment:
 The residual risk is real and accepted: anyone who learns the URL can read or
 overwrite the list. **Remove or gate this after the festival** — see Open threads.
 
+## Closing out a shop
+
+The pantry only becomes true stock if something writes reality back into it.
+**Finish shop → update pantry** opens a preview table — for every item on the
+selected days: what's in the pantry, what you bought (prefilled from the check-offs,
+rounded up, editable because real buying is in whole packs), what those days consume,
+and what's left after. Applying writes `pantry = now + bought − used` (floored at
+zero), clears the check-offs, and unticks the days — the trip is done.
+
+Rows where `now + bought < used` are flagged **short** in red rather than silently
+floored to zero: "you did not buy enough for this service" is the single most
+useful thing the close-out can tell a caterer, and a zero would hide it.
+
+This is the only path that mutates pantry quantities from the shopping side, and it
+is always previewed before it writes.
+
 ## Open threads
 
-- **Pantry drawdown is not consumption tracking.** Stock is subtracted from what you
-  are *about to buy*; nothing decrements it when a day is actually cooked. If Daniel
-  wants "what's left after Thursday," that's a real feature (a per-day consumed/actual
-  column), deliberately not built yet.
+- **Close-out assumes planned = cooked.** It subtracts what the menu *says* a day
+  needs, not what the kitchen actually used. Good enough while the plan is the best
+  estimate anyone has; a real "actual used" column is the next honest step.
 - **Menus for the rest of the week** still have to be entered — the structure is
   there, the food isn't. Copy-a-day covers the repeat cases.
 - **Retire or gate post-festival.** Either delete the page + route, or move it
