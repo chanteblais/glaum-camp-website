@@ -1,6 +1,7 @@
 # Kitchen board (catering shopping list)
 
-**Status:** shipped 2026-08-05 · festival-scoped, deliberately quarantined from the rest of the app.
+**Status:** live and in daily use · festival-scoped, deliberately quarantined from the rest
+of the app. Starting a session on this? Read [kitchen-session-prompt.md](kitchen-session-prompt.md) first.
 
 A single unlinked page — `camp.glaum.ca/kitchen.html` — where the caterer plans the
 week's service: per-day menus, a shopping list that **aggregates the days you're
@@ -153,6 +154,29 @@ it is never crossed off, so a close-out never draws it down. Crossing it off any
 (bought 0) does the right thing, but nothing prompts that. If the ledger starts
 drifting high across the week, this is why.
 
+## Where the board stands (2026-08-05)
+
+Four days entered from Daniel's handwritten sheets — 82 shopping rows, 830 covers:
+
+| Day | Volunteers | PAs | Shape of the menu |
+|---|---|---|---|
+| Thursday — Taco Night | 88 | 121 | taco bar; PA-only Egg McMuffin brunch special, pickled onions, nacho chips |
+| Friday — Thai Night | 111 | 133 | lemon-pepper chicken + prawn scampi (V) / lemongrass chicken + seafood pot (PA); PA extras; perogies brunch |
+| Saturday — BBQ | 60 | 128 | BBQ chicken + penne bolognese (V) / ribs + Cajun chicken (PA); burrito brunch |
+| Sunday — Asian | 51 | 138 | Korean BBQ chicken (V) / beef (PA); PA dips, pickles, wontons; French-toast brunch |
+
+Every sheet's headcounts were **doubled by accident**; the table shows the halved figures
+actually in the board. Saturday's 255 PAs halved to 128 — rounded up, since rounding a
+headcount down means under-feeding someone.
+
+Brunch specials are **PA-only** on every day, matching Chante's original framing ("PAs and
+volunteers get the same brunch, but PAs get a brunch special").
+
+**Portions throughout are Claude's planning defaults**, derived from standard catering
+ranges and the dish names on the sheets — not Daniel's numbers. The dish names, days, groups
+and headcounts are his. Treat portions as the thing most likely to be wrong, and never
+silently change one he has set.
+
 ## Open threads
 
 - **Close-out assumes planned = cooked.** It subtracts what the menu *says* a day
@@ -164,3 +188,9 @@ drifting high across the week, this is why.
   behind auth once the catering thread graduates into a real product surface.
 - The portion defaults are standard catering planning ranges, not Daniel's numbers —
   they're starting points he's expected to correct in place.
+- **Friday's "Spicy sauce" (Ex 2)** carries a flag in the UI: it looked struck through on the
+  sheet and hasn't been confirmed either way. (Saturday's baked beans carried the same flag
+  until Chante confirmed the strikethrough was her testing, not a menu change.)
+- `~/Documents/Glaum/catering/shopping-list.html` is the **superseded** standalone prototype
+  that preceded this page (also published as a private artifact). Nobody uses it; don't
+  develop there by mistake.
