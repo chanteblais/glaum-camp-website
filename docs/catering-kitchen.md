@@ -116,11 +116,15 @@ overwrite the list. **Remove or gate this after the festival** — see Open thre
 ## Closing out a shop
 
 The pantry only becomes true stock if something writes reality back into it.
-**Finish shop → update pantry** opens a preview table — for every item on the
-selected days: what's in the pantry, what you bought (prefilled from the check-offs,
-rounded up, editable because real buying is in whole packs), what those days consume,
-and what's left after. Applying writes `pantry = now + bought − used` (floored at
-zero), clears the check-offs, and unticks the days — the trip is done.
+**Finish shop → update pantry** sits at the *end of the shopping list*, where a trip
+actually finishes, and acts on **the rows you crossed off** — those are the things
+that came back from the shop. It previews them: what's in the pantry, what you bought
+(prefilled, rounded up, editable because real buying is in whole packs), what the
+selected days consume, and what's left. Applying writes `pantry = now + bought − used`
+(floored at zero) for those rows and unticks them. Everything still on the list is
+left alone, so a partial shop closes out cleanly and the rest stays to be bought.
+
+The button is disabled until something is crossed off, and says why.
 
 Rows where `now + bought < used` are flagged **short** in red rather than silently
 floored to zero: "you did not buy enough for this service" is the single most
@@ -128,6 +132,11 @@ useful thing the close-out can tell a caterer, and a zero would hide it.
 
 This is the only path that mutates pantry quantities from the shopping side, and it
 is always previewed before it writes.
+
+**Known gap:** an item the pantry already covers (`stocked ✓`) never needs buying, so
+it is never crossed off, so a close-out never draws it down. Crossing it off anyway
+(bought 0) does the right thing, but nothing prompts that. If the ledger starts
+drifting high across the week, this is why.
 
 ## Open threads
 

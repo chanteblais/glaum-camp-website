@@ -281,6 +281,10 @@
   table.co input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .co-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; align-items: center; }
   .co-note { font-size: 12px; color: var(--muted); }
+  .shop-end {
+    display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+    margin-top: 22px; padding-top: 18px; border-top: 3px solid var(--ink);
+  }
 
   .assumptions { font-size: 13px; color: var(--muted); }
   .assumptions strong { color: var(--ink); }
@@ -369,11 +373,8 @@
 
   <div class="toolbar no-print shop-only">
     <button class="btn-primary" id="btn-print">Print shopping list</button>
-    <button class="btn-ghost" id="btn-finish">Finish shop → update pantry</button>
     <button class="btn-ghost" id="btn-uncheck">Clear check-offs</button>
   </div>
-
-  <div class="closeout no-print shop-only" id="closeout" hidden></div>
 
   <p class="assumptions no-print shop-only">
     <strong>How the math works:</strong> pick the days you're shopping for above — quantities
@@ -386,6 +387,14 @@
   </p>
 
   <div id="shoplist" class="shop-only"></div>
+
+  <!-- end of the shopping list: where the trip actually finishes -->
+  <div class="shop-end no-print shop-only" id="shopend">
+    <button class="btn-primary" id="btn-finish">Finish shop → update pantry</button>
+    <span class="co-note" id="finish-hint"></span>
+  </div>
+
+  <div class="closeout no-print shop-only" id="closeout" hidden></div>
 
   <!-- MENUS -->
   <div class="panel menus-only no-print">
@@ -848,6 +857,7 @@
         ? 'Nothing to buy — select a day above.'
         : 'No days yet. Add one on the Menus tab.';
       $shoplist.appendChild(e);
+      syncFinish();
       return;
     }
     // group the aggregated rows under their (first-seen) menu section
@@ -856,6 +866,7 @@
       if (!byName[r.group]) { byName[r.group] = { name: r.group, rows: [] }; sections.push(byName[r.group]); }
       byName[r.group].rows.push(r);
     });
+    syncFinish();
     sections.forEach(function (sec) {
       var s = document.createElement('section');
       s.className = 'group';
@@ -885,6 +896,7 @@
     check.addEventListener('change', function () {
       if (check.checked) state.checked[agg.key] = true; else delete state.checked[agg.key];
       li.classList.toggle('checked', check.checked);
+      syncFinish();
       queueSave();
     });
 
@@ -1469,8 +1481,14 @@
     return unit === 'pc' ? Math.ceil(q) : Math.ceil(q * 10) / 10;
   }
 
+  // Only the crossed-off rows: those are the things that actually came back from
+  // the shop, and they're the only ones whose pantry line has anything new to say.
+  function crossedOffRows() {
+    return aggregate().filter(function (agg) { return state.checked[agg.key]; });
+  }
+
   function openCloseout() {
-    var rows = aggregate();
+    var rows = crossedOffRows();
     if (!rows.length) return;
     var days = selectedDays();
     var drafts = rows.map(function (agg) {
@@ -1480,7 +1498,7 @@
         unit: pantryDisplayUnit(agg.unit),
         now: pNow ? (pNow.qty || 0) : 0,
         needed: toDisplay(agg.unit, agg.total),
-        bought: state.checked[agg.key] ? tidy(pantryDisplayUnit(agg.unit), toDisplay(agg.unit, remaining(agg))) : 0
+        bought: tidy(pantryDisplayUnit(agg.unit), toDisplay(agg.unit, remaining(agg)))
       };
     });
 
@@ -1493,11 +1511,11 @@
 
     var lede = document.createElement('p');
     lede.className = 'lede';
-    lede.textContent = 'This writes the pantry for real: what you bought goes in, what '
-      + days.map(function (d) { return d.name.split(' — ')[0]; }).join(' + ')
-      + ' uses comes out, and what’s left is your standing stock. '
-      + 'Bought amounts are filled in from what you checked off — correct any of them '
-      + '(you buy whole packs, not exact pounds). Nothing changes until you apply.';
+    lede.textContent = 'The ' + drafts.length + (drafts.length === 1 ? ' item you crossed off' : ' items you crossed off')
+      + ' go into the pantry, what ' + days.map(function (d) { return d.name.split(' — ')[0]; }).join(' + ')
+      + ' uses comes out, and what’s left is your standing stock. Amounts are filled in '
+      + 'from the list — correct any of them, since you buy whole packs, not exact pounds. '
+      + 'Anything still on the list is left alone. Nothing changes until you apply.';
     $closeout.appendChild(lede);
 
     var scroll = document.createElement('div');
@@ -1568,22 +1586,21 @@
     var apply = document.createElement('button');
     apply.className = 'btn-primary';
     apply.textContent = 'Apply to pantry';
-    apply.addEventListener('click', function () { applyCloseout(drafts, days); });
+    apply.addEventListener('click', function () { applyCloseout(drafts); });
     var cancel = document.createElement('button');
     cancel.className = 'btn-ghost';
     cancel.textContent = 'Cancel';
     cancel.addEventListener('click', closeCloseout);
     var note = document.createElement('span');
     note.className = 'co-note';
-    note.textContent = 'Applying also clears the check-offs and unticks '
-      + (days.length > 1 ? 'those days' : 'that day') + ' — the trip is done.';
+    note.textContent = 'Applying clears these items off the list.';
     actions.appendChild(apply); actions.appendChild(cancel); actions.appendChild(note);
     $closeout.appendChild(actions);
   }
 
   function closeCloseout() { $closeout.hidden = true; $closeout.textContent = ''; }
 
-  function applyCloseout(drafts, days) {
+  function applyCloseout(drafts) {
     drafts.forEach(function (d) {
       var entry = pantryFor(d.agg.n, d.agg.unit);
       if (!entry) {
@@ -1592,19 +1609,34 @@
         state.pantry.push(entry);
       }
       entry.qty = Math.round(d.result * 100) / 100;
+      // this row is reconciled; anything left unticked stays on the list
+      delete state.checked[d.agg.key];
     });
-    state.checked = {};
-    var closedIds = days.map(function (d) { return d.id; });
-    state.selected = state.selected.filter(function (id) { return closedIds.indexOf(id) < 0; });
     closeCloseout();
     queueSave();
     render();
-    setStatus('ok', 'Pantry updated — ' + days.map(function (d) { return d.name.split(' — ')[0]; }).join(' + ') + ' closed out');
+    setStatus('ok', 'Pantry updated from ' + drafts.length + (drafts.length === 1 ? ' item' : ' items'));
   }
 
-  document.getElementById('btn-finish').addEventListener('click', function () {
+  var $finish = document.getElementById('btn-finish');
+  var $finishHint = document.getElementById('finish-hint');
+
+  // The button only does something once things are crossed off, so say so plainly
+  // rather than letting it look broken when clicked on an untouched list.
+  function syncFinish() {
+    if (!$finish || !$finishHint) return;
+    var n = crossedOffRows().length;
+    $finish.disabled = n === 0;
+    $finish.style.opacity = n === 0 ? '0.5' : '';
+    $finish.style.cursor = n === 0 ? 'not-allowed' : '';
+    $finishHint.textContent = n === 0
+      ? 'Cross items off as you buy them — this puts them into the pantry.'
+      : n + (n === 1 ? ' item crossed off' : ' items crossed off') + ' → into the pantry, minus what the selected days use.';
+  }
+
+  $finish.addEventListener('click', function () {
     if ($closeout.hidden === false) { closeCloseout(); return; }
-    if (!selectedDays().length) { alert('Pick at least one day first — the close-out works on the days you shopped for.'); return; }
+    if (!crossedOffRows().length) return;
     openCloseout();
   });
 
