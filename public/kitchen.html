@@ -1,0 +1,932 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Kitchen — Shopping List</title>
+<style>
+  :root {
+    --ground: #F4F2EA;
+    --card: #FDFCF8;
+    --ink: #23261F;
+    --muted: #6E7263;
+    --line: #D8D5C6;
+    --accent: #33714A;
+    --accent-ink: #FFFFFF;
+    --hl: rgba(244, 214, 76, 0.45);
+    --chip-v: #3F6E8C;
+    --chip-pa: #7C55A8;
+    --danger: #A04532;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #191B16;
+      --card: #22251E;
+      --ink: #E8E6D9;
+      --muted: #9AA08D;
+      --line: #3A3E33;
+      --accent: #7CC495;
+      --accent-ink: #14201A;
+      --hl: rgba(244, 214, 76, 0.16);
+      --chip-v: #7FA9C6;
+      --chip-pa: #B695D8;
+      --danger: #D08A78;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.45;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 24px 16px 80px; }
+
+  header.masthead { margin-bottom: 20px; }
+  .eyebrow {
+    font-size: 12px; font-weight: 700; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--muted); margin: 0 0 4px;
+  }
+  h1 {
+    font-size: clamp(26px, 6vw, 38px); font-weight: 800; letter-spacing: -0.01em;
+    margin: 0 0 6px; text-wrap: balance;
+    border-bottom: 4px solid var(--ink); padding-bottom: 8px; display: inline-block;
+  }
+  .service-times { color: var(--muted); font-size: 14px; margin: 6px 0 0; }
+  .service-times strong { color: var(--ink); }
+  .print-only { display: none; }
+
+  .syncbar {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    font-size: 12px; color: var(--muted); margin: 10px 0 0;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+  .dot.ok { background: var(--accent); }
+  .dot.busy { background: #C8A848; }
+  .dot.err { background: var(--danger); }
+  .syncbar.err { color: var(--danger); font-weight: 600; }
+
+  .tabs {
+    display: flex; gap: 4px; align-items: center; flex-wrap: wrap;
+    border-bottom: 1px solid var(--line); margin: 18px 0 4px;
+  }
+  .tab {
+    background: none; border: none; border-bottom: 3px solid transparent; border-radius: 0;
+    font-size: 14px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--muted); padding: 8px 12px; margin-bottom: -1px;
+  }
+  .tab.active { color: var(--ink); border-bottom-color: var(--ink); }
+  .inv-toggle {
+    margin-left: auto; font-size: 12px; font-weight: 700;
+    background: transparent; color: var(--muted); border: 1.5px solid var(--line);
+    border-radius: 999px; padding: 5px 12px;
+  }
+  .inv-toggle.on { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
+
+  .panel {
+    background: var(--card); border: 1px solid var(--line); border-radius: 6px;
+    padding: 14px 16px; margin: 16px 0;
+  }
+  .counts { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
+  .count-field { display: flex; flex-direction: column; gap: 4px; }
+  .count-field label {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .count-field input {
+    width: 96px; font: 700 20px/1.2 Menlo, Consolas, monospace;
+    padding: 6px 8px; border: 1.5px solid var(--line); border-radius: 5px;
+    background: var(--ground); color: var(--ink);
+  }
+  .count-field input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+  .covers-note { font-size: 13px; color: var(--muted); margin-left: auto; align-self: center; }
+  .covers-note strong { color: var(--ink); }
+
+  .toolbar { display: flex; gap: 10px; flex-wrap: wrap; margin: 18px 0; }
+  button {
+    font: 600 14px system-ui, sans-serif; cursor: pointer; border-radius: 5px;
+    padding: 9px 16px; border: 1.5px solid transparent;
+  }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn-primary { background: var(--accent); color: var(--accent-ink); }
+  .btn-ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+  .btn-ghost:hover, .btn-primary:hover { filter: brightness(1.06); }
+
+  section.group { margin: 26px 0; }
+  .group-head {
+    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+    border-bottom: 3px solid var(--ink); padding-bottom: 5px; margin-bottom: 4px;
+  }
+  .group-head h2 {
+    font-size: 17px; font-weight: 800; letter-spacing: 0.05em;
+    text-transform: uppercase; margin: 0;
+  }
+  .group-head .group-note { font-size: 13px; color: var(--muted); }
+
+  ul.items { list-style: none; margin: 0; padding: 0; }
+  li.item {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) 126px 150px 28px;
+    gap: 8px; align-items: center;
+    padding: 9px 2px; border-bottom: 1px dashed var(--line);
+  }
+  li.item.checked .item-name { text-decoration: line-through; color: var(--muted); }
+  li.item.checked .buy { background: transparent; color: var(--muted); }
+  li.item.covered .buy { background: transparent; color: var(--accent); }
+
+  .got { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
+  .item-main { min-width: 0; }
+  .item-name { font-weight: 600; font-size: 15px; }
+  .chip {
+    display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.07em;
+    text-transform: uppercase; border-radius: 999px; padding: 1px 8px; margin-left: 6px;
+    vertical-align: 2px; color: var(--card);
+  }
+  .chip.v { background: var(--chip-v); }
+  .chip.pa { background: var(--chip-pa); }
+
+  .per-cell { display: flex; align-items: center; gap: 5px; justify-content: flex-end; }
+  .per-cell input, .pantry-cell input {
+    width: 66px; text-align: right;
+    font: 600 14px Menlo, Consolas, monospace;
+    padding: 5px 6px; border: 1.5px solid var(--line); border-radius: 5px;
+    background: var(--ground); color: var(--ink);
+  }
+  .per-cell input:focus-visible, .pantry-cell input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+  .per-unit { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .per-print { display: none; font-size: 12px; color: var(--muted); }
+
+  .buy-cell { text-align: right; }
+  .buy {
+    font: 700 15px Menlo, Consolas, monospace;
+    background: var(--hl); padding: 2px 6px; border-radius: 3px; white-space: nowrap;
+  }
+  .pack-hint { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  li.pantry-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto 126px 28px;
+    gap: 8px; align-items: center;
+    padding: 9px 2px; border-bottom: 1px dashed var(--line);
+  }
+  .need-ref { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .need-ref strong { color: var(--ink); font: 700 13px Menlo, Consolas, monospace; }
+  .pantry-cell { display: flex; align-items: center; gap: 5px; justify-content: flex-end; }
+
+  .del {
+    background: none; border: none; color: var(--muted); font-size: 15px;
+    padding: 2px 6px; line-height: 1;
+  }
+  .del:hover { color: var(--danger); }
+
+  .add-row { margin-top: 8px; }
+  .add-link {
+    background: none; border: none; color: var(--accent); font-weight: 600;
+    font-size: 13px; padding: 4px 0;
+  }
+  .add-form { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; align-items: center; }
+  .add-form input[type="text"] {
+    flex: 1 1 160px; padding: 7px 9px; border: 1.5px solid var(--line);
+    border-radius: 5px; background: var(--ground); color: var(--ink); font-size: 14px;
+  }
+  .add-form input[type="number"] { width: 74px; padding: 7px 6px; border: 1.5px solid var(--line); border-radius: 5px; background: var(--ground); color: var(--ink); font-size: 14px; text-align: right; }
+  .add-form select { padding: 7px 6px; border: 1.5px solid var(--line); border-radius: 5px; background: var(--ground); color: var(--ink); font-size: 13px; }
+
+  .assumptions { font-size: 13px; color: var(--muted); }
+  .assumptions strong { color: var(--ink); }
+
+  footer.colophon { margin-top: 36px; font-size: 12px; color: var(--muted); }
+
+  .view-pantry .shop-only { display: none; }
+  .wrap:not(.view-pantry) .pantry-only { display: none; }
+
+  @media (max-width: 560px) {
+    li.item {
+      grid-template-columns: 28px minmax(0, 1fr) auto;
+      grid-template-areas: "check main del" "check per buy";
+      row-gap: 6px;
+    }
+    .got { grid-area: check; }
+    .item-main { grid-area: main; }
+    li.item .del { grid-area: del; }
+    .per-cell { grid-area: per; justify-content: flex-start; }
+    .buy-cell { grid-area: buy; }
+    li.pantry-item {
+      grid-template-columns: minmax(0, 1fr) auto 28px;
+      grid-template-areas: "main main pdel" "need have have";
+      row-gap: 6px;
+    }
+    li.pantry-item .item-main { grid-area: main; }
+    li.pantry-item .del { grid-area: pdel; }
+    .need-ref { grid-area: need; align-self: center; }
+    .pantry-cell { grid-area: have; }
+  }
+
+  @media print {
+    :root {
+      --ground: #FFFFFF; --card: #FFFFFF; --ink: #000000; --muted: #444444;
+      --line: #999999; --hl: transparent;
+    }
+    body { background: #fff; }
+    .wrap { max-width: none; padding: 0; }
+    .no-print, .toolbar, .del, .add-row, .per-cell input, .per-unit, .tabs, .syncbar { display: none !important; }
+    .pantry-only { display: none !important; }
+    .shop-only, #groups { display: block !important; }
+    .print-only { display: block; font-size: 13px; margin: 4px 0 0; }
+    .per-print { display: inline; }
+    .panel { border: none; padding: 0; }
+    .counts input { border: none; background: none; padding: 0; }
+    li.item { break-inside: avoid; padding: 5px 0; }
+    li.item.checked, li.item.covered { display: none; }
+    .buy { background: none; padding: 0; }
+    .got { appearance: none; -webkit-appearance: none; width: 14px; height: 14px; border: 1.5px solid #000; border-radius: 2px; }
+    section.group { margin: 18px 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap">
+  <header class="masthead">
+    <p class="eyebrow">Festival catering · shared kitchen board</p>
+    <h1 id="day-title">Thursday — Taco Night</h1>
+    <p class="service-times">
+      Brunch <strong>10:00–12:00</strong> (everyone; PA special: Egg McMuffin) ·
+      Dinner <strong>V 5:00–6:30</strong> / <strong>PA 6:00–8:00</strong>
+    </p>
+    <p class="syncbar no-print" id="syncbar"><span class="dot" id="syncdot"></span><span id="syncmsg">Loading…</span></p>
+    <p class="print-only" id="print-pantry-note" hidden>Pantry stock subtracted — fully stocked items are not listed.</p>
+  </header>
+
+  <div class="panel">
+    <div class="counts">
+      <div class="count-field">
+        <label for="in-v">Volunteers</label>
+        <input id="in-v" type="number" min="0" step="1">
+      </div>
+      <div class="count-field">
+        <label for="in-pa">Production artists</label>
+        <input id="in-pa" type="number" min="0" step="1">
+      </div>
+      <div class="count-field">
+        <label for="in-buffer">Buffer %</label>
+        <input id="in-buffer" type="number" min="0" step="1">
+      </div>
+      <p class="covers-note">Total covers: <strong id="covers">—</strong></p>
+    </div>
+  </div>
+
+  <nav class="tabs no-print" aria-label="Views">
+    <button class="tab active" id="tab-shop">Shopping list</button>
+    <button class="tab" id="tab-pantry">Pantry</button>
+    <button class="inv-toggle" id="btn-pantry-toggle" aria-pressed="false">Subtract pantry: OFF</button>
+  </nav>
+
+  <div class="toolbar no-print shop-only">
+    <button class="btn-primary" id="btn-print">Print shopping list</button>
+    <button class="btn-ghost" id="btn-uncheck">Clear check-offs</button>
+    <button class="btn-ghost" id="btn-reset">Reset to Daniel's sheet</button>
+  </div>
+
+  <p class="assumptions no-print shop-only">
+    <strong>How the math works:</strong> each “per person” number is a planning average across
+    the whole group it applies to — skippers and seconds baked in. Quantities for meat are
+    <strong>raw purchase weight</strong>. Edit any number and the buy column updates; the
+    buffer is added on top. With <strong>Subtract pantry</strong> on, the buy column shows
+    what's still needed after pantry stock — fully stocked items read “stocked ✓” and drop
+    off the printout. Check items off as you shop; checked items drop off the printout too.
+  </p>
+
+  <p class="assumptions no-print pantry-only">
+    <strong>The pantry is a standing ledger:</strong> it belongs to the kitchen, not to
+    Thursday — future day-lists will draw from the same stock. Enter what's on the shelves
+    (lb for weight, pc for counted items) and add anything Daniel has, whether or not it's
+    on this menu. Pantry stock is matched to shopping items <strong>by name</strong>; flip
+    <strong>Subtract pantry</strong> above to apply it to the list. Amounts here are kept
+    either way.
+  </p>
+
+  <div id="groups" class="shop-only"></div>
+  <div id="pantry-view" class="pantry-only"></div>
+
+  <footer class="colophon">
+    Everyone on this page shares one list — edits save automatically and appear for the
+    others within a few seconds. Portions are starting points from standard catering
+    planning ranges; trust Daniel's read of his crowd over the defaults.
+  </footer>
+</div>
+
+<script>
+(function () {
+  var API = '/api/kitchen-list';
+  var LS_KEY = 'catering-kitchen-backup';
+  var LB = 16, KG = 0.45359237;
+
+  var FACTORY = {
+    version: 2,
+    v: 176, pa: 241, buffer: 10, usePantry: false,
+    pantry: [],
+    groups: [
+      {
+        id: 'brunch', name: 'PA Brunch Special — Egg McMuffins',
+        note: 'PA only · one build per person',
+        items: [
+          { n: 'English muffins', who: 'pa', unit: 'pc', per: 1, pack: [12, '12-packs'] },
+          { n: 'Eggs', who: 'pa', unit: 'pc', per: 1, pack: [30, '30-flats'] },
+          { n: 'Cheddar slices', who: 'pa', unit: 'pc', per: 1, pack: [120, '120-ct packs'] },
+          { n: 'Sausage patties', who: 'pa', unit: 'pc', per: 1, pack: [60, '60-ct boxes'] },
+          { n: 'Butter', who: 'pa', unit: 'oz', per: 0.15, pack: [16, '1 lb blocks'] }
+        ]
+      },
+      {
+        id: 'proteins', name: 'Dinner — Proteins',
+        note: 'raw purchase weight · both menus',
+        items: [
+          { n: 'Ground beef', who: 'both', unit: 'oz', per: 3, pack: [160, '10 lb chubs'] },
+          { n: 'Chicken thighs (for shredding)', who: 'both', unit: 'oz', per: 3 },
+          { n: 'Firm tofu', who: 'both', unit: 'oz', per: 1, pack: [16, '1 lb blocks'] },
+          { n: 'Black beans (canned)', who: 'both', unit: 'oz', per: 1.5, pack: [106, '#10 cans'] },
+          { n: 'Taco seasoning', who: 'both', unit: 'oz', per: 0.2, pack: [24, '24 oz jars'] }
+        ]
+      },
+      {
+        id: 'sides', name: 'Dinner — Sides',
+        note: 'Mexi rice · Caesar · fajita veg',
+        items: [
+          { n: 'Rice (dry)', who: 'both', unit: 'oz', per: 1.5, pack: [800, '50 lb bags'] },
+          { n: 'Tomato sauce (for rice)', who: 'both', unit: 'oz', per: 0.5, pack: [106, '#10 cans'] },
+          { n: 'Romaine', who: 'both', unit: 'oz', per: 2 },
+          { n: 'Caesar dressing', who: 'both', unit: 'oz', per: 0.9, pack: [128, 'gallon jugs'] },
+          { n: 'Croutons', who: 'both', unit: 'oz', per: 0.5, pack: [40, '2.5 lb bags'] },
+          { n: 'Shaved parmesan', who: 'both', unit: 'oz', per: 0.3, pack: [80, '5 lb bags'] },
+          { n: 'Bell peppers (fajita veg)', who: 'both', unit: 'oz', per: 1.5 },
+          { n: 'Onions (fajita veg)', who: 'both', unit: 'oz', per: 1 },
+          { n: 'Cooking oil', who: 'both', unit: 'oz', per: 0.25, pack: [128, 'gallon jugs'] }
+        ]
+      },
+      {
+        id: 'bar', name: 'Taco Bar',
+        note: 'tortillas + toppings · both menus unless tagged',
+        items: [
+          { n: 'Tortillas', who: 'both', unit: 'pc', per: 3, pack: [60, '60-ct packs'] },
+          { n: 'Salsa', who: 'both', unit: 'oz', per: 1.5, pack: [106, '#10 cans'] },
+          { n: 'Sour cream', who: 'both', unit: 'oz', per: 1, pack: [80, '5 lb tubs'] },
+          { n: 'Queso', who: 'both', unit: 'oz', per: 1.5, pack: [106, '#10 cans'] },
+          { n: 'Shredded cheese', who: 'both', unit: 'oz', per: 1, pack: [80, '5 lb bags'] },
+          { n: 'Hot sauce (bottles)', who: 'both', unit: 'pc', per: 0.02, note: '≈ 1 bottle per 50 people' },
+          { n: 'Limes', who: 'both', unit: 'pc', per: 0.25 },
+          { n: 'Cilantro (bunches)', who: 'both', unit: 'pc', per: 0.02, note: '≈ 1 bunch per 50 people' },
+          { n: 'Pickled red onions', who: 'pa', unit: 'oz', per: 0.75, note: 'PA menu Ex 1' },
+          { n: 'Nacho chips', who: 'pa', unit: 'oz', per: 1.5, pack: [32, '2 lb bags'], note: 'PA menu Ex 3' }
+        ]
+      },
+      { id: 'other', name: 'Other / Supplies', note: 'add anything else the run needs', items: [] }
+    ]
+  };
+  FACTORY.groups.forEach(function (g) {
+    g.items.forEach(function (it) {
+      FACTORY.pantry.push({ n: it.n, qty: 0, unit: it.unit === 'oz' ? 'lb' : 'pc' });
+    });
+  });
+
+  var state = JSON.parse(JSON.stringify(FACTORY));
+  var nextId = 1;
+  var dirty = false;          // local edits not yet accepted by the server
+  var saving = false;
+  var saveTimer = null;
+  var lastServerJson = null;  // what we believe the server holds
+
+  function assignIds() {
+    state.groups.forEach(function (g) { g.items.forEach(function (it) { it.id = nextId++; }); });
+    state.pantry.forEach(function (p) { p.id = nextId++; });
+  }
+
+  // ---------- sync ----------
+  var $dot = document.getElementById('syncdot');
+  var $msg = document.getElementById('syncmsg');
+  var $bar = document.getElementById('syncbar');
+  function setStatus(kind, text) {
+    $dot.className = 'dot' + (kind ? ' ' + kind : '');
+    $msg.textContent = text;
+    $bar.classList.toggle('err', kind === 'err');
+  }
+
+  function payload() {
+    return JSON.stringify({
+      version: 2, v: state.v, pa: state.pa, buffer: state.buffer,
+      usePantry: state.usePantry,
+      groups: state.groups.map(function (g) {
+        return {
+          id: g.id, name: g.name, note: g.note,
+          items: g.items.map(function (it) {
+            return { n: it.n, who: it.who, unit: it.unit, per: it.per, pack: it.pack, note: it.note, got: !!it.got };
+          })
+        };
+      }),
+      pantry: state.pantry.map(function (p) { return { n: p.n, qty: p.qty, unit: p.unit }; })
+    });
+  }
+
+  function cacheLocal(json) {
+    try { localStorage.setItem(LS_KEY, json); } catch (e) { /* private mode */ }
+  }
+
+  function queueSave() {
+    dirty = true;
+    setStatus('busy', 'Saving…');
+    cacheLocal(payload());
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(doSave, 700);
+  }
+
+  function doSave() {
+    if (saving) { saveTimer = setTimeout(doSave, 400); return; }
+    saving = true;
+    var body = payload();
+    fetch(API, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{"state":' + body + '}'
+    }).then(function (r) {
+      saving = false;
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      lastServerJson = body;
+      if (body === payload()) { dirty = false; setStatus('ok', 'Saved — everyone sees this list'); }
+    }).catch(function () {
+      saving = false;
+      setStatus('err', 'Offline — changes are kept on this device and will save when you reconnect');
+    });
+  }
+
+  function adoptRemote(remote) {
+    var activeTag = document.activeElement && document.activeElement.tagName;
+    if (activeTag === 'INPUT' || activeTag === 'SELECT') return; // don't yank a field mid-edit
+    state = remote;
+    if (!Array.isArray(state.pantry)) state.pantry = [];
+    assignIds();
+    var wasPantry = $wrap.classList.contains('view-pantry');
+    render();
+    setView(wasPantry);
+    setStatus('ok', 'Updated from another device');
+  }
+
+  function poll() {
+    if (dirty || saving) return;
+    fetch(API, { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) {
+      if (!d || !d.state || !d.state.groups) return;
+      var json = JSON.stringify(d.state);
+      if (json !== lastServerJson && json !== payload()) {
+        lastServerJson = json;
+        adoptRemote(d.state);
+      }
+    }).catch(function () { /* keep working offline */ });
+  }
+
+  function boot() {
+    fetch(API, { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d && d.state && Array.isArray(d.state.groups)) {
+        state = d.state;
+        if (!Array.isArray(state.pantry)) state.pantry = [];
+        lastServerJson = JSON.stringify(d.state);
+        assignIds();
+        render();
+        setStatus('ok', 'Shared list — everyone on this page sees the same numbers');
+      } else {
+        // first ever load: seed the server with the factory sheet
+        assignIds();
+        render();
+        setStatus('busy', 'Setting up…');
+        queueSave();
+      }
+    }).catch(function () {
+      var cached = null;
+      try { cached = localStorage.getItem(LS_KEY); } catch (e) { /* ignore */ }
+      if (cached) {
+        try { state = JSON.parse(cached); } catch (e) { /* ignore */ }
+      }
+      if (!Array.isArray(state.pantry)) state.pantry = [];
+      assignIds();
+      render();
+      setStatus('err', "Can't reach the server — showing the last copy saved on this device");
+    }).then(function () {
+      setInterval(poll, 10000);
+    });
+  }
+
+  window.addEventListener('pagehide', function () {
+    if (!dirty) return;
+    try { navigator.sendBeacon(API, new Blob(['{"state":' + payload() + '}'], { type: 'application/json' })); } catch (e) { /* ignore */ }
+  });
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') poll();
+  });
+
+  // ---------- math ----------
+  function baseCount(who) {
+    if (who === 'v') return state.v;
+    if (who === 'pa') return state.pa;
+    return state.v + state.pa;
+  }
+  function neededFor(item) {
+    return item.per * baseCount(item.who) * (1 + state.buffer / 100);
+  }
+  function nameKey(n) { return String(n).trim().toLowerCase(); }
+  function unitsCompatible(itemUnit, pantryUnit) {
+    return (itemUnit === 'oz' && pantryUnit === 'lb') || (itemUnit === 'pc' && pantryUnit === 'pc');
+  }
+  function pantryEntryFor(item) {
+    for (var i = 0; i < state.pantry.length; i++) {
+      var p = state.pantry[i];
+      if (nameKey(p.n) === nameKey(item.n) && unitsCompatible(item.unit, p.unit)) return p;
+    }
+    return null;
+  }
+  function pantryNative(item) {
+    var p = pantryEntryFor(item);
+    if (!p) return 0;
+    return p.unit === 'lb' ? (p.qty || 0) * LB : (p.qty || 0);
+  }
+  function remainingFor(item) {
+    var n = neededFor(item);
+    return state.usePantry ? Math.max(0, n - pantryNative(item)) : n;
+  }
+  function fmt(n, d) { return Number(n.toFixed(d)).toLocaleString(); }
+  function qtyText(item, q) {
+    if (item.unit === 'pc') return fmt(Math.ceil(q), 0) + ' pc';
+    var lb = q / LB;
+    return (lb >= 20 ? fmt(Math.ceil(lb), 0) : fmt(lb, 1)) + ' lb';
+  }
+  function subText(item) {
+    var rem = remainingFor(item);
+    var bits = [];
+    if (item.unit === 'oz' && rem > 0) bits.push('≈ ' + fmt((rem / LB) * KG, 1) + ' kg');
+    if (item.pack && rem > 0) bits.push('≈ ' + Math.ceil(rem / item.pack[0]) + ' × ' + item.pack[1]);
+    var p = pantryEntryFor(item);
+    if (state.usePantry && p && (p.qty || 0) > 0) {
+      bits.push('need ' + qtyText(item, neededFor(item)) + ' − pantry ' + fmt(p.qty, 2) + ' ' + p.unit);
+    }
+    if (item.note) bits.push(item.note);
+    return bits.join(' · ');
+  }
+  function listNeedsFor(p) {
+    var total = 0, matched = false;
+    state.groups.forEach(function (g) {
+      g.items.forEach(function (it) {
+        if (nameKey(it.n) === nameKey(p.n) && unitsCompatible(it.unit, p.unit)) {
+          matched = true; total += neededFor(it);
+        }
+      });
+    });
+    if (!matched) return null;
+    return p.unit === 'lb'
+      ? (total / LB >= 20 ? fmt(Math.ceil(total / LB), 0) : fmt(total / LB, 1)) + ' lb'
+      : fmt(Math.ceil(total), 0) + ' pc';
+  }
+
+  // ---------- render ----------
+  var $wrap = document.getElementById('wrap');
+  var $groups = document.getElementById('groups');
+  var $pantryView = document.getElementById('pantry-view');
+  var $v = document.getElementById('in-v');
+  var $pa = document.getElementById('in-pa');
+  var $buffer = document.getElementById('in-buffer');
+  var $covers = document.getElementById('covers');
+  var $pantryToggle = document.getElementById('btn-pantry-toggle');
+  var $printPantryNote = document.getElementById('print-pantry-note');
+
+  function render() {
+    $v.value = state.v; $pa.value = state.pa; $buffer.value = state.buffer;
+    $covers.textContent = (state.v + state.pa).toLocaleString();
+    syncPantryToggle();
+    $groups.textContent = '';
+    state.groups.forEach(function (g) { $groups.appendChild(renderGroup(g)); });
+    renderPantry();
+  }
+
+  function renderGroup(g) {
+    var sec = document.createElement('section');
+    sec.className = 'group';
+    var head = document.createElement('div');
+    head.className = 'group-head';
+    var h2 = document.createElement('h2');
+    h2.textContent = g.name;
+    head.appendChild(h2);
+    if (g.note) {
+      var n = document.createElement('span');
+      n.className = 'group-note';
+      n.textContent = g.note;
+      head.appendChild(n);
+    }
+    sec.appendChild(head);
+    var ul = document.createElement('ul');
+    ul.className = 'items';
+    g.items.forEach(function (it) { ul.appendChild(renderItem(g, it)); });
+    sec.appendChild(ul);
+    var addRow = document.createElement('div');
+    addRow.className = 'add-row no-print';
+    var addLink = document.createElement('button');
+    addLink.className = 'add-link';
+    addLink.textContent = '+ Add item';
+    addLink.addEventListener('click', function () { showAddItemForm(g, addRow, addLink); });
+    addRow.appendChild(addLink);
+    sec.appendChild(addRow);
+    return sec;
+  }
+
+  function itemLabel(item, chips) {
+    var main = document.createElement('div');
+    main.className = 'item-main';
+    var nameEl = document.createElement('span');
+    nameEl.className = 'item-name';
+    nameEl.textContent = item.n;
+    main.appendChild(nameEl);
+    if (chips && item.who && item.who !== 'both') {
+      var chip = document.createElement('span');
+      chip.className = 'chip ' + item.who;
+      chip.textContent = item.who === 'v' ? 'V only' : 'PA only';
+      main.appendChild(chip);
+    }
+    return main;
+  }
+
+  function renderItem(group, item) {
+    var li = document.createElement('li');
+    li.className = 'item' + (item.got ? ' checked' : '');
+
+    var check = document.createElement('input');
+    check.type = 'checkbox'; check.className = 'got';
+    check.checked = !!item.got;
+    check.setAttribute('aria-label', 'Got ' + item.n);
+    check.addEventListener('change', function () {
+      item.got = check.checked;
+      li.classList.toggle('checked', check.checked);
+      queueSave();
+    });
+
+    var perCell = document.createElement('div');
+    perCell.className = 'per-cell';
+    var perIn = document.createElement('input');
+    perIn.type = 'number'; perIn.min = '0'; perIn.step = item.unit === 'pc' ? '0.01' : '0.05';
+    perIn.value = item.per;
+    perIn.setAttribute('aria-label', item.n + ' per person');
+    var perUnit = document.createElement('span');
+    perUnit.className = 'per-unit';
+    perUnit.textContent = item.unit + ' / person';
+    var perPrint = document.createElement('span');
+    perPrint.className = 'per-print';
+    perCell.appendChild(perIn); perCell.appendChild(perUnit); perCell.appendChild(perPrint);
+
+    var buyCell = document.createElement('div');
+    buyCell.className = 'buy-cell';
+    var buy = document.createElement('span');
+    buy.className = 'buy';
+    var hint = document.createElement('span');
+    hint.className = 'pack-hint';
+    buyCell.appendChild(buy); buyCell.appendChild(hint);
+
+    var del = document.createElement('button');
+    del.className = 'del no-print';
+    del.textContent = '✕';
+    del.setAttribute('aria-label', 'Remove ' + item.n);
+    del.addEventListener('click', function () {
+      group.items = group.items.filter(function (x) { return x !== item; });
+      li.remove();
+      queueSave(); refreshAll();
+    });
+
+    function refresh() {
+      var needed = neededFor(item);
+      var rem = remainingFor(item);
+      var covered = state.usePantry && needed > 0 && rem <= 0;
+      li.classList.toggle('covered', covered);
+      buy.textContent = covered ? 'stocked ✓' : qtyText(item, rem);
+      hint.textContent = subText(item);
+      perPrint.textContent = item.per + ' ' + item.unit + '/pp';
+    }
+    perIn.addEventListener('input', function () {
+      var val = parseFloat(perIn.value);
+      item.per = isNaN(val) || val < 0 ? 0 : val;
+      refreshAll(); queueSave();
+    });
+    li.refresh = refresh;
+    refresh();
+
+    li.appendChild(check); li.appendChild(itemLabel(item, true)); li.appendChild(perCell);
+    li.appendChild(buyCell); li.appendChild(del);
+    return li;
+  }
+
+  function renderPantry() {
+    $pantryView.textContent = '';
+    var sec = document.createElement('section');
+    sec.className = 'group';
+    var head = document.createElement('div');
+    head.className = 'group-head';
+    var h2 = document.createElement('h2');
+    h2.textContent = 'Pantry — Standing Stock';
+    head.appendChild(h2);
+    var note = document.createElement('span');
+    note.className = 'group-note';
+    note.textContent = 'the kitchen’s ledger · outlives any one day';
+    head.appendChild(note);
+    sec.appendChild(head);
+
+    var ul = document.createElement('ul');
+    ul.className = 'items';
+    state.pantry.forEach(function (p) { ul.appendChild(renderPantryItem(p)); });
+    sec.appendChild(ul);
+
+    var addRow = document.createElement('div');
+    addRow.className = 'add-row no-print';
+    var addLink = document.createElement('button');
+    addLink.className = 'add-link';
+    addLink.textContent = '+ Add pantry item';
+    addLink.addEventListener('click', function () { showAddPantryForm(addRow, addLink); });
+    addRow.appendChild(addLink);
+    sec.appendChild(addRow);
+    $pantryView.appendChild(sec);
+  }
+
+  function renderPantryItem(p) {
+    var li = document.createElement('li');
+    li.className = 'pantry-item';
+
+    var need = document.createElement('span');
+    need.className = 'need-ref';
+
+    var cell = document.createElement('div');
+    cell.className = 'pantry-cell';
+    var qtyIn = document.createElement('input');
+    qtyIn.type = 'number'; qtyIn.min = '0'; qtyIn.step = p.unit === 'lb' ? '0.5' : '1';
+    qtyIn.value = p.qty || 0;
+    qtyIn.setAttribute('aria-label', p.n + ' in pantry');
+    var unitEl = document.createElement('span');
+    unitEl.className = 'per-unit';
+    unitEl.textContent = p.unit + ' on hand';
+    cell.appendChild(qtyIn); cell.appendChild(unitEl);
+
+    var del = document.createElement('button');
+    del.className = 'del no-print';
+    del.textContent = '✕';
+    del.setAttribute('aria-label', 'Remove ' + p.n + ' from pantry');
+    del.addEventListener('click', function () {
+      state.pantry = state.pantry.filter(function (x) { return x !== p; });
+      li.remove();
+      queueSave(); refreshAll();
+    });
+
+    function refresh() {
+      var needs = listNeedsFor(p);
+      need.textContent = '';
+      if (needs === null) {
+        need.appendChild(document.createTextNode('not on this list'));
+      } else {
+        need.appendChild(document.createTextNode('list needs '));
+        var s = document.createElement('strong');
+        s.textContent = needs;
+        need.appendChild(s);
+      }
+    }
+    qtyIn.addEventListener('input', function () {
+      var val = parseFloat(qtyIn.value);
+      p.qty = isNaN(val) || val < 0 ? 0 : val;
+      refreshAll(); queueSave();
+    });
+    li.refresh = refresh;
+    refresh();
+
+    li.appendChild(itemLabel(p, false)); li.appendChild(need); li.appendChild(cell); li.appendChild(del);
+    return li;
+  }
+
+  function refreshAll() {
+    $covers.textContent = (state.v + state.pa).toLocaleString();
+    var rows = document.querySelectorAll('#groups li.item, #pantry-view li.pantry-item');
+    for (var i = 0; i < rows.length; i++) if (rows[i].refresh) rows[i].refresh();
+  }
+
+  function showAddItemForm(group, container, link) {
+    if (container.querySelector('.add-form')) return;
+    link.style.display = 'none';
+    var form = document.createElement('div');
+    form.className = 'add-form';
+    var name = document.createElement('input');
+    name.type = 'text'; name.placeholder = 'Item name';
+    var who = document.createElement('select');
+    [['both', 'Everyone'], ['v', 'V only'], ['pa', 'PA only']].forEach(function (o) {
+      var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; who.appendChild(op);
+    });
+    var unit = document.createElement('select');
+    [['oz', 'oz / person'], ['pc', 'pc / person']].forEach(function (o) {
+      var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; unit.appendChild(op);
+    });
+    var per = document.createElement('input');
+    per.type = 'number'; per.placeholder = 'per person'; per.min = '0'; per.step = '0.05';
+    var ok = document.createElement('button');
+    ok.className = 'btn-primary'; ok.textContent = 'Add';
+    var cancel = document.createElement('button');
+    cancel.className = 'btn-ghost'; cancel.textContent = 'Cancel';
+    ok.addEventListener('click', function () {
+      var n = name.value.trim();
+      var p = parseFloat(per.value);
+      if (!n || isNaN(p) || p < 0) { name.focus(); return; }
+      group.items.push({ id: nextId++, n: n, who: who.value, unit: unit.value, per: p });
+      queueSave(); render();
+    });
+    cancel.addEventListener('click', function () { form.remove(); link.style.display = ''; });
+    form.appendChild(name); form.appendChild(who); form.appendChild(unit);
+    form.appendChild(per); form.appendChild(ok); form.appendChild(cancel);
+    container.appendChild(form);
+    name.focus();
+  }
+
+  function showAddPantryForm(container, link) {
+    if (container.querySelector('.add-form')) return;
+    link.style.display = 'none';
+    var form = document.createElement('div');
+    form.className = 'add-form';
+    var name = document.createElement('input');
+    name.type = 'text'; name.placeholder = 'Item name (match the list name to link them)';
+    var unit = document.createElement('select');
+    [['lb', 'lb'], ['pc', 'pc']].forEach(function (o) {
+      var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; unit.appendChild(op);
+    });
+    var qty = document.createElement('input');
+    qty.type = 'number'; qty.placeholder = 'on hand'; qty.min = '0'; qty.step = '0.5';
+    var ok = document.createElement('button');
+    ok.className = 'btn-primary'; ok.textContent = 'Add';
+    var cancel = document.createElement('button');
+    cancel.className = 'btn-ghost'; cancel.textContent = 'Cancel';
+    ok.addEventListener('click', function () {
+      var n = name.value.trim();
+      var q = parseFloat(qty.value);
+      if (!n) { name.focus(); return; }
+      state.pantry.push({ id: nextId++, n: n, qty: isNaN(q) || q < 0 ? 0 : q, unit: unit.value });
+      queueSave(); render();
+    });
+    cancel.addEventListener('click', function () { form.remove(); link.style.display = ''; });
+    form.appendChild(name); form.appendChild(qty); form.appendChild(unit);
+    form.appendChild(ok); form.appendChild(cancel);
+    container.appendChild(form);
+    name.focus();
+  }
+
+  [[$v, 'v'], [$pa, 'pa'], [$buffer, 'buffer']].forEach(function (pair) {
+    pair[0].addEventListener('input', function () {
+      var val = parseInt(pair[0].value, 10);
+      state[pair[1]] = isNaN(val) || val < 0 ? 0 : val;
+      refreshAll(); queueSave();
+    });
+  });
+
+  var $tabShop = document.getElementById('tab-shop');
+  var $tabPantry = document.getElementById('tab-pantry');
+  function setView(pantry) {
+    $wrap.classList.toggle('view-pantry', pantry);
+    $tabShop.classList.toggle('active', !pantry);
+    $tabPantry.classList.toggle('active', pantry);
+  }
+  $tabShop.addEventListener('click', function () { setView(false); });
+  $tabPantry.addEventListener('click', function () { setView(true); });
+
+  function syncPantryToggle() {
+    $pantryToggle.textContent = 'Subtract pantry: ' + (state.usePantry ? 'ON' : 'OFF');
+    $pantryToggle.setAttribute('aria-pressed', String(state.usePantry));
+    $pantryToggle.classList.toggle('on', state.usePantry);
+    $printPantryNote.hidden = !state.usePantry;
+  }
+  $pantryToggle.addEventListener('click', function () {
+    state.usePantry = !state.usePantry;
+    syncPantryToggle(); refreshAll(); queueSave();
+  });
+
+  document.getElementById('btn-print').addEventListener('click', function () { window.print(); });
+  document.getElementById('btn-uncheck').addEventListener('click', function () {
+    state.groups.forEach(function (g) { g.items.forEach(function (it) { it.got = false; }); });
+    queueSave(); render();
+  });
+  document.getElementById('btn-reset').addEventListener('click', function () {
+    if (!confirm("Reset the menu, headcounts, and check-offs back to Daniel's Thursday sheet? The pantry is kept as-is. This affects everyone using this page.")) return;
+    var keepPantry = state.pantry;
+    var keepUse = state.usePantry;
+    state = JSON.parse(JSON.stringify(FACTORY));
+    state.pantry = keepPantry;
+    state.usePantry = keepUse;
+    assignIds();
+    queueSave(); render();
+  });
+
+  boot();
+})();
+</script>
+</body>
+</html>

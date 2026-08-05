@@ -85,6 +85,7 @@ Sign-out flow:
 
 | Route | Method | Purpose |
 |---|---|---|
+| `/api/kitchen-list` | GET/PUT/POST | **Unauthenticated** (deliberate): read/write the catering kitchen board's shared state (`page_content.catering_kitchen_state`). Backs `public/kitchen.html`, used by the caterer, who has no member account. Key is hardcoded, payload shape-validated (`groups` + `pantry` arrays) and capped at 200 KB; POST exists only so the page's leave-flush `sendBeacon` works. Last-write-wins, ~10 s poll. See [catering-kitchen.md](catering-kitchen.md). |
 | `/api/apply` | POST | Submit application |
 | `/api/apply/file` | POST | Upload an attachment for an admin-added **File upload** application field (multipart `file` → public `application-files` bucket under `{userId}/`; returns `{ url, name }`). Type allow-list + 10 MB cap. Gate is **any signed-in Clerk user** (not just applicants) and there's no cleanup path — see the gate note below the tables. |
 | `/api/volunteer` | POST | Submit volunteer signup |
