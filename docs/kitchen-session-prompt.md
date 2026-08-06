@@ -4,8 +4,19 @@ Paste at the start of a new Claude session that is working on the **catering kit
 board**. Deliberately short; `docs/catering-kitchen.md` is the full spec, read it before
 changing anything structural.
 
-**Live:** https://camp.glaum.ca/kitchen.html — unlinked, **unauthenticated**, in daily use
-by Daniel (Chante's partner) catering What If 2026. Treat it as production with real users.
+**Deployed:** https://camp.glaum.ca/kitchen.html — unlinked, **unauthenticated**. Built for
+Daniel (Chante's partner) catering What If 2026.
+
+⚠️ **The board's DATA is no longer live or current (Chante, 2026-08-06):** *"None of it is
+live or current anymore."* Nobody is shopping off it. Earlier revisions of this brief said
+"in daily use — treat it as production with real users"; **that is now stale.** Practical
+effect: shape changes and state edits are **low-risk**, and the "snapshot before you write
+to live" caution is about not destroying a record, not about interrupting a live shop.
+
+**Still true, and unchanged by the above:** the page is **publicly reachable**,
+`kitchen-list` is the app's only unauthenticated *write* endpoint, and `kitchen-ai` is its
+only unauthenticated endpoint that **spends money**. Retire-or-gate (see Open threads) is
+now *more* actionable, not less — nothing is using it.
 
 **Code:** `public/kitchen.html` (one self-contained static page — no framework, no build)
 and two unauthenticated routes: `app/api/kitchen-list/route.ts` (GET/PUT state) and
@@ -20,19 +31,33 @@ app" in the spec.
 - `docs/catering-kitchen.md` — the spec: shape, migrations, sync, security posture, open threads
 - `docs/branching.md` — branching + parallel-session rules (they apply here too)
 
-## ⚠️ In flight — read this first
+## ⚠️ Shelved — read this first
 
-**`feat/kitchen-prices` (77d93be) is committed but NOT merged.** It adds the v6 price
-book (a Prices tab) and the By item / By supplier lens on the shopping list. Production
-is still on **v5** and has no `suppliers`/`prices` fields. So:
+**`feat/kitchen-prices` (77d93be) is SHELVED, not in flight.** Chante's call, 2026-08-06:
+the price book "didn't end up being as helpful as I imagined". The branch adds the v6 price
+book (a Prices tab) and the By item / By supplier lens. **It will not be merged as it
+stands.** Production is on **v5** and has no `suppliers`/`prices` fields.
 
-- If that branch is still unmerged, the shape notes below describe the *branch*, not live.
-- It was verified quantity-identical against a copy of live (84 rows, hash `8543926e` on
-  both the deployed v5 page and the v6 page) — don't redo that work, but do re-verify if
-  you change the shape again.
-- Awaiting Chante's review. Nothing to do before merging except her look; no migration.
+- **Don't merge it, and don't treat it as pending review.** It is parked deliberately, not
+  forgotten. Left on disk because it is complete and verified, so reviving it is cheap if
+  the price book (or a second supplier — see Costco below) ever becomes real.
+- It was verified quantity-identical against a copy of live (84 rows, hash `8543926e`) —
+  that work stands if it is ever revived.
+- **The shape notes below describe live (v5), not that branch.**
+- ⚠️ **Version-number collision.** The shelved branch calls its shape **v6**. The next
+  change that actually ships — the minimal `sku` field for cart export — will also want to
+  be v6. If that lands first, reviving `feat/kitchen-prices` means renumbering it to v7 and
+  re-checking `migrate()`. Don't let two different v6 shapes exist.
+
+**The active direction is cart export instead** — a minimal `sku` on the item, then emitting
+a SKU list the caterer loads into his own Wholesale Club cart. See
+`docs/wholesale-club-cart.md`.
 
 ## The four rules that matter most
+
+*(Rules 1–3 were written while Daniel was shopping off the board daily. The data is no
+longer live — see the ⚠️ at the top — so the stakes are lower, but the failure modes they
+describe are real and the habits are cheap. Keep them.)*
 
 1. **Never point a dev page at the live board.** The page defaults to a scratch board on
    localhost (`?scope=test`, "SCRATCH BOARD" banner) precisely because this went wrong once:
@@ -53,18 +78,18 @@ is still on **v5** and has no `suppliers`/`prices` fields. So:
    catering planning default that Claude invented. The dish names, days, groups and headcounts
    come from Daniel's handwritten sheets. Never silently "correct" a portion he has set.
 
-## Shape (v6), in one breath
+## Shape (v5 = live), in one breath
 
 A **day** holds the **groups** eating that day (label + headcount) and the **meals** served;
 each meal has **sections** (courses); each **item** names the `groupIds` that get it. Quantity
 = `per × (assigned groups' headcounts) × (1 + buffer)`. The **shopping list** aggregates every
 selected day into one trip, matched by item name+unit. The **pantry** is a standing ledger
 matched to items by name and subtracted once from the combined total. **Finish shop** (foot of
-the list) writes crossed-off rows back into the pantry. The **price book** (`suppliers` +
-`prices`, v6) is a second standing ledger — what each item costs per pack at each supplier —
-and drives the shopping list's **By supplier** lens, which buys each item wherever the *whole
-packs* come out cheapest (**not** the best unit price: needing 9 lb, three 4 lb bags at
-$2.25/lb beat one 22 lb case at $1.59/lb).
+the list) writes crossed-off rows back into the pantry.
+
+*(A **price book** — `suppliers` + `prices`, a second standing ledger driving a By-supplier
+lens that buys where the whole packs come out cheapest — exists only on the shelved
+`feat/kitchen-prices` branch. **It is not part of the live shape.** See Shelved, above.)*
 
 All of it lives in one JSON blob: `page_content.catering_kitchen_state`.
 
@@ -72,7 +97,11 @@ All of it lives in one JSON blob: `page_content.catering_kitchen_state`.
 *operations*; the page resolves each against the current board into a before/after preview
 and nothing mutates until Apply. Keep every new capability on that rail.
 
-## Where it stands (2026-08-05)
+## Where it stood (2026-08-05) — historical
+
+⚠️ Snapshot of the board while it was in active use. **The data is no longer current
+(2026-08-06)** — read the numbers below as a record of what was built and proven, not as
+the state of the board today.
 
 Four days from Daniel's sheets — **84 shopping rows, 819 covers**:
 
@@ -93,13 +122,20 @@ pantry row is normal, not clutter. **The shop hadn't really started** as of this
 
 ## Open threads
 
-- **The price book is empty** — 1 of 84 items priced (a black-bean test entry). It only
-  earns its keep once Daniel fills it; dictating to the assistant is the fast path.
+- ~~The price book is empty~~ — **closed 2026-08-06, shelved with the branch.** It never got
+  past 1 of 84 items priced, and Chante's read is that it didn't earn its keep. See Shelved,
+  above. The lesson worth keeping: structure built for a future that hasn't arrived doesn't
+  pay for itself — which is why the `sku` replacement below is deliberately one field.
 - **Costco Business Centre New Westminster** opened Nov 2025 — first in BC, next-day
   delivery inside a zone, ~3,000 items aimed at commercial kitchens. Worth checking whether
-  the zone reaches them; it may matter more than any feature.
-- **Cart-ready export is the natural next step.** Price rows already carry an unused `sku`
-  field, and filling that in is the real work — everything downstream is formatting.
+  the zone reaches them; it may matter more than any feature. (This is also the one thing
+  that would justify reviving supplier-scoped SKUs — see below.)
+- **Cart export is the active direction** (2026-08-06). It needs a **minimal optional `sku`
+  on the item**, meaning "the Wholesale Club product" — *not* the supplier-scoped `sku` on
+  the shelved branch's price rows, which is entangled with `suppliers`/`prices` and is not
+  worth cherry-picking. Add it fresh; it's roughly a tenth of that code. If a second
+  supplier ever becomes real, widening one field to a map is a small, well-understood
+  migration.
   ⚠️ **The old line here said automated checkout was "off the table (credentials, bot
   detection, ToS, money)". That is now half wrong** — see `docs/wholesale-club-cart.md`
   (2026-08-06). Wholesale Club's cart is a server-side object written by a single

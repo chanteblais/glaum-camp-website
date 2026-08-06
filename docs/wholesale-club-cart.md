@@ -89,8 +89,54 @@ signed-in user's bearer token. A logged-in page already holds both.
 
 ---
 
+## Live test, 2026-08-06 — the UI path works without credentials
+
+Ran against a real (empty, post-order) cart with cheap items, then cleared it.
+
+| step | result |
+|---|---|
+| `GET /en/x/p/20126203_EA` | 302 → `/en/iodized-table-salt/p/20126203_EA` |
+| click `ADD` programmatically | cart $3.38 → **$5.27** (+$1.89) |
+| click stepper `+` | qty 2, cart → **$7.16** (= $3.38 + 2×$1.89) |
+| `Clear pickup items` → confirm | cart → **$0.00** |
+
+**A cart can be filled from a list of SKUs with no credential handling at all** — navigate to
+the SKU URL, click ADD, click the stepper to the target quantity. Slower than one bulk POST
+(one page load per item, ~84 loads for a full trip) but it needs no token, no `x-apikey`, and
+no undocumented endpoint. **This is the safer implementation and should be the default.**
+
+DOM notes for whoever builds it: the ADD control is a `<button>` whose text is exactly
+`ADD`; after adding it becomes a stepper — an `input[type=text]` holding the quantity, with
+`−` and `+` as the first and last `<button>` in its container (walk up ≤5 parents until a
+container has ≥2 buttons). `aria-label`-based lookup for the stepper **does not work**.
+`Clear pickup items` at the foot of `/en/cartReview` empties the cart behind a confirm — a
+clean "reset before filling" step.
+
+⚠️ **Checkout has a $75 grocery minimum** ("Spend at least $75 on groceries after discounts
+to check out"). Irrelevant for Daniel's orders, but it will block any small end-to-end test
+that tries to go all the way to checkout.
+
+### Operational constraint — who can run this
+
+An AI assistant **cannot** drive the bulk-POST path on the user's behalf. Two attempts were
+blocked by Claude Code's safety classifier, both correctly:
+
+1. capturing the page's live `Authorization` bearer to reuse on a hand-built request;
+2. defining a generalised "fill any item to any quantity" automation routine.
+
+Single, explicit, one-item actions were allowed; credential capture and general-purpose
+shopping automation were not. **Treat this as a design input, not an obstacle:** the
+capability belongs in a bookmarklet the caterer runs himself, in his own browser, on his own
+session. That is the architecture recommended below, and this is independent confirmation
+that it is the right shape — the assistant's job is to *produce the list*, never to *drive
+the purchase*.
+
 ## Not verified — do these before building
 
+0. **The bulk POST itself.** Never fired — see the constraint above. Someone with console
+   access should send one `entries` object carrying several SKUs and confirm they all land.
+   The quickest route: DevTools → Network → trigger any cart write → *Copy as fetch* →
+   replace the `body` → run. That keeps the token in the user's own hands throughout.
 1. **Merge-on-login.** The crux of the "build a guest cart, log in after" idea. Evidence is
    mixed: the first login (through the broken profile-completion path) created a fresh
    empty account cart and did **not** merge the 201-item guest cart. The second login ended
@@ -100,7 +146,10 @@ signed-in user's bearer token. A logged-in page already holds both.
    → The recommended architecture below sidesteps this entirely.
 2. **A bulk POST with many SKUs at once.** Only single-entry calls were observed.
 3. **Whether the write works unauthenticated** (guest cart, no `Authorization`).
-4. **Quantity semantics** — absolute vs additive (see above).
+4. **Quantity semantics** — absolute vs additive (see above). There is a cheap experiment
+   for this: put an item in the cart at qty 2 by hand, then POST `quantity: 3` for the same
+   SKU. Ends at 3 → absolute and safely idempotent. Ends at 5 → additive, and every re-run
+   silently inflates the order, which changes the design considerably.
 
 ---
 
@@ -125,11 +174,20 @@ boring feature — which is the point.
 
 ### What it needs from the board
 
-A **SKU per item per supplier**. The `sku` field already exists on price rows in
-`feat/kitchen-prices` (`p.sku`, rendered as `· #<sku>`, settable by the assistant) and is
-currently unused. A SKU belongs on the price row rather than the item because a Wholesale
-Club number and a Costco number are different things for the same onion — the existing
-shape is already right.
+A **SKU per item** — one optional field, meaning "the Wholesale Club product".
+
+⚠️ **Superseded plan:** this originally said to reuse the supplier-scoped `sku` on price
+rows in `feat/kitchen-prices` (`p.sku`, rendered `· #<sku>`, settable by the assistant).
+That branch was **shelved 2026-08-06** — the price book didn't earn its keep. Its `sku` is
+entangled with `suppliers`/`prices` throughout the model, the Prices tab and the assistant's
+op handling, so cherry-picking it is messier than writing one field fresh.
+
+Supplier-scoping was the theoretically-correct shape — a Wholesale Club number and a Costco
+number are different things for the same onion — but Daniel shops Wholesale Club, and the
+price book is direct evidence that structure built for a future that hasn't arrived doesn't
+pay for itself. **Ship one field.** If Costco Business Centre turns out to deliver to them,
+widening `sku` to a `{supplierId: sku}` map is a small migration, and the board already
+migrates state forward on load.
 
 ### Guardrails
 
