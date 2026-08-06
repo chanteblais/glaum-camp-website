@@ -99,9 +99,17 @@ pantry row is normal, not clutter. **The shop hadn't really started** as of this
   delivery inside a zone, ~3,000 items aimed at commercial kitchens. Worth checking whether
   the zone reaches them; it may matter more than any feature.
 - **Cart-ready export is the natural next step.** Price rows already carry an unused `sku`
-  field; Costco/Superstore have no ordering API and automated checkout is off the table
-  (credentials, bot detection, ToS, money), so the target is an order sheet by item number
-  that Daniel enters himself.
+  field, and filling that in is the real work — everything downstream is formatting.
+  ⚠️ **The old line here said automated checkout was "off the table (credentials, bot
+  detection, ToS, money)". That is now half wrong** — see `docs/wholesale-club-cart.md`
+  (2026-08-06). Wholesale Club's cart is a server-side object written by a single
+  `POST .../carts/<cartId>` whose `entries` object is keyed by SKU, so a whole list lands
+  in one call; and a bookmarklet running in Daniel's own logged-in browser needs **no
+  stored credentials, no guest cart and no server-side traffic**. What stands unchanged:
+  it is an **undocumented internal API** (ToS, can break without notice), accuracy on a
+  ~$2k order is the real exposure, and this must not land on the unauthenticated page —
+  it belongs after the retire-or-gate thread and after the festival. A SKU-only product
+  URL (`/en/x/p/<SKU>`) works, so the plain link export remains the always-works fallback.
 - **Friday, "Spicy sauce" (Ex 2)** is flagged in the UI: it looked struck through on the
   sheet and has not been confirmed. Confirm or delete.
 - **Portions want Daniel's eye**, especially the Friday/Saturday/Sunday mains, which were

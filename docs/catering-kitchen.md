@@ -256,6 +256,13 @@ silently change one he has set.
   there, the food isn't. Copy-a-day covers the repeat cases.
 - **Retire or gate post-festival.** Either delete the page + route, or move it
   behind auth once the catering thread graduates into a real product surface.
+- **Filling a Wholesale Club cart from the shopping list** — researched 2026-08-06, nothing
+  built. Their cart is a server-side object written by one `POST .../carts/<cartId>` with an
+  `entries` object keyed by SKU, so an entire trip lands in a single call, and a bookmarklet
+  in the caterer's own logged-in browser needs no stored credentials. Full findings, the
+  unverified parts, the ToS/fragility risks and the recommended architecture:
+  `docs/wholesale-club-cart.md`. Blocked on the `sku` field being filled in (it ships unused
+  on `feat/kitchen-prices`) and on this page not being public — see retire-or-gate above.
 - The portion defaults are standard catering planning ranges, not Daniel's numbers —
   they're starting points he's expected to correct in place.
 - **Friday's "Spicy sauce" (Ex 2)** carries a flag in the UI: it looked struck through on the
