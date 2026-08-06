@@ -119,7 +119,9 @@ CRDT, which this does not need yet.
 
 ## Security posture
 
-This is the app's **only unauthenticated write endpoint**. Containment:
+`/api/kitchen-list` is the app's **only unauthenticated write endpoint**, and
+`/api/kitchen-ai` (see The assistant, above) is its only unauthenticated
+endpoint that **spends money**. Containment for kitchen-list:
 
 - The route **hardcodes** the `page_content` key — it cannot write any other key.
 - Shape validation (`groups` + `pantry` must be arrays) and a 200 KB cap.
@@ -128,6 +130,58 @@ This is the app's **only unauthenticated write endpoint**. Containment:
 
 The residual risk is real and accepted: anyone who learns the URL can read or
 overwrite the list. **Remove or gate this after the festival** — see Open threads.
+
+## The assistant (voice-friendly AI edits)
+
+**Added 2026-08-05, owner-approved despite the endpoint posture below.** A chat
+drawer on the page (floating "Assistant" button) plus one new route,
+`/api/kitchen-ai` (POST). The intended gesture is the phone keyboard's dictation
+mic — no audio pipeline exists; the OS turns speech into text and the drawer is
+just a text box. Daniel says *"twelve and a half pounds of black beans"* and the
+board updates, semantically matched ("black beans" → "Black beans (canned)").
+
+**The assistant proposes; the caterer disposes.** The page sends its current
+state + the chat history; the route calls Claude (`claude-opus-5`, adaptive
+thinking at `effort: low` — the default effort ran ~2 minutes/request, low runs
+~6 s) and returns a short reply plus a list of **operations** (`set_pantry`,
+`rename_pantry`, `set_headcount`, `set_portion`, `check_item`, `add_menu_item`,
+…). The page resolves each op against the *current* board into a before/after
+line ("Pantry: Chickpeas — 12.5 → 8 lb"), shows them in a preview panel, and
+nothing mutates until **Apply** is tapped — which routes through the ordinary
+save path. Ops are re-resolved at tap time in case the board changed since the
+preview; unresolvable ops (stale name, bad id) show as errors and are skipped.
+The model never returns whole state and the route never touches the database,
+so the assistant cannot mangle rows it isn't editing and cannot write anything
+on its own.
+
+This also dissolves most of the name-matching fragility for anything entered
+through the drawer: the model sees the whole board, so off-by-a-word stock
+("pasta sauce" vs "Tomato sauce (bolognese)") gets linked or asked about
+instead of silently subtracting from nothing. Standing rules are enforced by
+construction and by prompt: portions/headcounts/buffers only change when
+explicitly asked, ambiguous names get an either/or question, destructive
+requests get a confirm, and converted numbers are read back so a dictation
+mis-hear ("125" for "12.5") is catchable at a glance.
+
+**Implementation notes:**
+- Structured outputs were tried and abandoned — even a modest op schema hit
+  "Schema is too complex" / "Grammar compilation timed out" (3-minute
+  requests). Prompt-instructed JSON + a tolerant extractor generates in
+  seconds; the page re-validates every op anyway, so the grammar's guarantee
+  was redundant.
+- The system prompt is byte-stable and cache-marked; the (per-call) state JSON
+  rides in the first user turn.
+- Duplicate pantry names in different units exist (two Bacon rows) — op
+  resolution prefers a unit match and falls back to name-only.
+- Cost: roughly 5¢/interaction at Opus 5 rates; single-digit dollars for a
+  festival week.
+
+**Containment (this endpoint spends money):** no DB access at all, request
+size caps (state 200 KB, message 4 K chars, history 12 turns), `max_tokens`
+8000, and a best-effort per-IP rate limit (40/hour per serverless instance).
+`ANTHROPIC_API_KEY` must be set in the deployment env. It shares the kitchen
+board's retire-or-gate-after-festival clause — and strengthens the case for
+gating.
 
 ## Closing out a shop
 
