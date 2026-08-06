@@ -255,3 +255,18 @@ eventually new-tenant starter templates. If anything gets built early, it's this
 - Open question, undecided: fold catering into the app's functionality later vs. stand-alone
   tool/product. Field test (Daniel actually shopping off it) decides whether the thread is
   worth pulling.
+
+### 2026-08-05 — Catering: voice-driven AI inventory as a differentiator
+
+- Built the same day it was proposed: an AI assistant drawer on the kitchen board
+  (`/api/kitchen-ai`) — the caterer dictates via the phone keyboard's mic ("twelve and a
+  half pounds of black beans"), Claude turns it into proposed board edits, the caterer taps
+  Apply. No audio pipeline; the OS does speech-to-text, the model does semantic matching
+  ("pasta sauce" → "Tomato sauce (bolognese)") and unit math (6 bags × 12 buns = 72 pc),
+  reading converted numbers back so dictation mis-hears get caught.
+- Commercial read: hands-busy, aisle-standing inventory update with zero UI navigation is a
+  genuine differentiator for the catering segment — spreadsheets can't do it, and the
+  propose→preview→apply pattern keeps the human accountable for every number (matters for
+  food-cost trust). Cost ~5¢/interaction — noise against a catering contract.
+- Chante accepted the unauthenticated-endpoint risk explicitly for the festival window
+  ("no one knows about it, worth it for real data"); retire-or-gate stays on the books.

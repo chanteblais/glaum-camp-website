@@ -8,7 +8,9 @@ changing anything structural.
 by Daniel (Chante's partner) catering What If 2026. Treat it as production with real users.
 
 **Code:** `public/kitchen.html` (one self-contained static page — no framework, no build)
-and `app/api/kitchen-list/route.ts` (one unauthenticated GET/PUT route).
+and two unauthenticated routes: `app/api/kitchen-list/route.ts` (GET/PUT state) and
+`app/api/kitchen-ai/route.ts` (the assistant drawer — Claude-backed, proposes operations
+the page previews and applies; **spends money**, needs `ANTHROPIC_API_KEY` in the env).
 **Repo:** `/Users/chante/Documents/Glaum/website/glaum-camp-website` — the camp app repo.
 It shares nothing else with the camp app; see "Why it looks nothing like the rest of the
 app" in the spec.
@@ -73,8 +75,10 @@ figures. Saturday's PAs were 255, halved to 128 (rounded up rather than under-fe
   prompts it. If the ledger drifts high across the week, that's why.
 - **Close-out assumes planned = cooked** — it subtracts what the menu says, not what the
   kitchen actually used.
-- **Retire or gate this after the festival.** It is the app's only unauthenticated write
-  endpoint. Either delete the page + route or move it behind auth.
+- **Retire or gate this after the festival.** kitchen-list is the app's only
+  unauthenticated write endpoint, and kitchen-ai its only unauthenticated endpoint that
+  spends money (owner accepted the risk 2026-08-05). Either delete the page + both routes
+  or move them behind auth.
 - **Product question, unresolved:** fold catering into the camp app properly, or spin it out.
   See `docs/business.md` → Discussion log, 2026-08-04.
 

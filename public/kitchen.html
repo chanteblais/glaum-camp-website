@@ -393,6 +393,85 @@
     li.item .buy-cell { grid-area: buy; }
     li.item .del { grid-area: del; }
   }
+
+  /* assistant drawer */
+  .ai-fab {
+    position: fixed; right: 16px; bottom: 16px; z-index: 40;
+    border-radius: 999px; padding: 12px 20px; border: none;
+    background: var(--ink); color: var(--card);
+    font: 700 14px system-ui, sans-serif;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  }
+  .ai-drawer {
+    position: fixed; right: 0; bottom: 0; left: 0; z-index: 50;
+    background: var(--card); border-top: 2px solid var(--ink);
+    box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.18);
+    max-height: 72vh; display: flex; flex-direction: column;
+  }
+  @media (min-width: 700px) {
+    .ai-drawer {
+      left: auto; right: 16px; bottom: 16px; width: 440px;
+      border: 1.5px solid var(--line); border-top: 2px solid var(--ink);
+      border-radius: 8px; max-height: 70vh;
+    }
+  }
+  .ai-drawer[hidden], .ai-fab[hidden] { display: none; }
+  .ai-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px; border-bottom: 1px solid var(--line);
+  }
+  .ai-head h3 {
+    margin: 0; font-size: 13px; font-weight: 800;
+    letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .ai-scope {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.06em;
+    color: var(--danger); border: 1px solid var(--danger);
+    border-radius: 3px; padding: 1px 6px;
+  }
+  .ai-head .del { margin-left: auto; }
+  .ai-msgs { overflow-y: auto; padding: 10px 14px; flex: 1 1 auto; min-height: 90px; }
+  .ai-msg { margin: 7px 0; font-size: 14px; max-width: 92%; }
+  .ai-msg.user { margin-left: auto; text-align: right; color: var(--muted); }
+  .ai-msg.sys { color: var(--danger); font-size: 13px; }
+  .ai-msg.busy { color: var(--muted); font-style: italic; }
+  .ai-pending {
+    border: 1.5px solid var(--accent); border-radius: 6px;
+    padding: 10px 12px; margin: 8px 0;
+  }
+  .ai-pending .panel-label { margin-bottom: 6px; }
+  .ai-pending ul { list-style: none; margin: 0 0 10px; padding: 0; }
+  .ai-pending li {
+    font: 500 13px Menlo, Consolas, monospace;
+    padding: 3px 0; border-bottom: 1px dashed var(--line);
+  }
+  .ai-pending li.err { color: var(--danger); font-family: system-ui, sans-serif; }
+  .ai-pending .co-actions { margin-top: 0; }
+  .ai-drawer.mini .ai-msgs, .ai-drawer.mini .ai-hint { display: none; }
+  .ai-drawer.mini .ai-row { border-top: none; padding-top: 6px; }
+  .ai-pill {
+    font-size: 11px; font-weight: 700; color: var(--accent-ink);
+    background: var(--accent); border-radius: 999px; padding: 1px 8px;
+  }
+  .ai-row { display: flex; gap: 8px; padding: 10px 14px 6px; border-top: 1px solid var(--line); }
+  .ai-mic {
+    flex: none; width: 42px; display: inline-flex; align-items: center; justify-content: center;
+    padding: 0; border: 1.5px solid var(--line); border-radius: 5px;
+    background: transparent; color: var(--muted);
+  }
+  .ai-mic.on {
+    background: var(--danger); border-color: var(--danger); color: var(--card);
+    animation: ai-pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes ai-pulse { 50% { opacity: 0.55; } }
+  @media (prefers-reduced-motion: reduce) { .ai-mic.on { animation: none; } }
+  .ai-row input {
+    flex: 1 1 auto; min-width: 0; padding: 9px 10px;
+    border: 1.5px solid var(--line); border-radius: 5px;
+    background: var(--ground); color: var(--ink); font-size: 15px;
+  }
+  .ai-row input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+  .ai-hint { font-size: 11px; color: var(--muted); margin: 0; padding: 0 14px 10px; }
 </style>
 </head>
 <body>
@@ -464,6 +543,30 @@
     within a few seconds. Portions are starting points from standard catering planning ranges;
     trust Daniel's read of his crowd over the defaults.
   </footer>
+
+  <button class="ai-fab no-print" id="ai-fab" aria-haspopup="dialog">Assistant</button>
+  <div class="ai-drawer no-print" id="ai-drawer" role="dialog" aria-label="Kitchen assistant" hidden>
+    <div class="ai-head">
+      <h3>Kitchen assistant</h3>
+      <span class="ai-scope" id="ai-scope" hidden>SCRATCH</span>
+      <span class="ai-pill" id="ai-pill" hidden></span>
+      <button class="del" id="ai-min" aria-label="Minimize assistant" aria-expanded="true">−</button>
+      <button class="del" id="ai-close" aria-label="Close assistant">✕</button>
+    </div>
+    <div class="ai-msgs" id="ai-msgs"></div>
+    <div class="ai-row">
+      <button class="ai-mic" id="ai-mic" aria-label="Dictate" aria-pressed="false" hidden>
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+          <path d="M12 14.5a3 3 0 0 0 3-3v-5a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3z" fill="currentColor"/>
+          <path d="M18 11.5a6 6 0 0 1-12 0M12 17.5V21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <input type="text" id="ai-input" placeholder="Inventory, counts, questions…" autocomplete="off" enterkeyhint="send">
+      <button class="btn-primary btn-sm" id="ai-send">Send</button>
+    </div>
+    <p class="ai-hint" id="ai-hint">Tip: tap the mic on your keyboard and just say it — “twelve and a half pounds of black beans”.
+      Changes preview here first; nothing touches the board until you tap Apply.</p>
+  </div>
 </div>
 
 <script>
@@ -1803,6 +1906,346 @@
     state.checked = {};
     queueSave(); renderShopList();
   });
+
+  // ---------- assistant ----------
+  // The assistant proposes; the caterer disposes. Every operation from the
+  // model is resolved against the *current* state into a human-readable
+  // before/after line, shown in a preview, and only mutates the board when
+  // Apply is tapped — so a mis-heard dictation can never silently change
+  // anything, and portions stay Daniel's unless he approves an edit.
+  var AI_API = '/api/kitchen-ai';
+  var aiHistory = [];
+  var aiPendingOps = null;
+  var aiBusyNow = false;
+
+  var $aiFab = document.getElementById('ai-fab');
+  var $aiDrawer = document.getElementById('ai-drawer');
+  var $aiMsgs = document.getElementById('ai-msgs');
+  var $aiInput = document.getElementById('ai-input');
+  var $aiSend = document.getElementById('ai-send');
+  var $aiMic = document.getElementById('ai-mic');
+  var $aiMin = document.getElementById('ai-min');
+  var $aiPill = document.getElementById('ai-pill');
+  var $aiHint = document.getElementById('ai-hint');
+
+  // Pending changes must never be out of sight: the count rides on the
+  // minimized bar and on the closed fab, so a preview can't be forgotten.
+  function aiSyncChrome() {
+    var n = aiPendingOps ? aiPendingOps.length : 0;
+    $aiFab.textContent = n ? 'Assistant · ' + n : 'Assistant';
+    $aiPill.hidden = !(n && aiMinimized);
+    if (n && aiMinimized) $aiPill.textContent = n + (n === 1 ? ' change' : ' changes');
+  }
+
+  var aiMinimized = false;
+  function aiSetMinimized(on) {
+    aiMinimized = on;
+    $aiDrawer.classList.toggle('mini', on);
+    $aiMin.textContent = on ? '+' : '−';
+    $aiMin.setAttribute('aria-label', on ? 'Expand assistant' : 'Minimize assistant');
+    $aiMin.setAttribute('aria-expanded', String(!on));
+    aiSyncChrome();
+  }
+
+  // ---------- dictation ----------
+  // Web Speech API where it exists (Chrome, Edge, Safari incl. iOS). Firefox
+  // has no SpeechRecognition, so the button stays hidden there and the
+  // keyboard-mic route in the hint is the fallback.
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var aiRec = null, aiListening = false, aiBaseText = '', aiFinalText = '';
+
+  function aiSetListening(on) {
+    aiListening = on;
+    $aiMic.classList.toggle('on', on);
+    $aiMic.setAttribute('aria-pressed', String(on));
+    $aiMic.setAttribute('aria-label', on ? 'Stop dictating' : 'Dictate');
+  }
+
+  function aiStopDictation() {
+    if (aiRec) { try { aiRec.stop(); } catch (e) {} }
+    aiSetListening(false);
+  }
+
+  function aiStartDictation() {
+    if (!SR || aiListening) return;
+    aiRec = new SR();
+    aiRec.continuous = true;      // a caterer lists several things in one breath
+    aiRec.interimResults = true;  // show it building, so a mis-hear is caught early
+    aiRec.lang = navigator.language || 'en-US';
+    aiBaseText = $aiInput.value.trim() ? $aiInput.value.trim() + ' ' : '';
+    aiFinalText = '';
+    aiRec.onresult = function (e) {
+      var interim = '';
+      for (var i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) aiFinalText += e.results[i][0].transcript;
+        else interim += e.results[i][0].transcript;
+      }
+      $aiInput.value = (aiBaseText + aiFinalText + interim).replace(/\s+/g, ' ').trim();
+    };
+    aiRec.onerror = function (e) {
+      aiSetListening(false);
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+        aiHistory.push({ role: 'sys', content: 'Microphone blocked — allow mic access for this site in your browser settings, or use the mic on your keyboard.' });
+        aiRender();
+      } else if (e.error === 'no-speech') {
+        aiHistory.push({ role: 'sys', content: 'Didn’t catch anything — tap the mic and try again.' });
+        aiRender();
+      }
+    };
+    aiRec.onend = function () { aiSetListening(false); };
+    try { aiRec.start(); aiSetListening(true); } catch (e) { aiSetListening(false); }
+  }
+
+  if (SR) {
+    $aiMic.hidden = false;
+    $aiHint.textContent = 'Tap the mic and just say it — “twelve and a half pounds of black beans”. '
+      + 'Changes preview here first; nothing touches the board until you tap Apply.';
+    $aiMic.addEventListener('click', function () {
+      if (aiListening) aiStopDictation(); else aiStartDictation();
+    });
+  }
+
+  function aiFindDay(id) {
+    var d = null;
+    state.days.forEach(function (x) { if (x.id === id) d = x; });
+    return d;
+  }
+  function aiFindPantry(name, unit) {
+    // Duplicate names in different units exist (two Bacon rows, lb and pc) —
+    // when the op names a unit, that match wins; name-only is the fallback.
+    var byUnit = null, byName = null;
+    state.pantry.forEach(function (p) {
+      if (nameKey(p.n) !== nameKey(name)) return;
+      if (!byName) byName = p;
+      if (!byUnit && unit && p.unit === (unit === 'oz' ? 'lb' : unit)) byUnit = p;
+    });
+    return byUnit || byName;
+  }
+  function aiFindItem(dayId, sectionId, name) {
+    var day = aiFindDay(dayId);
+    if (!day) return null;
+    var hit = null;
+    day.meals.forEach(function (m) {
+      m.sections.forEach(function (s) {
+        if (s.id !== sectionId) return;
+        s.items.forEach(function (it) {
+          if (!hit && nameKey(it.n) === nameKey(name)) hit = { day: day, meal: m, sec: s, item: it };
+        });
+      });
+    });
+    return hit;
+  }
+  function aiMenuUnit(u) { return u === 'lb' ? 'oz' : (u || 'pc'); }
+  function aiShort(name) { return String(name).split(' — ')[0]; }
+
+  // op -> { label, apply } for the preview, or { error } when it can't be
+  // resolved against the current board (stale name, bad id, missing field).
+  function aiResolve(op) {
+    var day, g, p, hit, i;
+    switch (op.op) {
+      case 'set_pantry':
+        if (typeof op.qty !== 'number' || op.qty < 0 || !op.name) return { error: 'Bad pantry update' };
+        p = aiFindPantry(op.name, op.unit);
+        if (p) {
+          return { label: 'Pantry: ' + p.n + ' — ' + fmt(p.qty || 0, 2) + ' → ' + fmt(op.qty, 2) + ' ' + p.unit,
+            apply: function () { p.qty = op.qty; } };
+        }
+        var unit = op.unit === 'lb' || op.unit === 'pc' ? op.unit : (op.unit === 'oz' ? 'lb' : 'pc');
+        return { label: 'Pantry: add ' + op.name + ' — ' + fmt(op.qty, 2) + ' ' + unit,
+          apply: function () { state.pantry.push({ uid: uid++, n: op.name, qty: op.qty, unit: unit }); } };
+      case 'rename_pantry':
+        p = aiFindPantry(op.name, op.unit);
+        if (!p || !op.newName) return { error: 'No pantry row called “' + op.name + '”' };
+        return { label: 'Pantry: rename “' + p.n + '” → “' + op.newName + '”',
+          apply: function () { p.n = op.newName; } };
+      case 'remove_pantry':
+        p = aiFindPantry(op.name, op.unit);
+        if (!p) return { error: 'No pantry row called “' + op.name + '”' };
+        return { label: 'Pantry: remove ' + p.n,
+          apply: function () { state.pantry = state.pantry.filter(function (x) { return x !== p; }); } };
+      case 'set_headcount':
+        day = aiFindDay(op.dayId);
+        g = null;
+        if (day) day.groups.forEach(function (x) { if (x.id === op.groupId) g = x; });
+        if (!day || !g || typeof op.count !== 'number' || op.count < 0) return { error: 'Bad headcount update' };
+        return { label: aiShort(day.name) + ': ' + g.label + ' ' + (g.count || 0) + ' → ' + Math.round(op.count),
+          apply: function () { g.count = Math.round(op.count); } };
+      case 'set_buffer':
+        day = aiFindDay(op.dayId);
+        if (!day || typeof op.buffer !== 'number' || op.buffer < 0) return { error: 'Bad buffer update' };
+        return { label: aiShort(day.name) + ': buffer ' + day.buffer + '% → ' + op.buffer + '%',
+          apply: function () { day.buffer = op.buffer; } };
+      case 'set_portion':
+        hit = aiFindItem(op.dayId, op.sectionId, op.name);
+        if (!hit || typeof op.per !== 'number' || op.per < 0) return { error: 'Couldn’t find “' + op.name + '” to reportion' };
+        return { label: hit.item.n + ' (' + aiShort(hit.day.name) + '): ' + hit.item.per + ' → ' + op.per + ' ' + hit.item.unit + '/person',
+          apply: function () { hit.item.per = op.per; } };
+      case 'set_item_groups':
+        hit = aiFindItem(op.dayId, op.sectionId, op.name);
+        if (!hit || !Array.isArray(op.groupIds)) return { error: 'Couldn’t find “' + op.name + '” to reassign' };
+        var valid = hit.day.groups.filter(function (x) { return op.groupIds.indexOf(x.id) > -1; });
+        return { label: hit.item.n + ' (' + aiShort(hit.day.name) + ') → ' + (valid.length ? valid.map(function (x) { return x.label; }).join(' + ') : 'nobody'),
+          apply: function () { hit.item.groupIds = valid.map(function (x) { return x.id; }); } };
+      case 'add_menu_item':
+        day = aiFindDay(op.dayId);
+        if (!day || !op.name || typeof op.per !== 'number' || op.per < 0) return { error: 'Bad new item' };
+        var sec = null;
+        day.meals.forEach(function (m) {
+          if (op.mealId && m.id !== op.mealId) return;
+          m.sections.forEach(function (s) { if (!sec && s.id === op.sectionId) sec = s; });
+        });
+        if (!sec) return { error: 'Couldn’t find that course for “' + op.name + '”' };
+        var mu = aiMenuUnit(op.unit);
+        var gids = Array.isArray(op.groupIds) && op.groupIds.length
+          ? day.groups.filter(function (x) { return op.groupIds.indexOf(x.id) > -1; }).map(function (x) { return x.id; })
+          : day.groups.map(function (x) { return x.id; });
+        return { label: 'Add ' + op.name + ' — ' + op.per + ' ' + mu + '/person → ' + sec.name + ' (' + aiShort(day.name) + ')',
+          apply: function () {
+            sec.items.push({ uid: uid++, n: op.name, unit: mu, per: op.per, groupIds: gids });
+            if (!pantryFor(op.name, mu)) state.pantry.push({ uid: uid++, n: op.name, qty: 0, unit: mu === 'oz' ? 'lb' : 'pc' });
+          } };
+      case 'remove_menu_item':
+        hit = aiFindItem(op.dayId, op.sectionId, op.name);
+        if (!hit) return { error: 'Couldn’t find “' + op.name + '” to remove' };
+        return { label: 'Remove ' + hit.item.n + ' from ' + hit.sec.name + ' (' + aiShort(hit.day.name) + ')',
+          apply: function () { hit.sec.items = hit.sec.items.filter(function (x) { return x !== hit.item; }); } };
+      case 'check_item':
+      case 'uncheck_item':
+        if (!op.name) return { error: 'Bad check-off' };
+        var key = itemKey(op.name, aiMenuUnit(op.unit));
+        var checking = op.op === 'check_item';
+        return { label: (checking ? 'Cross off ' : 'Restore ') + op.name,
+          apply: function () { if (checking) state.checked[key] = true; else delete state.checked[key]; } };
+      case 'select_days':
+        if (!Array.isArray(op.dayIds)) return { error: 'Bad day selection' };
+        var days = op.dayIds.map(aiFindDay).filter(Boolean);
+        if (!days.length) return { error: 'Those days aren’t on the board' };
+        return { label: 'Shop for: ' + days.map(function (d) { return aiShort(d.name); }).join(' + '),
+          apply: function () { state.selected = days.map(function (d) { return d.id; }); } };
+      default:
+        return { error: 'Unknown change (' + op.op + ')' };
+    }
+  }
+
+  function aiRender() {
+    $aiMsgs.textContent = '';
+    aiHistory.slice(-20).forEach(function (m) {
+      var d = document.createElement('div');
+      d.className = 'ai-msg ' + (m.role === 'user' ? 'user' : m.role === 'sys' ? 'sys' : '');
+      d.textContent = m.content;
+      $aiMsgs.appendChild(d);
+    });
+    if (aiBusyNow) {
+      var b = document.createElement('div');
+      b.className = 'ai-msg busy';
+      b.textContent = 'Thinking…';
+      $aiMsgs.appendChild(b);
+    }
+    if (aiPendingOps && aiPendingOps.length) {
+      var resolved = aiPendingOps.map(aiResolve);
+      var ok = resolved.filter(function (r) { return !r.error; });
+      var panel = document.createElement('div');
+      panel.className = 'ai-pending';
+      var lbl = document.createElement('p');
+      lbl.className = 'panel-label';
+      lbl.textContent = 'Proposed changes';
+      panel.appendChild(lbl);
+      var ul = document.createElement('ul');
+      resolved.forEach(function (r) {
+        var li = document.createElement('li');
+        if (r.error) { li.className = 'err'; li.textContent = '✕ ' + r.error; }
+        else li.textContent = r.label;
+        ul.appendChild(li);
+      });
+      panel.appendChild(ul);
+      var actions = document.createElement('div');
+      actions.className = 'co-actions';
+      var apply = document.createElement('button');
+      apply.className = 'btn-primary btn-sm';
+      apply.textContent = ok.length ? 'Apply' + (ok.length > 1 ? ' all ' + ok.length : '') : 'Nothing to apply';
+      apply.disabled = !ok.length;
+      apply.addEventListener('click', function () {
+        // re-resolve at tap time — the board may have changed since preview
+        var fresh = aiPendingOps.map(aiResolve).filter(function (r) { return !r.error; });
+        fresh.forEach(function (r) { r.apply(); });
+        aiPendingOps = null;
+        aiHistory.push({ role: 'sys-ok', content: 'Applied ' + fresh.length + (fresh.length === 1 ? ' change.' : ' changes.') });
+        queueSave(); render(); aiRender();
+      });
+      var discard = document.createElement('button');
+      discard.className = 'btn-ghost btn-sm';
+      discard.textContent = 'Discard';
+      discard.addEventListener('click', function () { aiPendingOps = null; aiRender(); });
+      actions.appendChild(apply); actions.appendChild(discard);
+      panel.appendChild(actions);
+      $aiMsgs.appendChild(panel);
+    }
+    $aiMsgs.scrollTop = $aiMsgs.scrollHeight;
+    aiSyncChrome();
+  }
+
+  function aiSend() {
+    aiStopDictation();
+    var text = $aiInput.value.trim();
+    if (!text || aiBusyNow) return;
+    aiPendingOps = null;
+    aiHistory.push({ role: 'user', content: text });
+    $aiInput.value = '';
+    aiBusyNow = true;
+    $aiSend.disabled = true;
+    aiRender();
+    var convo = aiHistory.filter(function (m) { return m.role === 'user' || m.role === 'assistant'; }).slice(-12);
+    fetch(AI_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: convo, state: JSON.parse(payload()) })
+    }).then(function (r) {
+      return r.json().then(function (d) { return { ok: r.ok, d: d }; });
+    }).then(function (res) {
+      aiBusyNow = false;
+      $aiSend.disabled = false;
+      if (!res.ok || res.d.error) {
+        aiHistory.push({ role: 'sys', content: res.d && res.d.error ? res.d.error : 'Something went wrong — try again.' });
+      } else {
+        aiHistory.push({ role: 'assistant', content: res.d.reply || '(no reply)' });
+        if (Array.isArray(res.d.ops) && res.d.ops.length) {
+          aiPendingOps = res.d.ops;
+          if (aiMinimized) aiSetMinimized(false); // a preview is never hidden
+        }
+      }
+      aiRender();
+    }).catch(function () {
+      aiBusyNow = false;
+      $aiSend.disabled = false;
+      aiHistory.push({ role: 'sys', content: 'Can’t reach the assistant — check your connection and try again.' });
+      aiRender();
+    });
+  }
+
+  $aiFab.addEventListener('click', function () {
+    $aiDrawer.hidden = false;
+    $aiFab.hidden = true;
+    aiSetMinimized(false); // reopening is an intent to use it
+    if (SCOPE === 'test') document.getElementById('ai-scope').hidden = false;
+    if (!aiHistory.length) {
+      aiHistory.push({ role: 'sys-ok', content: 'Tell me what’s in the pantry, new headcounts, or ask what’s left to buy. I’ll show every change for approval before it saves.' });
+    }
+    aiRender();
+    $aiInput.focus();
+  });
+  document.getElementById('ai-close').addEventListener('click', function () {
+    aiStopDictation();
+    $aiDrawer.hidden = true;
+    $aiFab.hidden = false;
+    aiSyncChrome(); // closed with changes pending → the fab carries the count
+  });
+  $aiMin.addEventListener('click', function () { aiSetMinimized(!aiMinimized); });
+  // tapping the collapsed header is the natural way back
+  document.querySelector('.ai-head').addEventListener('click', function (e) {
+    if (aiMinimized && !e.target.closest('button')) aiSetMinimized(false);
+  });
+  $aiSend.addEventListener('click', aiSend);
+  $aiInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') aiSend(); });
 
   boot();
 })();
