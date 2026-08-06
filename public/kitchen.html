@@ -447,7 +447,24 @@
   }
   .ai-pending li.err { color: var(--danger); font-family: system-ui, sans-serif; }
   .ai-pending .co-actions { margin-top: 0; }
+  .ai-drawer.mini .ai-msgs, .ai-drawer.mini .ai-hint { display: none; }
+  .ai-drawer.mini .ai-row { border-top: none; padding-top: 6px; }
+  .ai-pill {
+    font-size: 11px; font-weight: 700; color: var(--accent-ink);
+    background: var(--accent); border-radius: 999px; padding: 1px 8px;
+  }
   .ai-row { display: flex; gap: 8px; padding: 10px 14px 6px; border-top: 1px solid var(--line); }
+  .ai-mic {
+    flex: none; width: 42px; display: inline-flex; align-items: center; justify-content: center;
+    padding: 0; border: 1.5px solid var(--line); border-radius: 5px;
+    background: transparent; color: var(--muted);
+  }
+  .ai-mic.on {
+    background: var(--danger); border-color: var(--danger); color: var(--card);
+    animation: ai-pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes ai-pulse { 50% { opacity: 0.55; } }
+  @media (prefers-reduced-motion: reduce) { .ai-mic.on { animation: none; } }
   .ai-row input {
     flex: 1 1 auto; min-width: 0; padding: 9px 10px;
     border: 1.5px solid var(--line); border-radius: 5px;
@@ -532,14 +549,22 @@
     <div class="ai-head">
       <h3>Kitchen assistant</h3>
       <span class="ai-scope" id="ai-scope" hidden>SCRATCH</span>
+      <span class="ai-pill" id="ai-pill" hidden></span>
+      <button class="del" id="ai-min" aria-label="Minimize assistant" aria-expanded="true">−</button>
       <button class="del" id="ai-close" aria-label="Close assistant">✕</button>
     </div>
     <div class="ai-msgs" id="ai-msgs"></div>
     <div class="ai-row">
+      <button class="ai-mic" id="ai-mic" aria-label="Dictate" aria-pressed="false" hidden>
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+          <path d="M12 14.5a3 3 0 0 0 3-3v-5a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3z" fill="currentColor"/>
+          <path d="M18 11.5a6 6 0 0 1-12 0M12 17.5V21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
       <input type="text" id="ai-input" placeholder="Inventory, counts, questions…" autocomplete="off" enterkeyhint="send">
       <button class="btn-primary btn-sm" id="ai-send">Send</button>
     </div>
-    <p class="ai-hint">Tip: tap the mic on your keyboard and just say it — “twelve and a half pounds of black beans”.
+    <p class="ai-hint" id="ai-hint">Tip: tap the mic on your keyboard and just say it — “twelve and a half pounds of black beans”.
       Changes preview here first; nothing touches the board until you tap Apply.</p>
   </div>
 </div>
@@ -1898,6 +1923,87 @@
   var $aiMsgs = document.getElementById('ai-msgs');
   var $aiInput = document.getElementById('ai-input');
   var $aiSend = document.getElementById('ai-send');
+  var $aiMic = document.getElementById('ai-mic');
+  var $aiMin = document.getElementById('ai-min');
+  var $aiPill = document.getElementById('ai-pill');
+  var $aiHint = document.getElementById('ai-hint');
+
+  // Pending changes must never be out of sight: the count rides on the
+  // minimized bar and on the closed fab, so a preview can't be forgotten.
+  function aiSyncChrome() {
+    var n = aiPendingOps ? aiPendingOps.length : 0;
+    $aiFab.textContent = n ? 'Assistant · ' + n : 'Assistant';
+    $aiPill.hidden = !(n && aiMinimized);
+    if (n && aiMinimized) $aiPill.textContent = n + (n === 1 ? ' change' : ' changes');
+  }
+
+  var aiMinimized = false;
+  function aiSetMinimized(on) {
+    aiMinimized = on;
+    $aiDrawer.classList.toggle('mini', on);
+    $aiMin.textContent = on ? '+' : '−';
+    $aiMin.setAttribute('aria-label', on ? 'Expand assistant' : 'Minimize assistant');
+    $aiMin.setAttribute('aria-expanded', String(!on));
+    aiSyncChrome();
+  }
+
+  // ---------- dictation ----------
+  // Web Speech API where it exists (Chrome, Edge, Safari incl. iOS). Firefox
+  // has no SpeechRecognition, so the button stays hidden there and the
+  // keyboard-mic route in the hint is the fallback.
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var aiRec = null, aiListening = false, aiBaseText = '', aiFinalText = '';
+
+  function aiSetListening(on) {
+    aiListening = on;
+    $aiMic.classList.toggle('on', on);
+    $aiMic.setAttribute('aria-pressed', String(on));
+    $aiMic.setAttribute('aria-label', on ? 'Stop dictating' : 'Dictate');
+  }
+
+  function aiStopDictation() {
+    if (aiRec) { try { aiRec.stop(); } catch (e) {} }
+    aiSetListening(false);
+  }
+
+  function aiStartDictation() {
+    if (!SR || aiListening) return;
+    aiRec = new SR();
+    aiRec.continuous = true;      // a caterer lists several things in one breath
+    aiRec.interimResults = true;  // show it building, so a mis-hear is caught early
+    aiRec.lang = navigator.language || 'en-US';
+    aiBaseText = $aiInput.value.trim() ? $aiInput.value.trim() + ' ' : '';
+    aiFinalText = '';
+    aiRec.onresult = function (e) {
+      var interim = '';
+      for (var i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) aiFinalText += e.results[i][0].transcript;
+        else interim += e.results[i][0].transcript;
+      }
+      $aiInput.value = (aiBaseText + aiFinalText + interim).replace(/\s+/g, ' ').trim();
+    };
+    aiRec.onerror = function (e) {
+      aiSetListening(false);
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+        aiHistory.push({ role: 'sys', content: 'Microphone blocked — allow mic access for this site in your browser settings, or use the mic on your keyboard.' });
+        aiRender();
+      } else if (e.error === 'no-speech') {
+        aiHistory.push({ role: 'sys', content: 'Didn’t catch anything — tap the mic and try again.' });
+        aiRender();
+      }
+    };
+    aiRec.onend = function () { aiSetListening(false); };
+    try { aiRec.start(); aiSetListening(true); } catch (e) { aiSetListening(false); }
+  }
+
+  if (SR) {
+    $aiMic.hidden = false;
+    $aiHint.textContent = 'Tap the mic and just say it — “twelve and a half pounds of black beans”. '
+      + 'Changes preview here first; nothing touches the board until you tap Apply.';
+    $aiMic.addEventListener('click', function () {
+      if (aiListening) aiStopDictation(); else aiStartDictation();
+    });
+  }
 
   function aiFindDay(id) {
     var d = null;
@@ -2075,9 +2181,11 @@
       $aiMsgs.appendChild(panel);
     }
     $aiMsgs.scrollTop = $aiMsgs.scrollHeight;
+    aiSyncChrome();
   }
 
   function aiSend() {
+    aiStopDictation();
     var text = $aiInput.value.trim();
     if (!text || aiBusyNow) return;
     aiPendingOps = null;
@@ -2100,7 +2208,10 @@
         aiHistory.push({ role: 'sys', content: res.d && res.d.error ? res.d.error : 'Something went wrong — try again.' });
       } else {
         aiHistory.push({ role: 'assistant', content: res.d.reply || '(no reply)' });
-        if (Array.isArray(res.d.ops) && res.d.ops.length) aiPendingOps = res.d.ops;
+        if (Array.isArray(res.d.ops) && res.d.ops.length) {
+          aiPendingOps = res.d.ops;
+          if (aiMinimized) aiSetMinimized(false); // a preview is never hidden
+        }
       }
       aiRender();
     }).catch(function () {
@@ -2114,6 +2225,7 @@
   $aiFab.addEventListener('click', function () {
     $aiDrawer.hidden = false;
     $aiFab.hidden = true;
+    aiSetMinimized(false); // reopening is an intent to use it
     if (SCOPE === 'test') document.getElementById('ai-scope').hidden = false;
     if (!aiHistory.length) {
       aiHistory.push({ role: 'sys-ok', content: 'Tell me what’s in the pantry, new headcounts, or ask what’s left to buy. I’ll show every change for approval before it saves.' });
@@ -2122,8 +2234,15 @@
     $aiInput.focus();
   });
   document.getElementById('ai-close').addEventListener('click', function () {
+    aiStopDictation();
     $aiDrawer.hidden = true;
     $aiFab.hidden = false;
+    aiSyncChrome(); // closed with changes pending → the fab carries the count
+  });
+  $aiMin.addEventListener('click', function () { aiSetMinimized(!aiMinimized); });
+  // tapping the collapsed header is the natural way back
+  document.querySelector('.ai-head').addEventListener('click', function (e) {
+    if (aiMinimized && !e.target.closest('button')) aiSetMinimized(false);
   });
   $aiSend.addEventListener('click', aiSend);
   $aiInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') aiSend(); });

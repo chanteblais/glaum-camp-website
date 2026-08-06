@@ -135,10 +135,26 @@ overwrite the list. **Remove or gate this after the festival** — see Open thre
 
 **Added 2026-08-05, owner-approved despite the endpoint posture below.** A chat
 drawer on the page (floating "Assistant" button) plus one new route,
-`/api/kitchen-ai` (POST). The intended gesture is the phone keyboard's dictation
-mic — no audio pipeline exists; the OS turns speech into text and the drawer is
-just a text box. Daniel says *"twelve and a half pounds of black beans"* and the
-board updates, semantically matched ("black beans" → "Black beans (canned)").
+`/api/kitchen-ai` (POST). Daniel says *"twelve and a half pounds of black
+beans"* and the board updates, semantically matched ("black beans" → "Black
+beans (canned)").
+
+**Dictation is a button in the drawer**, not a hunt for the keyboard mic — that
+only exists on phones, and the board gets used on laptops too. It uses the Web
+Speech API (`webkitSpeechRecognition`), which is **feature-detected**: present
+in Chrome, Edge and Safari (incl. iOS), absent in Firefox, where the button
+stays hidden and the hint falls back to the keyboard-mic route. Still no audio
+pipeline of our own — the browser does speech-to-text and hands us a string.
+Recognition is `continuous` with interim results, so a caterer can list several
+things in one breath and watch the text build (a mis-hear is catchable before
+sending); the mic toggles off on a second tap and on send.
+
+**Three drawer states**, because a preview must never be somewhere you can't
+see it: open, **minimized** (header + input only — you can still dictate and
+send while reading the board), and closed (back to the fab). A reply carrying
+proposed changes force-expands out of minimized, the minimized header shows a
+"1 change" badge, and the closed fab reads "Assistant · 1". Tapping the
+collapsed header restores it.
 
 **The assistant proposes; the caterer disposes.** The page sends its current
 state + the chat history; the route calls Claude (`claude-opus-5`, adaptive
