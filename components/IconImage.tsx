@@ -22,7 +22,20 @@
 // Height of a square-ish artwork on the standard frame (art diagonal 1060 on a
 // 1024-high canvas → ~750px). The img height that makes that art fill the box:
 // fill / (750/1024).
+import { supabaseResizedUrl } from '@/lib/supabase-image'
+
 const ART_OF_FRAME = 750 / 1024
+
+// Uploaded icon art is stored at the full 1536×1024 frame (~700KB-1MB PNG) but
+// never renders larger than ~220px of art height, so storage URLs go through
+// the transform CDN at 720×480 — same 3:2 aspect as the frame, i.e. a pure
+// downscale (resize=cover crops nothing when aspects match), retina-safe for
+// every render site. Built-in /asset-library/ paths pass through unchanged.
+export const ICON_FRAME_W = 720
+export const ICON_FRAME_H = 480
+export function iconDisplaySrc(src: string): string {
+  return supabaseResizedUrl(src, ICON_FRAME_W, ICON_FRAME_H) ?? src
+}
 
 // The largest `fill` at which no icon clips inside a circular mask. Geometry
 // bounds it at 750/1060 ≈ 0.71 (art half-diagonal ≤ circle radius); measured
@@ -55,7 +68,7 @@ export function IconImage({ src, size, fill = 0.82, opacity, round = false, imgS
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={src}
+        src={iconDisplaySrc(src)}
         alt=""
         style={{
           height: `${(fill / ART_OF_FRAME) * 100}%`,

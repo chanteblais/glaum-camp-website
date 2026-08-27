@@ -9,6 +9,7 @@ import {
   type AssetLibraryItem,
 } from '@/lib/asset-library'
 import { isImageIcon } from '@/lib/icon-src'
+import { iconDisplaySrc } from '@/components/IconImage'
 
 // Reusable image picker backed by the asset library. A compact trigger shows the
 // current selection and opens a modal grouped into categories (Distinctions,
@@ -69,7 +70,7 @@ function AssetTile({ src, label, selected, onClick, fit = 'contain' }: {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt="" style={tileImgStyle(fit)} />
+        <img src={iconDisplaySrc(src)} alt="" style={tileImgStyle(fit)} />
       </span>
       <span style={{ fontSize: '0.55rem', color: CREAM, opacity: selected ? 0.95 : 0.55, maxWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '0.02em' }}>
         {label}
@@ -162,7 +163,7 @@ export function AssetImagePicker({
           {!value
             ? <span style={{ fontSize: '0.55rem', opacity: 0.3 }}>—</span>
             : isImageIcon(value)
-              ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={value} alt="" style={tileImgStyle(fitFor(selected?.cat))} />
+              ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={iconDisplaySrc(value)} alt="" style={tileImgStyle(fitFor(selected?.cat))} />
               /* Legacy non-image value (e.g. an emoji) — render as text. */
               : <span style={{ fontSize: '1.4rem', lineHeight: 1 }}>{value}</span>}
         </span>
