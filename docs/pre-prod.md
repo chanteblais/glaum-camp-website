@@ -23,7 +23,7 @@ Things to sort before going live.
 - [ ] Apply migration `031_shoutouts.sql` (creates the `shoutouts` table) — required before the Shoutouts dashboard widget works.
 - [ ] Apply migration `032_message_sender_name.sql` (adds `messages.sender_name` + backfill). **Apply this before or together with the deploy** — the message-send path now writes `sender_name`, so deploying the code ahead of the column will break sending messages.
 - [ ] Apply migration `034_group_badge_image.sql` (adds `groups.badge_image` + the public `group-badges` bucket), then `035_rename_group_badge_to_icon.sql` (renames it to `groups.icon_image`). **Apply before/with the deploy** — `getMemberGroups` and the groups admin API now select `icon_image`, so deploying the code ahead of the column breaks the profile and Groups admin.
-- [ ] Confirm storage buckets `avatars`, `schedule-icons`, `application-files`, and `group-badges` are set to **public** in the production project.
+- [ ] Confirm storage buckets `avatars`, `schedule-icons`, and `group-badges` are set to **public** in the production project. `application-files` must be **private** (migration `072`, 2026-08-27 security review) — reads go through the authorized GET `/api/apply/file` route, never public object URLs.
 
 ## Environment variables (Vercel)
 

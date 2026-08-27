@@ -56,12 +56,20 @@ export async function GET(req: NextRequest) {
     const optedOut = new Set<string>()
     const alreadySent = new Set<string>()
     if (ids.length) {
-      const [{ data: prefRows }, { data: ledgerRows }] = await Promise.all([
+      const [{ data: prefRows, error: prefError }, { data: ledgerRows }] = await Promise.all([
         supabaseAdmin.from('notification_preferences')
           .select('clerk_user_id, email_event_reminders').in('clerk_user_id', ids),
         supabaseAdmin.from('event_reminders_sent')
           .select('clerk_user_id').eq('target_date', targetDate).eq('phase', phase).in('clerk_user_id', ids),
       ])
+      // Fail CLOSED on a broken opt-out read: without it we can't tell who
+      // opted out, and "email everyone anyway" is the wrong default. (A ledger
+      // read failure is tolerable — the pre-send claim below still dedupes.)
+      if (prefError) {
+        console.error('[event-reminders] preference lookup failed, skipping phase:', prefError)
+        report.push({ phase, targetDate, status: `phase skipped: preference lookup failed (${prefError.message})` })
+        continue
+      }
       for (const p of prefRows ?? []) if (p.email_event_reminders === false) optedOut.add(p.clerk_user_id)
       for (const l of ledgerRows ?? []) alreadySent.add(l.clerk_user_id)
     }
@@ -77,6 +85,23 @@ export async function GET(req: NextRequest) {
       if (alreadySent.has(r.clerkUserId)) { entry.status = 'skipped: already sent'; continue }
       if (dryRun) { entry.status = 'would send'; continue }
 
+      // Claim the ledger slot BEFORE sending: the UNIQUE constraint makes
+      // exactly one concurrent runner the sender. (Send-then-record could
+      // double-email when two fires overlap; claim-then-send at worst drops a
+      // reminder if the process dies mid-send — the release below covers the
+      // known failure paths.)
+      const { error: claimError } = await supabaseAdmin.from('event_reminders_sent')
+        .insert({ clerk_user_id: r.clerkUserId, target_date: targetDate, phase })
+      if (claimError) {
+        entry.status = claimError.code === '23505'
+          ? 'skipped: already sent (claimed by a concurrent run)'
+          : `failed to claim ledger: ${claimError.message}`
+        continue
+      }
+      // Send failed → release the claim so the next fire can retry (best-effort).
+      const releaseClaim = () => supabaseAdmin.from('event_reminders_sent')
+        .delete().eq('clerk_user_id', r.clerkUserId).eq('target_date', targetDate).eq('phase', phase)
+
       try {
         const result = await sendEventReminderEmail({
           to: r.email, recipientName: r.name, phase, items: r.items,
@@ -85,15 +110,14 @@ export async function GET(req: NextRequest) {
         if (result.ok) {
           sent++
           entry.status = 'sent'
-          // Claim the ledger slot; ignore conflict (a concurrent fire may have sent).
-          await supabaseAdmin.from('event_reminders_sent')
-            .upsert({ clerk_user_id: r.clerkUserId, target_date: targetDate, phase }, { onConflict: 'clerk_user_id,target_date,phase', ignoreDuplicates: true })
         } else {
           entry.status = `failed: ${result.error}`
+          await releaseClaim()
         }
       } catch (err) {
         console.error('[event-reminders] send failed:', err)
         entry.status = 'failed'
+        await releaseClaim()
       }
       await sleep(SEND_SPACING_MS)
     }

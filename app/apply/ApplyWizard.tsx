@@ -7,6 +7,7 @@ import type { MemberFormConfig, StepConfig, FieldConfig } from '@/lib/form-confi
 import type { ContributionType } from '@/lib/application-options'
 import { DEFAULT_CONTRIBUTION_TYPES } from '@/lib/application-options'
 import { RichText } from '@/lib/markdown-lite'
+import { applicationFileHref, applicationFileName } from '@/lib/application-files'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -385,14 +386,9 @@ function PhotoUpload({ value, onChange }: { value: string | null; onChange: (url
 
 // ── File upload (admin-added "File upload" fields) ───────────────────────────
 
-function fileNameFromUrl(url: string): string {
-  try {
-    const seg = decodeURIComponent(url.split('?')[0].split('/').pop() ?? '')
-    return seg.replace(/^\d{10,}-/, '') || 'Uploaded file'
-  } catch {
-    return 'Uploaded file'
-  }
-}
+// File answers store an /api/apply/file href (or, pre-072, a public storage
+// URL) — the shared helpers understand both forms.
+const fileNameFromUrl = (url: string) => applicationFileName(url)
 
 function ApplicationFileUpload({ value, onChange }: { value: string; onChange: (url: string) => void }) {
   const [uploading, setUploading] = useState(false)
@@ -423,7 +419,7 @@ function ApplicationFileUpload({ value, onChange }: { value: string; onChange: (
       <input ref={ref} type="file" style={{ display: 'none' }} onChange={handleFile} />
       {value ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <a href={value} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: GOLD, fontSize: '0.85rem', textDecoration: 'none', maxWidth: '100%', overflow: 'hidden' }}>
+          <a href={applicationFileHref(value)} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: GOLD, fontSize: '0.85rem', textDecoration: 'none', maxWidth: '100%', overflow: 'hidden' }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" style={{ flexShrink: 0 }}>
               <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
             </svg>

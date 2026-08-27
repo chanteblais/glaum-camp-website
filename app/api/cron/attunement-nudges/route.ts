@@ -48,20 +48,26 @@ export async function GET(req: NextRequest) {
   // Opt-outs + ledger in two batch queries.
   const clerkIds = outstanding.map(m => m.clerkUserId)
   const optedOut = new Set<string>()
-  const lastSent = new Map<string, string>()
+  const ledger = new Map<string, { last_sent_at: string; outstanding_count: number; nudge_count: number }>()
   if (clerkIds.length) {
-    const [{ data: prefRows }, { data: ledgerRows }] = await Promise.all([
+    const [{ data: prefRows, error: prefError }, { data: ledgerRows }] = await Promise.all([
       supabaseAdmin
         .from('notification_preferences')
         .select('clerk_user_id, email_attunement_nudges')
         .in('clerk_user_id', clerkIds),
       supabaseAdmin
         .from('attunement_nudges')
-        .select('clerk_user_id, last_sent_at')
+        .select('clerk_user_id, last_sent_at, outstanding_count, nudge_count')
         .in('clerk_user_id', clerkIds),
     ])
+    // Fail CLOSED on a broken opt-out read: without it we can't tell who opted
+    // out, and "email everyone anyway" is the wrong default.
+    if (prefError) {
+      console.error('[attunement-nudges] preference lookup failed, aborting sweep:', prefError)
+      return NextResponse.json({ error: `preference lookup failed: ${prefError.message}` }, { status: 500 })
+    }
     for (const p of prefRows ?? []) if (p.email_attunement_nudges === false) optedOut.add(p.clerk_user_id)
-    for (const l of ledgerRows ?? []) lastSent.set(l.clerk_user_id, l.last_sent_at)
+    for (const l of ledgerRows ?? []) ledger.set(l.clerk_user_id, l)
   }
 
   const { data: cfgRows } = await supabaseAdmin
@@ -88,9 +94,40 @@ export async function GET(req: NextRequest) {
     if (nudgeDays === 0) { entry.status = 'skipped: reminders off'; continue }
     if (!m.email) { entry.status = 'skipped: no email'; continue }
     if (optedOut.has(m.clerkUserId)) { entry.status = 'skipped: opted out'; continue }
-    const last = lastSent.get(m.clerkUserId)
-    if (last && new Date(last).getTime() > cooldownFloor) { entry.status = 'skipped: nudged recently'; continue }
+    const prev = ledger.get(m.clerkUserId)
+    if (prev && new Date(prev.last_sent_at).getTime() > cooldownFloor) { entry.status = 'skipped: nudged recently'; continue }
     if (dryRun) { entry.status = 'would send'; continue }
+
+    // Claim the ledger BEFORE sending (mirrors event-reminders): bump
+    // last_sent_at conditionally so exactly one concurrent sweep wins the
+    // claim; the loser sees zero rows updated / a conflict and skips.
+    const outstandingCount = m.outstandingRequired.length + m.outstandingCommitments.length
+    let claimed: boolean
+    if (prev) {
+      const { data: rows, error } = await supabaseAdmin
+        .from('attunement_nudges')
+        .update({ last_sent_at: new Date().toISOString(), outstanding_count: outstandingCount, nudge_count: prev.nudge_count + 1 })
+        .eq('clerk_user_id', m.clerkUserId)
+        .eq('last_sent_at', prev.last_sent_at)
+        .select('clerk_user_id')
+      claimed = !error && (rows?.length ?? 0) > 0
+    } else {
+      const { data: rows, error } = await supabaseAdmin
+        .from('attunement_nudges')
+        .upsert(
+          { clerk_user_id: m.clerkUserId, last_sent_at: new Date().toISOString(), outstanding_count: outstandingCount, nudge_count: 1 },
+          { onConflict: 'clerk_user_id', ignoreDuplicates: true }
+        )
+        .select('clerk_user_id')
+      claimed = !error && (rows?.length ?? 0) > 0
+    }
+    if (!claimed) { entry.status = 'skipped: claimed by a concurrent sweep'; continue }
+
+    // Send failed → restore the previous ledger state so the next sweep
+    // retries instead of waiting out a cooldown that never emailed (best-effort).
+    const releaseClaim = () => prev
+      ? supabaseAdmin.from('attunement_nudges').update(prev).eq('clerk_user_id', m.clerkUserId)
+      : supabaseAdmin.from('attunement_nudges').delete().eq('clerk_user_id', m.clerkUserId)
 
     try {
       const result = await sendAttunementNudgeEmail({
@@ -104,28 +141,15 @@ export async function GET(req: NextRequest) {
       if (result.ok) {
         sent++
         entry.status = 'sent'
-        const outstandingCount = m.outstandingRequired.length + m.outstandingCommitments.length
-        const { data: existing } = await supabaseAdmin
-          .from('attunement_nudges')
-          .select('nudge_count')
-          .eq('clerk_user_id', m.clerkUserId)
-          .maybeSingle()
-        await supabaseAdmin.from('attunement_nudges').upsert(
-          {
-            clerk_user_id: m.clerkUserId,
-            last_sent_at: new Date().toISOString(),
-            outstanding_count: outstandingCount,
-            nudge_count: (existing?.nudge_count ?? 0) + 1,
-          },
-          { onConflict: 'clerk_user_id' }
-        )
       } else {
         entry.status = `failed: ${result.error}`
+        await releaseClaim()
       }
     } catch (err) {
       // Best-effort: one bad address must never stop the sweep.
       console.error('[attunement-nudges] send failed:', err)
       entry.status = 'failed'
+      await releaseClaim()
     }
     await sleep(SEND_SPACING_MS)
   }

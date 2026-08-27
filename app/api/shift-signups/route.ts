@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getShiftParticipant, participantDisplayName } from '@/lib/members'
-import { getShiftSignupData, fetchAllHolds, countHoldsFor } from '@/lib/participate-data'
+import { getShiftSignupData } from '@/lib/participate-data'
 import { eventRangeDays, isValidOccurrence } from '@/lib/shift-occurrences'
 import { getNotificationPreferences } from '@/lib/notification-prefs'
 import { sendSignupConfirmationEmail } from '@/lib/send-email'
@@ -104,16 +104,11 @@ export async function POST(req: NextRequest) {
     : existingQuery.eq('occurrence_date', occurrenceDate)
   const { data: existing } = await existingQuery.maybeSingle()
 
-  if (event.capacity != null && !existing) {
-    // Capacity is per night: only holds on THIS occurrence count.
-    const holds = await fetchAllHolds()
-    if (countHoldsFor(holds.pairs, event.id, occurrenceDate) >= event.capacity) {
-      return NextResponse.json({ error: `"${event.title}" is full` }, { status: 409 })
-    }
-  }
-
-  // Explicit insert/update (partial unique indexes don't infer cleanly in a
-  // PostgREST upsert). Re-signing the same night is a no-op bar a role change.
+  // Re-signing the same night is a no-op bar a role change; a fresh hold goes
+  // through claim_shift_signup (073), which re-checks capacity and inserts in
+  // one advisory-locked transaction — two concurrent signups can't both take
+  // the last slot the way a separate read-then-insert allowed.
+  let created = false
   if (existing) {
     if (role && role !== existing.role) {
       const { error } = await supabaseAdmin
@@ -121,11 +116,21 @@ export async function POST(req: NextRequest) {
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     }
   } else {
-    const { error } = await supabaseAdmin
-      .from('member_shift_signups')
-      .insert({ clerk_user_id: userId, schedule_event_id, occurrence_date: occurrenceDate, role: role ?? 'member' })
+    const { data: claim, error } = await supabaseAdmin.rpc('claim_shift_signup', {
+      p_clerk_user_id: userId,
+      p_schedule_event_id: schedule_event_id,
+      p_occurrence_date: occurrenceDate,
+      p_role: role ?? 'member',
+    })
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (claim === 'full') return NextResponse.json({ error: `"${event.title}" is full` }, { status: 409 })
+    if (claim === 'not_found') return NextResponse.json({ error: 'Shift not found' }, { status: 404 })
+    // 'exists' = a concurrent duplicate of this same signup already landed —
+    // treat as the no-op re-sign it is (no second email/notification).
+    created = claim === 'ok'
+  }
 
+  if (created) {
     // Confirmation email on a fresh hold (best-effort — never block the signup),
     // gated by the signer's gathering/shift email preference.
     try {
@@ -161,7 +166,7 @@ export async function POST(req: NextRequest) {
       ? `${name} offered to lead "${event.title}"`
       : `${name} stepped back from leading "${event.title}"`
     : `${name} signed up ${role === 'lead' ? 'to lead' : 'for'} "${event.title}"`
-  if (!existing || (role && role !== existing.role)) {
+  if (created || (existing && role && role !== existing.role)) {
     await supabaseAdmin.from('admin_notifications').insert({
       application_id: participant.kind === 'member' ? participant.member.id : null,
       event_type: 'shift_change',

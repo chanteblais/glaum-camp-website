@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { requireAdmin } from '@/lib/admin-auth'
+import { APPLICATION_FILES_BUCKET, APPLICATION_FILE_ROUTE } from '@/lib/application-files'
 
 // Generic file attachments for admin-added "File upload" application fields.
-// Stored in the public `application-files` bucket, namespaced by user.
+// Stored in the PRIVATE `application-files` bucket (migration 072), namespaced
+// by user. POST uploads and returns an href to this route; GET is the only way
+// to read an object — owner-or-admin, then a redirect to a short-lived signed
+// URL. Answers never store a storage URL directly.
 const ALLOWED_TYPES = [
   'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic',
   'application/pdf',
@@ -11,7 +16,12 @@ const ALLOWED_TYPES = [
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'text/plain',
 ]
-const MAX_BYTES = 10 * 1024 * 1024 // 10 MB
+const MAX_BYTES = 10 * 1024 * 1024 // 10 MB per file
+// Per-user quota — an authenticated stranger shouldn't be able to fill the
+// bucket. Generous for real applicants (a form has a handful of file fields;
+// replacements don't delete the old object, so leave headroom).
+const MAX_FILES_PER_USER = 30
+const MAX_TOTAL_BYTES_PER_USER = 100 * 1024 * 1024 // 100 MB
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth()
@@ -28,6 +38,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'File must be under 10 MB' }, { status: 400 })
   }
 
+  // Quota check against what this user already has in their folder.
+  const { data: existing, error: listError } = await supabaseAdmin.storage
+    .from(APPLICATION_FILES_BUCKET)
+    .list(userId, { limit: MAX_FILES_PER_USER + 1 })
+  if (listError) {
+    console.error('[application file upload] quota list failed:', listError)
+    return NextResponse.json({ error: 'Upload failed. Please try again.' }, { status: 500 })
+  }
+  const totalBytes = (existing ?? []).reduce((sum, o) => sum + (Number(o.metadata?.size) || 0), 0)
+  if ((existing ?? []).length >= MAX_FILES_PER_USER || totalBytes + file.size > MAX_TOTAL_BYTES_PER_USER) {
+    return NextResponse.json({ error: 'Upload limit reached. Please contact an organizer if you need to attach more files.' }, { status: 429 })
+  }
+
   // Preserve a readable name, but sanitise and prefix with a timestamp so
   // re-uploads don't collide.
   const safeName = (file.name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80)
@@ -35,7 +58,7 @@ export async function POST(req: NextRequest) {
   const buffer = Buffer.from(await file.arrayBuffer())
 
   const { error: uploadError } = await supabaseAdmin.storage
-    .from('application-files')
+    .from(APPLICATION_FILES_BUCKET)
     .upload(path, buffer, { contentType: file.type, upsert: false, cacheControl: '31536000' })
 
   if (uploadError) {
@@ -43,9 +66,35 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: uploadError.message }, { status: 500 })
   }
 
-  const { data: { publicUrl } } = supabaseAdmin.storage
-    .from('application-files')
-    .getPublicUrl(path)
+  return NextResponse.json({
+    url: `${APPLICATION_FILE_ROUTE}?path=${encodeURIComponent(path)}`,
+    name: file.name || safeName,
+  })
+}
 
-  return NextResponse.json({ url: publicUrl, name: file.name || safeName })
+// GET ?path=<userId>/<file> — the read gate for the private bucket. The
+// uploader may read their own folder; admins may read anything (they review
+// applications). Everyone else gets nothing, URL or no URL.
+export async function GET(req: NextRequest) {
+  const { userId } = await auth()
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const path = req.nextUrl.searchParams.get('path') ?? ''
+  const segments = path.split('/')
+  if (segments.length !== 2 || segments.some(s => !s || s === '.' || s === '..' || !/^[A-Za-z0-9._-]+$/.test(s))) {
+    return NextResponse.json({ error: 'Invalid path' }, { status: 400 })
+  }
+
+  if (!path.startsWith(`${userId}/`) && !(await requireAdmin())) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const { data, error } = await supabaseAdmin.storage
+    .from(APPLICATION_FILES_BUCKET)
+    .createSignedUrl(path, 60)
+  if (error || !data?.signedUrl) {
+    return NextResponse.json({ error: 'File not found' }, { status: 404 })
+  }
+
+  return NextResponse.redirect(data.signedUrl, 302)
 }

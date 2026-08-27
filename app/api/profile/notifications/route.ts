@@ -12,7 +12,9 @@ export async function GET() {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const prefs = await getNotificationPreferences(userId)
+  // 'defaults' on error: this renders toggles, it doesn't gate a send — showing
+  // everything OFF on a transient DB error would invite a wrong re-save.
+  const prefs = await getNotificationPreferences(userId, { onError: 'defaults' })
   return NextResponse.json({ preferences: prefs }, { headers: { 'Cache-Control': 'no-store' } })
 }
 
@@ -43,6 +45,6 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  const prefs = await getNotificationPreferences(userId)
+  const prefs = await getNotificationPreferences(userId, { onError: 'defaults' })
   return NextResponse.json({ success: true, preferences: prefs })
 }
