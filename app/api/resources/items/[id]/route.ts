@@ -17,7 +17,8 @@ async function gate(userId: string | null) {
   return null
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { userId } = await auth()
   const denied = await gate(userId)
   if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status })
@@ -42,7 +43,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return NextResponse.json({ success: true })
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { userId } = await auth()
   const denied = await gate(userId)
   if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status })

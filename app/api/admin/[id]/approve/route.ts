@@ -6,7 +6,8 @@ import { upsertMember } from '@/lib/members'
 import { requireAdmin } from '@/lib/admin-auth'
 import { postSourcedRadioEvent, welcomeRadioPost } from '@/lib/radio'
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const userId = await requireAdmin()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

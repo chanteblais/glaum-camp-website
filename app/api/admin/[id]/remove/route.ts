@@ -6,7 +6,8 @@ import { requireAdmin } from '@/lib/admin-auth'
 import { setMemberStatus } from '@/lib/members'
 import { deleteGroupWelcome } from '@/lib/conversations'
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const userId = await requireAdmin()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

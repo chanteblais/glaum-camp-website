@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { requireAdmin } from '@/lib/admin-auth'
 
-export async function PATCH(req: NextRequest, { params }: { params: { userId: string } }) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ userId: string }> }) {
+  const params = await props.params;
   if (!(await requireAdmin())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { decision } = await req.json() // 'approved' | 'rejected'

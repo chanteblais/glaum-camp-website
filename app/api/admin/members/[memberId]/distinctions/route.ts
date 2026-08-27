@@ -9,7 +9,8 @@ import { postSourcedRadioEvent, achievementRadioPost } from '@/lib/radio'
 //   POST   { distinctionId, note? }      → grant
 //   DELETE ?distinctionId=...            → revoke
 
-export async function POST(req: NextRequest, { params }: { params: { memberId: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ memberId: string }> }) {
+  const params = await props.params;
   const adminId = await requireAdmin()
   if (!adminId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
@@ -52,7 +53,8 @@ export async function POST(req: NextRequest, { params }: { params: { memberId: s
     : NextResponse.json({ error: 'Failed to grant' }, { status: 500 })
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { memberId: string } }) {
+export async function DELETE(req: NextRequest, props: { params: Promise<{ memberId: string }> }) {
+  const params = await props.params;
   const adminId = await requireAdmin()
   if (!adminId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 

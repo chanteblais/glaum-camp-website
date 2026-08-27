@@ -7,7 +7,8 @@ export const dynamic = 'force-dynamic'
 
 // POST /api/groups/[id]/leave — leave an open group. Admin-assigned groups are
 // admin-managed: a member can't unilaterally leave (would drop a camp responsibility).
-export async function POST(_req: Request, { params }: { params: { id: string } }) {
+export async function POST(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

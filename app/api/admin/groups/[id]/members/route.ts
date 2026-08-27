@@ -5,7 +5,8 @@ import { sendGroupWelcome, deleteGroupWelcome } from '@/lib/conversations'
 
 // GET — roster for a group, enriched with each member's application info.
 // No FK between group_members and applications, so we join in JS by clerk_user_id.
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   if (!(await requireAdmin())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { data: rows, error } = await supabaseAdmin
@@ -46,7 +47,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 }
 
 // POST — add a member to the group by clerk_user_id.
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   if (!(await requireAdmin())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { clerk_user_id } = await req.json()
@@ -70,7 +72,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 }
 
 // DELETE — remove a member from the group (clerk_user_id passed as ?clerk_user_id=).
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   if (!(await requireAdmin())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const clerkUserId = req.nextUrl.searchParams.get('clerk_user_id')

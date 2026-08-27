@@ -5,11 +5,12 @@ import { auth } from '@clerk/nextjs/server'
 import { resolveSiteOrigin } from '@/lib/site-origin'
 import { clerkAppearance } from '@/lib/clerk-appearance'
 
-export default async function SignInPage({
-  searchParams,
-}: {
-  searchParams: { redirect_url?: string }
-}) {
+export default async function SignInPage(
+  props: {
+    searchParams: Promise<{ redirect_url?: string }>
+  }
+) {
+  const searchParams = await props.searchParams;
   const headersList = await headers()
   const baseUrl = resolveSiteOrigin(headersList)
 

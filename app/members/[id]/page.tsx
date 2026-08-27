@@ -58,7 +58,8 @@ function SectionHeading({ title }: { title: string }) {
   )
 }
 
-export default async function MemberPage({ params }: { params: { id: string } }) {
+export default async function MemberPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
 

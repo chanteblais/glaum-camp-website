@@ -22,7 +22,8 @@ async function rsvpCount(eventId: string): Promise<number> {
 }
 
 // GET — return whether the current user has RSVP'd + total count for this event.
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
@@ -42,7 +43,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 }
 
 // POST — toggle the current user's RSVP for this event.
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 

@@ -7,7 +7,8 @@ import { requireAdmin } from '@/lib/admin-auth'
 // or 'volunteer' (the volunteers table, admin-tracked only — no self-report).
 // Collected manually this year — this just records who paid; a future Stripe
 // webhook would set the same `dues_paid_at`.
-export async function POST(req: NextRequest, { params }: { params: { memberId: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ memberId: string }> }) {
+  const params = await props.params;
   const userId = await requireAdmin()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

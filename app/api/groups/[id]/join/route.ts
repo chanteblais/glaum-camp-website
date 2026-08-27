@@ -6,7 +6,8 @@ import { getOrCreateGroupConversation, sendGroupWelcome } from '@/lib/conversati
 export const dynamic = 'force-dynamic'
 
 // POST /api/groups/[id]/join — self-join an open group.
-export async function POST(_req: Request, { params }: { params: { id: string } }) {
+export async function POST(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

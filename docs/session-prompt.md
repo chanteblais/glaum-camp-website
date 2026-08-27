@@ -3,7 +3,7 @@
 Paste at the start of a new Claude session. Deliberately short; the detailed docs in `docs/` are read on demand.
 
 **Path:** `/Users/chante/Documents/Glaum/website/glaum-camp-website`
-**Stack:** Next.js 14 (App Router) · TypeScript · Clerk v7 (auth) · Supabase (Postgres + Storage) · Tailwind · deployed on Vercel.
+**Stack:** Next.js 16 (App Router, React 19) · TypeScript · Clerk v7 (auth) · Supabase (Postgres + Storage) · Tailwind · deployed on Vercel.
 
 ## Detailed docs — read only when relevant, don't preload
 - `docs/architecture.md` — data fetching, auth, API routes, badge generation

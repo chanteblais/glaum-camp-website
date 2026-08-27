@@ -21,14 +21,15 @@ export const dynamic = 'force-dynamic'
 const MENTION_EMAIL_THROTTLE_MS = 30 * 60 * 1000
 
 function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 // GET /api/messages/g/[groupId] — the group's thread (flat, chronological).
 // Access is approved group members only: group_members grants the thread, but a
 // removed/rejected member's row may outlive their membership window, so the
 // approved-status gate runs alongside it.
-export async function GET(_req: Request, { params }: { params: { groupId: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ groupId: string }> }) {
+  const params = await props.params;
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -89,7 +90,8 @@ export async function GET(_req: Request, { params }: { params: { groupId: string
 // Quiet by default: ordinary posts create no emails or notification rows — the
 // unread badge (last_read_at) is the in-app signal. @mentions are the exception:
 // they notify (in-app) and email the mentioned member (see notifyMentions).
-export async function POST(req: Request, { params }: { params: { groupId: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ groupId: string }> }) {
+  const params = await props.params;
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -116,7 +118,7 @@ export async function POST(req: Request, { params }: { params: { groupId: string
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const convId = existingConvId ?? await getOrCreateGroupConversation(params.groupId)
+  const convId = existingConvId ?? (await getOrCreateGroupConversation(params.groupId))
 
   // Replies are one level deep: a parent must be a top-level message in this
   // conversation (you can't reply to a reply). System notes (the private

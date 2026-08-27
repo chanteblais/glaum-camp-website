@@ -28,7 +28,8 @@ async function rsvpCount(eventId: string): Promise<number> {
 // This is a per-session "I'll be there" headcount only — it never touches
 // attunement, shifts, or camp signup. (Gathering leads were built then
 // scrapped 2026-07-02; leads remain a shifts-only concept.)
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
