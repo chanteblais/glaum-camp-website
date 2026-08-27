@@ -4,6 +4,8 @@ A **running ledger of everything Glåüm/What If–specific or single-community�
 
 > **Why this exists:** What If is the dogfood. The single best way to learn what's truly core vs. Glåüm-specific is to build/run the real event and notice every place the app assumes "Glåüm" or "What If." Captured from reality, not guessed.
 
+> **Prioritization (2026-08-27):** per the community-builders reframe in [`business.md`](./business.md) (discussion log, 2026-08-27), the highest-value rows for the foundation phase are the **single-annual-event / seasonality assumptions** (one-event schema like `lead_up_events`, event countdowns, camp-season timing, attunement tied to a season) — they block the year-round community positioning. Cosmetic Glåüm-isms (names, copy, colors) still get logged but rank lower.
+
 ## Maintenance protocol — for Claude (automatic, every iteration)
 
 During **any** work on this codebase, whenever you write or read code that:
