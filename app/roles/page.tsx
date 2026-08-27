@@ -5,6 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { Header } from '@/components/Header'
 import { isImageIcon } from '@/lib/icon-src'
 import { roleSlug } from '@/lib/role-slug'
+import { getApprovedMember } from '@/lib/members'
 import { ClaimRoleButton } from './ClaimRoleButton'
 
 export const dynamic = 'force-dynamic'
@@ -72,13 +73,10 @@ export default async function RolesRegistryPage() {
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
 
-  // Same gate as /schedule and /participate: approved members only.
-  const { data: member } = await supabaseAdmin
-    .from('members')
-    .select('status')
-    .eq('clerk_user_id', userId)
-    .maybeSingle()
-  if (member?.status !== 'approved') redirect('/profile')
+  // Same gate as /schedule and /participate: approved members only —
+  // canonical gate (members table + email fallback; see app/messages/page.tsx).
+  const member = await getApprovedMember(userId)
+  if (!member) redirect('/profile')
 
   const [deptRes, rolesRes, signupRes, roleCounts] = await Promise.all([
     supabaseAdmin.from('departments').select('id, name, description, icon, sort_order').order('sort_order'),
