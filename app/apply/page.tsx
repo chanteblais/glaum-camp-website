@@ -8,7 +8,10 @@ import { parseContributionTypes } from '@/lib/application-options'
 import { ApplyWizard } from './ApplyWizard'
 import { TrackPicker } from './TrackPicker'
 
-export default async function ApplyPage({ searchParams }: { searchParams: { track?: string; admin_preview?: string } }) {
+export default async function ApplyPage(
+  props: { searchParams: Promise<{ track?: string; admin_preview?: string }> }
+) {
+  const searchParams = await props.searchParams;
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
 

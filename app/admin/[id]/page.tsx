@@ -18,7 +18,8 @@ import { parseDuesConfig, duesAppliesToMembers } from '@/lib/dues'
 import { DistinctionAwards } from './DistinctionAwards'
 import { AdminNav } from '../AdminNav'
 
-export default async function ApplicationDetailPage({ params }: { params: { id: string } }) {
+export default async function ApplicationDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
 
@@ -446,7 +447,7 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
 function fileNameFromUrl(url: string): string {
   try {
     const seg = decodeURIComponent(url.split('?')[0].split('/').pop() ?? '')
-    return seg.replace(/^\d{10,}-/, '') || 'Attachment'
+    return seg.replace(/^\d{10,}-/, '') || 'Attachment';
   } catch {
     return 'Attachment'
   }

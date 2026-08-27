@@ -8,7 +8,8 @@ export const dynamic = 'force-dynamic'
 // Read-only: marking messages as read is handled by POST /api/messages/[userId]/read.
 // The thread logic lives in lib/inbox.ts, shared with the server-rendered
 // thread page (this route is the client's refresh/poll path).
-export async function GET(_req: Request, { params }: { params: { userId: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ userId: string }> }) {
+  const params = await props.params;
   const { userId: myId } = await auth()
   if (!myId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

@@ -33,4 +33,4 @@ Also still open (lower stakes): admin editing surface (calendar grid vs date-awa
 - **Roles/departments:** the parallel system the open branch is about — `app/api/signup/route.ts` reads `departments` + `roles`; member picker in `SignupSection.tsx`.
 - **Dead code to remove in the redesign:** `shifts` table, `app/api/admin/shifts/{route,[id]/route}.ts` (nothing calls them).
 
-Stack + conventions: see `docs/session-prompt.md` (Next.js 14 App Router, Clerk v7, Supabase, Vercel). Don't touch port 3000 (Chante's); use 3001 if a server is needed, and stop it after verifying.
+Stack + conventions: see `docs/session-prompt.md` (Next.js 16 App Router, Clerk, Supabase, Vercel). Don't touch port 3000 (Chante's); use 3001 if a server is needed, and stop it after verifying.

@@ -13,7 +13,8 @@ const MAX_BYTES = 5 * 1024 * 1024 // 5 MB
 // into `departments.icon` when the modal is saved (no server-side DB write here).
 const BUCKET = 'group-badges'
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   if (!(await requireAdmin())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const formData = await req.formData()

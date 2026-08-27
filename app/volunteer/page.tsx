@@ -4,7 +4,8 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { mergeVolunteerConfig } from '@/lib/form-config'
 import { VolunteerForm } from './VolunteerForm'
 
-export default async function VolunteerPage({ searchParams }: { searchParams: { admin_preview?: string } }) {
+export default async function VolunteerPage(props: { searchParams: Promise<{ admin_preview?: string }> }) {
+  const searchParams = await props.searchParams;
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
 

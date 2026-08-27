@@ -6,7 +6,8 @@ import { requireAdmin } from '@/lib/admin-auth'
 // clear all their shifts (clear_shift), or set their lead status on one shift
 // (set_shift_role: { schedule_event_id, role }). Shifts live in
 // member_shift_signups (many-to-many); roles on camp_signups.
-export async function PATCH(req: NextRequest, { params }: { params: { userId: string } }) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ userId: string }> }) {
+  const params = await props.params;
   if (!(await requireAdmin())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await req.json()

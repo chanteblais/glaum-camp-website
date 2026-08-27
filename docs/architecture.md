@@ -4,8 +4,8 @@
 
 | Layer | Technology |
 |---|---|
-| Framework | Next.js 14 (App Router) |
-| Auth | Clerk v7 |
+| Framework | Next.js 16 (App Router, React 19) |
+| Auth | Clerk (`@clerk/nextjs` v6) |
 | Database + Storage | Supabase (Postgres + Storage) |
 | Styling | Tailwind CSS + custom CSS |
 | Language | TypeScript |
@@ -30,7 +30,7 @@ Client Component  →  fetch('/api/...')  →  API Route  →  supabaseAdmin
 
 ## Auth
 
-Auth is handled by **Clerk v7**. The Clerk middleware runs on all routes via `middleware.ts`.
+Auth is handled by **Clerk** (`@clerk/nextjs` v6). The Clerk middleware runs on all routes via `proxy.ts` (Next 16's rename of the `middleware.ts` convention).
 
 - Admin role is set in Clerk Dashboard → User → `publicMetadata.role = 'admin'`
 - `lib/profile-auth.ts` provides a shared helper to verify auth in server components and API routes

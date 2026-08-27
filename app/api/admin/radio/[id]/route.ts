@@ -3,7 +3,8 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { requireAdmin } from '@/lib/admin-auth'
 
 // DELETE — remove a radio event (any kind; the feed is curated, not sacred).
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const userId = await requireAdmin()
   if (!userId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 

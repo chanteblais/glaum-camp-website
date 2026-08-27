@@ -80,7 +80,8 @@ async function splitNight(id: string, night: string, body: Record<string, unknow
   return NextResponse.json({ event: updated, splitEvent, removedSeries: false })
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   if (!(await requireAdmin())) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
@@ -160,7 +161,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return NextResponse.json({ event: data })
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   if (!(await requireAdmin())) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }

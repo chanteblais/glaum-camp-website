@@ -8,7 +8,8 @@ export const dynamic = 'force-dynamic'
 // POST /api/messages/[userId]/read — mark the conversation with [userId] as read
 // up to now by advancing my participant read cursor (last_read_at). Called by the
 // thread view when the conversation is viewed.
-export async function POST(_req: Request, { params }: { params: { userId: string } }) {
+export async function POST(_req: Request, props: { params: Promise<{ userId: string }> }) {
+  const params = await props.params;
   const { userId: myId } = await auth()
   if (!myId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

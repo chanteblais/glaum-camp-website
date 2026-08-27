@@ -5,7 +5,8 @@ import { getOrCreateGroupConversation, isGroupMember, setParticipantPrefs } from
 export const dynamic = 'force-dynamic'
 
 // PATCH /api/messages/g/[groupId]/me — set my per-thread prefs (mute / email opt-in).
-export async function PATCH(req: Request, { params }: { params: { groupId: string } }) {
+export async function PATCH(req: Request, props: { params: Promise<{ groupId: string }> }) {
+  const params = await props.params;
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

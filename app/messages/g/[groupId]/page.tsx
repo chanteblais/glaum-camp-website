@@ -6,7 +6,8 @@ import { Header } from '@/components/Header'
 import { findGroupConversation, getParticipantPrefs } from '@/lib/conversations'
 import { GroupThreadClient } from './GroupThreadClient'
 
-export default async function GroupThreadPage({ params }: { params: { groupId: string } }) {
+export default async function GroupThreadPage(props: { params: Promise<{ groupId: string }> }) {
+  const params = await props.params;
   const { userId: myId } = await auth()
   if (!myId) redirect('/sign-in')
 

@@ -21,7 +21,8 @@ function whenLabel(event_date: string | null, start_time: string | null): string
 // bell notification for each member with an account, plus an email to those who
 // haven't turned announcement emails off. Deliberate (button-triggered), so it
 // can be re-sent; sets notified_at for the manager's "Notified" state.
-export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const actingUserId = await requireAdmin()
   if (!actingUserId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 

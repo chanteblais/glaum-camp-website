@@ -14,7 +14,7 @@ Things to sort before going live.
 ## Clerk
 
 - [ ] **Swap development keys for production keys.** `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` in `.env.local` are currently dev keys — Clerk will warn users and enforce strict rate limits. Create a production instance in the Clerk dashboard and update the env vars on Vercel.
-- [ ] Replace deprecated `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL` / `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL` env vars with `NEXT_PUBLIC_CLERK_FALLBACK_REDIRECT_URL` (Clerk v7 deprecation warning is already showing in the console).
+- [ ] Replace deprecated `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL` / `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL` env vars with `NEXT_PUBLIC_CLERK_FALLBACK_REDIRECT_URL` (Clerk deprecation warning is already showing in the console).
 
 ## Database
 

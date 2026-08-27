@@ -8,7 +8,8 @@ import { DEFAULT_AGREEMENT_ITEMS, DEFAULT_ATTENDANCE_OPTIONS } from '@/lib/site-
 import { parseContributionTypes } from '@/lib/application-options'
 import { ApplyWizard } from '../../apply/ApplyWizard'
 
-export default async function DevApplyPage({ searchParams }: { searchParams: { step?: string } }) {
+export default async function DevApplyPage(props: { searchParams: Promise<{ step?: string }> }) {
+  const searchParams = await props.searchParams;
   if (process.env.NODE_ENV === 'production') notFound()
 
   const initialStep = Number.parseInt(searchParams.step ?? '0', 10) || 0

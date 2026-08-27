@@ -18,7 +18,8 @@ account and is standing in a warehouse aisle on his phone**:
 1. **No authentication.** Requested explicitly. The caterer is not a camp member
    and must not hit a sign-in wall mid-shop.
 2. **Static HTML in `public/`, not a Next route.** No Clerk, no server components,
-   no build coupling. `middleware.ts`'s matcher excludes any path containing a dot
+   no build coupling. `proxy.ts`'s matcher (the file Next 16 renamed from
+   `middleware.ts`) excludes any path containing a dot
    (`/((?!_next|.*\..*).*)`), so `/kitchen.html` never enters the Clerk pipeline at
    all. The service worker doesn't cache `.html`, so a republish is live on reload.
 3. **One JSON blob, not tables.** The data model is a scratchpad that changes shape

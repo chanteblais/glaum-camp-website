@@ -7,7 +7,8 @@ import { Header } from '@/components/Header'
 import { ThreadClient } from './ThreadClient'
 import { supabaseResizedUrl } from '@/lib/supabase-image'
 
-export default async function ThreadPage({ params }: { params: { userId: string } }) {
+export default async function ThreadPage(props: { params: Promise<{ userId: string }> }) {
+  const params = await props.params;
   const { userId: myId } = await auth()
   if (!myId) redirect('/sign-in')
 

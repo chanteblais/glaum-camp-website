@@ -9,7 +9,8 @@ import { requireAdmin } from '@/lib/admin-auth'
 // one destructive guardrail: it cascades away every item and every claim, so
 // it's ADMIN-ONLY (2026-07-08). See app/api/resources/lists/route.ts.
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -36,7 +37,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return NextResponse.json({ success: true })
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   // Deleting a whole list wipes its items and everyone's claims — admin-only.
   if (!(await requireAdmin())) return NextResponse.json({ error: 'Only admins can delete lists' }, { status: 403 })
 
