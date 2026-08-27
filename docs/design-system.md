@@ -177,7 +177,7 @@ Two separate visual registers, both specified in `docs/design-philosophy.md` §7
 
 ### Page ornament — the hands margins
 
-Registry-flavoured pages (profile, Many Hands, messages, the admin tabs, volunteer form, track picker) carry the engraved hands margin art: fixed `hands-left.svg`/`hands-right.svg`, full height, `opacity: 0.85`, `pointer-events: none`, `z-index: 0`. Currently duplicated inline per page — when next touched, extract a shared `<PageOrnament />` so the theme stays swappable (ux-review-log finding 22).
+Registry-flavoured pages (profile, Many Hands, messages, the admin tabs, volunteer form, track picker) carry the engraved hands margin art through the shared `HandsBackdrop` component (see Component patterns above — versioned WebP rasters, immutable-cached; the SVGs are editable masters only): full height, `opacity: 0.85` (message threads `0.6`), `pointer-events: none`, `z-index: 0`. The per-page duplication ux-review-log finding 22 called out was resolved 2026-07-09; a theme-layer `<PageOrnament />` swap remains the multi-community follow-up (generalizability log).
 
 ### Department Icons
 
