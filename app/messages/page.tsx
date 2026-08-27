@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getInboxConversations } from '@/lib/inbox'
+import { getApprovedMember } from '@/lib/members'
 import { Header } from '@/components/Header'
 import { MessagesInboxClient } from './MessagesInboxClient'
 import { UnreadCountBadge } from './UnreadCountBadge'
@@ -20,13 +21,11 @@ export default async function MessagesPage() {
   // The access check, the "New Message" member picker, and the initial inbox
   // are independent reads — run them together (the page renders with the inbox
   // already in place; the client only re-fetches to stay fresh).
-  const [{ data: app }, { data: members }, initialConversations] = await Promise.all([
-    // Only approved members
-    supabaseAdmin
-      .from('applications')
-      .select('status')
-      .eq('clerk_user_id', userId)
-      .maybeSingle(),
+  const [me, { data: members }, initialConversations] = await Promise.all([
+    // Only approved members — the canonical gate (members table + email
+    // fallback). The old raw applications-by-clerk-id query bounced localhost
+    // dev-instance sessions, whose Clerk id predates the 059 prod remap.
+    getApprovedMember(userId),
     // All other approved members for the "New Message" picker
     // Phase 5: identity resolution reads the canonical `members` table.
     supabaseAdmin
@@ -38,7 +37,7 @@ export default async function MessagesPage() {
     getInboxConversations(userId),
   ])
 
-  if (app?.status !== 'approved') redirect('/profile')
+  if (!me) redirect('/profile')
 
   const memberOptions: MemberOption[] = (members ?? [])
     .filter(m => m.clerk_user_id)

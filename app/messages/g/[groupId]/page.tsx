@@ -4,6 +4,7 @@ import { redirect, notFound } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { Header } from '@/components/Header'
 import { findGroupConversation, getParticipantPrefs } from '@/lib/conversations'
+import { getApprovedMember } from '@/lib/members'
 import { GroupThreadClient } from './GroupThreadClient'
 
 export default async function GroupThreadPage(props: { params: Promise<{ groupId: string }> }) {
@@ -13,13 +14,10 @@ export default async function GroupThreadPage(props: { params: Promise<{ groupId
 
   // The access check, group row, roster, and conversation lookup are
   // independent reads — run them together.
-  const [{ data: myApp }, { data: group }, { data: roster }, convId] = await Promise.all([
-    // Approved members only.
-    supabaseAdmin
-      .from('applications')
-      .select('status')
-      .eq('clerk_user_id', myId)
-      .maybeSingle(),
+  const [me, { data: group }, { data: roster }, convId] = await Promise.all([
+    // Approved members only — canonical gate (members table + email fallback;
+    // see app/messages/page.tsx).
+    getApprovedMember(myId),
     // The group must exist…
     supabaseAdmin
       .from('groups')
@@ -34,7 +32,7 @@ export default async function GroupThreadPage(props: { params: Promise<{ groupId
     findGroupConversation(params.groupId),
   ])
 
-  if (myApp?.status !== 'approved') redirect('/profile')
+  if (!me) redirect('/profile')
   if (!group) notFound()
   const memberIds = (roster ?? []).map(r => r.clerk_user_id).filter(Boolean)
   if (!memberIds.includes(myId)) redirect('/messages')
