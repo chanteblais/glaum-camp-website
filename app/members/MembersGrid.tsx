@@ -386,13 +386,13 @@ export function MembersGrid({ members, volunteers }: { members: MemberCard[]; vo
 
       {members.length === 0 && volunteers.length === 0 && (
         <p style={{ textAlign: 'center', opacity: 0.35, fontStyle: 'italic', fontSize: '0.9rem' }}>
-          No approved members yet.
+          The circle&rsquo;s still gathering — no members yet.
         </p>
       )}
 
       {(members.length > 0 || volunteers.length > 0) && filtered.length === 0 && filteredVolunteers.length === 0 && (
         <p style={{ textAlign: 'center', opacity: 0.35, fontStyle: 'italic', fontSize: '0.9rem' }}>
-          No members match your filters.
+          No one matches those filters.
         </p>
       )}
     </>

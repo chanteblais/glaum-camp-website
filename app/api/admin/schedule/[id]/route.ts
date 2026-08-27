@@ -62,7 +62,11 @@ async function splitNight(id: string, night: string, body: Record<string, unknow
     return NextResponse.json({ error: `The night became its own event, but moving its signups failed: ${moveError.message}. Check the rosters before retrying.` }, { status: 500 })
   }
 
-  const remaining = (row.recurrence_days ?? rangeDays).filter((d: string) => d !== night)
+  // `[]` means "every day" everywhere else (shiftOccurrenceDates, and it's how
+  // isValidOccurrence let `night` through above) — normalize it the same way
+  // here, or an empty array would read as "no nights left" and drop the series.
+  const seriesNights: string[] = row.recurrence_days?.length ? row.recurrence_days : rangeDays
+  const remaining = seriesNights.filter((d: string) => d !== night)
   if (remaining.length === 0) {
     const { error: dropError } = await supabaseAdmin.from('schedule_events').delete().eq('id', id)
     if (dropError) return NextResponse.json({ error: `The night became its own event, but removing the now-empty series failed: ${dropError.message}.` }, { status: 500 })

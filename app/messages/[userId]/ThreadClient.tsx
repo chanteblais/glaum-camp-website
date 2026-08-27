@@ -203,7 +203,7 @@ export function ThreadClient({ currentUserId, recipientId, displayName, avatarUr
 
         {!loading && messages.length === 0 && (
           <p style={{ textAlign: 'center', opacity: 0.4, fontStyle: 'italic', fontSize: '0.9rem', marginTop: '3rem' }}>
-            No messages yet. Say hello!
+            Nothing said yet — the first word is yours.
           </p>
         )}
 

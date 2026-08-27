@@ -51,8 +51,11 @@ export default async function SignupPage() {
           </a>
 
           <div style={{ marginBottom: '2rem' }}>
+            {/* Not "Your Shifts" — the shift plaque right below carries that
+                kicker already, and on this shifts-only page the echo was bare
+                (UX 2026-07-20 #30). Hands-language instead. */}
             <h1 style={{ fontFamily: 'TokyoDreams, serif', fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', color: '#C8A848', margin: '0 0 0.5rem', letterSpacing: '0.06em' }}>
-              Your Shifts
+              Lend a Hand
             </h1>
             <p style={{ fontSize: '0.9rem', opacity: 0.55, margin: 0, lineHeight: 1.6 }}>
               Lend your hands where they're needed — pick the shifts that work for you. You can change your mind anytime.

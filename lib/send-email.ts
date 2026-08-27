@@ -301,8 +301,11 @@ export async function sendEventReminderEmail(opts: {
   recipientName: string
   phase: 'day_before' | 'morning_of'
   items: ReminderItem[]
+  // Footer-button target. Volunteers get '/participate' — /schedule is
+  // member-gated and would bounce them to /profile.
+  schedulePath?: string
 }) {
-  const { to, recipientName, phase, items } = opts
+  const { to, recipientName, phase, items, schedulePath = '/schedule' } = opts
   const prefsUrl = `${APP_URL}/profile#notifications`
   const whenWord = phase === 'day_before' ? 'tomorrow' : 'today'
 
@@ -330,7 +333,7 @@ export async function sendEventReminderEmail(opts: {
     <p>A gentle reminder — here's what you have coming up ${whenWord}:</p>
     ${list}
     <p style="margin:24px 0">
-      <a href="${APP_URL}/schedule" style="display:inline-block;background:#C8A848;color:#1A0A24;text-decoration:none;padding:11px 22px;border-radius:8px;font-weight:bold">View your schedule ✦</a>
+      <a href="${APP_URL}${schedulePath}" style="display:inline-block;background:#C8A848;color:#1A0A24;text-decoration:none;padding:11px 22px;border-radius:8px;font-weight:bold">View your schedule ✦</a>
     </p>
     <p style="font-size:12px;color:#8a8a8a;margin-top:28px">
       You're receiving this because you have gathering &amp; shift reminders turned on.

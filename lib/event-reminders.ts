@@ -36,6 +36,7 @@ export type ReminderRecipient = {
   clerkUserId: string
   email: string | null
   name: string
+  kind: 'member' | 'volunteer'
   items: ReminderItem[]
 }
 
@@ -140,6 +141,7 @@ export async function collectEventReminders(targetDate: string): Promise<Reminde
         clerkUserId,
         email: m.email ?? null,
         name: m.preferred_name || m.first_name || 'there',
+        kind: 'member',
         items,
       })
       continue
@@ -150,7 +152,10 @@ export async function collectEventReminders(targetDate: string): Promise<Reminde
       clerkUserId,
       email: v.email ?? null,
       name: v.preferred_name || v.first_name || 'there',
-      items,
+      kind: 'volunteer',
+      // /schedule is member-gated (redirects volunteers to /profile); their
+      // shift home is /participate — same target the confirmation email uses.
+      items: items.map(it => it.href === '/schedule' ? { ...it, href: '/participate' } : it),
     })
   }
   return out

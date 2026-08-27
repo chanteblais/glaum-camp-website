@@ -889,7 +889,14 @@ export function ScheduleManager({ rangeStart, rangeEnd, initialEvents, initialSh
   // Deleting one night of a recurring event = trimming it from recurrence_days;
   // the PATCH deletes that night's signups server-side. Informed confirm first.
   const removeNight = async (ev: ScheduleEvent, night: string): Promise<boolean> => {
-    const n = signupsOn(ev, night)
+    // Count what the PATCH will actually delete — every signup outside the
+    // kept set, not just the target night. A signup can sit outside today's
+    // nights (the range was narrowed after it was taken); the server-side
+    // cleanup takes those too, so the confirm must own up to them.
+    const keep = new Set(nightsOf(ev).filter(d => d !== night))
+    const gone = (rosters[ev.id] ?? []).filter(e => e.occurrence_date && !keep.has(e.occurrence_date))
+    const goneNights = Array.from(new Set(gone.map(e => e.occurrence_date as string))).sort()
+    const n = gone.length
     const s = n === 1 ? '' : 's'
     const ok = await confirm(n === 0
       ? {
@@ -901,7 +908,9 @@ export function ScheduleManager({ rangeStart, rangeEnd, initialEvents, initialSh
       : {
           eyebrow: 'Signups will be deleted',
           title: `Remove the ${fmtNight(night)} night of “${ev.title}”?`,
-          body: `Its ${n} signup${s} will be permanently deleted — those members lose their spot${s} and are not notified. The other nights keep theirs.`,
+          body: goneNights.length === 1 && goneNights[0] === night
+            ? `Its ${n} signup${s} will be permanently deleted — those members lose their spot${s} and are not notified. The other nights keep theirs.`
+            : `${n} signup${s} on ${goneNights.map(fmtNight).join(' · ')} will be permanently deleted — saving also clears signups that no longer fall on one of the event's nights. Those members lose their spot${s} and are not notified. The remaining nights keep theirs.`,
           confirmLabel: `Remove night + delete ${n} signup${s}`,
           danger: true,
         })

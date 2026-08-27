@@ -478,7 +478,7 @@ export function GroupThreadClient({ currentUserId, groupId, groupName, groupIcon
 
         {!loading && topLevel.length === 0 && (
           <p style={{ textAlign: 'center', opacity: 0.4, fontStyle: 'italic', fontSize: '0.9rem', marginTop: '3rem' }}>
-            No messages yet. Start the conversation!
+            Nothing said here yet — the first word is yours.
           </p>
         )}
 

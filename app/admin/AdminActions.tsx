@@ -25,6 +25,15 @@ export function AdminActions({ id, email, redirectAfter }: { id: string; email: 
   }
 
   const handleReject = async () => {
+    // Rejecting emails the applicant — the heavier gesture of the two, so it
+    // gets the same guard the volunteer Decline has (UX 2026-07-20 #28).
+    const ok = await confirm({
+      title: 'Reject this application?',
+      body: `${email} will be emailed that their application wasn't accepted.`,
+      confirmLabel: 'Reject',
+      danger: true,
+    })
+    if (!ok) return
     setLoading('reject')
     const res = await fetch(`/api/admin/${id}/reject`, { method: 'POST' })
     const data = await res.json().catch(() => ({}))

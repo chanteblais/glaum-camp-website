@@ -7,6 +7,136 @@ Newest review at the top. Fixes are only applied once agreed.
 
 ---
 
+## Review — 2026-07-20 (the new volunteer-shifts surfaces: unified Pending Review queue + volunteer self-serve `/participate`, `/profile`)
+
+Scope: the volunteer-shifts work that landed 2026-07-16 (`a468ee4`) — the unified
+Pending Review queue on Admin → Community (member applications + volunteer signups
+in one list) and the volunteer's own self-serve shift surfaces (`/participate`
+shifts-only, `/profile` "Your Shifts"). Read-only, against `origin/main`. This is
+the first pass over these surfaces; they read well overall (the tag language on the
+queue is a clean solution to the "Vera hid in a collapsed section" problem, and the
+`hideRole` plaque collapse on the volunteer profile is tidy). Three seams below.
+
+### 28. The unified Pending Review queue is two different UIs stacked in one list · Severity: medium (cohesion) · Effort: small–medium · Status: **fixed 2026-08-02** (`session/2026-08-02-board-queue`)
+
+The queue (`app/admin/page.tsx` `pendingQueue`) interleaves member applications and
+volunteer signups, newest-first, each tagged Member/Volunteer — the right call. But
+the two row types are built from unrelated components and behave nothing alike, so
+scanning the list means switching mental models row to row:
+
+- **Interaction model differs.** A member row (`ApplicationRow`) is a *link* — the
+  whole card navigates to `/admin/[id]` — with Approve/**Reject** always visible in
+  an `AdminActions` cluster beside it. A volunteer row (`PendingVolunteerRow`) is an
+  *expander* — clicking it opens an inline panel, and Approve/**Decline** live hidden
+  inside that panel. So in the same list, one row type acts on one click and the other
+  needs a click-to-expand-then-act. (Structural cause: members have a dossier page,
+  volunteers don't — but the queue doesn't have to expose that difference as two
+  interaction grammars.)
+- **Destructive guard is inconsistent, and backwards.** Declining a volunteer pops a
+  confirm dialog (`useConfirm`, `danger`); **rejecting a member application fires
+  immediately with no confirmation** (`AdminActions.handleReject` → straight to the
+  reject endpoint, which emails the applicant). The higher-stakes, harder-to-walk-back
+  action — sending a person a rejection — is the *unguarded* one, right next to the
+  guarded lighter one. At minimum member Reject should confirm too.
+- **Verb split.** "Reject" (member) vs "Decline" (volunteer) for the same gesture in
+  one queue. Defensible on its own, but combined with the two points above it reads as
+  drift, not deliberate register.
+
+Cheapest coherent fix: give member Reject a confirm dialog (closes the sharpest
+gap on its own), and — when next touched — align the two rows on one affordance
+(either both expand-to-act, or both show actions inline), so the queue reads as one
+list of one kind of thing-to-do.
+
+### 29. A volunteer landing on `/participate` before shifts exist hits a promise-with-no-payoff dead end · Severity: medium (empty state) · Effort: small · Status: **fixed 2026-08-02** (`session/2026-08-02-board-queue`)
+
+`/participate` is the *entire* participation surface for a volunteer (no roles,
+groups, or resources — shifts only). The page (`app/participate/page.tsx`) heads it
+"Your Shifts / Lend your hands where they're needed — pick the shifts that work for
+you. You can change your mind anytime," then renders `SignupSection hideRole`. But
+the shift picker *and its closed-state explanation* are both gated behind
+`shifts.length > 0` (`SignupSection.tsx:1387`). When no shift occurrences exist yet
+(pre-schedule) the volunteer sees: the inviting heading, a "None yet" card, and
+nothing else — no picker, no "signup opens once the schedule is set" note, no
+onward action. The copy actively promises shifts to pick that aren't on the page.
+Members are cushioned (the rest of `/participate` still has content); for a volunteer
+this is a blank surface that contradicts its own header. Fix: when
+`shifts.length === 0`, show the same "Shift times aren't confirmed yet — check back
+soon" reassurance the closed-but-populated state already uses, so the volunteer's one
+page always explains itself.
+
+### 30. The volunteer `/participate` view says "Your Shifts" twice, inches apart · Severity: low (visual seam) · Effort: trivial · Status: **fixed 2026-08-02** (`session/2026-08-02-board-queue`)
+
+On the volunteer participate view the page `h1` is "Your Shifts"
+(`app/participate/page.tsx`), and the very next element — the `CurrentSignupCards`
+shift plaque — carries its own kicker "✦ Your Shifts ✦" (`SignupSection.tsx:249`).
+Two identical titles stacked with only a hairline divider between them. Fine on
+`/profile` (where the plaque sits under a different page title) and on a member's
+`/participate` (where it's one card among many), but on the volunteer's shifts-only
+page the repetition is bare. Either drop the page `h1` to a subtitle-only intro, or
+retitle the volunteer page header (e.g. "Lend a Hand") so the plaque's "Your Shifts"
+isn't an echo.
+
+## Review — 2026-07-14 (empty-state voice audit — member surfaces)
+
+Scope: a cross-cutting read of every member-surface empty state (radio, messages,
+members, profile tasks/shifts/resources, home teaser, schedule), judged against
+design-philosophy §5 ("Copy carries philosophy too… never corporate") and the
+existing calibration references. Read-only, `origin/main` @ `4ee6d73`. This is a
+*voice*-consistency pass, not a "add jokes everywhere" pass — §5 also says calm is
+a feature and one wink per page is enough. The finding is that the surfaces have
+drifted into two registers, and the flat one reads like a different app.
+
+The app already contains its own calibration references — these get it right:
+
+- Radio feed empty: **"The airwaves are quiet — nothing on the air yet."** + the
+  **"✦ That's all for now. Stay tuned. ✦"** sign-off (`RadioFeed.tsx`).
+- Profile tasks: **"You're all set. Nothing left to do for now."** (`TaskStatus.tsx`).
+- Profile shift (pre-schedule): **"Shift signup will open here once the schedule is
+  set — check back soon."** (`SignupSection.tsx`).
+- Member resource lists: **"Nobody yet — be the first."** (`ResourceCommitments.tsx`).
+- Home digest: **"All quiet — N days to camp."**; schedule teaser: **"The schedule
+  begins Wednesday, July 22."** (both fixed in earlier passes).
+
+Against those, a cluster of member empty states reads as generic UI-kit boilerplate.
+
+### 26. Member empty-state copy has split into two registers · Severity: low-medium · Effort: small · Status: **fixed 2026-08-02** (`session/2026-08-02-board-queue`)
+
+The laggards, all member-facing:
+
+- `/messages` inbox, no conversations: **"No messages yet."** (bare — the warmer
+  `MessagesInboxClient.tsx` button beneath it, "Start a conversation", already
+  carries the invitation; the sentence above it is dead weight).
+- `/messages` new-message member search, no matches: **"No members found"**
+  (`MessagesInboxClient.tsx`).
+- 1:1 thread: **"No messages yet. Say hello!"** (`ThreadClient.tsx`); group thread:
+  **"No messages yet. Start the conversation!"** (`GroupThreadClient.tsx`) — the
+  "Say hello!" / exclamation-mark register is *casual-generic*, a different voice
+  from the deadpan ceremonial warmth everywhere else (cf. the radio sign-off).
+- `/members`, no approved members: **"No approved members yet."**; after filtering:
+  **"No members match your filters."** (`MembersGrid.tsx`).
+
+None of these are wrong or broken — they're the calm-plain default. The issue is
+that a member moving from Radio (witnessed, gilded, "airwaves are quiet") to
+Messages/Members drops into flat app-speak, and the seam is visible. The fix is
+cheap: bring the laggards to the register the app already models — not a wink on
+each, just the house's straight-faced warmth. It's a copy-only sweep (no layout),
+so effort is small; worth batching with the next Messages or Members touch rather
+than a standalone commit.
+
+### 27. The Many Hands directory earns the reciprocity register most of all · Severity: low · Effort: trivial · Status: **fixed 2026-08-02** (`session/2026-08-02-board-queue`)
+
+`/members` is the app's hands-territory surface (§2: "the directory, anything a
+member *does* for the whole") — the one place the plainest empty copy sits.
+"No approved members yet." is the true-empty case; "No members match your filters."
+is a no-results-after-filter case (philosophy tolerates plainer there — it's a
+search result, not a threshold moment). But the true-empty line in particular is a
+missed reciprocity beat on the surface named for it. A single warm line in the
+"Many Hands" voice ("The circle's still gathering." / similar — Chante's phrasing)
+would close the gap with `ResourceCommitments`' "Nobody yet — be the first." No
+new wink budget spent; it replaces one flat sentence with one warm one.
+
+---
+
 ## A5 second half — 2026-07-08 (`feat/roster-links-radio-filters`)
 
 **Status: fixed.** Member names across the admin console now link to their

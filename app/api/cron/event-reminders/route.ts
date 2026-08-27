@@ -78,7 +78,10 @@ export async function GET(req: NextRequest) {
       if (dryRun) { entry.status = 'would send'; continue }
 
       try {
-        const result = await sendEventReminderEmail({ to: r.email, recipientName: r.name, phase, items: r.items })
+        const result = await sendEventReminderEmail({
+          to: r.email, recipientName: r.name, phase, items: r.items,
+          schedulePath: r.kind === 'volunteer' ? '/participate' : '/schedule',
+        })
         if (result.ok) {
           sent++
           entry.status = 'sent'

@@ -4,6 +4,74 @@ Running record of QA sweeps: what was tested, what was fixed, and — most
 useful for the next tester — what is *known and deliberate* so it doesn't get
 re-reported, plus where the remaining risk lives. Newest sweep first.
 
+## Sentry 2026-07-19 — nightly review of `fix/delete-signup-guards` (4ebb7d2) (both fixed 2026-08-02, `session/2026-08-02-board-queue`)
+
+Automated review of the three commits new on `main` since the last sentry
+(`5a924ca`, `fa2a122`, `4ebb7d2`). Route gating, house rules (no inline
+`<style>`, ~380px handling in the new `ChoiceDialog`), and same-commit docs all
+check out. Two edge findings, neither reachable in the normal flow.
+
+### Found — fixed 2026-08-02: `removeNight` now counts with the same keep-set the PATCH deletes by; `splitNight` normalizes `recurrence_days = []` to the range like `shiftOccurrenceDates` does.
+
+- **The "remove one night" confirm can under-count what the save deletes.**
+  `removeNight` (`app/admin/ScheduleManager.tsx:864`) counts only the target
+  night's signups, but the PATCH it sends deletes *every* signup whose
+  `occurrence_date` falls outside the new `recurrence_days` set
+  (`app/api/admin/schedule/[id]/route.ts:142`). On an "every day" event those
+  two disagree whenever a signup sits outside the currently configured event
+  range — e.g. the range was narrowed in Configure → Event Dates after the
+  signup was taken (`/api/shift-signups` validates against the range at signup
+  time, not afterwards). Removing any one night then also destroys those
+  out-of-range signups, unannounced. The edit-modal save path is fine: it
+  computes its count from the same keep-set the server uses. Fix would be to
+  count with the keep-set in `removeNight` too. (Note the qa-log entry below
+  calls this cleanup "self-healing for stale phantom rows" — that is the
+  deliberate part; the silent count is the gap.)
+- **`recurrence_days = []` is read as "no nights" by the split, but as "every
+  day" everywhere else.** `splitNight` computes
+  `remaining = (row.recurrence_days ?? rangeDays)`
+  (`app/api/admin/schedule/[id]/route.ts:65`), so an empty array stays empty and
+  the series is deleted outright — while `shiftOccurrenceDates` treats `[]` as
+  the full range, which is also why `isValidOccurrence` at line 31 lets the
+  night through in the first place. Not reachable from the admin UI (`nightsOf`
+  returns `[]` for such a row, so no chooser is offered) — it needs a
+  hand-crafted PATCH from an admin, hence low severity. A
+  `?? `→`length ? … : rangeDays` normalization would close it, and would match
+  the "No days selected" state the manager already renders.
+
+## Sentry 2026-07-17 — volunteer shift-reminder emails link to the member-gated `/schedule` (fixed 2026-08-02, `session/2026-08-02-board-queue`)
+
+Nightly QA sentry over the 5 commits merged 2026-07-16 for volunteer shifts
+(`a468ee4` and below). One confirmed finding; the rest of the feature checked
+out (shift signup POST/DELETE, `/participate` shifts-only variant, public
+Shifts medallion card, unified Pending Review queue, `memberDisplayNames`
+volunteer fallback, `member_shift_signups.clerk_user_id` has no FK so a
+volunteer id inserts cleanly).
+
+### Confirmed — fixed 2026-08-02: `ReminderRecipient` now carries `kind`; volunteer item links rewrite to `/participate` and the footer button takes a `schedulePath`.
+
+- **Reminder emails send active volunteers to a page they can't open.**
+  `feat/volunteer-shifts` added volunteers to `collectEventReminders`
+  (`lib/event-reminders.ts` — an active volunteer holding a shift on the target
+  night now becomes a `ReminderRecipient`), but the shift item's `href` is
+  hardcoded `'/schedule'` (`lib/event-reminders.ts:107`) and the reminder
+  email's footer "View your schedule ✦" button is a hardcoded
+  `${APP_URL}/schedule` (`lib/send-email.ts:334`) — neither is recipient-kind
+  aware. `/schedule` redirects any non-approved user to `/profile`
+  (`app/schedule/page.tsx:26`), so a volunteer who self-serves a shift and gets
+  a day-before / morning-of reminder taps through to a bounce, not their shift.
+  The **confirmation** email in the signup POST *was* made volunteer-aware
+  (`href: participant.kind === 'volunteer' ? '/participate' : '/schedule'`,
+  `app/api/shift-signups/route.ts`), and this commit's own docs claim the same
+  for reminders — features.md: *"Reminder + confirmation emails resolve
+  volunteers too … the volunteer's links point at `/participate` since
+  `/schedule` is member-gated."* The reminder path just wasn't updated to match.
+  Fix: thread the recipient kind through `ReminderRecipient` (or resolve it in
+  the cron loop) and point volunteers' item links + footer button at
+  `/participate`, mirroring the confirmation email. Landing on `/profile` isn't
+  catastrophic (it now carries the "✦ Pick / change your shifts" entry point),
+  but it contradicts the shipped docs and the member experience.
+
 ## Fix 2026-07-16 — deleting a schedule event silently destroyed all its signups (branch `fix/delete-signup-guards`)
 
 Prompted by a real incident (2026-07-16): to delete ONE night (Friday) of the
@@ -212,6 +280,11 @@ keys, dangling bindings).
   `gatheringsAttended` backfilled from `custom_answers` (registry-coerced), and
   the 4 dead `cf_*` keys left by a pre-Phase-3 seeding path stripped from the
   8 older profiles (that data is fully duplicated on the application rows).
+  **Executed in prod 2026-08-02** (script regenerated — the original lived in a
+  session scratchpad): by then only 2 of the 4 still lacked rows (Andy + Michael
+  Frank, first-year answer → `gatheringsAttended: []`; the other two had
+  self-filled via the profile catch-up banner), and the 4 dead keys were
+  stripped from all 8 profiles — verified zero `cf_*` keys remain.
 
 ### Known & deliberate — don't re-report
 
