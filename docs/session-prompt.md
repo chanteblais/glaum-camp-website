@@ -2,7 +2,7 @@
 
 Paste at the start of a new Claude session. Deliberately short; the detailed docs in `docs/` are read on demand.
 
-**Path:** `/Users/chante/Documents/Glaum/website/glaum-camp-website`
+**Path:** `/Users/chante/Projects/glaum-camp-website`
 **Stack:** Next.js 16 (App Router, React 19) · TypeScript · Clerk (auth, `@clerk/nextjs` v6) · Supabase (Postgres + Storage) · Tailwind · deployed on Vercel.
 
 ## Detailed docs — read only when relevant, don't preload
