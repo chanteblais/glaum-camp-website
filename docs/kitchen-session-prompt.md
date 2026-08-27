@@ -133,6 +133,13 @@ pantry row is normal, not clutter. **The shop hadn't really started** as of this
 
 ## Open threads
 
+- **⚠️ Run this before building more ordering features: can Daniel actually order the list
+  online?** Cheap invalidating test (rescued from the deleted `docs/kitchen-brief-0806`
+  branch) — price one real day's list on the Wholesale Club site and count how many lines
+  are genuinely orderable. The *online* range is narrower than in-store, thinnest in bulk
+  meat and produce — exactly what a caterer buys most. If half the list can't be ordered,
+  the SKU book and any cart-fill bookmarklet are solving the wrong problem. ~20 minutes,
+  Daniel's call.
 - ~~The price book is empty~~ — **closed 2026-08-06, shelved with the branch.** It never got
   past 1 of 84 items priced, and Chante's read is that it didn't earn its keep. See Shelved,
   above. The lesson worth keeping: structure built for a future that hasn't arrived doesn't
