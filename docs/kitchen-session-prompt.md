@@ -23,7 +23,8 @@ and two unauthenticated routes: `app/api/kitchen-list/route.ts` (GET/PUT state) 
 `app/api/kitchen-ai/route.ts` (the assistant drawer — Claude-backed, proposes operations
 the page previews and applies; **spends money**, needs `ANTHROPIC_API_KEY` in the env,
 which is set on Vercel for production + preview).
-**Repo:** `/Users/chante/Documents/Glaum/website/glaum-camp-website` — the camp app repo.
+**Repo:** `/Users/chante/Projects/glaum-camp-website` — the camp app repo (moved from
+`~/Documents/Glaum/website/glaum-camp-website`, which is no longer a checkout).
 It shares nothing else with the camp app; see "Why it looks nothing like the rest of the
 app" in the spec.
 
@@ -43,15 +44,19 @@ stands.** Production is on **v5** and has no `suppliers`/`prices` fields.
   the price book (or a second supplier — see Costco below) ever becomes real.
 - It was verified quantity-identical against a copy of live (84 rows, hash `8543926e`) —
   that work stands if it is ever revived.
-- **The shape notes below describe live (v5), not that branch.**
-- ⚠️ **Version-number collision.** The shelved branch calls its shape **v6**. The next
-  change that actually ships — the minimal `sku` field for cart export — will also want to
-  be v6. If that lands first, reviving `feat/kitchen-prices` means renumbering it to v7 and
-  re-checking `migrate()`. Don't let two different v6 shapes exist.
+- ⚠️ **Version-number collision — now real.** The shelved branch calls its shape **v6**,
+  but the SKU book **shipped as the live v6** (merged 2026-08-26). Reviving
+  `feat/kitchen-prices` therefore means **renumbering it to v7** and re-checking
+  `migrate()` (both exits) and `payload()` against the shipped v6 first.
 
-**The active direction is cart export instead** — a minimal `sku` on the item, then emitting
-a SKU list the caterer loads into his own Wholesale Club cart. See
-`docs/wholesale-club-cart.md`.
+**Cart export SHIPPED (2026-08-26)** — the first half of the direction in
+`docs/wholesale-club-cart.md`: a standing **SKU book** (`state.skus`, keyed by
+`itemKey(name, unit)` like the pantry, so one product can't carry two disagreeing
+numbers) with an "item #" field on each shopping row, plus a **Cart list → clipboard**
+button that emits pack-count lines (`3 × 4 lb bag — Black beans (need 9 lb) — #12345 —
+<product URL>`); rows missing a SKU or pack size are named, not silently dropped. The
+*second* half — a bookmarklet that fills the Wholesale Club cart in the caterer's own
+logged-in browser — is still unbuilt and stays gated behind retire-or-gate.
 
 ## The four rules that matter most
 
@@ -70,7 +75,10 @@ describe are real and the habits are cheap. Keep them.)*
 3. **Any shape change must be quantity-identical.** The page migrates old state forward on
    load (v1→v6 so far, no SQL migrations). Before shipping a new shape, seed a scratch board
    with a copy of the real live state, then diff **every** shopping-list quantity before and
-   after. v4→v5 was verified across all 50 rows; v5→v6 across all 84. Do the same.
+   after. v4→v5 was verified across all 50 rows; the shelved prices shape across all 84;
+   the shipped v5→v6 (SKU book) across all 49 rows of the 2026-08-26 live state — both
+   pages run headlessly against the same snapshot, identical row sets (hash `83f5a7c8`).
+   Do the same.
    Two traps that shape changes keep hitting: `migrate()` has **multiple exits** that each
    pin a version, and `payload()` lists fields **explicitly** — miss it and every save
    silently drops your new data.
@@ -78,18 +86,21 @@ describe are real and the habits are cheap. Keep them.)*
    catering planning default that Claude invented. The dish names, days, groups and headcounts
    come from Daniel's handwritten sheets. Never silently "correct" a portion he has set.
 
-## Shape (v5 = live), in one breath
+## Shape (v6 = live), in one breath
 
 A **day** holds the **groups** eating that day (label + headcount) and the **meals** served;
 each meal has **sections** (courses); each **item** names the `groupIds` that get it. Quantity
 = `per × (assigned groups' headcounts) × (1 + buffer)`. The **shopping list** aggregates every
 selected day into one trip, matched by item name+unit. The **pantry** is a standing ledger
 matched to items by name and subtracted once from the combined total. **Finish shop** (foot of
-the list) writes crossed-off rows back into the pantry.
+the list) writes crossed-off rows back into the pantry. The **SKU book** (`skus`, v6) is a
+third standing ledger — the Wholesale Club item number per shopping row — feeding the
+cart-list export (see Shelved/Shipped, above).
 
 *(A **price book** — `suppliers` + `prices`, a second standing ledger driving a By-supplier
 lens that buys where the whole packs come out cheapest — exists only on the shelved
-`feat/kitchen-prices` branch. **It is not part of the live shape.** See Shelved, above.)*
+`feat/kitchen-prices` branch. **It is not part of the live shape**, and its shape number
+now collides with the shipped v6. See Shelved, above.)*
 
 All of it lives in one JSON blob: `page_content.catering_kitchen_state`.
 

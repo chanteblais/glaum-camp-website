@@ -27,11 +27,12 @@ account and is standing in a warehouse aisle on his phone**:
 
 ## Data
 
-One `page_content` row, key `catering_kitchen_state` (v3):
+One `page_content` row, key `catering_kitchen_state` (v6):
 
 ```
-{ version: 5, usePantry, selected: [dayId],
+{ version: 6, usePantry, selected: [dayId],
   checked: { "<name>|w|c": true },
+  skus:    { "<name>|w|c": "item #" },   // v6 — standing Wholesale Club SKU book
   days: [{ id, name, buffer,
            groups: [{ id, label, count }],          // who is on site, and how many
            meals:  [{ id, label, times,             // Brunch / Dinner / ...
@@ -63,7 +64,15 @@ one-click "all of this course → <group> / everyone".
 **Shape history.** v1 stored per-menu-item `onHand`; v2 replaced that with a
 standing `pantry` array; v3 wrapped the single implicit day in a `days` array and
 moved check-offs to a top-level `checked` map; v4 split each day into per-group
-menus; v5 turned that inside out into meals + per-item group assignment.
+menus; v5 turned that inside out into meals + per-item group assignment; v6
+(2026-08-26) added the standing `skus` book — keyed by `itemKey(name, unit)` like
+`checked` and the pantry, so the same product on two days cannot carry two
+disagreeing item numbers. v5 → v6 (`v5toV6`) is purely additive (an empty `skus`
+map, nothing else touched) and was verified quantity-identical against the
+2026-08-26 live state: both page versions run headlessly over the same snapshot
+produced the same 49 shopping rows (totals, remainders and day-parts, hash
+`83f5a7c8`). *(The shelved `feat/kitchen-prices` branch also calls its shape "v6";
+reviving it now means renumbering to v7 — see `kitchen-session-prompt.md`.)*
 
 v4 → v5 (`v4toV5`) merges the per-group menus back into one set of sections,
 recording which groups each item came from; identical name+unit+**per** across menus
@@ -256,15 +265,18 @@ silently change one he has set.
   there, the food isn't. Copy-a-day covers the repeat cases.
 - **Retire or gate post-festival.** Either delete the page + route, or move it
   behind auth once the catering thread graduates into a real product surface.
-- **Filling a Wholesale Club cart from the shopping list** — researched 2026-08-06, nothing
-  built. Their cart is a server-side object written by one `POST .../carts/<cartId>` with an
-  `entries` object keyed by SKU, so an entire trip lands in a single call, and a bookmarklet
-  in the caterer's own logged-in browser needs no stored credentials. Full findings, the
-  unverified parts, the ToS/fragility risks and the recommended architecture:
-  `docs/wholesale-club-cart.md`. Needs a **minimal optional `sku` on the item** — added
-  fresh, *not* salvaged from `feat/kitchen-prices`, which was **shelved 2026-08-06** (the
-  price book didn't earn its keep) and whose supplier-scoped `sku` is entangled with
-  `suppliers`/`prices`. Also gated on this page not being public — see retire-or-gate above.
+- **Filling a Wholesale Club cart from the shopping list** — half shipped. The **SKU book +
+  cart-list export landed 2026-08-26** (v6): an "item #" field per shopping row and a
+  "Cart list → clipboard" button emitting pack counts, item numbers and `/en/x/p/<SKU>`
+  product links; rows missing a SKU or pack size are named rather than silently dropped.
+  The SKU book was added fresh (`state.skus`, keyed like the pantry), *not* salvaged from
+  `feat/kitchen-prices` — **shelved 2026-08-06** (the price book didn't earn its keep),
+  its supplier-scoped `sku` entangled with `suppliers`/`prices`. The *second* half — a
+  bookmarklet in the caterer's own logged-in browser writing the server-side cart via
+  `POST .../carts/<cartId>` (`entries` keyed by SKU, one call per trip, no stored
+  credentials) — is researched but unbuilt: findings, unverified parts and ToS/fragility
+  risks in `docs/wholesale-club-cart.md`. Still gated on this page not being public — see
+  retire-or-gate above.
 - The portion defaults are standard catering planning ranges, not Daniel's numbers —
   they're starting points he's expected to correct in place.
 - **Friday's "Spicy sauce" (Ex 2)** carries a flag in the UI: it looked struck through on the
