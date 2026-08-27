@@ -1,10 +1,11 @@
 import type { CSSProperties } from 'react'
 
 // The fixed ornamental hands framing most pages. The source SVGs are ~750
-// paths each — cheap to composite on desktop, but phones re-rasterize them at
-// 3× device-pixel-ratio (and re-blur them under any frosted bar), so below
-// 768px the <picture> swaps in pre-struck WebP rasters instead
-// (scripts/raster-hands.mjs regenerates them from the SVGs).
+// paths each and gzip to ~138KB combined, so every breakpoint serves the
+// pre-struck WebP rasters instead (scripts/raster-hands.mjs regenerates them;
+// the SVGs stay in public/ as editable masters only). The filenames carry a
+// version because next.config.js serves them with a 1-year immutable cache —
+// after regenerating, bump the version in the script AND here.
 export function HandsBackdrop({ opacity = 0.85 }: { opacity?: number }) {
   const common: CSSProperties = {
     position: 'fixed',
@@ -18,14 +19,8 @@ export function HandsBackdrop({ opacity = 0.85 }: { opacity?: number }) {
   }
   return (
     <>
-      <picture>
-        <source media="(max-width: 768px)" srcSet="/hands-left.mobile.webp" />
-        <img src="/hands-left.svg" alt="" aria-hidden role="presentation" style={{ ...common, left: 0 }} />
-      </picture>
-      <picture>
-        <source media="(max-width: 768px)" srcSet="/hands-right.mobile.webp" />
-        <img src="/hands-right.svg" alt="" aria-hidden role="presentation" style={{ ...common, right: 0 }} />
-      </picture>
+      <img src="/hands-left.v2.webp" alt="" aria-hidden role="presentation" style={{ ...common, left: 0 }} />
+      <img src="/hands-right.v2.webp" alt="" aria-hidden role="presentation" style={{ ...common, right: 0 }} />
     </>
   )
 }

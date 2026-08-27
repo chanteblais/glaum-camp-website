@@ -115,7 +115,7 @@ Most content cards use a parchment aesthetic:
 
 ### Ornamental hands (page backdrop)
 
-`HandsBackdrop` (`components/HandsBackdrop.tsx`) — the fixed hands framing most pages, one component instead of per-page `<img>` pairs. Props: `opacity` (default `0.85`; message threads use `0.6`). Desktop renders the crisp SVGs; below 768px a `<picture>` swaps in pre-struck WebP rasters (`public/hands-*.mobile.webp`) because the ~750-path SVGs are expensive for phones to rasterize at 3× DPR. After editing the source SVGs, re-strike the rasters: `node scripts/raster-hands.mjs`.
+`HandsBackdrop` (`components/HandsBackdrop.tsx`) — the fixed hands framing most pages, one component instead of per-page `<img>` pairs. Props: `opacity` (default `0.85`; message threads use `0.6`). ALL breakpoints render pre-struck WebP rasters (`public/hands-*.v2.webp`, ~145KB the pair, immutable-cached via `next.config.js` `headers()`); the ~750-path SVGs stay in `public/` as editable masters only (they gzip to ~138KB and were re-requested on every navigation). After editing the source SVGs: bump the version in `scripts/raster-hands.mjs` AND `HandsBackdrop`, then `node scripts/raster-hands.mjs`.
 
 ### Avatar
 

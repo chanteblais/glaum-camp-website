@@ -4,7 +4,7 @@
 // caches HTML navigations or API requests, so authenticated (Clerk) content is
 // always fetched fresh. Push handling will be added in step 2.
 
-const CACHE = 'glaum-static-v3'
+const CACHE = 'glaum-static-v4'
 
 // Local dev is exempt from caching entirely: dev chunk paths are stable across
 // edits (no content hashes), so cache-first would keep serving stale code after
@@ -12,16 +12,15 @@ const CACHE = 'glaum-static-v3'
 // way (activate deletes all other cache keys).
 const IS_DEV_HOST = self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1'
 
-// Same-origin paths / extensions that are safe to cache (immutable assets).
-const STATIC_PATH = /\/(?:_next\/static|favicon|fonts)\//
-const STATIC_EXT = /\.(?:png|jpe?g|svg|gif|webp|ico|woff2?|ttf|otf|css|js)$/
-// Mutable art under stable names — the asset library gets re-struck in place
-// (icons, medals), so cache-first would pin stale art forever (it did: the
-// pre-normalization icons survived in every installed PWA until the v3 bump
-// above purged them). Let the network + HTTP etags keep these fresh.
-// /hands-* covers the ornamental hands (SVGs still being color-tuned + their
-// mobile WebP strikes from scripts/raster-hands.mjs).
-const MUTABLE_PATH = /^\/(?:asset-library\/|hands-)/
+// Cache-first is reserved for content-hashed build output — the ONLY paths
+// whose bytes can never change under a given URL. Everything in public/
+// (fonts, hands rasters, asset-library art) is served with HTTP cache headers
+// from next.config.js instead: versioned filenames get long immutable
+// lifetimes, re-struck-in-place art gets a short SWR window. The old broad
+// extension match cached non-hashed files forever and pinned stale art/fonts
+// in installed PWAs until a manual CACHE bump (see the v3 incident) — don't
+// widen this again.
+const STATIC_PATH = /\/_next\/static\//
 
 self.addEventListener('install', () => {
   self.skipWaiting()
@@ -46,10 +45,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url)
   if (url.origin !== self.location.origin) return
 
-  if (MUTABLE_PATH.test(url.pathname)) return // mutable art → always network
-
-  const isStatic = STATIC_PATH.test(url.pathname) || STATIC_EXT.test(url.pathname)
-  if (!isStatic) return // HTML, API, auth → always hit the network
+  if (!STATIC_PATH.test(url.pathname)) return // HTML, API, public/ assets → network + HTTP cache
 
   event.respondWith(
     caches.open(CACHE).then(async (cache) => {
