@@ -6,6 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { RememberSignedIn } from '@/components/RememberSignedIn'
 import { Header } from '@/components/Header'
 import { NotificationPreferences } from './NotificationPreferences'
+import { getNotificationPreferences } from '@/lib/notification-prefs'
 import { ProfileSettings } from './ProfileSettings'
 import { VolunteerSettings } from './VolunteerSettings'
 import { AvatarUpload } from '@/components/AvatarUpload'
@@ -22,6 +23,7 @@ import { parseDuesConfig, duesAppliesToMembers } from '@/lib/dues'
 import { buildMemberFacts } from '@/lib/member-facts'
 import { parseDistinctions, evaluateDistinctions } from '@/lib/distinctions'
 import { resolveMember, getMemberProfileValues } from '@/lib/members'
+import { getPageContent } from '@/lib/page-content'
 import { parseProfileFields, storedFields, profileGaps } from '@/lib/profile-fields'
 import { getMemberAwards } from '@/lib/distinction-awards'
 import { CabinetOfDistinctions } from './CabinetOfDistinctions'
@@ -104,9 +106,10 @@ export default async function ProfilePage() {
     [{ data: campSignup }, { data: heldShiftRows }],
     memberGroups,
     resourceClaims,
-    { data: attuneConfigRows },
+    attuneConfig,
     shiftState,
     profileMember,
+    notificationPrefs,
   ] = await Promise.all([
     isActiveMember
       ? Promise.all([
@@ -126,15 +129,16 @@ export default async function ProfilePage() {
     // Shared-resource claims ("I'll bring one") — BRINGING rows on the commitments card.
     getMemberResourceClaims(memberClerkId),
     // Attunement config (Admin → Manage → Attunement Tasks) + distinction rules.
-    supabaseAdmin
-      .from('page_content')
-      .select('key, value')
-      .in('key', ['config_attunement_tasks', 'config_shift_signup_open', 'config_distinctions', 'config_profile_fields', 'config_dues']),
+    getPageContent(['config_attunement_tasks', 'config_shift_signup_open', 'config_distinctions', 'config_profile_fields', 'config_dues']),
     // Shift-hours state: held hours per shift type + obligations derived from the
     // member's groups/roles. Same helper as the home dashboard — keep in sync.
     getMemberShiftState(memberClerkId),
     // Canonical member row (Phase 1 member_profiles) for stored profile values.
     resolveMember(memberClerkId, email),
+    // Email preferences — server-rendered so NotificationPreferences skips its
+    // mount fetch of /api/profile/notifications. Keyed by the CALLER (this is
+    // always the member's own profile page).
+    getNotificationPreferences(userId),
   ])
 
   // Extract role + department info
@@ -168,7 +172,6 @@ export default async function ProfilePage() {
 
   // Attunement checklist — admin-configured tasks, each auto-completed from its
   // requirement type (Admin → Manage → Attunement Tasks).
-  const attuneConfig = Object.fromEntries((attuneConfigRows ?? []).map(r => [r.key, r.value]))
   // Shared with the home dashboard banner via buildAttunementChecklist — keep both in sync.
   const attunementState = {
     hasPhoto: !!application?.avatar_url,
@@ -195,10 +198,9 @@ export default async function ProfilePage() {
   // Profile-completion nudge: registry fields flagged "catch-up" (askExisting)
   // that this member hasn't filled and hasn't permanently dismissed. Computed
   // server-side so the top banner renders with data in place (no client fetch).
-  const profileGapList = profileGaps(
-    storedFields(parseProfileFields(attuneConfig['config_profile_fields'])),
-    profileValues,
-  ).map(f => ({ key: f.key, label: f.label, required: !!f.required }))
+  const registryFields = storedFields(parseProfileFields(attuneConfig['config_profile_fields']))
+  const profileGapList = profileGaps(registryFields, profileValues)
+    .map(f => ({ key: f.key, label: f.label, required: !!f.required }))
 
   // Member facts → earned distinctions (Cabinet of Distinctions). Facts are
   // derived from existing data; medals are never persisted — they're recomputed
@@ -619,7 +621,12 @@ export default async function ProfilePage() {
                 until the registry has member-visible fields. The id is the
                 ProfileNudge "Add now" scroll target. */}
             <div id="profile-details">
-              <ProfileDetails />
+              {/* Same filter as GET /api/profile/fields — skips that route's
+                  mount fetch (currentUser + resolveMember + 2 queries). */}
+              <ProfileDetails
+                initialFields={registryFields.filter(f => f.public || f.memberEditable)}
+                initialValues={profileValues}
+              />
             </div>
 
             <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.2), transparent)', margin: '2.5rem 0' }} />
@@ -635,7 +642,7 @@ export default async function ProfilePage() {
 
             <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.2), transparent)', margin: '2.5rem 0' }} />
 
-            <NotificationPreferences />
+            <NotificationPreferences initialPrefs={notificationPrefs} />
 
             <a href="/members" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem 1.5rem', border: '1px solid rgba(200,168,72,0.18)', borderRadius: '1rem', background: 'rgba(200,168,72,0.03)', textDecoration: 'none' }}>
               <div>
@@ -718,7 +725,7 @@ export default async function ProfilePage() {
             </div>
 
             <TaskStatus track="volunteer" volunteerStatus={volunteer.status} />
-            <NotificationPreferences />
+            <NotificationPreferences initialPrefs={notificationPrefs} />
           </>
         )}
 

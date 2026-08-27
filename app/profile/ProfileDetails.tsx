@@ -86,19 +86,26 @@ function FieldEditor({ field, value, onChange }: {
   }
 }
 
-export function ProfileDetails({ title = 'Profile Details' }: { title?: string } = {}) {
-  const [fields, setFields] = useState<ProfileField[] | null>(null)
-  const [values, setValues] = useState<Record<string, unknown>>({})
+export function ProfileDetails({ title = 'Profile Details', initialFields, initialValues }: {
+  title?: string
+  /** Server-rendered registry fields (already filtered to public/memberEditable) — skips the mount fetch. */
+  initialFields?: ProfileField[]
+  initialValues?: Record<string, unknown>
+} = {}) {
+  const [fields, setFields] = useState<ProfileField[] | null>(initialFields ?? null)
+  const [values, setValues] = useState<Record<string, unknown>>(initialValues ?? {})
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (initialFields != null) return // server already provided the data
     fetch('/api/profile/fields')
       .then(r => r.json())
       .then(d => { setFields(d.fields ?? []); setValues(d.values ?? {}) })
       .catch(() => setFields([]))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Nothing to show until loaded; render nothing if the registry has no

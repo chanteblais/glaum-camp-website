@@ -34,22 +34,6 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   if (!userId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   try {
-    if (!(await requireApprovedMember(userId))) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
-    // Verify the gathering exists, is visible, and hasn't already happened.
-    const { data: event } = await supabaseAdmin
-      .from('lead_up_events')
-      .select('id, title, event_date, start_time, location')
-      .eq('id', params.id)
-      .eq('visible', true)
-      .maybeSingle()
-    if (!event) return NextResponse.json({ error: 'Gathering not found' }, { status: 404 })
-    if (event.event_date && event.event_date < new Date().toISOString().slice(0, 10)) {
-      return NextResponse.json({ error: 'This gathering has already happened' }, { status: 400 })
-    }
-
     // Allow an explicit desired state; default to toggle.
     let desired: 'on' | 'off' | 'toggle' = 'toggle'
     try {
@@ -60,12 +44,28 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       // No / invalid body — fall back to toggle.
     }
 
-    const { data: existing } = await supabaseAdmin
-      .from('lead_up_event_rsvps')
-      .select('id')
-      .eq('lead_up_event_id', params.id)
-      .eq('clerk_user_id', userId)
-      .maybeSingle()
+    // Approval gate, gathering check, and existing-RSVP lookup are
+    // independent — one parallel round trip instead of three serial ones.
+    const [approved, { data: event }, { data: existing }] = await Promise.all([
+      requireApprovedMember(userId),
+      supabaseAdmin
+        .from('lead_up_events')
+        .select('id, title, event_date, start_time, location')
+        .eq('id', params.id)
+        .eq('visible', true)
+        .maybeSingle(),
+      supabaseAdmin
+        .from('lead_up_event_rsvps')
+        .select('id')
+        .eq('lead_up_event_id', params.id)
+        .eq('clerk_user_id', userId)
+        .maybeSingle(),
+    ])
+    if (!approved) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!event) return NextResponse.json({ error: 'Gathering not found' }, { status: 404 })
+    if (event.event_date && event.event_date < new Date().toISOString().slice(0, 10)) {
+      return NextResponse.json({ error: 'This gathering has already happened' }, { status: 400 })
+    }
 
     const shouldRemove = desired === 'off' || (desired === 'toggle' && !!existing)
 

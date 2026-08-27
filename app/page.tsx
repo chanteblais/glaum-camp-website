@@ -6,6 +6,7 @@ import { Footer } from '@/components/Footer'
 import { Section, Kicker, GoldDivider } from '@/components/Section'
 import { ScheduleSection } from '@/components/ScheduleSection'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getAllPageContent, getPageContent } from '@/lib/page-content'
 import { getMemberGroups } from '@/lib/groups'
 import { getResourceWidgetState } from '@/lib/resources'
 import { buildAttunementChecklist, memberGroupCounts, requiredItems, commitmentItems } from '@/lib/attunement'
@@ -58,7 +59,7 @@ let canManagePolls = false
   // Kicked off before any member work — page content is user-independent and
   // is awaited in the parallel batch further down. (Supabase builders never
   // reject; errors come back on the result object.)
-  const pageContentQuery = supabaseAdmin.from('page_content').select('key, value')
+  const pageContentQuery = getAllPageContent()
 
   if (userId) {
     // currentUser() is a Clerk Backend-API round-trip; the application lookup
@@ -252,8 +253,7 @@ let canManagePolls = false
   const isSuspended = !!(suspendedResult?.data?.suspended_at)
   const duesPaid = !!(suspendedResult?.data?.dues_paid_at)
   const duesReported = !!(suspendedResult?.data?.dues_reported_at)
-  const contentRows = pageContentResult.data
-  const pageContent: Record<string, string> = Object.fromEntries((contentRows ?? []).map(r => [r.key, r.value]))
+  const pageContent: Record<string, string> = pageContentResult
   const c = (key: string, fallback: string) => pageContent[key] ?? fallback
 
   // ── Dashboard layout (admin-configurable widget order) ────────

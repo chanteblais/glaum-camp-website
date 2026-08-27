@@ -2,7 +2,7 @@ import { auth } from '@clerk/nextjs/server'
 import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
 import { Section, Kicker } from '@/components/Section'
-import { supabaseAdmin } from '@/lib/supabase'
+import { getAllPageContent } from '@/lib/page-content'
 import { resolveMemberForUser } from '@/lib/members'
 
 export const dynamic = 'force-dynamic'
@@ -11,13 +11,11 @@ export default async function AboutPage() {
   const { userId } = await auth()
 
   // Member lookup and page content are independent — one round-trip.
-  const [member, pageContentResult] = await Promise.all([
+  const [member, pageContent] = await Promise.all([
     userId ? resolveMemberForUser(userId) : Promise.resolve(null),
-    supabaseAdmin.from('page_content').select('key, value'),
+    getAllPageContent(),
   ])
   const hasApplied = !!member && member.status !== 'cancelled'
-  const contentRows = pageContentResult.data
-  const pageContent: Record<string, string> = Object.fromEntries((contentRows ?? []).map(r => [r.key, r.value]))
   const c = (key: string, fallback: string) => pageContent[key] ?? fallback
 
   return (

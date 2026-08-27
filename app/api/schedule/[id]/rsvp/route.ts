@@ -28,14 +28,17 @@ export async function GET(_req: NextRequest, props: { params: Promise<{ id: stri
   if (!userId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   try {
-    const { data: existing } = await supabaseAdmin
-      .from('event_rsvps')
-      .select('id')
-      .eq('schedule_event_id', params.id)
-      .eq('clerk_user_id', userId)
-      .maybeSingle()
+    const [{ data: existing }, count] = await Promise.all([
+      supabaseAdmin
+        .from('event_rsvps')
+        .select('id')
+        .eq('schedule_event_id', params.id)
+        .eq('clerk_user_id', userId)
+        .maybeSingle(),
+      rsvpCount(params.id),
+    ])
 
-    return NextResponse.json({ rsvped: !!existing, count: await rsvpCount(params.id) })
+    return NextResponse.json({ rsvped: !!existing, count })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to load RSVP'
     return NextResponse.json({ error: message }, { status: 500 })
@@ -49,20 +52,6 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   if (!userId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   try {
-    if (!(await requireApprovedMember(userId))) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
-    // Verify the event exists and is visible
-    const { data: event } = await supabaseAdmin
-      .from('schedule_events')
-      .select('id')
-      .eq('id', params.id)
-      .eq('visible', true)
-      .maybeSingle()
-
-    if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 })
-
     // Allow the client to specify an explicit desired state; default to toggle.
     let desired: 'on' | 'off' | 'toggle' = 'toggle'
     try {
@@ -73,12 +62,25 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       // No / invalid body — fall back to toggle behaviour.
     }
 
-    const { data: existing } = await supabaseAdmin
-      .from('event_rsvps')
-      .select('id')
-      .eq('schedule_event_id', params.id)
-      .eq('clerk_user_id', userId)
-      .maybeSingle()
+    // Approval gate, event check, and existing-RSVP lookup are independent —
+    // one parallel round trip instead of three serial ones.
+    const [approved, { data: event }, { data: existing }] = await Promise.all([
+      requireApprovedMember(userId),
+      supabaseAdmin
+        .from('schedule_events')
+        .select('id')
+        .eq('id', params.id)
+        .eq('visible', true)
+        .maybeSingle(),
+      supabaseAdmin
+        .from('event_rsvps')
+        .select('id')
+        .eq('schedule_event_id', params.id)
+        .eq('clerk_user_id', userId)
+        .maybeSingle(),
+    ])
+    if (!approved) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 })
 
     const shouldRemove = desired === 'off' || (desired === 'toggle' && !!existing)
 

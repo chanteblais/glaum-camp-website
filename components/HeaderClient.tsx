@@ -242,7 +242,6 @@ export function HeaderClient({ initialAuth }: { initialAuth?: NavAuthState }) {
 
   const authSlot = signedIn ? (
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-      {isAdmin ? <NotificationBell /> : <UserNotificationBell />}
     <div ref={dropdownRef} style={{ position: 'relative' }}>
       <button
         onClick={() => setDropdownOpen(!dropdownOpen)}
@@ -500,6 +499,18 @@ export function HeaderClient({ initialAuth }: { initialAuth?: NavAuthState }) {
           </nav>
         )}
 
+        {/* Notification bell — rendered ONCE outside the isMobile branches so
+            the false→true flip on mobile doesn't unmount/remount it (each
+            mount fires the notifications fetch; the old two-slot layout
+            fetched twice on every mobile load). marginLeft:auto right-aligns
+            it when the desktop nav (flex:1) is absent; -0.5rem cancels half
+            the row gap to keep the original 0.5rem spacing to its neighbor. */}
+        {signedIn && (
+          <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0, marginLeft: 'auto', marginRight: '-0.5rem' }}>
+            {isAdmin ? <NotificationBell /> : <UserNotificationBell />}
+          </div>
+        )}
+
         {/* Desktop auth slot */}
         {!isMobile && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexShrink: 0 }}>
@@ -507,10 +518,9 @@ export function HeaderClient({ initialAuth }: { initialAuth?: NavAuthState }) {
           </div>
         )}
 
-        {/* Mobile right side: bell (if signed in) + hamburger */}
+        {/* Mobile right side: hamburger */}
         {isMobile && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
-            {signedIn && (isAdmin ? <NotificationBell /> : <UserNotificationBell />)}
             <button
               onClick={() => setMenuOpen(!menuOpen)}
               style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.4rem', color: '#C8A848', display: 'flex', alignItems: 'center', justifyContent: 'center' }}

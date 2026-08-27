@@ -1,38 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { usePathname } from 'next/navigation'
+import { useUnreadMessages } from '@/components/MessagesNavLink'
 
 export function UnreadCountBadge() {
-  const [unread, setUnread] = useState(0)
-  const pathname = usePathname()
-
-  const refresh = useCallback(() => {
-    return fetch('/api/messages/unread', { cache: 'no-store' })
-      .then(r => (r.ok ? r.json() : null))
-      .then((d: { count?: number } | null) => setUnread(d?.count ?? 0))
-      .catch(() => {})
-  }, [])
-
-  useEffect(() => {
-    refresh()
-    // Poll every 30s for near-real-time updates.
-    const id = setInterval(refresh, 30_000)
-
-    // Re-check promptly when the tab regains focus or another part of the app
-    // signals that messages were read (e.g. opening a thread).
-    const onFocus = () => refresh()
-    const onRead = () => refresh()
-    window.addEventListener('focus', onFocus)
-    window.addEventListener('glaum:messages-read', onRead)
-
-    return () => {
-      clearInterval(id)
-      window.removeEventListener('focus', onFocus)
-      window.removeEventListener('glaum:messages-read', onRead)
-    }
-    // Re-run on route change so the count updates after navigating.
-  }, [refresh, pathname])
+  // Shares the module-level poller in MessagesNavLink — this component used to
+  // run its own identical 30s poll, doubling the sustained request rate on
+  // /messages.
+  const unread = useUnreadMessages()
 
   if (unread <= 0) return null
 

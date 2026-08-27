@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getPageContent, getPageContentValue } from '@/lib/page-content'
 import { getShiftParticipant, participantDisplayName } from '@/lib/members'
 import { getShiftSignupData } from '@/lib/participate-data'
 import { eventRangeDays, isValidOccurrence } from '@/lib/shift-occurrences'
@@ -19,10 +20,7 @@ import { whenText } from '@/lib/event-reminders'
 // The guarded configured event range (for validating an "every day" recurring
 // shift's occurrence dates), fetched once per request.
 async function getRangeDays(): Promise<string[]> {
-  const { data } = await supabaseAdmin
-    .from('page_content').select('key, value')
-    .in('key', ['config_event_start_date', 'config_event_end_date'])
-  const c = Object.fromEntries((data ?? []).map(r => [r.key, r.value as string]))
+  const c = await getPageContent(['config_event_start_date', 'config_event_end_date'])
   return eventRangeDays(c['config_event_start_date'], c['config_event_end_date'])
 }
 
@@ -50,13 +48,6 @@ export async function POST(req: NextRequest) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const participant = await getShiftParticipant(userId)
-  if (!participant) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  // Suspension is a member state (volunteers are gated by their status instead).
-  if (participant.kind === 'member' && participant.member.suspended_at) {
-    return NextResponse.json({ error: 'Your attendance is suspended — resume it on your profile to sign up for shifts.' }, { status: 403 })
-  }
-
   const { schedule_event_id, occurrence_date: rawDate, role: rawRole } = await req.json()
   if (!schedule_event_id) return NextResponse.json({ error: 'schedule_event_id required' }, { status: 400 })
   // Optional participation role (migration 048); omitting it keeps an existing
@@ -67,23 +58,31 @@ export async function POST(req: NextRequest) {
   const role = rawRole as 'member' | 'lead' | undefined
   const occurrenceDate: string | null = rawDate ?? null
 
-  const { data: flag } = await supabaseAdmin
-    .from('page_content').select('value').eq('key', 'config_shift_signup_open').maybeSingle()
-  if (flag?.value === 'false') {
+  // Participant gate, signup-open flag, event row, and configured range are
+  // all independent — one parallel round trip instead of four serial ones.
+  const [participant, flagValue, { data: event }, rangeDays] = await Promise.all([
+    getShiftParticipant(userId),
+    getPageContentValue('config_shift_signup_open'),
+    supabaseAdmin
+      .from('schedule_events')
+      .select('id, title, capacity, participation_type, visible, needs_lead, is_recurring, recurrence_days, event_date, time, start_time')
+      .eq('id', schedule_event_id)
+      .single(),
+    getRangeDays(),
+  ])
+  if (!participant) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  // Suspension is a member state (volunteers are gated by their status instead).
+  if (participant.kind === 'member' && participant.member.suspended_at) {
+    return NextResponse.json({ error: 'Your attendance is suspended — resume it on your profile to sign up for shifts.' }, { status: 403 })
+  }
+  if (flagValue === 'false') {
     return NextResponse.json({ error: 'Shift signup is currently closed.' }, { status: 403 })
   }
-
-  const { data: event } = await supabaseAdmin
-    .from('schedule_events')
-    .select('id, title, capacity, participation_type, visible, needs_lead, is_recurring, recurrence_days, event_date, time, start_time')
-    .eq('id', schedule_event_id)
-    .single()
   if (!event || event.participation_type !== 'shift' || !event.visible) {
     return NextResponse.json({ error: 'Shift not found' }, { status: 404 })
   }
   // The night must be a real occurrence: a date on a recurring shift (one of its
   // nights), or NULL on a non-recurring shift.
-  const rangeDays = await getRangeDays()
   if (!isValidOccurrence(event, occurrenceDate, rangeDays)) {
     return NextResponse.json({
       error: event.is_recurring ? 'occurrence_date must be one of this shift’s nights' : 'This shift is not recurring',

@@ -1,4 +1,5 @@
 import { supabaseAdmin } from './supabase'
+import { getPageContent, getPageContentValue } from './page-content'
 import { shiftDurationHours } from './shift-hours'
 import { getMemberShiftState } from './shift-attunement'
 import { parseAttunementTasks } from './site-config'
@@ -20,15 +21,15 @@ export type RoleSignupData = {
 }
 
 export async function getRoleSignupData(userId: string): Promise<RoleSignupData> {
-  const [deptRes, rolesRes, signupRes, roleCounts, shiftFlagRes] = await Promise.all([
+  const [deptRes, rolesRes, signupRes, roleCounts, shiftFlagValue] = await Promise.all([
     supabaseAdmin.from('departments').select('id, name, description, icon, sort_order').order('sort_order'),
     supabaseAdmin.from('roles').select('id, name, description, capacity, sort_order, department_id, purpose, responsibilities_before, responsibilities_during, ideal_for, commitment, commitment_period, requires_approval').order('sort_order'),
     supabaseAdmin.from('camp_signups').select('role_id, role_approval_status').eq('clerk_user_id', userId).maybeSingle(),
     supabaseAdmin.from('camp_signups').select('role_id').not('role_id', 'is', null),
-    supabaseAdmin.from('page_content').select('value').eq('key', 'config_shift_signup_open').maybeSingle(),
+    getPageContentValue('config_shift_signup_open'),
   ])
 
-  const shiftSignupOpen = shiftFlagRes.data?.value !== 'false'
+  const shiftSignupOpen = shiftFlagValue !== 'false'
 
   const roleSignupCounts: Record<string, number> = {}
   for (const row of roleCounts.data ?? []) {
@@ -108,7 +109,7 @@ export type ShiftSignupData = {
 }
 
 export async function getShiftSignupData(userId: string): Promise<ShiftSignupData> {
-  const [eventsRes, holds, shiftState, flagRes, typesRes] = await Promise.all([
+  const [eventsRes, holds, shiftState, config, typesRes] = await Promise.all([
     supabaseAdmin
       .from('schedule_events')
       .select('id, title, subtitle, day, time, event_date, start_time, end_time, capacity, shift_type_id, needs_lead, is_recurring, recurrence_days, shift_types(name, icon)')
@@ -118,14 +119,13 @@ export async function getShiftSignupData(userId: string): Promise<ShiftSignupDat
       .order('start_time', { ascending: true, nullsFirst: false }),
     fetchAllHolds(),
     getMemberShiftState(userId),
-    supabaseAdmin.from('page_content').select('key, value').in('key', ['config_shift_signup_open', 'config_attunement_tasks', 'config_event_start_date', 'config_event_end_date']),
+    getPageContent(['config_shift_signup_open', 'config_attunement_tasks', 'config_event_start_date', 'config_event_end_date']),
     supabaseAdmin.from('shift_types').select('id, name, icon').order('sort_order'),
   ])
 
   // Registry order drives each type's palette slot (lib/shift-colors.ts).
   const shiftTypes = (typesRes.data ?? []).map((t, i) => ({ id: t.id, name: t.name, icon: t.icon, color_index: i }))
 
-  const config = Object.fromEntries((flagRes.data ?? []).map(r => [r.key, r.value]))
   const shiftSignupOpen = config['config_shift_signup_open'] !== 'false'
   const rangeDays = eventRangeDays(config['config_event_start_date'], config['config_event_end_date'])
 

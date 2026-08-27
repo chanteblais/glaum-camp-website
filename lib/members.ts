@@ -149,9 +149,13 @@ export type ShiftParticipant =
  * volunteer, else null.
  */
 export async function getShiftParticipant(clerkUserId: string): Promise<ShiftParticipant | null> {
-  const member = await getApprovedMember(clerkUserId)
+  // Both lookups key on clerk_user_id and member wins — run them in parallel
+  // (this sits on the hot path of every shift-signup request).
+  const [member, volunteer] = await Promise.all([
+    getApprovedMember(clerkUserId),
+    getActiveVolunteer(clerkUserId),
+  ])
   if (member) return { kind: 'member', member }
-  const volunteer = await getActiveVolunteer(clerkUserId)
   return volunteer ? { kind: 'volunteer', volunteer } : null
 }
 

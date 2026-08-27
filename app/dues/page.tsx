@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getPageContentValue } from '@/lib/page-content'
 import { getApprovedMember } from '@/lib/members'
 import { parseDuesConfig, formatDuesAmount, duesConfigReady, duesAppliesToMembers } from '@/lib/dues'
 import { RichText } from '@/lib/markdown-lite'
@@ -20,13 +21,13 @@ export default async function DuesPage() {
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
 
-  const [member, { data: cfgRow }] = await Promise.all([
+  const [member, duesValue] = await Promise.all([
     getApprovedMember(userId),
-    supabaseAdmin.from('page_content').select('value').eq('key', 'config_dues').maybeSingle(),
+    getPageContentValue('config_dues'),
   ])
   if (!member) redirect('/profile')
 
-  const cfg = parseDuesConfig(cfgRow?.value)
+  const cfg = parseDuesConfig(duesValue)
 
   // Dues off, or not applied to members → nothing to collect here.
   if (!duesAppliesToMembers(cfg)) {

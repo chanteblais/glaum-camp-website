@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '@/lib/supabase'
+import { getPageContent } from '@/lib/page-content'
 import { ScheduleCalendarClient } from '@/components/ScheduleCalendarClient'
 import { shiftColorIndexMap } from '@/lib/shift-colors'
 import { buildScheduleDays } from '@/lib/schedule-days'
@@ -7,7 +8,7 @@ export { EventIcon } from '@/components/EventIcon'
 export { ICON_TYPES } from '@/components/EventIcon'
 
 export async function ScheduleSection() {
-  const [{ data: eventsRaw }, { data: shiftTypes }, { data: configRows }] = await Promise.all([
+  const [{ data: eventsRaw }, { data: shiftTypes }, config] = await Promise.all([
     supabaseAdmin
       .from('schedule_events')
       .select('id, day, time, title, subtitle, detail_desc, icon_type, highlight, is_recurring, recurrence_days, event_date, participation_type, shift_type_id')
@@ -16,7 +17,7 @@ export async function ScheduleSection() {
       .eq('show_on_schedule', true)
       .order('sort_order', { ascending: true }),
     supabaseAdmin.from('shift_types').select('id').order('sort_order'),
-    supabaseAdmin.from('page_content').select('key, value').in('key', ['config_event_start_date', 'config_event_end_date']),
+    getPageContent(['config_event_start_date', 'config_event_end_date']),
   ])
 
   // Each shift type gets a stable palette slot from its registry position.
@@ -29,7 +30,6 @@ export async function ScheduleSection() {
   // Day columns: the configured event range ∪ every date an event DISPLAYS on
   // (late-night convention — an after-midnight event belongs to the previous
   // night's column, so its true morning date must not spawn a column).
-  const config = Object.fromEntries((configRows ?? []).map(r => [r.key, r.value]))
   const days = buildScheduleDays(
     data.filter(e => !e.is_recurring).map(e => displayPlacement(e.time, e.event_date).displayDate),
     config['config_event_start_date'],

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidateTag } from 'next/cache'
 import { supabaseAdmin } from '@/lib/supabase'
 import { requireAdmin } from '@/lib/admin-auth'
+import { PAGE_CONTENT_TAG } from '@/lib/page-content'
 
 export async function GET() {
   if (!(await requireAdmin())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -31,5 +33,11 @@ export async function PATCH(req: NextRequest) {
     .upsert(rows, { onConflict: 'key' })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Invalidate every cached getPageContent() read (lib/page-content.ts).
+  // Next 16 semantics: the 'max' profile marks entries stale immediately —
+  // one request may still see the old value (SWR) while the fresh read runs.
+  // Admin editors are unaffected: this route's GET reads the table directly.
+  revalidateTag(PAGE_CONTENT_TAG, 'max')
   return NextResponse.json({ success: true })
 }

@@ -1,4 +1,5 @@
 import { supabaseAdmin } from './supabase'
+import { getPageContent } from './page-content'
 import { shiftDurationHours } from './shift-hours'
 import { parseAttunementTasks } from './site-config'
 import { eventRangeDays, shiftOccurrenceCount, shiftOccurrenceDates } from './shift-occurrences'
@@ -65,7 +66,7 @@ export async function getShiftHoursOverview(): Promise<ShiftHoursOverview> {
     { data: shiftTypes },
     { data: events },
     signups,
-    { data: configRows },
+    config,
     { data: approvedRows },
     suspendedClerkIds,
     { data: groupRows },
@@ -81,10 +82,7 @@ export async function getShiftHoursOverview(): Promise<ShiftHoursOverview> {
     // Shared with the Manage-side roster (lib/admin-program-data.ts
     // getAdminRosters) so "who holds this shift" can never disagree.
     fetchShiftHolds(),
-    supabaseAdmin
-      .from('page_content')
-      .select('key, value')
-      .in('key', ['config_event_start_date', 'config_event_end_date', 'config_attunement_tasks']),
+    getPageContent(['config_event_start_date', 'config_event_end_date', 'config_attunement_tasks']),
     supabaseAdmin.from('applications').select('clerk_user_id').eq('status', 'approved').not('clerk_user_id', 'is', null),
     // Shared with Manage + Overview's other counts (lib/admin-counts.ts).
     getSuspendedClerkUserIds(),
@@ -97,7 +95,6 @@ export async function getShiftHoursOverview(): Promise<ShiftHoursOverview> {
       .not('role_id', 'is', null),
   ])
 
-  const config = Object.fromEntries((configRows ?? []).map(r => [r.key, r.value as string]))
   const rangeDays = eventRangeDays(config['config_event_start_date'], config['config_event_end_date'])
 
   const eventById = new Map((events ?? []).map(e => [e.id as string, e]))

@@ -1,4 +1,5 @@
 import { supabaseAdmin } from './supabase'
+import { getPageContent, getPageContentValue } from './page-content'
 import { eventRangeDays, shiftOccurrenceDates } from './shift-occurrences'
 
 // Data behind the admin console's "Needs attention" digest (A1) and the
@@ -35,7 +36,7 @@ const daysUntil = (iso: string) =>
 // At most five prioritized, actionable lines. Every line names work and links
 // to where it's done. Order = review queues first, then time-sensitive comms.
 export async function getAttentionItems(): Promise<AttentionItem[]> {
-  const [apps, vols, roleReqs, roleSuggs, { data: gatherings }, { data: leadShifts }, { data: shiftHolds }, { data: rangeRows }] = await Promise.all([
+  const [apps, vols, roleReqs, roleSuggs, { data: gatherings }, { data: leadShifts }, { data: shiftHolds }, rangeConfig] = await Promise.all([
     supabaseAdmin.from('applications').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     supabaseAdmin.from('volunteers').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     supabaseAdmin.from('camp_signups').select('clerk_user_id', { count: 'exact', head: true }).eq('role_approval_status', 'pending'),
@@ -58,7 +59,7 @@ export async function getAttentionItems(): Promise<AttentionItem[]> {
       .gt('capacity', 0)
       .or(`event_date.is.null,event_date.gte.${todayLocal()},is_recurring.eq.true`),
     supabaseAdmin.from('member_shift_signups').select('clerk_user_id, schedule_event_id, occurrence_date, role'),
-    supabaseAdmin.from('page_content').select('key, value').in('key', ['config_event_start_date', 'config_event_end_date']),
+    getPageContent(['config_event_start_date', 'config_event_end_date']),
   ])
 
   const items: AttentionItem[] = []
@@ -108,8 +109,8 @@ export async function getAttentionItems(): Promise<AttentionItem[]> {
     if ('role' in r && r.role === 'lead') leadOccs.add(k)
   }
   const rangeDays = eventRangeDays(
-    (rangeRows ?? []).find(r => r.key === 'config_event_start_date')?.value,
-    (rangeRows ?? []).find(r => r.key === 'config_event_end_date')?.value,
+    rangeConfig['config_event_start_date'],
+    rangeConfig['config_event_end_date'],
   )
   // A shift flags if ANY of its occurrences (nights) is full and leadless.
   const leadless = (leadShifts ?? []).filter(s => {
@@ -139,11 +140,8 @@ export async function getAttentionItems(): Promise<AttentionItem[]> {
 // The thin always-visible strip under the admin tabs: days to camp + the next
 // couple of dated milestones on the runway.
 export async function getAdminRunway(): Promise<AdminRunway> {
-  const [{ data: cfgRows }, { data: gatherings }] = await Promise.all([
-    supabaseAdmin
-      .from('page_content')
-      .select('key, value')
-      .in('key', ['config_event_start_date']),
+  const [startValue, { data: gatherings }] = await Promise.all([
+    getPageContentValue('config_event_start_date'),
     supabaseAdmin
       .from('lead_up_events')
       .select('title, event_date')
@@ -153,7 +151,7 @@ export async function getAdminRunway(): Promise<AdminRunway> {
       .limit(2),
   ])
 
-  const start = (cfgRows ?? []).find(r => r.key === 'config_event_start_date')?.value || null
+  const start = startValue || null
   const daysToCamp = start ? Math.max(0, daysUntil(start)) : null
 
   const milestones: RunwayMilestone[] = (gatherings ?? [])
