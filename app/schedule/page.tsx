@@ -5,6 +5,7 @@ import { ScheduleSection } from '@/components/ScheduleSection'
 import { LeadUpGatherings } from './LeadUpGatherings'
 import { Header } from '@/components/Header'
 import { getMemberLeadUpEvents } from '@/lib/lead-up'
+import { getApprovedMember } from '@/lib/members'
 
 export default async function SchedulePage() {
   const { userId } = await auth()
@@ -13,17 +14,14 @@ export default async function SchedulePage() {
   // Gate + gatherings in one batch; the events are discarded on redirect. A
   // failed gatherings fetch degrades to undefined — the section then runs its
   // own mount fetch instead of erroring the page.
-  const [{ data: application }, leadUpEvents] = await Promise.all([
-    supabaseAdmin
-      .from('members')
-      .select('status')
-      .eq('clerk_user_id', userId)
-      .maybeSingle(),
+  const [member, leadUpEvents] = await Promise.all([
+    // Only approved members can view schedule — canonical gate (members table
+    // + email fallback; see app/messages/page.tsx).
+    getApprovedMember(userId),
     getMemberLeadUpEvents(userId).catch(() => undefined),
   ])
 
-  // Only approved members can view schedule
-  if (application?.status !== 'approved') redirect('/profile')
+  if (!member) redirect('/profile')
 
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1 }}>

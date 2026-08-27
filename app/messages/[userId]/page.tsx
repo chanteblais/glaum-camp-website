@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server'
 import { redirect, notFound } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getDirectThreadMessages } from '@/lib/inbox'
+import { getApprovedMember } from '@/lib/members'
 import { Header } from '@/components/Header'
 import { ThreadClient } from './ThreadClient'
 import { supabaseResizedUrl } from '@/lib/supabase-image'
@@ -18,13 +19,10 @@ export default async function ThreadPage(props: { params: Promise<{ userId: stri
   // The access check, the recipient profile, and the initial thread are
   // independent reads — run them together so the thread paints with its
   // messages already in place (the client keeps polling for new ones).
-  const [{ data: myApp }, { data: other }, initialMessages] = await Promise.all([
-    // Auth: only approved members
-    supabaseAdmin
-      .from('applications')
-      .select('status')
-      .eq('clerk_user_id', myId)
-      .maybeSingle(),
+  const [me, { data: other }, initialMessages] = await Promise.all([
+    // Auth: only approved members — canonical gate (members table + email
+    // fallback; see app/messages/page.tsx).
+    getApprovedMember(myId),
     // Recipient profile
     supabaseAdmin
       .from('members')
@@ -35,7 +33,7 @@ export default async function ThreadPage(props: { params: Promise<{ userId: stri
     getDirectThreadMessages(myId, params.userId).catch(() => null),
   ])
 
-  if (myApp?.status !== 'approved') redirect('/profile')
+  if (!me) redirect('/profile')
 
   // The other member may have been removed (deleted / no longer approved). Rather
   // than 404, still show the existing conversation read-only — but only if there's
