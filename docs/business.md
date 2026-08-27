@@ -220,6 +220,12 @@ eventually new-tenant starter templates. If anything gets built early, it's this
 5. **Boring-but-real launch mechanics** — business entity, liability, payment processing (Stripe
    already deferred once), privacy policy for multi-tenant member data. Park until first paid
    customer is in sight.
+6. **Event-mode toggle — can it do both?** (2026-08-27) One product serving seasonal camps *and*
+   year-round communities via a mode switch: event-on = current implementation (countdown,
+   schedule, shifts, attunement-as-readiness prominent), event-off = community-focused (registry,
+   groups, messaging, memory). See discussion log 2026-08-27 (later) for the full analysis.
+   Sub-questions: what makes the app worth opening in the off-season (the toggle is only the
+   delivery mechanism for that content), and manual toggle vs derived-from-event-dates.
 
 ---
 
@@ -305,3 +311,33 @@ eventually new-tenant starter templates. If anything gets built early, it's this
   matter less. (Prioritization note added to the genlog intro.)
 - If the reframe is adopted, it touches landing-page positioning copy (showcase rung 3) and open
   question #4 — the platform name should read community-first, not event-first.
+
+### 2026-08-27 (later) — Event-mode toggle: could it do both?
+
+- Chante's idea (logged as **open question #6**, undecided): an admin **event toggle** — on =
+  current event-planning implementation, off = community-focused functionality. One product
+  serving both seasonal camps and year-round communities.
+- Assessment: right move, with a reframe — it's less a feature toggle than the app admitting a
+  community has a *lifecycle*, with the event as one phase. It resolves the positioning tension
+  from the morning's entry in-product: community infrastructure that *ramps into event mode*.
+  Camps live mostly on, ICs/co-ops mostly off with occasional events; no competitor sits on both
+  sides of the switch.
+- **The dogfood case is live now:** What If was 2026-07-23; Glåüm is currently a community with
+  no upcoming event, while the app still leads with event surfaces. Off-season Glåüm *is*
+  "toggle off" — design it from real need (what do members want in September? registry,
+  groups/messaging, retrospective/memory, maybe rolling applications — the anti-churn moat made
+  visible).
+- Implementation read: cheaper than it sounds if kept shallow. Modes differ in *emphasis*, not
+  functionality — homepage/dashboard composition (already configurable via `page_content`), nav
+  ordering, countdown/schedule prominence, attunement dormancy. Groups, messaging, profiles,
+  distinctions, polls are mode-agnostic. V1 ≈ one boolean in `page_content` + show/hide gates.
+  **Resist letting modes fork behavior deeply** — a toggle changing *what's on stage* is cheap;
+  one changing *how features work* doubles QA surface forever.
+- Architecture note (foundation phase, not now): end state is mode *derived* from whether an
+  event is active/upcoming (with manual override), per the genlog's Event-as-first-class-object
+  row. The manual toggle is the right intermediate — names the no-active-event state and builds
+  the off-season UX without abstracting ahead of a second use case; consumers stay, only the
+  source changes.
+- The honest risk: off-season mode is only worth building if there's off-season *content*. A
+  toggle that reveals an empty room reads as a dead app — worse for retention than event
+  clutter. The real design work is "what makes the app worth opening in the off-season."
