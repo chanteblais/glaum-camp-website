@@ -104,6 +104,13 @@ things*: apply, get approved, join groups, hold shifts, pay dues, earn distincti
 serious owns that wedge for secular grassroots communities. (Hylo is the nearest neighbor and
 it's a nonprofit social network, not an ops tool.)
 
+Sharper vocabulary for the same wedge (2026-08-27): the incumbents serve **audience-shaped**
+communities — a creator/org broadcasting to members who consume and chat. This product serves
+**participation-shaped** communities — membership is earned and members contribute labor, not
+just attention. The gap sits between community platforms with no concept of contribution on one
+side and volunteer-logistics tools (SignUpGenius et al.) with no concept of identity or belonging
+on the other. One-liner: **"communities where people contribute, not just consume."**
+
 ---
 
 ## Business-model directions (nothing decided yet)
@@ -270,3 +277,31 @@ eventually new-tenant starter templates. If anything gets built early, it's this
   food-cost trust). Cost ~5¢/interaction — noise against a catering contract.
 - Chante accepted the unauthenticated-endpoint risk explicitly for the festival window
   ("no one knows about it, worth it for real data"); retire-or-gate stays on the books.
+
+### 2026-08-27 — Reframe: software for community builders, not volunteer organization
+
+- Chante's reframe (thinking out loud, **nothing decided**): the product's category isn't
+  volunteer organization — it's **software for community builders**. Question posed: does that
+  change viability, given the earlier seasonality concerns?
+- Assessment: the reframe is *accurate to what's already built*. The event-specific surface
+  (shifts, schedule) is a minority of the codebase; the core is a membership lifecycle — apply →
+  get vetted → join groups → take on commitments → be recognized. Framed as community
+  infrastructure, the seasonality problem becomes a retention story: applications, groups,
+  messaging, profiles, and distinctions all have off-season life, so the year-round relationship
+  is the default posture rather than a stretch.
+- The caution: "community software" as a *category* is crowded (Circle, Mighty Networks, Skool,
+  Heylo, Hivebrite, Wild Apricot, plus free gravity from Discord/Slack/Facebook Groups), and
+  going to market that broadly means competing on breadth against funded incumbents while sanding
+  off the opinionated workflows that differentiate this product. Keep the wedge: this refines,
+  not replaces, the 2026-07-10 "ops platform" positioning — see the audience-shaped vs
+  participation-shaped vocabulary added to *What this product is NOT competing with*.
+- Also strengthens the willingness-to-pay story: participation-shaped communities tend to have
+  money flows (dues, camp fees) and an organizer with real coordination pain — vs the generic
+  "community builder" who is often an unpaid volunteer with no budget.
+- Foundation-phase implication: the highest-value generalizability-log rows are the
+  **single-annual-event assumptions** (event countdowns, camp-season timing, one-event schema
+  like `lead_up_events`, attunement tied to a season) — a year-round community product needs the
+  event to be *a* thing a community runs, not *the* thing the app orbits. Cosmetic Glåüm-isms
+  matter less. (Prioritization note added to the genlog intro.)
+- If the reframe is adopted, it touches landing-page positioning copy (showcase rung 3) and open
+  question #4 — the platform name should read community-first, not event-first.
