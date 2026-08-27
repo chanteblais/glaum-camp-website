@@ -31,7 +31,7 @@ function Avatar({ url }: { url: string | null }) {
     <div style={{ flexShrink: 0, width: '32px', height: '32px', borderRadius: '50%', overflow: 'hidden', border: '1px solid rgba(111,73,31,0.6)', background: 'rgba(200,168,72,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       {url
         // eslint-disable-next-line @next/next/no-img-element
-        ? <img src={supabaseResizedUrl(url, 64) ?? ''} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ? <img src={supabaseResizedUrl(url, 64) ?? ''} loading="lazy" decoding="async" alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         : <span style={{ fontSize: '0.7rem', opacity: 0.3 }}>✦</span>}
     </div>
   )

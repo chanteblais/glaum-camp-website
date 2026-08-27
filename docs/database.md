@@ -538,7 +538,7 @@ Member-submitted suggestions for new departments or roles. Added in migration `0
 
 | Bucket | Used for | Bucket access |
 |---|---|---|
-| `avatars` | Member profile photos (uploaded via `AvatarUpload`; also the application Photo field → `/api/profile/avatar`) | Public |
+| `avatars` | Member profile photos (uploaded via `AvatarUpload`; also the application Photo field → `/api/profile/avatar`). Stored normalized since 2026-08-27: ≤1024px WebP (GIFs as-is), 1-year `cacheControl`; earlier objects are full-size originals with 1-hour cache until re-uploaded | Public |
 | `schedule-icons` | Custom icons for schedule events | Public (must be configured) |
 | `application-files` | Attachments for admin-added **File upload** application fields (`/api/apply/file`) | Public — **must be created** (migration `029`, or create in the Supabase dashboard like `avatars`) |
 | `group-badges` | Icon/badge art for the shared asset library — group icons (`groups/` prefix → `groups.icon_image`), distinction medals (`distinctions/`), and department icons (`departments/`), each via `/api/admin/{groups,distinctions,departments}/[id]/icon`. Legacy bucket name. | Public — **must be created** (migration `034`, or create in the Supabase dashboard like `avatars`) |

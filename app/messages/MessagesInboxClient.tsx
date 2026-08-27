@@ -95,7 +95,7 @@ function Avatar({ avatarUrl, displayName, size = 44, icon, iconImage }: { avatar
         <span aria-hidden="true" style={{ fontSize: size * 0.45 }}>{icon || '✦'}</span>
       ) : avatarUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={supabaseResizedUrl(avatarUrl, size * 2) ?? ''} alt={`${displayName}'s avatar`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        <img src={supabaseResizedUrl(avatarUrl, size * 2) ?? ''} loading="lazy" decoding="async" alt={`${displayName}'s avatar`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       ) : (
         <span aria-hidden="true" style={{ fontFamily: 'TokyoDreams, serif', fontSize: size * 0.4, color: '#C8A848', opacity: 0.6 }}>
           {displayName.charAt(0).toUpperCase()}

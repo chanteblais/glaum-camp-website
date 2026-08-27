@@ -43,7 +43,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
 
   const { error: uploadError } = await supabaseAdmin.storage
     .from(BUCKET)
-    .upload(path, buffer, { contentType: 'image/png', upsert: true })
+    .upload(path, buffer, { contentType: 'image/png', upsert: true, cacheControl: '31536000' })
 
   if (uploadError) {
     console.error('[department icon upload]', uploadError)

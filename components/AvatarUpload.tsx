@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { supabaseResizedUrl } from '@/lib/supabase-image'
 
 export function AvatarUpload({
   initialUrl,
@@ -116,8 +117,9 @@ export function AvatarUpload({
         {/* Avatar image or initials */}
         {preview ? (
           <img
-            src={preview}
+            src={supabaseResizedUrl(preview, size * 2) ?? preview}
             alt={displayName}
+            fetchPriority="high"
             style={{ width: '100%', minHeight: '100%', objectFit: 'cover', display: 'block' }}
           />
         ) : (
