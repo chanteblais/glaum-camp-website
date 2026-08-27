@@ -1,41 +1,61 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 // Polls the unread-message count and keeps it fresh across focus, route
-// changes, and the glaum:messages-read signal. Shared by the nav link and the
-// mobile tab bar (only one of the two renders a badge at a time).
+// changes, and the glaum:messages-read signal. Shared by the nav link, the
+// mobile tab bar, and the /messages page badge — the poller and its listeners
+// live at MODULE level so any number of mounted consumers share ONE interval
+// and ONE in-flight request (each instance previously ran its own 30s poll,
+// doubling the sustained request rate whenever two badges were mounted).
+let sharedCount = 0
+const subscribers = new Set<(n: number) => void>()
+let pollerStarted = false
+let inflight: Promise<void> | null = null
+
+function refreshShared(): Promise<void> {
+  if (!inflight) {
+    inflight = fetch('/api/messages/unread', { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : null))
+      .then((d: { count?: number } | null) => {
+        sharedCount = d?.count ?? 0
+        subscribers.forEach((fn) => fn(sharedCount))
+      })
+      .catch(() => {})
+      .finally(() => { inflight = null })
+  }
+  return inflight
+}
+
+// Started on first consumer mount, never torn down — a badge consumer (header
+// or tab bar) is mounted for the whole life of any signed-in page, and the
+// listeners are inert while `subscribers` is empty. Polling skips hidden tabs;
+// visibility/focus regain refreshes immediately to catch up.
+function ensurePoller() {
+  if (pollerStarted || typeof window === 'undefined') return
+  pollerStarted = true
+  setInterval(() => { if (!document.hidden) refreshShared() }, 30_000)
+  window.addEventListener('focus', () => { refreshShared() })
+  window.addEventListener('glaum:messages-read', () => { refreshShared() })
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshShared() })
+}
+
 export function useUnreadMessages() {
-  const [unread, setUnread] = useState(0)
+  const [unread, setUnread] = useState(sharedCount)
   const pathname = usePathname()
 
-  const refresh = useCallback(() => {
-    return fetch('/api/messages/unread', { cache: 'no-store' })
-      .then(r => (r.ok ? r.json() : null))
-      .then((d: { count?: number } | null) => setUnread(d?.count ?? 0))
-      .catch(() => {})
+  useEffect(() => {
+    subscribers.add(setUnread)
+    ensurePoller()
+    return () => { subscribers.delete(setUnread) }
   }, [])
 
-  useEffect(() => {
-    refresh()
-    const id = setInterval(refresh, 30_000)
-
-    // Re-check promptly when the tab regains focus or another part of the app
-    // signals that messages were read (e.g. opening a thread).
-    const onFocus = () => refresh()
-    const onRead = () => refresh()
-    window.addEventListener('focus', onFocus)
-    window.addEventListener('glaum:messages-read', onRead)
-
-    return () => {
-      clearInterval(id)
-      window.removeEventListener('focus', onFocus)
-      window.removeEventListener('glaum:messages-read', onRead)
-    }
-    // Re-run on route change so the count updates after navigating into/out of /messages
-  }, [refresh, pathname])
+  // Re-check on route change so the count updates after navigating into/out of
+  // /messages; the in-flight dedup collapses simultaneous instances into one
+  // request.
+  useEffect(() => { refreshShared() }, [pathname])
 
   return unread
 }

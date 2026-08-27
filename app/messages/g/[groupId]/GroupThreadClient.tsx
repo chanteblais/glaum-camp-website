@@ -227,8 +227,14 @@ export function GroupThreadClient({ currentUserId, groupId, groupName, groupIcon
 
   useEffect(() => {
     fetchMessages()
-    const interval = setInterval(fetchMessages, 12000)
-    return () => clearInterval(interval)
+    // Skip polls while the tab is hidden; catch up the moment it's visible again.
+    const interval = setInterval(() => { if (!document.hidden) fetchMessages() }, 12000)
+    const onVisible = () => { if (!document.hidden) fetchMessages() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [fetchMessages])
 
   // Scroll to bottom on load and when a new top-level message arrives (not on

@@ -340,7 +340,13 @@ export function MessagesInboxClient({ currentUserId, members, initialConversatio
       .catch(() => setLoading(false))
   }, [])
 
-  useEffect(() => { loadConversations() }, [loadConversations])
+  // Server-rendered inbox (initialConversations) is fresh at navigation time —
+  // dynamic pages skip the client router cache — so only fetch when the prop
+  // is absent (client-side error recovery / legacy render paths).
+  useEffect(() => {
+    if (initialConversations != null) return
+    loadConversations()
+  }, [initialConversations, loadConversations])
 
   return (
     <>

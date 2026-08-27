@@ -71,9 +71,10 @@ export function NotificationBell({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Poll for new notifications every 60s
+  // Poll for new notifications every 60s (skipped while the tab is hidden)
   useEffect(() => {
     const interval = setInterval(async () => {
+      if (document.hidden) return
       try {
         const res = await fetch('/api/admin/notifications')
         if (res.ok) {

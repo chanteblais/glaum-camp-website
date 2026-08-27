@@ -98,17 +98,19 @@ function PrefCheckbox({
   )
 }
 
-export function NotificationPreferences() {
-  const [prefs, setPrefs] = useState<Prefs | null>(null)
+export function NotificationPreferences({ initialPrefs }: { initialPrefs?: Prefs } = {}) {
+  const [prefs, setPrefs] = useState<Prefs | null>(initialPrefs ?? null)
   const [saving, setSaving] = useState<keyof Prefs | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [savedAt, setSavedAt] = useState<number | null>(null)
 
   useEffect(() => {
+    if (initialPrefs != null) return // server already provided them
     fetch('/api/profile/notifications', { cache: 'no-store' })
       .then(r => r.json())
       .then(d => setPrefs(d.preferences ?? null))
       .catch(() => setError('Could not load your preferences.'))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function update(key: keyof Prefs, value: boolean) {

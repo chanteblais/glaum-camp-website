@@ -6,6 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { RememberSignedIn } from '@/components/RememberSignedIn'
 import { Header } from '@/components/Header'
 import { NotificationPreferences } from './NotificationPreferences'
+import { getNotificationPreferences } from '@/lib/notification-prefs'
 import { ProfileSettings } from './ProfileSettings'
 import { VolunteerSettings } from './VolunteerSettings'
 import { AvatarUpload } from '@/components/AvatarUpload'
@@ -107,6 +108,7 @@ export default async function ProfilePage() {
     { data: attuneConfigRows },
     shiftState,
     profileMember,
+    notificationPrefs,
   ] = await Promise.all([
     isActiveMember
       ? Promise.all([
@@ -135,6 +137,10 @@ export default async function ProfilePage() {
     getMemberShiftState(memberClerkId),
     // Canonical member row (Phase 1 member_profiles) for stored profile values.
     resolveMember(memberClerkId, email),
+    // Email preferences — server-rendered so NotificationPreferences skips its
+    // mount fetch of /api/profile/notifications. Keyed by the CALLER (this is
+    // always the member's own profile page).
+    getNotificationPreferences(userId),
   ])
 
   // Extract role + department info
@@ -195,10 +201,9 @@ export default async function ProfilePage() {
   // Profile-completion nudge: registry fields flagged "catch-up" (askExisting)
   // that this member hasn't filled and hasn't permanently dismissed. Computed
   // server-side so the top banner renders with data in place (no client fetch).
-  const profileGapList = profileGaps(
-    storedFields(parseProfileFields(attuneConfig['config_profile_fields'])),
-    profileValues,
-  ).map(f => ({ key: f.key, label: f.label, required: !!f.required }))
+  const registryFields = storedFields(parseProfileFields(attuneConfig['config_profile_fields']))
+  const profileGapList = profileGaps(registryFields, profileValues)
+    .map(f => ({ key: f.key, label: f.label, required: !!f.required }))
 
   // Member facts → earned distinctions (Cabinet of Distinctions). Facts are
   // derived from existing data; medals are never persisted — they're recomputed
@@ -619,7 +624,12 @@ export default async function ProfilePage() {
                 until the registry has member-visible fields. The id is the
                 ProfileNudge "Add now" scroll target. */}
             <div id="profile-details">
-              <ProfileDetails />
+              {/* Same filter as GET /api/profile/fields — skips that route's
+                  mount fetch (currentUser + resolveMember + 2 queries). */}
+              <ProfileDetails
+                initialFields={registryFields.filter(f => f.public || f.memberEditable)}
+                initialValues={profileValues}
+              />
             </div>
 
             <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.2), transparent)', margin: '2.5rem 0' }} />
@@ -635,7 +645,7 @@ export default async function ProfilePage() {
 
             <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,72,0.2), transparent)', margin: '2.5rem 0' }} />
 
-            <NotificationPreferences />
+            <NotificationPreferences initialPrefs={notificationPrefs} />
 
             <a href="/members" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem 1.5rem', border: '1px solid rgba(200,168,72,0.18)', borderRadius: '1rem', background: 'rgba(200,168,72,0.03)', textDecoration: 'none' }}>
               <div>
@@ -718,7 +728,7 @@ export default async function ProfilePage() {
             </div>
 
             <TaskStatus track="volunteer" volunteerStatus={volunteer.status} />
-            <NotificationPreferences />
+            <NotificationPreferences initialPrefs={notificationPrefs} />
           </>
         )}
 

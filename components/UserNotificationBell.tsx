@@ -33,7 +33,8 @@ export function UserNotificationBell() {
 
   useEffect(() => {
     fetchNotifications()
-    const interval = setInterval(fetchNotifications, 60_000)
+    // Skip polls while the tab is hidden.
+    const interval = setInterval(() => { if (!document.hidden) fetchNotifications() }, 60_000)
     return () => clearInterval(interval)
   }, [])
 
