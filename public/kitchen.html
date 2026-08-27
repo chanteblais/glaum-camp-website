@@ -221,6 +221,10 @@
     background: var(--hl); padding: 2px 6px; border-radius: 3px; white-space: nowrap;
   }
   .pack-hint { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .sku-row { margin-top: 3px; }
+  .sku-in { width: 11ch; font-size: 11px; padding: 1px 4px; }
+  .sku-in::placeholder { color: var(--muted); }
+  @media (max-width: 420px) { .sku-in { width: 9ch; } }
   .breakdown { font-size: 11px; color: var(--muted); margin-top: 2px; }
 
   li.pantry-item {
@@ -518,6 +522,11 @@
     <span class="co-note" id="finish-hint"></span>
   </div>
 
+  <div class="shop-end no-print shop-only" id="cartexport">
+    <button id="btn-cart">Cart list → clipboard</button>
+    <span class="co-note" id="cart-hint"></span>
+  </div>
+
   <div class="closeout no-print shop-only" id="closeout" hidden></div>
 
   <!-- MENUS -->
@@ -595,7 +604,7 @@
     var v = { id: newId('g'), label: 'Volunteers', count: 0 };
     var pa = { id: newId('g'), label: 'Production artists', count: 0 };
     return {
-      version: 5, usePantry: false, pantry: [], checked: {}, selected: [],
+      version: 6, usePantry: false, pantry: [], checked: {}, selected: [], skus: {},
       days: [{
         id: newId('d'), name: 'Day one', buffer: 10,
         groups: [v, pa],
@@ -710,6 +719,17 @@
     return s;
   }
 
+  // v5 -> v6: a standing SKU book, keyed by itemKey(name, unit) — the supplier's
+  // product number for each shopping row. Purely additive: no quantity, portion or
+  // assignment is touched, so every shopping-list total must come out identical.
+  // Keyed centrally (like the pantry) rather than per item occurrence, so the same
+  // product on two days cannot carry two disagreeing SKUs.
+  function v5toV6(s) {
+    if (!s.skus || typeof s.skus !== 'object' || Array.isArray(s.skus)) s.skus = {};
+    s.version = 6;
+    return s;
+  }
+
   function migrate(s) {
     if (!s || typeof s !== 'object') return null;
     if (!Array.isArray(s.pantry)) s.pantry = [];
@@ -723,7 +743,7 @@
         delete d.groups; delete d.v; delete d.pa;
       });
       if (s.days.some(function (d) { return Array.isArray(d.menus); })) v4toV5(s);
-      s.version = 5;
+      v5toV6(s); // EXIT 1 of 2 — pins the version; keep both exits in step
       if (!Array.isArray(s.selected) || !s.selected.length) s.selected = s.days.length ? [s.days[0].id] : [];
       return s;
     }
@@ -747,7 +767,7 @@
           menus: splitByAudience(s.groups, s.v || 0, s.pa || 0)
         }]
       };
-      return v4toV5(wrapped);
+      return v5toV6(v4toV5(wrapped)); // EXIT 2 of 2 — v1/v2 builds a fresh object
     }
     return null;
   }
@@ -764,10 +784,13 @@
 
   function payload() {
     return JSON.stringify({
-      version: 5,
+      version: 6,
       usePantry: state.usePantry,
       checked: state.checked,
       selected: state.selected,
+      skus: state.skus || {}, // v6 — payload() lists fields EXPLICITLY; omitting this
+                              // silently drops every SKU on every save
+
       pantry: state.pantry.map(function (p) { return { n: p.n, qty: p.qty, unit: p.unit }; }),
       days: state.days.map(function (d) {
         return {
@@ -1038,10 +1061,10 @@
         ? 'Nothing to buy — select a day above, or check that items are assigned to a group.'
         : 'No days yet. Add one on the Menus tab.';
       $shoplist.appendChild(e);
-      syncFinish();
+      syncFinish(); syncCart();
       return;
     }
-    syncFinish();
+    syncFinish(); syncCart();
     var sections = [], byName = {};
     rows.forEach(function (r) {
       if (!byName[r.group]) { byName[r.group] = { name: r.group, rows: [] }; sections.push(byName[r.group]); }
@@ -1076,7 +1099,7 @@
     check.addEventListener('change', function () {
       if (check.checked) state.checked[agg.key] = true; else delete state.checked[agg.key];
       li.classList.toggle('checked', check.checked);
-      syncFinish(); queueSave();
+      syncFinish(); syncCart(); queueSave();
     });
 
     var main = document.createElement('div');
@@ -1094,6 +1117,25 @@
       }).join(' + ');
       main.appendChild(bd);
     }
+
+    // the supplier's product number for this row — a standing fact about the
+    // product, so it is keyed centrally in state.skus and survives day changes
+    var skuWrap = document.createElement('div');
+    skuWrap.className = 'sku-row no-print';
+    var skuIn = document.createElement('input');
+    skuIn.type = 'text';
+    skuIn.className = 'sku-in';
+    skuIn.placeholder = 'item #';
+    skuIn.value = (state.skus && state.skus[agg.key]) || '';
+    skuIn.setAttribute('aria-label', 'Wholesale Club item number for ' + agg.n);
+    skuIn.addEventListener('change', function () {
+      if (!state.skus) state.skus = {};
+      var v = skuIn.value.trim();
+      if (v) state.skus[agg.key] = v; else delete state.skus[agg.key];
+      queueSave(); renderShopList();
+    });
+    skuWrap.appendChild(skuIn);
+    main.appendChild(skuWrap);
 
     var buyCell = document.createElement('div');
     buyCell.className = 'buy-cell';
@@ -1870,6 +1912,77 @@
     $finishHint.textContent = n === 0
       ? 'Cross items off as you buy them — this puts them into the pantry.'
       : n + (n === 1 ? ' item crossed off' : ' items crossed off') + ' → into the pantry, minus what the selected days use.';
+  }
+
+  // ---------- cart list ----------
+  // Turns the shopping list into cart-ready lines: pack COUNT (what you put in a
+  // cart) rather than lb/kg (what the kitchen needs), plus the supplier's item #
+  // and a product link. A row needs BOTH a SKU and a pack size to convert; rows
+  // missing either are reported rather than silently dropped.
+  var PRODUCT_URL = 'https://www.wholesaleclub.ca/en/x/p/';
+  function cartRows() {
+    var ready = [], noSku = [], noPack = [];
+    aggregate().forEach(function (agg) {
+      if (state.checked[agg.key]) return;           // already bought
+      var rem = remaining(agg);
+      if (rem <= 0) return;                          // pantry covers it
+      var sku = (state.skus || {})[agg.key];
+      if (!sku) { noSku.push(agg.n); return; }
+      if (!agg.pack || !agg.pack[0]) { noPack.push(agg.n); return; }
+      ready.push({ n: agg.n, sku: sku, packs: Math.ceil(rem / agg.pack[0]),
+                   packLabel: agg.pack[1], need: qtyText(agg.unit, rem) });
+    });
+    return { ready: ready, noSku: noSku, noPack: noPack };
+  }
+
+  function cartText() {
+    var r = cartRows();
+    var lines = r.ready.map(function (x) {
+      return x.packs + ' × ' + x.packLabel + ' — ' + x.n
+        + ' (need ' + x.need + ') — #' + x.sku + ' — ' + PRODUCT_URL + x.sku;
+    });
+    // name the skipped rows, but don't let them drown the list you came for
+    function skipped(label, names) {
+      if (!names.length) return;
+      var shown = names.slice(0, 8).join(', ');
+      var more = names.length > 8 ? ' … and ' + (names.length - 8) + ' more' : '';
+      lines.push('', names.length + ' ' + label + ': ' + shown + more);
+    }
+    skipped('with no item # (add one on the shopping list)', r.noSku);
+    skipped('with no pack size (cannot work out how many to buy)', r.noPack);
+    return lines.join('\n');
+  }
+
+  // looked up lazily: renderShopList() runs before this block executes, so
+  // module-level element vars would still be undefined on the first render
+  function syncCart() {
+    var $cartBtn = document.getElementById('btn-cart');
+    var $cartHint = document.getElementById('cart-hint');
+    if (!$cartBtn || !$cartHint) return;
+    var r = cartRows();
+    var n = r.ready.length, missing = r.noSku.length + r.noPack.length;
+    $cartBtn.disabled = n === 0;
+    $cartBtn.style.opacity = n === 0 ? '0.5' : '';
+    $cartBtn.style.cursor = n === 0 ? 'not-allowed' : '';
+    $cartHint.textContent = n === 0
+      ? 'Add item numbers on the rows above to build a cart list.'
+      : n + (n === 1 ? ' row ready' : ' rows ready')
+        + (missing ? ' · ' + missing + ' skipped (no item # or pack size)' : '');
+  }
+  var $cartBtn = document.getElementById('btn-cart');
+  if ($cartBtn) {
+    $cartBtn.addEventListener('click', function () {
+      var txt = cartText();
+      function done(ok) {
+        var h = document.getElementById('cart-hint');
+        if (h) h.textContent = ok ? 'Copied — paste it wherever you are ordering.'
+                                  : 'Could not copy; select the text manually.';
+        setTimeout(syncCart, 2500);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).then(function () { done(true); }, function () { done(false); });
+      } else { done(false); }
+    });
   }
 
   // ---------- tabs / toggles ----------
