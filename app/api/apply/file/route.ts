@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { requireAdmin } from '@/lib/admin-auth'
 import { APPLICATION_FILES_BUCKET, APPLICATION_FILE_ROUTE } from '@/lib/application-files'
+import { bytesMatchType } from '@/lib/file-sniff'
 
 // Generic file attachments for admin-added "File upload" application fields.
 // Stored in the PRIVATE `application-files` bucket (migration 072), namespaced
@@ -56,6 +57,12 @@ export async function POST(req: NextRequest) {
   const safeName = (file.name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80)
   const path = `${userId}/${Date.now()}-${safeName}`
   const buffer = Buffer.from(await file.arrayBuffer())
+
+  // The declared type is client-controlled — verify the bytes match it before
+  // storing (lib/file-sniff.ts; blocks e.g. HTML relabelled as PDF).
+  if (!bytesMatchType(file.type, buffer)) {
+    return NextResponse.json({ error: 'File content does not match its type.' }, { status: 400 })
+  }
 
   const { error: uploadError } = await supabaseAdmin.storage
     .from(APPLICATION_FILES_BUCKET)

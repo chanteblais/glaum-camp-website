@@ -10,10 +10,12 @@ import { auth, clerkClient } from '@clerk/nextjs/server'
 //
 // Note: session claims refresh with the token (~60s), so promoting or demoting
 // an admin takes effect on the member's next token refresh, not instantly.
-export async function requireAdmin(): Promise<string | null> {
-  const { userId, sessionClaims } = await auth()
-  if (!userId) return null
 
+/**
+ * Role check shared by requireAdmin() and the proxy.ts admin wall (which has
+ * its own auth context and passes claims in).
+ */
+export async function hasAdminRole(userId: string, sessionClaims: unknown): Promise<boolean> {
   // The claim is only ever a POSITIVE fast path. A metadata claim that exists
   // but lacks role === 'admin' must not settle the question — a differently
   // shaped dashboard customization or a token minted mid-config would lock
@@ -22,10 +24,16 @@ export async function requireAdmin(): Promise<string | null> {
   // read; actual admins with a healthy claim still skip the network call.
   const metadata = (sessionClaims as { metadata?: unknown } | null)?.metadata
   if (metadata && typeof metadata === 'object' && (metadata as { role?: unknown }).role === 'admin') {
-    return userId
+    return true
   }
 
   const client = await clerkClient()
   const user = await client.users.getUser(userId)
-  return user.publicMetadata?.role === 'admin' ? userId : null
+  return user.publicMetadata?.role === 'admin'
+}
+
+export async function requireAdmin(): Promise<string | null> {
+  const { userId, sessionClaims } = await auth()
+  if (!userId) return null
+  return (await hasAdminRole(userId, sessionClaims)) ? userId : null
 }

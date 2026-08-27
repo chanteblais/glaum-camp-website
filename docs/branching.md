@@ -11,8 +11,10 @@ non-trivial change is one visible, revertable unit — not ceremony.
    - `feat/…` new feature · `fix/…` bug fix · `ux/…` UX-advisor rounds ·
      `docs/…` documentation · `chore/…` everything else
    - Examples: `fix/dangling-profile-bindings`, `feat/shifts-redesign`, `ux/round-4`
-3. **Verify before merging:** `npx tsc --noEmit` passes and you've clicked through
-   the affected pages on a local dev server.
+3. **Verify before merging:** `npm run check` passes (`tsc --noEmit` + the
+   route-auth audit, `scripts/check-route-auth.mjs`) and you've clicked through
+   the affected pages on a local dev server. CI (`.github/workflows/ci.yml`)
+   runs the same checks on pushes and PRs.
 4. **Merge with `--no-ff`, then delete the branch.** The merge commit keeps the
    change visible as one unit in history (`git log --first-parent main` reads as a
    changelog); deleting keeps the branch list honest.

@@ -1,0 +1,24 @@
+# CI (2026-08-27 security review follow-up): typecheck + route-auth audit on
+# every push and PR. Deploys are Vercel-on-push-to-main, so a main failure here
+# is after the fact — but it still surfaces regressions loudly, and branch
+# pushes get checked before merge. (`next build` also typechecks pre-deploy on
+# Vercel; the audit is the piece nothing else runs.)
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run check:routes
