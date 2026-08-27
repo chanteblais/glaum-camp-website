@@ -3,6 +3,10 @@ const nextConfig = {
   // Next 16's `next dev` writes AGENTS.md/CLAUDE.md at the repo root unless
   // disabled; agent guidance lives in docs/ here, so keep the tree clean.
   agentRules: false,
+  images: {
+    // Non-default `quality` values must be allow-listed in Next 16.
+    qualities: [50, 65, 75],
+  },
   async headers() {
     return [
       // Versioned hands rasters (scripts/raster-hands.mjs bumps the filename

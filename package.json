@@ -11,15 +11,12 @@
   "dependencies": {
     "@clerk/nextjs": "^6.39.3",
     "@supabase/supabase-js": "^2.105.4",
-    "clsx": "^2.1.0",
-    "framer-motion": "^11.0.0",
     "next": "16.3.3",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-easy-crop": "^5.5.7",
     "resend": "^6.12.4",
-    "sharp": "^0.35.2",
-    "tailwind-merge": "^2.2.0"
+    "sharp": "^0.35.2"
   },
   "devDependencies": {
     "@types/node": "^20",
