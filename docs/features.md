@@ -16,7 +16,7 @@ Glåüm   About · Participate · Schedule · Apply     [Sign in]
 Glåüm   Schedule · Radio · Many Hands · Messages · Participate · My Profile   [🔔 avatar▾]
 ```
 
-- `Messages` shows an unread count badge (polled every 30s via `/api/messages/unread` — `useUnreadMessages` in `MessagesNavLink.tsx`)
+- `Messages` shows an unread count badge (polled every 30s via `/api/messages/unread` — `useUnreadMessages` in `MessagesNavLink.tsx`; ONE module-level poller shared by every badge instance, paused while the tab is hidden)
 - Avatar dropdown: Admin link (admin only) + Sign out
 - Mobile, public/pending visitors: hamburger menu with the same contextual links
 - **Mobile, approved members: bottom tab bar** (`components/MobileTabBar.tsx`, rendered by `HeaderClient` under the JS `<768px` breakpoint) — the *same* member nav list (one product, one IA: `memberNavLinks` drives both renderings), as icon tabs (regal icons via `IconImage`: gathering / raised-hand / envelope / signpost / vintage-radio / hand-mirror), active tab marked with the desktop underline's gradient+dot moved to the tab's top edge, Messages badge included. The hamburger stays as overflow only (name, About, Admin, Sign out). Hidden on `/admin` (admin is a web/desktop workspace) and for non-members. The bar injects `body { padding-bottom }` (+ `env(safe-area-inset-bottom)` for the PWA) so page ends and the Footer stay reachable.
@@ -249,7 +249,7 @@ Linked from nav as "Many Hands".
 - Message bubbles: sent messages right-aligned (purple tint), received left-aligned (gold tint)
 - Timestamps shown when gap between messages > 5 minutes
 - Compose area: auto-expanding textarea, 2,000 char limit with counter (shown at 80% full), Enter to send / Shift+Enter for new line
-- Polls for new messages every 12 seconds
+- Polls for new messages every 12 seconds (skipped while the tab is hidden; catches up on visibility)
 - Auto-scrolls to bottom on new messages
 - Messages from the other person are marked read on page load (via `GET /api/messages/[userId]`)
 - **Deleted/inactive other member:** if their application is gone, the page no longer 404s — it renders the thread **read-only** (only when message history exists; otherwise still 404). The header shows their snapshot name (`messages.sender_name`, or "Former member") with a "No longer active" note and is **not** linked to `/members/[id]`; the composer is replaced with a "can't reply" notice (matching `POST /api/messages`, which rejects non-approved recipients). Sender names are snapshotted onto each message at send time so history survives deletion (migration `032`).
@@ -266,7 +266,7 @@ Linked from nav as "Many Hands".
 - **`@mention`:** typing `@` in the composer opens a member autocomplete (arrow/Enter/Tab/Esc, caret-aware). On send, the server matches `@Name` against current member display names (so mentions typed in replies notify too), creating an in-app notification **and** an email to the mentioned member. In the rendered message, a recognized mention is shown as a colored pill **linked to that member's profile** (`/members/[id]`) — purple for others, gold when it's **you** — so a successful mention is visually confirmed (an `@name` that doesn't match a member stays plain text).
 - **Quiet by default:** ordinary posts create **no emails or notification-feed rows** — the unread badge is the only signal. `@mentions` are the deliberate exception (email gated by the recipient's `email_new_message` pref, throttled 30 min per group).
 - **Welcome note (migration `071`):** every path that adds a `group_members` row (admin add, `/participate` toggle, open-group join, apply-time `group_select`) drops a **private system note** into the thread — *"Welcome to {Group}! ✦ You're a member of this group — this is its message thread."* Only the new member sees it (`messages.visible_to`; rendered as a centered gold note with "Only visible to you", no bubble/avatar/reply), and it lands **unread**, so the message badge makes them aware of the membership — no email, no notification rows, invisible to everyone else. `sendGroupWelcome` in `lib/conversations.ts` is idempotent per (group, member); removal paths (`deleteGroupWelcome`) clear it so a re-add re-welcomes. The migration backfilled a note for every pre-existing membership.
-- Polls every 12s; marks read on view (advances `last_read_at`); auto-scrolls only on new *top-level* messages so reading a thread isn't interrupted.
+- Polls every 12s (skipped while the tab is hidden); marks read on view (advances `last_read_at`); auto-scrolls only on new *top-level* messages so reading a thread isn't interrupted.
 - **Bell menu** (bell icon at the top-right of the thread header; renders as a slashed/dimmed bell when muted): **Mute** (muted threads don't badge), **Email me about this group** (opt into a throttled activity email for every post), and — for **open** groups — **Leave group**. Backed by `PATCH /api/messages/g/[groupId]/me` and `POST /api/groups/[id]/leave`.
 
 ---
