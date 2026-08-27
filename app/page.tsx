@@ -362,6 +362,9 @@ let canManagePolls = false
                 alt=""
                 fill
                 priority
+                // Dimmed to 38% brightness — artifacts are invisible, so the
+                // preloaded LCP-competing image can ship much lighter.
+                quality={50}
                 sizes="(max-width: 1100px) 100vw, 1100px"
                 style={{ objectFit: 'cover', objectPosition: 'center 40%', filter: 'brightness(0.38) saturate(1.2)' }}
               />
@@ -839,6 +842,7 @@ let canManagePolls = false
               width={1200}
               height={675}
               priority
+              quality={65}
               style={{ width: '100%', height: 'auto', display: 'block', filter: 'brightness(0.9) saturate(1.1)' }}
             />
             {/* Bottom fade into ink */}

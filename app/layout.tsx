@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { Libre_Baskerville, Marcellus, Cormorant_Garamond } from 'next/font/google'
+import { Libre_Baskerville, Cormorant_Garamond } from 'next/font/google'
 import { ClerkProvider } from '@clerk/nextjs'
 import { headers } from 'next/headers'
 import { clerkFallbackHome, resolveSiteOrigin } from '@/lib/site-origin'
@@ -14,15 +14,11 @@ const libreBaskerville = Libre_Baskerville({
   variable: '--font-libre-baskerville',
 })
 
-const marcellus = Marcellus({
-  subsets: ['latin'],
-  weight: ['400'],
-  variable: '--font-marcellus',
-})
-
 const cormorantGaramond = Cormorant_Garamond({
   subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700'],
+  // 300 was loaded but never used; check inline fontWeight uses before
+  // trimming further (500 IS used — ApprovedCamperPill, RadioHero, profile).
+  weight: ['400', '500', '600', '700'],
   variable: '--font-cormorant-garamond',
 })
 
@@ -51,15 +47,31 @@ export const viewport: Viewport = {
   initialScale: 1,
 }
 
+// Clerk's frontend-API host, decoded from the publishable key
+// (pk_<env>_<base64 "host$">) — no hardcoded domain, works per-community.
+function clerkFrontendOriginFromKey(): string | null {
+  const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+  const b64 = pk?.split('_')[2]
+  if (!b64) return null
+  try {
+    const host = Buffer.from(b64, 'base64').toString('utf8').replace(/\$$/, '')
+    return host ? `https://${host}` : null
+  } catch {
+    return null
+  }
+}
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const headerList = await headers()
   const appHome = clerkFallbackHome(resolveSiteOrigin(headerList))
+  const clerkFrontendOrigin = clerkFrontendOriginFromKey()
 
   return (
     <ClerkProvider
       afterSignOutUrl={appHome}
       signInFallbackRedirectUrl={appHome}
       signInUrl="/sign-in"
+      telemetry={{ disabled: true }}
     >
       <html lang="en">
         <head>
@@ -68,9 +80,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           {process.env.NEXT_PUBLIC_SUPABASE_URL && (
             <link rel="preconnect" href={process.env.NEXT_PUBLIC_SUPABASE_URL} />
           )}
+          {/* clerk-js loads at runtime from the frontend-API host (encoded in
+              the publishable key) — the earliest, most blocking third-party
+              connection, so warm it too. */}
+          {clerkFrontendOrigin && <link rel="preconnect" href={clerkFrontendOrigin} crossOrigin="anonymous" />}
+          {/* The TokyoDreams faces live in the render-blocking stylesheet, so
+              without a preload the browser discovers the LCP heading's font
+              only after CSS parse (guaranteed FOUT). Both faces total ~47KB. */}
+          <link rel="preload" href="/fonts/TokyoDreams.v1.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+          <link rel="preload" href="/fonts/TokyoDreamsPlain.v1.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
         </head>
         <body
-          className={`${libreBaskerville.variable} ${marcellus.variable} ${cormorantGaramond.variable}`}
+          className={`${libreBaskerville.variable} ${cormorantGaramond.variable}`}
           style={{ fontFamily: 'var(--font-libre-baskerville), Georgia, serif' }}
         >
           <div className="site-shell">{children}</div>

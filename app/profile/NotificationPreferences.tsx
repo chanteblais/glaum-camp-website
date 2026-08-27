@@ -84,7 +84,7 @@ function PrefCheckbox({
             display: 'block',
             fontSize: '0.92rem',
             color: '#F3EDE6',
-            fontFamily: 'var(--font-marcellus), Georgia, serif',
+            fontFamily: 'var(--font-cormorant-garamond), Georgia, serif',
             marginBottom: '0.15rem',
           }}
         >

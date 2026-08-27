@@ -5,8 +5,15 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth, useUser } from '@clerk/nextjs'
 import { supabaseResizedUrl } from '@/lib/supabase-image'
+import dynamicImport from 'next/dynamic'
 import { UserNotificationBell } from './UserNotificationBell'
-import { NotificationBell } from '@/app/admin/NotificationBell'
+
+// Admin-only: a static client→client import would bundle the admin bell into
+// every visitor's header chunk — load it only when an admin actually renders.
+const NotificationBell = dynamicImport(
+  () => import('@/app/admin/NotificationBell').then(m => m.NotificationBell),
+  { ssr: false },
+)
 import { MessagesNavLink } from './MessagesNavLink'
 import { MobileTabBar, type TabBarLink } from './MobileTabBar'
 

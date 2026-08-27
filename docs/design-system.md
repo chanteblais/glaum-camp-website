@@ -31,15 +31,16 @@ The site shell (`.site-shell` in `globals.css`) layers, bottom to top: base ink 
 
 | Font | Weight | Source | CSS variable / class |
 |---|---|---|---|
-| TokyoDreams (Plain) | 400 | Local `/fonts/TokyoDreamsPlain.otf` | `font-tokyo` / `font-family: 'TokyoDreams'` |
-| TokyoDreams (Bold) | 700 | Local `/fonts/TokyoDreams.otf` | `font-bold font-tokyo` |
-| Libre Baskerville | — | Google Fonts | `--font-libre-baskerville` / `font-baskerville` |
-| Marcellus | — | Google Fonts | `--font-marcellus` |
-| Cormorant Garamond | — | Google Fonts | `--font-cormorant-garamond` |
+| TokyoDreams (Plain) | 400 | Local `/fonts/TokyoDreamsPlain.v1.woff2` (OTF master kept beside it) | `font-tokyo` / `font-family: 'TokyoDreams'` |
+| TokyoDreams (Bold) | 700 | Local `/fonts/TokyoDreams.v1.woff2` (OTF master kept beside it) | `font-bold font-tokyo` |
+| Libre Baskerville | 400/700 | Google Fonts (next/font) | `--font-libre-baskerville` / `font-baskerville` |
+| Cormorant Garamond | 400/500/600/700 | Google Fonts (next/font) | `--font-cormorant-garamond` |
+
+Both TokyoDreams faces are `<link rel="preload">`ed in `app/layout.tsx` (they live in the render-blocking stylesheet, so without the preload the LCP heading FOUTs). `/fonts/*` is served immutable — a changed font gets a NEW versioned filename, re-referenced in `globals.css` + the layout preload. Marcellus was dropped 2026-08-27 (loaded globally, used once — that use now renders Cormorant); Cormorant weight 300 was loaded but never used.
 
 **TokyoDreams** is the display/heading font — used for the site name, section headings, and decorative text.  
 **Libre Baskerville** is the body serif — used for readable paragraph text.  
-**Marcellus** and **Cormorant Garamond** are supporting serifs used for cards, labels, and sub-headings.
+**Cormorant Garamond** is the supporting serif used for cards, labels, and sub-headings.
 
 ### Heading defaults
 
@@ -115,7 +116,7 @@ Most content cards use a parchment aesthetic:
 
 ### Ornamental hands (page backdrop)
 
-`HandsBackdrop` (`components/HandsBackdrop.tsx`) — the fixed hands framing most pages, one component instead of per-page `<img>` pairs. Props: `opacity` (default `0.85`; message threads use `0.6`). Desktop renders the crisp SVGs; below 768px a `<picture>` swaps in pre-struck WebP rasters (`public/hands-*.mobile.webp`) because the ~750-path SVGs are expensive for phones to rasterize at 3× DPR. After editing the source SVGs, re-strike the rasters: `node scripts/raster-hands.mjs`.
+`HandsBackdrop` (`components/HandsBackdrop.tsx`) — the fixed hands framing most pages, one component instead of per-page `<img>` pairs. Props: `opacity` (default `0.85`; message threads use `0.6`). ALL breakpoints render pre-struck WebP rasters (`public/hands-*.v2.webp`, ~145KB the pair, immutable-cached via `next.config.js` `headers()`); the ~750-path SVGs stay in `public/` as editable masters only (they gzip to ~138KB and were re-requested on every navigation). After editing the source SVGs: bump the version in `scripts/raster-hands.mjs` AND `HandsBackdrop`, then `node scripts/raster-hands.mjs`.
 
 ### Avatar
 

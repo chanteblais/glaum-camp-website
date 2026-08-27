@@ -1,8 +1,16 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import Cropper from 'react-easy-crop'
+import dynamic from 'next/dynamic'
 import type { Area } from 'react-easy-crop'
+
+// The crop modal only appears on the photo step — most applicants never reach
+// it, so keep react-easy-crop (~14KB gzip) out of the wizard's initial load.
+// (Cast restores the class's defaultProps typing that dynamic() erases.)
+const Cropper = dynamic(
+  () => import('react-easy-crop'),
+  { ssr: false },
+) as unknown as (typeof import('react-easy-crop'))['default']
 import type { MemberFormConfig, StepConfig, FieldConfig } from '@/lib/form-config'
 import type { ContributionType } from '@/lib/application-options'
 import { DEFAULT_CONTRIBUTION_TYPES } from '@/lib/application-options'
