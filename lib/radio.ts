@@ -12,6 +12,7 @@
 // is in UTC).
 
 import { supabaseAdmin } from '@/lib/supabase'
+import { getPageContent, getPageContentValue } from '@/lib/page-content'
 import { SITE_NAME } from '@/lib/site-config'
 
 export type RadioKind =
@@ -132,12 +133,8 @@ export async function postSourcedRadioEvent(
   event: RadioEventInput,
 ): Promise<void> {
   try {
-    const { data } = await supabaseAdmin
-      .from('page_content')
-      .select('value')
-      .eq('key', 'config_radio')
-      .maybeSingle()
-    if (!parseRadioSources(data?.value)[source]) return
+    const radioValue = await getPageContentValue('config_radio')
+    if (!parseRadioSources(radioValue)[source]) return
     await postRadioEvent(event)
   } catch (e) {
     console.error('[radio] sourced post failed', e)
@@ -376,11 +373,8 @@ const isoToday = () => new Date().toISOString().slice(0, 10)
 export async function getRadioNowData(): Promise<RadioNowData> {
   const today = isoToday()
 
-  const [{ data: configRows }, { data: events }] = await Promise.all([
-    supabaseAdmin
-      .from('page_content')
-      .select('key, value')
-      .in('key', ['config_event_start_date', 'config_event_end_date']),
+  const [config, { data: events }] = await Promise.all([
+    getPageContent(['config_event_start_date', 'config_event_end_date']),
     supabaseAdmin
       .from('schedule_events')
       .select('title, start_time, end_time, participation_type, event_date, is_recurring, recurrence_days')
@@ -390,7 +384,6 @@ export async function getRadioNowData(): Promise<RadioNowData> {
       .or(`event_date.eq.${today},is_recurring.eq.true`),
   ])
 
-  const config = Object.fromEntries((configRows ?? []).map(r => [r.key, r.value]))
   const rangeStart = config['config_event_start_date'] ?? null
   const rangeEnd = config['config_event_end_date'] ?? null
 

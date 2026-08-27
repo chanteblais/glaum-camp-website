@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getPageContent, getPageContentValue } from '@/lib/page-content'
 import { getShiftParticipant, participantDisplayName } from '@/lib/members'
 import { getShiftSignupData, fetchAllHolds, countHoldsFor } from '@/lib/participate-data'
 import { eventRangeDays, isValidOccurrence } from '@/lib/shift-occurrences'
@@ -19,10 +20,7 @@ import { whenText } from '@/lib/event-reminders'
 // The guarded configured event range (for validating an "every day" recurring
 // shift's occurrence dates), fetched once per request.
 async function getRangeDays(): Promise<string[]> {
-  const { data } = await supabaseAdmin
-    .from('page_content').select('key, value')
-    .in('key', ['config_event_start_date', 'config_event_end_date'])
-  const c = Object.fromEntries((data ?? []).map(r => [r.key, r.value as string]))
+  const c = await getPageContent(['config_event_start_date', 'config_event_end_date'])
   return eventRangeDays(c['config_event_start_date'], c['config_event_end_date'])
 }
 
@@ -67,9 +65,8 @@ export async function POST(req: NextRequest) {
   const role = rawRole as 'member' | 'lead' | undefined
   const occurrenceDate: string | null = rawDate ?? null
 
-  const { data: flag } = await supabaseAdmin
-    .from('page_content').select('value').eq('key', 'config_shift_signup_open').maybeSingle()
-  if (flag?.value === 'false') {
+  const flagValue = await getPageContentValue('config_shift_signup_open')
+  if (flagValue === 'false') {
     return NextResponse.json({ error: 'Shift signup is currently closed.' }, { status: 403 })
   }
 

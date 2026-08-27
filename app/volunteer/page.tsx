@@ -1,6 +1,7 @@
 import { auth, currentUser, clerkClient } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getPageContentValue } from '@/lib/page-content'
 import { mergeVolunteerConfig } from '@/lib/form-config'
 import { VolunteerForm } from './VolunteerForm'
 
@@ -23,15 +24,14 @@ export default async function VolunteerPage(props: { searchParams: Promise<{ adm
     isAdmin = clerkUser.publicMetadata?.role === 'admin'
   }
 
-  const [{ data: existing }, { data: application }, { data: configRows }] = await Promise.all([
+  const [{ data: existing }, { data: application }, volunteerFormValue] = await Promise.all([
     supabaseAdmin.from('volunteers').select('id, status').eq('clerk_user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabaseAdmin.from('members').select('id, status').or(`clerk_user_id.eq.${userId},email.eq.${email}`).order('created_at', { ascending: false }).limit(1).maybeSingle(),
-    supabaseAdmin.from('page_content').select('key, value').eq('key', 'config_volunteer_form'),
+    getPageContentValue('config_volunteer_form'),
   ])
 
-  const configMap = Object.fromEntries((configRows ?? []).map(r => [r.key, r.value]))
   let volunteerRaw: object = {}
-  try { if (configMap['config_volunteer_form']) volunteerRaw = JSON.parse(configMap['config_volunteer_form']) } catch { /* use defaults */ }
+  try { if (volunteerFormValue) volunteerRaw = JSON.parse(volunteerFormValue) } catch { /* use defaults */ }
 
   const volunteerConfig = mergeVolunteerConfig(volunteerRaw)
 

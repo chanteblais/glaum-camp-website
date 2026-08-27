@@ -1,6 +1,7 @@
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getPageContent } from '@/lib/page-content'
 import { requireAdmin } from '@/lib/admin-auth'
 import { mergeMemberConfig, mergeVolunteerConfig } from '@/lib/form-config'
 import { DEFAULT_AGREEMENT_ITEMS, DEFAULT_ATTENDANCE_OPTIONS, parseTrackCopy } from '@/lib/site-config'
@@ -20,12 +21,12 @@ export default async function ApplyPage(
   // currentUser() is a Clerk Backend-API round-trip (needed for the wizard's
   // email prefill) — it runs inside the batch, never on its own line. The
   // admin-preview check rides along via requireAdmin (session claims).
-  const [user, adminId, { data: existing }, { data: volunteer }, { data: configRows }] = await Promise.all([
+  const [user, adminId, { data: existing }, { data: volunteer }, configMap] = await Promise.all([
     currentUser(),
     isAdminPreview ? requireAdmin() : null,
     supabaseAdmin.from('members').select('id, status').eq('clerk_user_id', userId).maybeSingle(),
     supabaseAdmin.from('volunteers').select('id, status').eq('clerk_user_id', userId).maybeSingle(),
-    supabaseAdmin.from('page_content').select('key, value').in('key', [
+    getPageContent([
       'config_member_form',
       'config_volunteer_form',
       'member_acknowledgements',
@@ -38,7 +39,6 @@ export default async function ApplyPage(
   const email = user?.emailAddresses[0]?.emailAddress ?? ''
   const isAdmin = !!adminId
 
-  const configMap = Object.fromEntries((configRows ?? []).map(r => [r.key, r.value]))
 
   let memberRaw: object = {}
   let volunteerRaw: object = {}

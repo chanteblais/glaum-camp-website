@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getPageContentValue } from '@/lib/page-content'
 import { resolveMember, getMemberProfileValues, setProfileValues } from '@/lib/members'
 import { parseProfileFields, storedFields, coerceProfileValue, DISMISSED_KEY, type ProfileField } from '@/lib/profile-fields'
 
@@ -10,10 +11,7 @@ import { parseProfileFields, storedFields, coerceProfileValue, DISMISSED_KEY, ty
 //   PATCH → write values for memberEditable fields (validated against the registry).
 
 async function loadStoredFields(): Promise<ProfileField[]> {
-  const { data } = await supabaseAdmin
-    .from('page_content').select('value')
-    .eq('key', 'config_profile_fields').maybeSingle()
-  return storedFields(parseProfileFields(data?.value))
+  return storedFields(parseProfileFields(await getPageContentValue('config_profile_fields')))
 }
 
 export async function GET() {

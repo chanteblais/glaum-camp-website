@@ -23,6 +23,7 @@ import { parseDuesConfig, duesAppliesToMembers } from '@/lib/dues'
 import { buildMemberFacts } from '@/lib/member-facts'
 import { parseDistinctions, evaluateDistinctions } from '@/lib/distinctions'
 import { resolveMember, getMemberProfileValues } from '@/lib/members'
+import { getPageContent } from '@/lib/page-content'
 import { parseProfileFields, storedFields, profileGaps } from '@/lib/profile-fields'
 import { getMemberAwards } from '@/lib/distinction-awards'
 import { CabinetOfDistinctions } from './CabinetOfDistinctions'
@@ -105,7 +106,7 @@ export default async function ProfilePage() {
     [{ data: campSignup }, { data: heldShiftRows }],
     memberGroups,
     resourceClaims,
-    { data: attuneConfigRows },
+    attuneConfig,
     shiftState,
     profileMember,
     notificationPrefs,
@@ -128,10 +129,7 @@ export default async function ProfilePage() {
     // Shared-resource claims ("I'll bring one") — BRINGING rows on the commitments card.
     getMemberResourceClaims(memberClerkId),
     // Attunement config (Admin → Manage → Attunement Tasks) + distinction rules.
-    supabaseAdmin
-      .from('page_content')
-      .select('key, value')
-      .in('key', ['config_attunement_tasks', 'config_shift_signup_open', 'config_distinctions', 'config_profile_fields', 'config_dues']),
+    getPageContent(['config_attunement_tasks', 'config_shift_signup_open', 'config_distinctions', 'config_profile_fields', 'config_dues']),
     // Shift-hours state: held hours per shift type + obligations derived from the
     // member's groups/roles. Same helper as the home dashboard — keep in sync.
     getMemberShiftState(memberClerkId),
@@ -174,7 +172,6 @@ export default async function ProfilePage() {
 
   // Attunement checklist — admin-configured tasks, each auto-completed from its
   // requirement type (Admin → Manage → Attunement Tasks).
-  const attuneConfig = Object.fromEntries((attuneConfigRows ?? []).map(r => [r.key, r.value]))
   // Shared with the home dashboard banner via buildAttunementChecklist — keep both in sync.
   const attunementState = {
     hasPhoto: !!application?.avatar_url,

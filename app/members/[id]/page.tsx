@@ -4,6 +4,7 @@ import { EventIcon } from '@/components/EventIcon'
 import { IconImage, ROUND_FILL } from '@/components/IconImage'
 import { redirect, notFound } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getPageContent } from '@/lib/page-content'
 import { displayPlacement } from '@/lib/late-night'
 import { Header } from '@/components/Header'
 import { supabaseResizedUrl } from '@/lib/supabase-image'
@@ -105,7 +106,7 @@ export default async function MemberPage(props: { params: Promise<{ id: string }
   // Everything below depends only on the member row: signup with role + dept,
   // group affiliations, the two page_content configs (one keyed read), and the
   // canonical member record.
-  const [{ data: campSignup }, memberGroups, { data: cfgRows }, profileMember, { data: shiftRows }] = await Promise.all([
+  const [{ data: campSignup }, memberGroups, cfgMap, profileMember, { data: shiftRows }] = await Promise.all([
     member.clerk_user_id
       ? supabaseAdmin
           .from('camp_signups')
@@ -115,10 +116,7 @@ export default async function MemberPage(props: { params: Promise<{ id: string }
       : { data: null },
     // Group affiliations — the member's "Contributions" (Setup / Decor / Teardown …).
     getMemberGroups(member.clerk_user_id as string | null),
-    supabaseAdmin
-      .from('page_content')
-      .select('key, value')
-      .in('key', ['config_distinctions', 'config_profile_fields']),
+    getPageContent(['config_distinctions', 'config_profile_fields']),
     resolveMember((member.clerk_user_id as string | null) ?? null),
     // Shifts the member holds — same source as their own /profile commitments
     // card (member_shift_signups), plus the night held + lead offer per row.
@@ -129,7 +127,6 @@ export default async function MemberPage(props: { params: Promise<{ id: string }
           .eq('clerk_user_id', member.clerk_user_id)
       : { data: null },
   ])
-  const cfgMap: Record<string, string | undefined> = Object.fromEntries((cfgRows ?? []).map(r => [r.key, r.value]))
 
   const heldShifts = buildHeldShifts(shiftRows)
 
