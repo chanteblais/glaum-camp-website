@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
   const { error: uploadError } = await supabaseAdmin.storage
     .from('schedule-icons')
-    .upload(path, buffer, { contentType: file.type, upsert: false })
+    .upload(path, buffer, { contentType: file.type, upsert: false, cacheControl: '31536000' })
 
   if (uploadError) {
     return NextResponse.json({ error: uploadError.message }, { status: 500 })

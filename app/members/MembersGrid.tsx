@@ -233,7 +233,7 @@ export function MembersGrid({ members, volunteers }: { members: MemberCard[]; vo
               }}>
                 {member.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={supabaseResizedUrl(member.avatarUrl, 160) ?? ''} alt="" aria-hidden="true" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={supabaseResizedUrl(member.avatarUrl, 160) ?? ''} loading="lazy" decoding="async" alt="" aria-hidden="true" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
                   <span aria-hidden="true" style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.5rem', color: '#C8A848', opacity: 0.85 }}>
                     ✦
@@ -342,7 +342,7 @@ export function MembersGrid({ members, volunteers }: { members: MemberCard[]; vo
                     }}>
                       {v.avatarUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={supabaseResizedUrl(v.avatarUrl, 160) ?? ''} alt="" aria-hidden="true" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <img src={supabaseResizedUrl(v.avatarUrl, 160) ?? ''} loading="lazy" decoding="async" alt="" aria-hidden="true" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       ) : (
                         <span aria-hidden="true" style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1.5rem', color: '#C8A848', opacity: 0.85 }}>
                           ✦

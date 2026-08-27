@@ -1,4 +1,5 @@
 import type { EarnedDistinction } from '@/lib/distinctions'
+import { iconDisplaySrc } from '@/components/IconImage'
 
 // Cabinet of Distinctions — a gallery of earned honours rendered as collectible
 // engraved medals. These are honours, NOT controls: nothing here is clickable.
@@ -39,7 +40,7 @@ function Medal({ d, frame = 88, glyphSize = '2.1rem', labelSize = '0.66rem' }: {
         {d.image ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={d.image}
+            src={iconDisplaySrc(d.image)}
             alt={`${d.label} medal`}
             // Size by height (not objectFit) so the artwork — centered on a
             // landscape normalize frame — fills the medal. width:auto +

@@ -167,7 +167,7 @@ export function ThreadClient({ currentUserId, recipientId, displayName, avatarUr
               }}>
                 {avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={supabaseResizedUrl(avatarUrl, 76) ?? avatarUrl} alt={`${displayName}'s avatar`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={supabaseResizedUrl(avatarUrl, 76) ?? avatarUrl} loading="lazy" decoding="async" alt={`${displayName}'s avatar`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
                   <span aria-hidden="true" style={{ fontFamily: 'TokyoDreams, serif', fontSize: '1rem', color: '#C8A848', opacity: 0.6 }}>{initials}</span>
                 )}

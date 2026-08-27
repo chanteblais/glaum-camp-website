@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server'
 import { redirect, notFound } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
+import { supabaseResizedUrl } from '@/lib/supabase-image'
 import { requireAdmin } from '@/lib/admin-auth'
 import { AdminActions } from '../AdminActions'
 import { RemoveMemberButton } from '../RemoveMemberButton'
@@ -247,8 +248,9 @@ export default async function ApplicationDetailPage(props: { params: Promise<{ i
           {/* Avatar */}
           {app.avatar_url ? (
             <img
-              src={app.avatar_url}
+              src={supabaseResizedUrl(app.avatar_url, 520) ?? app.avatar_url}
               alt={`${app.preferred_name || app.first_name} ${app.last_name}`}
+              fetchPriority="high"
               style={{ width: '260px', height: '260px', borderRadius: '50%', objectFit: 'cover', border: '3px solid #6F491F', boxShadow: '0 0 0 1px rgba(200,168,72,0.2), 0 4px 24px rgba(0,0,0,0.5)', marginBottom: '1.5rem' }}
             />
           ) : (

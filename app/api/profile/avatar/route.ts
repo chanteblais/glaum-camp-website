@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, currentUser } from '@clerk/nextjs/server'
+import sharp from 'sharp'
 import { supabaseAdmin } from '@/lib/supabase'
 import { upsertMember } from '@/lib/members'
 
@@ -22,19 +23,45 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'File must be under 5 MB' }, { status: 400 })
   }
 
-  const ext = file.type.split('/')[1].replace('jpeg', 'jpg')
+  // Normalize to a display-sized WebP so the stored object is ~100KB, not the
+  // full camera original — everything downstream (raw serves and cache-miss
+  // CDN transforms alike) pays for the source size. GIFs pass through
+  // untouched to keep animation.
+  let buffer = Buffer.from(await file.arrayBuffer())
+  let contentType = file.type
+  let ext = file.type.split('/')[1].replace('jpeg', 'jpg')
+  if (file.type !== 'image/gif') {
+    try {
+      buffer = Buffer.from(
+        await sharp(buffer)
+          .rotate() // bake in EXIF orientation before it's stripped
+          .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true })
+          .webp({ quality: 82 })
+          .toBuffer()
+      )
+      contentType = 'image/webp'
+      ext = 'webp'
+    } catch (err) {
+      console.error('[avatar resize]', err)
+      return NextResponse.json({ error: 'That file could not be read as an image' }, { status: 400 })
+    }
+  }
   const path = `${userId}/avatar.${ext}`
-  const buffer = Buffer.from(await file.arrayBuffer())
 
   // Upload (upsert so re-uploads overwrite cleanly)
   const { error: uploadError } = await supabaseAdmin.storage
     .from('avatars')
-    .upload(path, buffer, { contentType: file.type, upsert: true })
+    .upload(path, buffer, { contentType, upsert: true, cacheControl: '31536000' })
 
   if (uploadError) {
     console.error('[avatar upload]', uploadError)
     return NextResponse.json({ error: uploadError.message }, { status: 500 })
   }
+
+  // Re-uploads that change extension (e.g. old avatar.jpg → avatar.webp) would
+  // otherwise strand the previous object; remove() ignores missing paths.
+  const stale = ['jpg', 'png', 'webp', 'gif'].filter((e) => e !== ext).map((e) => `${userId}/avatar.${e}`)
+  await supabaseAdmin.storage.from('avatars').remove(stale)
 
   const { data: { publicUrl } } = supabaseAdmin.storage
     .from('avatars')

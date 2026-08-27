@@ -62,7 +62,7 @@ function Avatar({ url, name, size = 30 }: { url: string | null; name: string; si
     }}>
       {url
         // eslint-disable-next-line @next/next/no-img-element
-        ? <img src={supabaseResizedUrl(url, size * 2) ?? ''} alt={`${name}'s avatar`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ? <img src={supabaseResizedUrl(url, size * 2) ?? ''} loading="lazy" decoding="async" alt={`${name}'s avatar`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         : <span aria-hidden="true" style={{ fontFamily: 'TokyoDreams, serif', fontSize: size * 0.42, color: '#C8A848', opacity: 0.6 }}>{name.charAt(0).toUpperCase()}</span>}
     </div>
   )

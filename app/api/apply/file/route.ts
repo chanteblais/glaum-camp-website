@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
 
   const { error: uploadError } = await supabaseAdmin.storage
     .from('application-files')
-    .upload(path, buffer, { contentType: file.type, upsert: false })
+    .upload(path, buffer, { contentType: file.type, upsert: false, cacheControl: '31536000' })
 
   if (uploadError) {
     console.error('[application file upload]', uploadError)
