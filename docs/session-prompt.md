@@ -10,7 +10,7 @@ Paste at the start of a new Claude session. Deliberately short; the detailed doc
 - `docs/database.md` — tables, columns, `page_content` keys, migrations, storage buckets
 - `docs/features.md` — every page & feature, incl. the modular application builder
 - `docs/design-system.md` — colors, fonts, CSS classes, component patterns
-- `docs/kitchen-session-prompt.md` — **the catering kitchen board** (`/kitchen.html`): its own brief; read that instead if the session is about catering
+- The **catering kitchen board** left this repo 2026-08-26 — it's now its own product, **All Hands** (`~/Projects/all-hands`); work catering sessions there (`CLAUDE.md` in that repo is the brief). Nothing kitchen-related remains here (page + routes deleted; `/kitchen.html` 404s)
 
 ## Conventions & gotchas
 - **Branching (start here, every session):** before your first edit, create your own branch — `type/slug` (`feat/` `fix/` `ux/` `docs/` `chore/`) or `session/YYYY-MM-DD-<topic>` if scope is unclear. `main` = deployable (push = prod deploy). Verify (`tsc` + local click-through), merge `--no-ff`, delete the branch. Tiny tweaks (log/doc one-liners) may go straight to `main`. Claude may push `main` once Chante has confirmed the change ("looks good" / "merge it" covers the deploy) — never unconfirmed work — and only after verifying docs are up to date for **every** outgoing commit. Full rules: `docs/branching.md`.

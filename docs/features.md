@@ -433,20 +433,15 @@ All admin surfaces also carry the **runway strip** inside the sticky `AdminNav`:
 
 ---
 
-## Kitchen Board (catering) — unlinked
+## Kitchen Board (catering) — moved to All Hands
 
-`camp.glaum.ca/kitchen.html` — a standalone static page (not a Next route, no auth,
-not linked from anywhere) where the festival caterer plans the week's
-service: per-day **meals** (brunch, dinner, anything added), where each item is
-assigned to the groups that eat it — so a course can go to one group only while
-the rest of the meal feeds everyone — a shopping list that **adds up whichever
-days you're shopping for** into one trip, and a standing **pantry** ledger
-subtracted once from the combined total. A **Finish shop** step at the foot of
-the list writes what was bought and used back into the pantry. Shared state for everyone
-with the URL via the unauthenticated `/api/kitchen-list`
-(`page_content.catering_kitchen_state`). Built for the What If 2026 catering run;
-deliberately quarantined from the member app's conventions. Full spec, security
-posture, and open threads: [catering-kitchen.md](catering-kitchen.md).
+The catering kitchen board (formerly `camp.glaum.ca/kitchen.html` + the
+unauthenticated `/api/kitchen-list` and `/api/kitchen-ai` routes) was extracted
+2026-08-26 into its own product repo, **All Hands** (`~/Projects/all-hands`),
+and its state copied to the All Hands deployment. Nothing remains in this app —
+page and routes were deleted outright and the old URL 404s; by Chante's call
+the camp app carries no link to the new deployment. Spec and history:
+`all-hands/docs/kitchen-board.md`.
 
 ## Supporting Features
 
