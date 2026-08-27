@@ -14,19 +14,20 @@ export async function GET() {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!signups?.length) return NextResponse.json({ requests: [] })
 
-  // Fetch roles + departments
+  // Roles+departments and applicant names are independent — one round trip.
   const roleIds = Array.from(new Set(signups.map(s => s.role_id).filter(Boolean)))
-  const { data: roles } = await supabaseAdmin
-    .from('roles')
-    .select('id, name, department_id, departments(name, icon)')
-    .in('id', roleIds)
-
-  // Applicant names from the canonical members table (Phase 5).
   const userIds = signups.map(s => s.clerk_user_id)
-  const { data: applications } = await supabaseAdmin
-    .from('members')
-    .select('clerk_user_id, first_name, last_name, preferred_name')
-    .in('clerk_user_id', userIds)
+  const [{ data: roles }, { data: applications }] = await Promise.all([
+    supabaseAdmin
+      .from('roles')
+      .select('id, name, department_id, departments(name, icon)')
+      .in('id', roleIds),
+    // Applicant names from the canonical members table (Phase 5).
+    supabaseAdmin
+      .from('members')
+      .select('clerk_user_id, first_name, last_name, preferred_name')
+      .in('clerk_user_id', userIds),
+  ])
 
   const roleMap = Object.fromEntries((roles ?? []).map(r => [r.id, r]))
   const appMap = Object.fromEntries((applications ?? []).map(a => [a.clerk_user_id, a]))

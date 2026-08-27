@@ -10,25 +10,27 @@ export async function GET() {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: app } = await supabaseAdmin
-    .from('members')
-    .select('status')
-    .eq('clerk_user_id', userId)
-    .maybeSingle()
+  // Approval gate, own memberships, and the open-group registry are
+  // independent — one parallel round trip instead of three serial ones.
+  const [{ data: app }, { data: mine }, { data: groups, error }] = await Promise.all([
+    supabaseAdmin
+      .from('members')
+      .select('status')
+      .eq('clerk_user_id', userId)
+      .maybeSingle(),
+    supabaseAdmin
+      .from('group_members')
+      .select('group_id')
+      .eq('clerk_user_id', userId),
+    supabaseAdmin
+      .from('groups')
+      .select('id, name, icon, icon_image, description')
+      .eq('join_policy', 'open')
+      .eq('visibility', 'listed')
+      .order('sort_order', { ascending: true }),
+  ])
   if (app?.status !== 'approved') return NextResponse.json({ groups: [] })
-
-  const { data: mine } = await supabaseAdmin
-    .from('group_members')
-    .select('group_id')
-    .eq('clerk_user_id', userId)
   const myGroupIds = new Set((mine ?? []).map(r => r.group_id))
-
-  const { data: groups, error } = await supabaseAdmin
-    .from('groups')
-    .select('id, name, icon, icon_image, description')
-    .eq('join_policy', 'open')
-    .eq('visibility', 'listed')
-    .order('sort_order', { ascending: true })
   if (error) {
     if (error.code === '42P01') return NextResponse.json({ groups: [] })
     return NextResponse.json({ error: error.message }, { status: 500 })

@@ -8,22 +8,23 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  // Polls live on the member dashboard — approved members only.
-  if (!(await getApprovedMember(userId))) {
-    return NextResponse.json({ error: 'Only approved members can vote' }, { status: 403 })
-  }
-
   const body = await req.json()
   const optionIndexes: number[] = Array.isArray(body.option_indexes) ? body.option_indexes : [body.option_index]
 
-  // Verify poll exists and is visible
-  const { data: poll } = await supabaseAdmin
-    .from('polls')
-    .select('id, allow_multiple, expires_at, options')
-    .eq('id', params.id)
-    .eq('visible', true)
-    .maybeSingle()
-
+  // Approval gate + poll lookup are independent — one parallel round trip.
+  // Polls live on the member dashboard — approved members only.
+  const [approvedMember, { data: poll }] = await Promise.all([
+    getApprovedMember(userId),
+    supabaseAdmin
+      .from('polls')
+      .select('id, allow_multiple, expires_at, options')
+      .eq('id', params.id)
+      .eq('visible', true)
+      .maybeSingle(),
+  ])
+  if (!approvedMember) {
+    return NextResponse.json({ error: 'Only approved members can vote' }, { status: 403 })
+  }
   if (!poll) return NextResponse.json({ error: 'Poll not found' }, { status: 404 })
   if (poll.expires_at && new Date(poll.expires_at) < new Date()) {
     return NextResponse.json({ error: 'Poll has expired' }, { status: 400 })
