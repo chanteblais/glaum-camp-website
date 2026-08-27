@@ -3,7 +3,7 @@
 Paste at the start of a new Claude session. Deliberately short; the detailed docs in `docs/` are read on demand.
 
 **Path:** `/Users/chante/Documents/Glaum/website/glaum-camp-website`
-**Stack:** Next.js 16 (App Router, React 19) · TypeScript · Clerk v7 (auth) · Supabase (Postgres + Storage) · Tailwind · deployed on Vercel.
+**Stack:** Next.js 16 (App Router, React 19) · TypeScript · Clerk (auth, `@clerk/nextjs` v6) · Supabase (Postgres + Storage) · Tailwind · deployed on Vercel.
 
 ## Detailed docs — read only when relevant, don't preload
 - `docs/architecture.md` — data fetching, auth, API routes, badge generation
@@ -21,7 +21,7 @@ Paste at the start of a new Claude session. Deliberately short; the detailed doc
 - **Docs before commit (standing task):** before **every** commit, sweep the docs and fold the change in — `docs/database.md` (tables/columns + migrations ledger), `docs/features.md`, `docs/architecture.md` (API routes), the relevant feature spec in `docs/`, and `docs/generalizability-log.md` — so docs land in the **same commit** as the code they describe. A commit that changes schema/API/UX with untouched docs is incomplete.
 - **Generalizability log (standing task):** This is a dogfood toward a multi-community SaaS. During **any** iteration, when you hardcode/encounter a Glåüm- or What-If–specific value (name, term, color, copy, option list, image, font, domain) or single-community assumption, **append a row to `docs/generalizability-log.md`** (log it, don't necessarily fix it; prefer config-first when you do touch it). What If is July 23, 2026 — ship single-tenant until then; the log feeds the post–What If multi-tenant foundation. See `docs/multi-community.md`.
 - **Data:** server components → `supabaseAdmin` directly (service key); client components → `fetch('/api/...')` → API route → `supabaseAdmin`. `lib/supabase.ts` is a lazy Proxy so missing env vars don't break the build. Env in `.env.local`.
-- **Auth:** Clerk v7. Admin = `publicMetadata.role === 'admin'`. Shared helper `lib/profile-auth.ts`.
+- **Auth:** Clerk (`@clerk/nextjs` v6). Admin = `publicMetadata.role === 'admin'`. Shared helper `lib/profile-auth.ts`.
 - No shared layout header — each page owns its header row. Mobile nav breakpoint in JS (`window.innerWidth < 768`). `overflow-x: hidden` on html/body.
 - Fetch `applications` and `camp_signups` separately and join in JS (no resolvable FK).
 - **Stale dev bundles ("page renders but clicks die") — root cause found & fixed 2026-07-02:** the PWA service worker cached same-origin `.js` cache-first, which poisons dev (stable chunk paths, no content hashes). Now `sw.js` no-ops on localhost and `ServiceWorkerRegister` unregisters + clears caches in dev. If a browser still serves stale code once, reload twice (first load swaps in the fixed worker). `rm -rf .next` + restart remains the fallback for genuine HMR staleness.
