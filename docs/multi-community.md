@@ -157,3 +157,56 @@ When adding new features, avoid introducing new hardcoded community-specific val
 | Hardcoded copy in a component | Key in `page_content` fetched at render time |
 | Community-specific field names in DB schema | Generic names; community-specific labels in form-config |
 | New DB column with culture-specific meaning | Consider `custom_answers JSONB` instead |
+
+---
+
+## Field evidence — the All Hands extraction (2026-08-26)
+
+The catering kitchen board was extracted into its own product repo (**All
+Hands**, `~/Projects/all-hands`), then restyled from its own paper-toned look
+into the full camp visual language. That is the closest thing to a dry run of
+"stand up a second product on this platform's DNA" we have, and it produced
+concrete evidence for several of this doc's bets — worth consulting before
+designing the Phase 1 foundation:
+
+1. **Token-layer theming works, and is cheap — when it exists.** The board's
+   stylesheet was CSS-custom-property-driven, and swapping its ~15 tokens
+   (plus targeted rules) re-skinned every surface in one pass; a headless
+   harness proved the change presentation-only (identical shopping-list
+   output before/after). This is the strongest evidence yet for Phase 2's
+   "theming via CSS custom properties injected at the layout" — and it
+   sharpens the cost of this app's inline-hex debt (genlog 2026-06-30): the
+   camp app can't have that one-pass swap until colors go through tokens.
+2. **A written design system is an installable theme.** The camp look
+   transplanted to a foreign page in a single session because
+   `design-system.md` + `globals.css` record exact tokens, shadows, fonts,
+   and motifs. For multi-tenant theming, the doc layer isn't documentation
+   overhead — it is the packaging of the theme itself.
+3. **Blast-radius-shaped modules extract cleanly; interwoven ones won't.**
+   The board came out in a day because it had one page, two routes, one
+   storage key, and storage behind one seam — the "quarantine" that was a
+   security posture turned out to be an extraction seam. Corollary for the
+   foundation: features whose seams are narrow (own routes, own keys, no
+   cross-imports) stay portable; members/profiles/groups-shaped features
+   will never extract like this and must be generalized in place.
+4. **Schema-compatible seams make migration a row copy.** All Hands kept the
+   `page_content` key/value shape, so moving the live board is one copied
+   row. Generic storage primitives shared across products keep future moves
+   (per-community exports, spin-outs) boring.
+5. **The working conventions are platform assets.** The docs flow
+   (docs-before-commit, generalizability log, QA/UX logs), the pre-commit
+   crossed-session guard, and the session brief transplanted wholesale into
+   the new repo in hours — with one upgrade worth back-porting: All Hands
+   uses a root `CLAUDE.md` as the auto-loaded session brief instead of this
+   repo's paste-in `docs/session-prompt.md`.
+6. **Every surface needs an identity story or an explicit expiry.** The
+   board's accepted-risk unauthenticated posture was fine festival-scoped
+   *because the acceptance and the retire-or-gate expiry were written down*
+   — and it still became the new product's founding constraint the moment
+   the probe became a product. Platform rule of thumb: no new surface
+   without either an auth story or a dated retirement clause.
+7. **Behavior-identity harnesses de-risk config swaps.** The pattern of
+   running a surface headlessly against real state and diffing its outputs
+   (All Hands `scripts/verify-quantities.mjs`) generalizes: any future
+   "swap the theme / config / tenant" change should be provable as
+   presentation-only the same way.
