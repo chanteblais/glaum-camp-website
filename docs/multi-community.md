@@ -198,7 +198,8 @@ designing the Phase 1 foundation:
    crossed-session guard, and the session brief transplanted wholesale into
    the new repo in hours — with one upgrade worth back-porting: All Hands
    uses a root `CLAUDE.md` as the auto-loaded session brief instead of this
-   repo's paste-in `docs/session-prompt.md`.
+   repo's paste-in `docs/session-prompt.md`. (Back-ported 2026-08-27 — this
+   repo's brief now lives at root `CLAUDE.md` too.)
 6. **Every surface needs an identity story or an explicit expiry.** The
    board's accepted-risk unauthenticated posture was fine festival-scoped
    *because the acceptance and the retire-or-gate expiry were written down*
