@@ -12,6 +12,7 @@ import { mergeMemberConfig } from '@/lib/form-config'
 import { resolveMember, getMemberProfileValues } from '@/lib/members'
 import { parseProfileFields, storedFields } from '@/lib/profile-fields'
 import { getMemberAwards } from '@/lib/distinction-awards'
+import { applicationFilePath, applicationFileHref, applicationFileName } from '@/lib/application-files'
 import { getMemberGroups } from '@/lib/groups'
 import { getAdminRunway } from '@/lib/admin-attention'
 import { parseDistinctions } from '@/lib/distinctions'
@@ -208,7 +209,7 @@ export default async function ApplicationDetailPage(props: { params: Promise<{ i
       if (!hasValue(value) && !other) continue
 
       const isFile = f.type === 'file' ||
-        (typeof value === 'string' && /^https?:\/\//.test(value) && value.includes('/application-files/'))
+        (typeof value === 'string' && applicationFilePath(value) !== null)
       rendered.push({
         key: f.key, label: f.label, value: value ?? '',
         long: f.type === 'textarea' || LONG_KEYS.has(f.key),
@@ -223,7 +224,8 @@ export default async function ApplicationDetailPage(props: { params: Promise<{ i
   const orphans: RenderField[] = []
   for (const [k, v] of Object.entries(customAnswers)) {
     if (seen.has(k) || k.endsWith('__other') || !hasValue(v)) continue
-    orphans.push({ key: k, label: k, value: v, long: typeof v === 'string', isFile: false, isAgreement: false })
+    const orphanIsFile = typeof v === 'string' && applicationFilePath(v) !== null
+    orphans.push({ key: k, label: k, value: v, long: typeof v === 'string', isFile: orphanIsFile, isAgreement: false })
   }
   if (orphans.length > 0) sections.push({ title: 'Additional Responses', fields: orphans })
 
@@ -446,14 +448,9 @@ export default async function ApplicationDetailPage(props: { params: Promise<{ i
   )
 }
 
-function fileNameFromUrl(url: string): string {
-  try {
-    const seg = decodeURIComponent(url.split('?')[0].split('/').pop() ?? '')
-    return seg.replace(/^\d{10,}-/, '') || 'Attachment';
-  } catch {
-    return 'Attachment'
-  }
-}
+// File answers store an /api/apply/file href (or, pre-072, a public storage
+// URL) — the shared helpers understand both forms.
+const fileNameFromUrl = (url: string) => applicationFileName(url, 'Attachment')
 
 type RenderField = {
   key: string; label: string; value: string | string[]
@@ -490,7 +487,7 @@ function FullAnswer({ f }: { f: RenderField }) {
     <div style={{ padding: '1rem 1.25rem', border: '1px solid rgba(200,168,72,0.1)', borderRadius: '0.5rem', background: 'rgba(255,255,255,0.02)', marginBottom: '1rem' }}>
       {label && <p style={{ fontSize: '0.65rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C8A848', opacity: 0.55, marginBottom: '0.5rem' }}>{label}</p>}
       {isFile && typeof value === 'string' ? (
-        <a href={value} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: '#C8A848', fontSize: '0.9rem', textDecoration: 'none' }}>
+        <a href={applicationFileHref(value)} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: '#C8A848', fontSize: '0.9rem', textDecoration: 'none' }}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
             <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
           </svg>
